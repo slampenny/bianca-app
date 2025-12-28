@@ -23,7 +23,6 @@ const auditLogSchema = mongoose.Schema(
       type: Date,
       default: Date.now,
       required: true,
-      index: true,
     },
 
     // User Information (NO PHI)

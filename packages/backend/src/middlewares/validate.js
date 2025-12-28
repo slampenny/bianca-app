@@ -1,6 +1,7 @@
 const Joi = require('joi');
 const httpStatus = require('http-status');
 const logger = require('../config/logger');
+const config = require('../config/config');
 const pick = require('../utils/pick');
 const ApiError = require('../utils/ApiError');
 
@@ -13,7 +14,10 @@ const validate = (schema) => (req, res, next) => {
 
   if (error) {
     const errorMessage = error.details.map((details) => details.message).join(', ');
-    logger.error(`Validation error: ${errorMessage}`);
+    // Don't log validation errors in test mode - they're expected
+    if (config.env !== 'test') {
+      logger.error(`Validation error: ${errorMessage}`);
+    }
     return next(new ApiError(httpStatus.BAD_REQUEST, errorMessage));
   }
   Object.assign(req, value);

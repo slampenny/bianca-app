@@ -182,6 +182,7 @@ describe('Privacy API routes', () => {
       // Create a request
       await PrivacyRequest.create({
         requestType: 'access',
+        requestorType: 'caregiver',
         requestorId: caregiverId,
         requestorModel: 'Caregiver',
         informationRequested: 'Test request',
@@ -199,6 +200,8 @@ describe('Privacy API routes', () => {
 
     it('should not return other users\' requests for non-admins', async () => {
       // Create another caregiver and their request
+      // Get the org from the existing caregiver
+      const existingCaregiver = await Caregiver.findById(caregiverId);
       const otherCaregiver = await Caregiver.create({
         name: 'Other User',
         email: 'other@test.com',
@@ -206,10 +209,12 @@ describe('Privacy API routes', () => {
         password: 'password123',
         role: 'staff',
         isEmailVerified: true,
+        org: existingCaregiver.org,
       });
 
       await PrivacyRequest.create({
         requestType: 'access',
+        requestorType: 'caregiver',
         requestorId: otherCaregiver._id,
         requestorModel: 'Caregiver',
         informationRequested: 'Other user request',
@@ -232,6 +237,7 @@ describe('Privacy API routes', () => {
     it('should return a specific request', async () => {
       const request = await PrivacyRequest.create({
         requestType: 'access',
+        requestorType: 'caregiver',
         requestorId: caregiverId,
         requestorModel: 'Caregiver',
         informationRequested: 'Test request',
@@ -247,6 +253,8 @@ describe('Privacy API routes', () => {
     });
 
     it('should not allow viewing other users\' requests', async () => {
+      // Get the org from the existing caregiver
+      const existingCaregiver = await Caregiver.findById(caregiverId);
       const otherCaregiver = await Caregiver.create({
         name: 'Other User',
         email: 'other2@test.com',
@@ -254,10 +262,12 @@ describe('Privacy API routes', () => {
         password: 'password123',
         role: 'staff',
         isEmailVerified: true,
+        org: existingCaregiver.org,
       });
 
       const request = await PrivacyRequest.create({
         requestType: 'access',
+        requestorType: 'caregiver',
         requestorId: otherCaregiver._id,
         requestorModel: 'Caregiver',
         informationRequested: 'Other user request',
@@ -305,6 +315,7 @@ describe('Privacy API routes', () => {
   describe('GET /v1/privacy/consent', () => {
     it('should return active consent records', async () => {
       await ConsentRecord.create({
+        userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
         consentType: 'collection',
@@ -325,6 +336,7 @@ describe('Privacy API routes', () => {
 
     it('should filter by consentType if provided', async () => {
       await ConsentRecord.create({
+        userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
         consentType: 'collection',
@@ -333,6 +345,7 @@ describe('Privacy API routes', () => {
       });
 
       await ConsentRecord.create({
+        userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
         consentType: 'recording',
@@ -352,6 +365,7 @@ describe('Privacy API routes', () => {
   describe('GET /v1/privacy/consent/check', () => {
     it('should return true if consent exists', async () => {
       await ConsentRecord.create({
+        userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
         consentType: 'recording',
@@ -407,6 +421,8 @@ describe('Privacy API routes', () => {
     });
 
     it('should not allow withdrawing another user\'s consent', async () => {
+      // Get the org from the existing caregiver
+      const existingCaregiver = await Caregiver.findById(caregiverId);
       const otherCaregiver = await Caregiver.create({
         name: 'Other User',
         email: 'other3@test.com',
@@ -414,9 +430,11 @@ describe('Privacy API routes', () => {
         password: 'password123',
         role: 'staff',
         isEmailVerified: true,
+        org: existingCaregiver.org,
       });
 
       const consent = await ConsentRecord.create({
+        userType: 'caregiver',
         userId: otherCaregiver._id,
         userModel: 'Caregiver',
         consentType: 'collection',
@@ -438,6 +456,7 @@ describe('Privacy API routes', () => {
   describe('GET /v1/privacy/consent/history', () => {
     it('should return consent history', async () => {
       await ConsentRecord.create({
+        userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
         consentType: 'collection',
@@ -447,6 +466,7 @@ describe('Privacy API routes', () => {
       });
 
       await ConsentRecord.create({
+        userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
         consentType: 'recording',
@@ -470,6 +490,8 @@ describe('Privacy API routes', () => {
     let adminId;
 
     beforeEach(async () => {
+      // Get the org from the existing caregiver
+      const existingCaregiver = await Caregiver.findById(caregiverId);
       // Create admin user
       const admin = await Caregiver.create({
         name: 'Admin',
@@ -478,6 +500,7 @@ describe('Privacy API routes', () => {
         password: 'password123',
         role: 'superAdmin',
         isEmailVerified: true,
+        org: existingCaregiver.org,
       });
       adminId = admin._id;
 
@@ -492,6 +515,7 @@ describe('Privacy API routes', () => {
 
         await PrivacyRequest.create({
           requestType: 'access',
+          requestorType: 'caregiver',
           requestorId: caregiverId,
           requestorModel: 'Caregiver',
           informationRequested: 'Test',
@@ -522,6 +546,7 @@ describe('Privacy API routes', () => {
 
         await PrivacyRequest.create({
           requestType: 'access',
+          requestorType: 'caregiver',
           requestorId: caregiverId,
           requestorModel: 'Caregiver',
           informationRequested: 'Test',
@@ -543,6 +568,7 @@ describe('Privacy API routes', () => {
       it('should return privacy statistics for admin', async () => {
         await PrivacyRequest.create({
           requestType: 'access',
+          requestorType: 'caregiver',
           requestorId: caregiverId,
           requestorModel: 'Caregiver',
           informationRequested: 'Test',

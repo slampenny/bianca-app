@@ -392,6 +392,7 @@ describe('SMS Verification Service', () => {
         password: 'Password123',
         isPhoneVerified: false,
         role: 'invited', // invited role doesn't require phone
+        org: testOrg._id,
       });
       await caregiver.save();
 

@@ -39,7 +39,6 @@ const conversationSchema = mongoose.Schema(
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
       ref: 'Call',
-      index: true,
       unique: true, // One conversation per call
     },
     patientId: {
@@ -109,7 +108,7 @@ const conversationSchema = mongoose.Schema(
 
 // Indexes for efficient querying
 conversationSchema.index({ patientId: 1 });
-conversationSchema.index({ callId: 1 });
+// Note: callId already has an index from unique: true, so we don't need an explicit index here
 conversationSchema.index({ patientId: 1, createdAt: -1 }); // For patient conversation history
 
 // Plugins for JSON conversion and pagination

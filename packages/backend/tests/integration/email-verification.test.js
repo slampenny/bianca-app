@@ -8,7 +8,7 @@ const app = require('../utils/integration-app');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 const { Caregiver, Org, Token } = require('../../src/models');
 const { tokenTypes } = require('../../src/config/tokens');
-const { caregiverOne, caregiverTwo, insertCaregivers, insertOrgs } = require('../fixtures/caregiver.fixture');
+const { caregiverOne, caregiverTwo, insertCaregivers, insertOrgs, password } = require('../fixtures/caregiver.fixture');
 const { orgOne } = require('../fixtures/org.fixture');
 
 describe('Email verification workflow', () => {
@@ -28,6 +28,10 @@ describe('Email verification workflow', () => {
     let newOrg;
 
     beforeEach(() => {
+      // Mock email service for all registration tests
+      const emailService = require('../../src/services/email.service');
+      jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue();
+      
       newCaregiver = {
         name: 'Test User',
         email: 'test@example.com',
@@ -101,19 +105,22 @@ describe('Email verification workflow', () => {
   });
 
   describe('POST /v1/auth/login', () => {
+    let insertedCaregiverOne;
+
     beforeEach(async () => {
-      await insertCaregivers([caregiverOne, caregiverTwo]);
+      const inserted = await insertCaregivers([caregiverOne, caregiverTwo]);
+      insertedCaregiverOne = inserted[0];
     });
 
     test('should allow login for verified email', async () => {
       // Set caregiver as verified
-      await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: true });
+      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: true });
 
       const res = await request(app)
         .post('/v1/auth/login')
         .send({
-          email: caregiverOne.email,
-          password: caregiverOne.password,
+          email: insertedCaregiverOne.email,
+          password: password,
         })
         .expect(httpStatus.OK);
 
@@ -123,13 +130,13 @@ describe('Email verification workflow', () => {
 
     test('should block login for unverified email and send verification email', async () => {
       // Ensure caregiver email is unverified
-      await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
+      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: false });
 
       const res = await request(app)
         .post('/v1/auth/login')
         .send({
-          email: caregiverOne.email,
-          password: caregiverOne.password,
+          email: insertedCaregiverOne.email,
+          password: password,
         })
         .expect(httpStatus.FORBIDDEN);
 
@@ -138,7 +145,7 @@ describe('Email verification workflow', () => {
 
       // Verify new verification token was created
       const verificationToken = await Token.findOne({ 
-        caregiver: caregiverOne._id, 
+        caregiver: insertedCaregiverOne._id, 
         type: tokenTypes.VERIFY_EMAIL 
       });
       expect(verificationToken).toBeTruthy();
@@ -151,13 +158,13 @@ describe('Email verification workflow', () => {
       emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
 
       // Ensure caregiver email is unverified
-      await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
+      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: false });
 
       const res = await request(app)
         .post('/v1/auth/login')
         .send({
-          email: caregiverOne.email,
-          password: caregiverOne.password,
+          email: insertedCaregiverOne.email,
+          password: password,
         })
         .expect(httpStatus.FORBIDDEN);
 
@@ -171,7 +178,7 @@ describe('Email verification workflow', () => {
       await request(app)
         .post('/v1/auth/login')
         .send({
-          email: caregiverOne.email,
+          email: insertedCaregiverOne.email,
           password: 'wrongpassword',
         })
         .expect(httpStatus.UNAUTHORIZED);
@@ -179,18 +186,21 @@ describe('Email verification workflow', () => {
   });
 
   describe('POST /v1/auth/resend-verification-email', () => {
+    let insertedCaregiverOne;
+
     beforeEach(async () => {
-      await insertCaregivers([caregiverOne]);
+      const inserted = await insertCaregivers([caregiverOne]);
+      insertedCaregiverOne = inserted[0];
     });
 
     test('should resend verification email for user with unverified email', async () => {
       // Ensure caregiver email is unverified
-      await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
+      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: false });
 
       const res = await request(app)
         .post('/v1/auth/resend-verification-email')
         .send({
-          email: caregiverOne.email,
+          email: insertedCaregiverOne.email,
         })
         .expect(httpStatus.OK);
 
@@ -198,7 +208,7 @@ describe('Email verification workflow', () => {
 
       // Verify new verification token was created
       const verificationToken = await Token.findOne({ 
-        caregiver: caregiverOne._id, 
+        caregiver: insertedCaregiverOne._id, 
         type: tokenTypes.VERIFY_EMAIL 
       });
       expect(verificationToken).toBeTruthy();
@@ -206,12 +216,12 @@ describe('Email verification workflow', () => {
 
     test('should reject resend for already verified user', async () => {
       // Set caregiver as verified
-      await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: true });
+      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: true });
 
       await request(app)
         .post('/v1/auth/resend-verification-email')
         .send({
-          email: caregiverOne.email,
+          email: insertedCaregiverOne.email,
         })
         .expect(httpStatus.BAD_REQUEST);
     });
@@ -239,12 +249,12 @@ describe('Email verification workflow', () => {
       emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
 
       // Ensure caregiver email is unverified
-      await Caregiver.findByIdAndUpdate(caregiverOne._id, { isEmailVerified: false });
+      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: false });
 
       await request(app)
         .post('/v1/auth/resend-verification-email')
         .send({
-          email: caregiverOne.email,
+          email: insertedCaregiverOne.email,
         })
         .expect(httpStatus.INTERNAL_SERVER_ERROR);
 
@@ -255,12 +265,16 @@ describe('Email verification workflow', () => {
 
   describe('GET /v1/auth/verify-email', () => {
     let verificationToken;
+    let insertedCaregiverOne;
 
     beforeEach(async () => {
-      await insertCaregivers([caregiverOne]);
-      // Create a verification token
+      const inserted = await insertCaregivers([caregiverOne]);
+      insertedCaregiverOne = inserted[0];
+      // Fetch the actual Mongoose document to get _id
+      const caregiverDoc = await Caregiver.findById(insertedCaregiverOne._id);
+      // Create a verification token using the Mongoose document
       const tokenService = require('../../src/services/token.service');
-      verificationToken = await tokenService.generateVerifyEmailToken(caregiverOne);
+      verificationToken = await tokenService.generateVerifyEmailToken(caregiverDoc);
     });
 
     test('should verify email with valid token', async () => {
@@ -273,12 +287,12 @@ describe('Email verification workflow', () => {
       expect(res.text).toContain('Redirecting you to the app');
 
       // Verify caregiver is now verified
-      const caregiver = await Caregiver.findById(caregiverOne._id);
+      const caregiver = await Caregiver.findById(insertedCaregiverOne._id);
       expect(caregiver.isEmailVerified).toBe(true);
 
       // Verify token was deleted
       const token = await Token.findOne({ 
-        caregiver: caregiverOne._id, 
+        caregiver: insertedCaregiverOne._id, 
         type: tokenTypes.VERIFY_EMAIL 
       });
       expect(token).toBeFalsy();
@@ -297,10 +311,12 @@ describe('Email verification workflow', () => {
     });
 
     test('should reject verification with expired token', async () => {
+      // Get the actual caregiver document to use its _id
+      const caregiverDoc = await Caregiver.findOne({ email: caregiverOne.email });
       // Create an expired token
       const expiredToken = require('jsonwebtoken').sign(
         {
-          sub: caregiverOne._id,
+          sub: caregiverDoc._id.toString(),
           type: tokenTypes.VERIFY_EMAIL,
           iat: Math.floor(Date.now() / 1000) - 3600, // 1 hour ago
           exp: Math.floor(Date.now() / 1000) - 1800, // 30 minutes ago
@@ -315,6 +331,12 @@ describe('Email verification workflow', () => {
   });
 
   describe('Email verification integration flow', () => {
+    beforeEach(() => {
+      // Mock email service for integration tests
+      const emailService = require('../../src/services/email.service');
+      jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue();
+    });
+
     test('should complete full email verification workflow', async () => {
       const newUser = {
         name: 'Integration Test User',

@@ -26,7 +26,11 @@ const register = catchAsync(async (req, res, next) => {
     }
   );
 
-  const caregiver = org.caregivers[0];
+  // Fetch the full caregiver object (org.caregivers[0] is just an ObjectId)
+  const caregiver = await caregiverService.getCaregiverById(org.caregivers[0]);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve created caregiver');
+  }
   
   // Record PIPEDA consent for data collection (required for Canadian users)
   try {

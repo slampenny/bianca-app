@@ -64,8 +64,9 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Log errors in development, test, and staging (not production to avoid PHI exposure)
-  if (['development', 'test', 'staging'].includes(config.env)) {
+  // Log errors in development and staging (not in test - these are expected errors)
+  // Not in production to avoid PHI exposure
+  if (['development', 'staging'].includes(config.env)) {
     logger.error('Error handled by error middleware:', {
       statusCode: err.statusCode,
       message: err.message,

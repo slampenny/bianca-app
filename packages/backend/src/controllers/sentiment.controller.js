@@ -1,7 +1,7 @@
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { sentimentService } = require('../services');
+const { sentimentService, conversationService } = require('../services');
 const { Call, Caregiver } = require('../models');
 
 const { SentimentTrendDTO, SentimentSummaryDTO } = require('../dtos');

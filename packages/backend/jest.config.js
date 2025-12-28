@@ -10,4 +10,6 @@ module.exports = {
   testMatch: ['**/*.test.js'], // Simplified to catch all .test.js files
   watchAll: false,
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
+  // Ignore devops directories to prevent Haste module naming collisions
+  modulePathIgnorePatterns: ['<rootDir>/devops'],
 };

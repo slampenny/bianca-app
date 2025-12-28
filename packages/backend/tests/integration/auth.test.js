@@ -76,6 +76,7 @@ describe('Auth routes', () => {
         org: expect.anything(),
         patients: [],
         isEmailVerified: false,
+        isPhoneVerified: false,
       });
 
       const dbCaregiver = await Caregiver.findById(caregiver.id);
@@ -172,6 +173,7 @@ describe('Auth routes', () => {
         role: 'staff',
         patients: [],
         isEmailVerified: true, // Test fixtures set isEmailVerified: true
+        isPhoneVerified: false,
       });
 
       expect(res.body.tokens).toEqual({
@@ -331,7 +333,7 @@ describe('Auth routes', () => {
 
       await request(app).post('/v1/auth/forgot-password').send({ email: caregiverOne.email }).expect(httpStatus.NO_CONTENT);
 
-      expect(sendResetPasswordEmailSpy).toHaveBeenCalledWith(caregiverOne.email, expect.any(String));
+      expect(sendResetPasswordEmailSpy).toHaveBeenCalledWith(caregiverOne.email, expect.any(String), expect.any(String));
       const resetPasswordToken = sendResetPasswordEmailSpy.mock.calls[0][1];
       const dbResetPasswordTokenDoc = await Token.findOne({ token: resetPasswordToken, caregiver: caregiverOne._id });
       expect(dbResetPasswordTokenDoc).toBeDefined();
@@ -343,8 +345,8 @@ describe('Auth routes', () => {
       await request(app).post('/v1/auth/forgot-password').send().expect(httpStatus.BAD_REQUEST);
     });
 
-    test('should return 404 if email does not belong to any caregiver', async () => {
-      await request(app).post('/v1/auth/forgot-password').send({ email: caregiverOne.email }).expect(httpStatus.NOT_FOUND);
+    test('should return 204 even if email does not belong to any caregiver (security: prevent email enumeration)', async () => {
+      await request(app).post('/v1/auth/forgot-password').send({ email: caregiverOne.email }).expect(httpStatus.NO_CONTENT);
     });
   });
 
@@ -458,7 +460,7 @@ describe('Auth routes', () => {
 
       await request(app).post('/v1/auth/send-verification-email').send({ caregiver }).expect(httpStatus.NO_CONTENT);
 
-      expect(sendVerificationEmailSpy).toHaveBeenCalledWith(caregiver.email, expect.any(String), expect.any(String));
+      expect(sendVerificationEmailSpy).toHaveBeenCalledWith(caregiver.email, expect.any(String), expect.any(String), expect.any(String));
       const verifyEmailToken = sendVerificationEmailSpy.mock.calls[0][1];
       const dbVerifyEmailToken = await Token.findOne({ token: verifyEmailToken, caregiver: caregiver.id });
 

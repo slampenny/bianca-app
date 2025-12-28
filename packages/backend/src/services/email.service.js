@@ -233,6 +233,14 @@ process.on('exit', () => {
  */
 const sendEmail = async (to, subject, text, html, attachments = null) => {
   try {
+    // Validate recipient email address
+    if (!to) {
+      const error = new Error('No recipients defined');
+      error.code = 'EENVELOPE';
+      logger.error('Email send failed: No recipients defined', { to, subject });
+      throw error;
+    }
+
     // Ensure transport is initialized
     if (!isInitialized || !transport) {
       logger.info('Email transport not initialized, attempting to initialize...');

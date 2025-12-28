@@ -38,6 +38,7 @@ import { useLanguage } from "./hooks/useLanguage"
 import { AuthModalProvider } from "./contexts/AuthModalContext"
 import { useSelector } from "react-redux"
 import { getCurrentUser } from "./store/authSlice"
+import { useTheme } from "./theme/ThemeContext"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
@@ -78,6 +79,68 @@ function InnerApp() {
   useLanguage()
   
   return null
+}
+
+/**
+ * Theme-aware container wrapper that applies theme colors for web mode
+ * This component applies the background to fill the viewport and styles the inner container
+ */
+function ThemedWebContainer({ children }: { children: React.ReactNode }) {
+  const { colors, currentTheme } = useTheme()
+  const isDark = currentTheme === "dark"
+  
+  // On web, inject styles to set background on body and html to fill the viewport
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const outerBgColor = isDark ? colors.palette.neutral200 : '#f5f5f5'
+      const styleId = 'themed-outer-container-bg'
+      let styleElement = document.getElementById(styleId)
+      if (!styleElement) {
+        styleElement = document.createElement('style')
+        styleElement.id = styleId
+        document.head.appendChild(styleElement)
+      }
+      // Set background on html and body to fill the entire viewport
+      styleElement.textContent = `
+        html, body {
+          background-color: ${outerBgColor} !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
+        }
+        #root {
+          background-color: ${outerBgColor} !important;
+          min-height: 100vh;
+        }
+      `
+      
+      return () => {
+        // Cleanup on unmount
+        const element = document.getElementById(styleId)
+        if (element) {
+          element.remove()
+        }
+      }
+    }
+  }, [colors.palette.neutral200, isDark])
+  
+  const $themedInnerStyle: ViewStyle = {
+    flex: 1,
+    ...(Platform.OS === 'web' && {
+      maxWidth: 1200,
+      width: '100%',
+      alignSelf: 'center',
+      marginHorizontal: 'auto',
+      backgroundColor: colors.palette.biancaBackground || (isDark ? colors.palette.neutral100 : '#ffffff'),
+      minHeight: '100vh',
+      boxShadow: isDark 
+        ? '0 0 20px rgba(0, 0, 0, 0.5)' 
+        : '0 0 20px rgba(0, 0, 0, 0.1)',
+    } as any),
+  }
+  
+  return <View style={$themedInnerStyle}>{children}</View>
 }
 
 /**
@@ -128,20 +191,22 @@ function App(props: AppProps) {
           <GestureHandlerRootView style={$container}>
             <Provider store={store}>
               <ThemeProvider>
-                <AuthModalProvider>
-                  <PersistGate
-                    loading={null}
-                    onBeforeLift={onBeforeLiftPersistGate}
-                    persistor={persistor}
-                  >
-                    <AppNavigator
-                      linking={linking}
-                      initialState={initialNavigationState}
-                      onStateChange={onNavigationStateChange}
-                    />
-                    <InnerApp />
-                  </PersistGate>
-                </AuthModalProvider>
+                <ThemedWebContainer>
+                  <AuthModalProvider>
+                    <PersistGate
+                      loading={null}
+                      onBeforeLift={onBeforeLiftPersistGate}
+                      persistor={persistor}
+                    >
+                      <AppNavigator
+                        linking={linking}
+                        initialState={initialNavigationState}
+                        onStateChange={onNavigationStateChange}
+                      />
+                      <InnerApp />
+                    </PersistGate>
+                  </AuthModalProvider>
+                </ThemedWebContainer>
               </ThemeProvider>
             </Provider>
           </GestureHandlerRootView>
@@ -153,23 +218,11 @@ function App(props: AppProps) {
 
 export default App
 
+// Base styles for non-web platforms (mobile)
 const $outerContainer: ViewStyle = {
   flex: 1,
-  ...(Platform.OS === 'web' && {
-    backgroundColor: '#f5f5f5',
-    minHeight: '100vh',
-  } as any),
 }
 
 const $container: ViewStyle = {
   flex: 1,
-  ...(Platform.OS === 'web' && {
-    maxWidth: 1200,
-    width: '100%',
-    alignSelf: 'center',
-    marginHorizontal: 'auto',
-    backgroundColor: '#ffffff',
-    minHeight: '100vh',
-    boxShadow: '0 0 20px rgba(0, 0, 0, 0.1)',
-  } as any),
 }

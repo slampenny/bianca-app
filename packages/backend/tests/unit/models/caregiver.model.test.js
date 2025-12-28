@@ -1,17 +1,29 @@
 const faker = require('faker');
 const mongoose = require('mongoose');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 const { Patient, Caregiver, Org } = require('../../../src/models');
 
 describe('Caregiver model', () => {
+  let mongoServer;
   let testOrg;
   
   beforeAll(async () => {
+    // Setup MongoDB Memory Server
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri, {});
+    
     // Create a test org for all caregiver tests
     testOrg = await Org.create({
       name: 'Test Org',
       email: 'testorg@example.com',
       country: 'US',
     });
+  });
+
+  afterAll(async () => {
+    await mongoose.disconnect();
+    await mongoServer.stop();
   });
   
   describe('Caregiver validation', () => {

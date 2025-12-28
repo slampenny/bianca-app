@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
 const config = require('../../src/config/config');
-const { Invoice, LineItem, Patient, Org, Token, Caregiver, Conversation, Message } = require('../../src/models');
+const { Invoice, LineItem, Patient, Org, Token, Caregiver, Conversation, Message, Call } = require('../../src/models');
 const { patientOne, insertPatients, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
 
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
@@ -96,6 +96,7 @@ describe('Payment routes', () => {
         dueDate: expect.any(String),
         status: expect.any(String),
         totalAmount: expect.any(Number),
+        stripeSynced: false,
       });
     });
 
@@ -146,6 +147,7 @@ describe('Payment routes', () => {
         dueDate: expect.any(String),
         status: expect.any(String),
         totalAmount: expect.any(Number),
+        stripeSynced: false,
       });
     });
 
@@ -199,7 +201,7 @@ describe('Payment routes', () => {
         .send()
         .expect(httpStatus.NOT_FOUND);
 
-      expect(res.body.message).toBe('No uncharged conversations found');
+      expect(res.body.message).toBe('No uncharged calls found');
     });
 
     test('should return 401 when no authorization token provided', async () => {
@@ -295,6 +297,7 @@ describe('Payment routes', () => {
         status: expect.any(String),
         totalAmount: expect.any(Number),
         notes: expect.any(String),
+        stripeSynced: false,
         // createdAt and updatedAt no longer expected
       });
     });
@@ -417,6 +420,7 @@ describe('Payment routes', () => {
         dueDate: expect.any(String),
         status: expect.any(String),
         totalAmount: expect.any(Number),
+        stripeSynced: false,
       });
     });
 
@@ -588,10 +592,10 @@ describe('Payment routes', () => {
       // Should create one invoice with total duration of all conversations
       expect(res.body.totalAmount).toBeGreaterThan(0);
       
-      // Verify all conversations are now marked as charged
-      const updatedConversations = await Conversation.find({ patientId: patient._id });
-      updatedConversations.forEach(conv => {
-        expect(conv.lineItemId).toBeDefined();
+      // Verify all calls are now marked as charged (payment service uses Call records, not Conversation)
+      const updatedCalls = await Call.find({ patientId: patient._id });
+      updatedCalls.forEach(call => {
+        expect(call.lineItemId).toBeDefined();
       });
     });
   });

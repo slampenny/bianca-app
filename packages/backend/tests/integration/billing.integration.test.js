@@ -5,7 +5,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 const request = require('supertest');
 const app = require('../utils/integration-app');
-const { Org, Patient, Conversation, Invoice, LineItem, Caregiver } = require('../../src/models');
+const { Org, Patient, Conversation, Invoice, LineItem, Caregiver, Call } = require('../../src/models');
 const { tokenService } = require('../../src/services');
 
 // Import the actual billing logic to test it
@@ -71,6 +71,7 @@ describe('Billing System Integration Tests', () => {
 
   beforeEach(async () => {
     // Clean up before each test
+    await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Invoice.deleteMany({});
     await LineItem.deleteMany({});
@@ -78,8 +79,8 @@ describe('Billing System Integration Tests', () => {
 
   describe('End-to-End Billing Flow', () => {
     it('should complete full billing cycle from conversation to invoice', async () => {
-      // Step 1: Create conversations with costs
-      const conversation1 = await Conversation.create({
+      // Step 1: Create Call records first (required for conversations)
+      const call1 = await Call.create({
         callSid: 'CA11111111111111111111111111111111',
         patientId: patient1._id,
         duration: 120, // 2 minutes
@@ -90,7 +91,7 @@ describe('Billing System Integration Tests', () => {
         lineItemId: null // Unbilled
       });
 
-      const conversation2 = await Conversation.create({
+      const call2 = await Call.create({
         callSid: 'CA22222222222222222222222222222222',
         patientId: patient1._id,
         duration: 180, // 3 minutes
@@ -101,7 +102,7 @@ describe('Billing System Integration Tests', () => {
         lineItemId: null // Unbilled
       });
 
-      const conversation3 = await Conversation.create({
+      const call3 = await Call.create({
         callSid: 'CA33333333333333333333333333333333',
         patientId: patient2._id,
         duration: 90, // 1.5 minutes
@@ -110,6 +111,25 @@ describe('Billing System Integration Tests', () => {
         startTime: new Date(),
         endTime: new Date(),
         lineItemId: null // Unbilled
+      });
+
+      // Step 1b: Create conversations linked to calls
+      const conversation1 = await Conversation.create({
+        callId: call1._id,
+        patientId: patient1._id,
+        messages: [],
+      });
+
+      const conversation2 = await Conversation.create({
+        callId: call2._id,
+        patientId: patient1._id,
+        messages: [],
+      });
+
+      const conversation3 = await Conversation.create({
+        callId: call3._id,
+        patientId: patient2._id,
+        messages: [],
       });
 
       // Step 2: Check unbilled costs via API
@@ -124,9 +144,9 @@ describe('Billing System Integration Tests', () => {
       // Step 3: Run daily billing process
       await processDailyBilling();
 
-      // Step 4: Verify conversations are marked as billed
-      const billedConversations = await Conversation.find({ lineItemId: { $ne: null } });
-      expect(billedConversations).toHaveLength(3);
+      // Step 4: Verify calls are marked as billed (payment service uses Call records, not Conversation)
+      const billedCalls = await Call.find({ lineItemId: { $ne: null } });
+      expect(billedCalls).toHaveLength(3);
 
       // Step 5: Verify invoice was created
       const invoices = await Invoice.find({ org: org._id });
@@ -171,8 +191,8 @@ describe('Billing System Integration Tests', () => {
     });
 
     it('should handle multiple billing cycles without double billing', async () => {
-      // Create initial conversations
-      await Conversation.create([
+      // Create initial Call records (payment service uses Call records for billing)
+      await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
           patientId: patient1._id,
@@ -202,8 +222,8 @@ describe('Billing System Integration Tests', () => {
       expect(invoices).toHaveLength(1);
       expect(invoices[0].totalAmount).toBe(0.35);
 
-      // Create new conversations for second billing cycle
-      await Conversation.create([
+      // Create new Call records for second billing cycle
+      await Call.create([
         {
           callSid: 'CA33333333333333333333333333333333',
           patientId: patient1._id,
@@ -225,14 +245,14 @@ describe('Billing System Integration Tests', () => {
       const totalAmount = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
       expect(totalAmount).toBeCloseTo(0.65, 2); // 0.35 + 0.30
 
-      // Verify no conversations are double-billed
-      const billedConversations = await Conversation.find({ lineItemId: { $ne: null } });
-      expect(billedConversations).toHaveLength(3); // All conversations billed exactly once
+      // Verify no calls are double-billed (payment service uses Call records)
+      const billedCalls = await Call.find({ lineItemId: { $ne: null } });
+      expect(billedCalls).toHaveLength(3); // All calls billed exactly once
     });
 
     it('should handle mixed billed and unbilled conversations correctly', async () => {
-      // Create some conversations
-      const conv1 = await Conversation.create({
+      // Create Call records (payment service uses Call records for billing)
+      const call1 = await Call.create({
         callSid: 'CA11111111111111111111111111111111',
         patientId: patient1._id,
         duration: 120,
@@ -243,7 +263,7 @@ describe('Billing System Integration Tests', () => {
         lineItemId: null
       });
 
-      const conv2 = await Conversation.create({
+      const call2 = await Call.create({
         callSid: 'CA22222222222222222222222222222222',
         patientId: patient1._id,
         duration: 180,
@@ -272,9 +292,9 @@ describe('Billing System Integration Tests', () => {
         quantity: 1
       });
 
-      // Mark first conversation as billed
-      await Conversation.updateOne(
-        { _id: conv1._id },
+      // Mark first call as billed
+      await Call.updateOne(
+        { _id: call1._id },
         { lineItemId: manualLineItem._id }
       );
 
@@ -288,14 +308,14 @@ describe('Billing System Integration Tests', () => {
       const automaticInvoice = invoices.find(inv => inv.invoiceNumber !== 'INV-MANUAL-001');
       expect(automaticInvoice.totalAmount).toBe(0.30); // Only the unbilled conversation
 
-      // Verify all conversations are billed
-      const billedConversations = await Conversation.find({ lineItemId: { $ne: null } });
-      expect(billedConversations).toHaveLength(2);
+      // Verify all calls are billed (payment service uses Call records)
+      const billedCalls = await Call.find({ lineItemId: { $ne: null } });
+      expect(billedCalls).toHaveLength(2);
     });
 
     it('should handle zero-cost conversations correctly', async () => {
-      // Create conversations with different costs
-      await Conversation.create([
+      // Create Call records with different costs (payment service uses Call records)
+      await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
           patientId: patient1._id,
@@ -336,14 +356,14 @@ describe('Billing System Integration Tests', () => {
       expect(invoices).toHaveLength(1);
       expect(invoices[0].totalAmount).toBe(0.35); // 0.20 + 0.15, excluding zero-cost
 
-      // Verify zero-cost conversation remains unbilled
-      const zeroCostConversation = await Conversation.findOne({ cost: 0 });
-      expect(zeroCostConversation.lineItemId).toBeNull();
+      // Verify zero-cost call remains unbilled (payment service uses Call records)
+      const zeroCostCall = await Call.findOne({ cost: 0 });
+      expect(zeroCostCall.lineItemId).toBeNull();
     });
 
     it('should handle API endpoints with proper authentication and authorization', async () => {
-      // Create test conversations
-      await Conversation.create({
+      // Create test Call record (payment service uses Call records for billing)
+      await Call.create({
         callSid: 'CA11111111111111111111111111111111',
         patientId: patient1._id,
         duration: 120,
@@ -407,8 +427,8 @@ describe('Billing System Integration Tests', () => {
     });
 
     it('should handle concurrent billing processes', async () => {
-      // Create conversations
-      await Conversation.create([
+      // Create Call records (payment service uses Call records for billing)
+      await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
           patientId: patient1._id,
@@ -441,16 +461,16 @@ describe('Billing System Integration Tests', () => {
       const invoices = await Invoice.find({ org: org._id });
       expect(invoices).toHaveLength(1);
 
-      // All conversations should be billed exactly once
-      const billedConversations = await Conversation.find({ lineItemId: { $ne: null } });
-      expect(billedConversations).toHaveLength(2);
+      // All calls should be billed exactly once (payment service uses Call records)
+      const billedCalls = await Call.find({ lineItemId: { $ne: null } });
+      expect(billedCalls).toHaveLength(2);
     });
 
     it('should handle large numbers of conversations efficiently', async () => {
-      // Create many conversations
-      const conversations = [];
+      // Create many Call records (payment service uses Call records for billing)
+      const calls = [];
       for (let i = 0; i < 50; i++) {
-        conversations.push({
+        calls.push({
           callSid: `CA${i.toString().padStart(30, '0')}`,
           patientId: i % 2 === 0 ? patient1._id : patient2._id,
           duration: 60 + (i * 2), // Varying durations
@@ -461,7 +481,7 @@ describe('Billing System Integration Tests', () => {
           lineItemId: null
         });
       }
-      await Conversation.insertMany(conversations);
+      await Call.insertMany(calls);
 
       const startTime = Date.now();
       await processDailyBilling();
@@ -470,9 +490,9 @@ describe('Billing System Integration Tests', () => {
       // Should complete within reasonable time (adjust threshold as needed)
       expect(endTime - startTime).toBeLessThan(5000); // 5 seconds
 
-      // Verify all conversations are billed
-      const billedConversations = await Conversation.find({ lineItemId: { $ne: null } });
-      expect(billedConversations).toHaveLength(50);
+      // Verify all calls are billed (payment service uses Call records)
+      const billedCalls = await Call.find({ lineItemId: { $ne: null } });
+      expect(billedCalls).toHaveLength(50);
 
       // Verify invoice was created with correct total
       const invoices = await Invoice.find({ org: org._id });
