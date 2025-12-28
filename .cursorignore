@@ -47,16 +47,18 @@ test-output.txt
 test-console-*.txt
 **/test-console-*.txt
 
-# Logs
+# Logs - ignore log directories and specific log files, but allow individual log files to be searchable for debugging
 logs/
 **/logs/
-*.log
 *.test.log
 docker-dev.log
 deployment.log
 *.deployment.log
 deploy-*.log
 crash.log
+yarn-error.log
+npm-debug.log
+# Note: Individual .log files in project root or source directories can still be opened manually for debugging
 
 # Environment and secrets
 .env*
