@@ -1,0 +1,204 @@
+# Dependencies
+node_modules/
+**/node_modules/
+yarn-error.log
+npm-debug.log
+.pnp.*
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+
+# Build outputs and artifacts
+dist/
+build/
+**/dist/
+**/build/
+*.jsbundle
+*.aab
+*.apk
+*.ipa
+*.app
+*.xcarchive
+web-build/
+.expo/
+.expo/*
+bin/
+
+# Test results and coverage
+coverage/
+**/coverage/
+test-results/
+**/test-results/
+test-logs/
+**/test-logs/
+playwright-report/
+**/playwright-report/
+playwright/.cache/
+**/playwright/.cache/
+.playwright/
+**/.playwright/
+*.trace
+*.webm
+*.mp4
+test_results.json
+test-output.txt
+test-console-*.txt
+**/test-console-*.txt
+
+# Logs
+logs/
+**/logs/
+*.log
+*.test.log
+docker-dev.log
+deployment.log
+*.deployment.log
+deploy-*.log
+crash.log
+
+# Environment and secrets
+.env*
+!.env*.example
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.keystore
+*.p8
+*.mobileprovision
+credentials/
+**/credentials/
+google.api.json
+
+# Terraform
+.terraform/
+**/.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+terraform.*.backup
+*.tfplan
+*.tfstate
+*.tfstate.backup
+
+# Docker
+docker-compose.override.yml
+.dockerignore.tmp
+uploads/
+**/uploads/
+devops/asterisk/recordings
+
+# Cache and temporary files
+*.cache
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.pid
+*.sock
+*.pid.lock
+metro-cache/
+**/metro-cache/
+.cache/
+**/.cache/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+DerivedData/
+*.hmap
+*.xcuserstate
+ios/.xcode.env.local
+.gradle/
+local.properties
+*.iml
+*.hprof
+.cxx/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Platform-specific
+android/
+ios/
+buck-out/
+.buckd/
+
+# Fastlane
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+
+# Lambda deployment packages
+devops/terraform/lambda-backup.zip
+devops/terraform/lambda-restore.zip
+devops/terraform/lambda-verify-backup.zip
+**/*.zip
+
+# Temporary files from shell operations
+-[a-zA-Z0-9]
+-[a-zA-Z0-9]*
+
+# Patch files
+*.patch
+
+# Large binary files and media (keep assets, ignore debug/test images)
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.pdf
+*.zip
+*.tar
+*.tar.gz
+*.gz
+# Debug and test screenshots
+*-debug*.png
+debug-*.png
+button-debug-*.png
+after-click.png
+profile-screen.png
+test-*.png
+
+# Session manager plugin
+session-manager-plugin.deb
+
+# Debug and diagnostic files
+debug_audio_calls/
+
+# Migration and seed scripts output
+migrations/*.js.bak
+
+# Terraform backup directories
+terraform-backup/
+terraform-new/
+terraform-wordpress/
+
+# Archive directories
+scripts-archive-final-20251101/
+
