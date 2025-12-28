@@ -45,12 +45,17 @@ export function TimePicker({
   const [minute, setMinute] = useState(0)
   const [isAM, setIsAM] = useState(true)
 
+  // Round minutes to nearest 15-minute increment (0, 15, 30, 45)
+  const roundTo15Minutes = (minutes: number): number => {
+    return Math.round(minutes / 15) * 15
+  }
+
   // Parse value from props - component just reflects the underlying data
   useEffect(() => {
     if (value) {
       const [hours, minutes] = value.split(":").map(Number)
       const h = hours || 0
-      const m = minutes || 0
+      const m = roundTo15Minutes(minutes || 0)
       setHour(h % 12 || 12)
       setMinute(m)
       setIsAM(h < 12)
@@ -84,7 +89,9 @@ export function TimePicker({
 
     if (selectedDate) {
       setDate(selectedDate)
-      const timeString = `${selectedDate.getHours().toString().padStart(2, "0")}:${selectedDate.getMinutes().toString().padStart(2, "0")}`
+      // Round minutes to nearest 15-minute increment
+      const roundedMinutes = roundTo15Minutes(selectedDate.getMinutes())
+      const timeString = `${selectedDate.getHours().toString().padStart(2, "0")}:${roundedMinutes.toString().padStart(2, "0")}`
       onValueChange(timeString)
     }
   }
@@ -358,11 +365,11 @@ export function TimePicker({
                     </ScrollView>
                   </View>
 
-                  {/* Minute selector */}
+                  {/* Minute selector - only 15-minute increments (0, 15, 30, 45) */}
                   <View style={styles.timeColumn}>
                     <Text style={styles.timeColumnLabel}>Minute</Text>
                     <ScrollView style={styles.timeScrollView} showsVerticalScrollIndicator={false}>
-                      {Array.from({ length: 60 }, (_, i) => i).map((m) => (
+                      {[0, 15, 30, 45].map((m) => (
                         <Pressable
                           key={m}
                           style={[
@@ -537,15 +544,21 @@ export function TimePicker({
                     mode="time"
                     is24Hour={false}
                     display="spinner"
+                    minuteInterval={15}
                     onChange={(event, selectedDate) => {
                       if (selectedDate) {
                         setDate(selectedDate)
                         const h = selectedDate.getHours() % 12 || 12
-                        const m = selectedDate.getMinutes()
+                        const m = roundTo15Minutes(selectedDate.getMinutes())
                         const am = selectedDate.getHours() < 12
                         setHour(h)
                         setMinute(m)
                         setIsAM(am)
+                        // Update the value immediately with rounded minutes
+                        const roundedDate = new Date(selectedDate)
+                        roundedDate.setMinutes(m)
+                        const timeString = `${roundedDate.getHours().toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`
+                        onValueChange(timeString)
                       }
                     }}
                     style={styles.iosPicker}
@@ -559,6 +572,7 @@ export function TimePicker({
               mode="time"
               is24Hour={false}
               display="clock"
+              minuteInterval={15}
               onChange={handleTimeChange}
             />
           )}

@@ -40,7 +40,7 @@ describe('Schedule routes', () => {
     test('should create a new schedule and return 201', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
-      const [patient] = await insertPatients([patientOne]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
 
       const res = await request(app)
         .post(`/v1/schedules/patients/${patient.id}`)
@@ -70,29 +70,37 @@ describe('Schedule routes', () => {
     test('should return 200 and a schedule if data is ok', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [patient] = await insertPatients([patientOne]);
-      const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      
+      // Create schedule via API to ensure proper timezone conversion
+      const createRes = await request(app)
+        .post(`/v1/schedules/patients/${patient.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send(scheduleOne)
+        .expect(httpStatus.CREATED);
+      
+      const scheduleId = createRes.body.id;
 
       const res = await request(app)
-        .get(`/v1/schedules/${schedule.id}`)
+        .get(`/v1/schedules/${scheduleId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.OK);
 
       expect(res.body).toEqual({
-        id: schedule.id,
+        id: scheduleId,
         caregivers: expect.arrayContaining([]),
-        frequency: schedule.frequency,
+        frequency: scheduleOne.frequency,
         intervals: expect.arrayContaining([
           expect.objectContaining({
             day: expect.any(Number),
             weeks: expect.any(Number),
           }),
         ]),
-        isActive: schedule.isActive,
+        isActive: true,
         nextCallDate: expect.any(String),
         patient: expect.any(String),
-        time: schedule.time,
+        time: createRes.body.time, // Use the time returned from creation (after timezone conversion)
       });
     });
   });
@@ -101,7 +109,7 @@ describe('Schedule routes', () => {
     test('should update a schedule and return 200', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [patient] = await insertPatients([patientOne]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
       const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
 
       const updateBody = {
@@ -133,7 +141,7 @@ describe('Schedule routes', () => {
     test('should delete a schedule and return 204', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [patient] = await insertPatients([patientOne]);
+      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
       const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
 
       await request(app)

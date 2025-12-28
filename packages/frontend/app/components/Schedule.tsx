@@ -259,6 +259,18 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
     setIntervals([{ day }])
   }
 
+  // Convert 24-hour time (HH:MM) to 12-hour AM/PM format
+  const formatTime12Hour = (time24: string): string => {
+    if (!time24) return ""
+    const [hours, minutes] = time24.split(":").map(Number)
+    const h = hours || 0
+    const m = minutes || 0
+    const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h
+    const displayMinute = m.toString().padStart(2, "0")
+    const ampm = h < 12 ? "AM" : "PM"
+    return `${displayHour}:${displayMinute} ${ampm}`
+  }
+
   const formatSchedule = (schedule: Schedule) => {
     const days = [
       translate("scheduleComponent.sunday"),
@@ -269,22 +281,23 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       translate("scheduleComponent.friday"),
       translate("scheduleComponent.saturday")
     ]
+    const time12Hour = formatTime12Hour(schedule.time)
     switch (schedule.frequency) {
       case "daily":
-        return translate("scheduleComponent.everyDayAt", { time: schedule.time })
+        return translate("scheduleComponent.everyDayAt", { time: time12Hour })
       case "weekly":
         if (schedule.intervals && schedule.intervals.length > 0) {
           const selectedDays = schedule.intervals
             .map((interval) => days[interval.day || 0])
             .join(", ")
-          return translate("scheduleComponent.everyDaysAt", { days: selectedDays, time: schedule.time })
+          return translate("scheduleComponent.everyDaysAt", { days: selectedDays, time: time12Hour })
         } else {
-          return translate("scheduleComponent.everyWeekAt", { time: schedule.time })
+          return translate("scheduleComponent.everyWeekAt", { time: time12Hour })
         }
       case "monthly":
         return translate("scheduleComponent.everyMonthOn", { 
           day: schedule.intervals.length > 0 ? schedule.intervals[0].day : 0,
-          time: schedule.time 
+          time: time12Hour 
         })
       default:
         return ""

@@ -53,8 +53,8 @@ describe('OpenAI Realtime API Integration Tests', () => {
 
   describe(`Session Configuration (${apiVersion})`, () => {
     it(`should use correct model name for ${apiVersion}`, () => {
-      const expectedModel = useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12';
-      const actualModel = config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-4o-realtime-preview-2025-01-12');
+      const expectedModel = useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28';
+      const actualModel = config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28');
       expect(actualModel).toBe(expectedModel);
     });
 

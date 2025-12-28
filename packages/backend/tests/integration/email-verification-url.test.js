@@ -20,8 +20,10 @@ describe('Email Verification URL Integration Tests', () => {
   });
 
   afterEach(async () => {
+    const { Org } = require('../../src/models');
     await Caregiver.deleteMany();
     await Token.deleteMany();
+    await Org.deleteMany();
   });
 
   describe('Email Service Verification Link Generation', () => {

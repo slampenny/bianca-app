@@ -56,9 +56,22 @@ beforeAll(async () => {
   await patient.save();
   patientId = patient._id;
 
+  // Create a call first (required for conversation)
+  const { Call } = require('../../src/models');
+  const call = new Call({
+    patientId: patientId,
+    callSid: 'test-call-sid',
+    status: 'completed',
+    startTime: new Date(),
+    endTime: new Date(),
+    duration: 300000
+  });
+  await call.save();
+  
   // Create a conversation with sentiment data
   const conversation = new Conversation({
     patientId: patientId,
+    callId: call._id,
     callSid: 'test-call-sid',
     lineItemId: null,
     messages: [],
@@ -80,11 +93,7 @@ beforeAll(async () => {
       },
       sentimentAnalyzedAt: new Date()
     },
-    metadata: {},
-    startTime: new Date(),
-    endTime: new Date(),
-    duration: 300000,
-    status: 'completed'
+    metadata: {}
   });
   await conversation.save();
   conversationId = conversation._id;
@@ -209,19 +218,28 @@ describe('Sentiment Analysis API', () => {
     });
 
     it('should return 200 with null sentiment for conversation without sentiment analysis', async () => {
+      // Create a call first
+      const { Call } = require('../../src/models');
+      const call2 = new Call({
+        patientId: patientId,
+        callSid: 'test-call-sid-2',
+        status: 'completed',
+        startTime: new Date(),
+        endTime: new Date(),
+        duration: 300000
+      });
+      await call2.save();
+      
       // Create a conversation without sentiment data
       const conversationWithoutSentiment = new Conversation({
         patientId: patientId,
+        callId: call2._id,
         callSid: 'test-call-sid-2',
         lineItemId: null,
         messages: [],
         history: 'Test conversation without sentiment',
         analyzedData: {},
-        metadata: {},
-        startTime: new Date(),
-        endTime: new Date(),
-        duration: 300000,
-        status: 'completed'
+        metadata: {}
       });
       await conversationWithoutSentiment.save();
 
@@ -275,19 +293,28 @@ describe('Sentiment Analysis API', () => {
       const mockOpenAI = new OpenAI();
       mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
 
+      // Create a call first
+      const { Call } = require('../../src/models');
+      const call3 = new Call({
+        patientId: patientId,
+        callSid: 'test-call-sid-3',
+        status: 'completed',
+        startTime: new Date(),
+        endTime: new Date(),
+        duration: 300000
+      });
+      await call3.save();
+      
       // Create a conversation with messages but no sentiment
       const conversationToAnalyze = new Conversation({
         patientId: patientId,
+        callId: call3._id,
         callSid: 'test-call-sid-3',
         lineItemId: null,
         messages: [],
         history: 'Test conversation for analysis',
         analyzedData: {},
-        metadata: {},
-        startTime: new Date(),
-        endTime: new Date(),
-        duration: 300000,
-        status: 'completed'
+        metadata: {}
       });
       await conversationToAnalyze.save();
 
@@ -334,18 +361,26 @@ describe('Sentiment Analysis API', () => {
     });
 
     it('should handle conversation without messages gracefully', async () => {
+      const { Call } = require('../../src/models');
+      const call4 = new Call({
+        patientId: patientId,
+        callSid: 'test-call-sid-4',
+        status: 'completed',
+        startTime: new Date(),
+        endTime: new Date(),
+        duration: 300000
+      });
+      await call4.save();
+      
       const conversationWithoutMessages = new Conversation({
         patientId: patientId,
+        callId: call4._id,
         callSid: 'test-call-sid-4',
         lineItemId: null,
         messages: [],
         history: 'Test conversation without messages',
         analyzedData: {},
-        metadata: {},
-        startTime: new Date(),
-        endTime: new Date(),
-        duration: 300000,
-        status: 'completed'
+        metadata: {}
       });
       await conversationWithoutMessages.save();
 
@@ -360,18 +395,26 @@ describe('Sentiment Analysis API', () => {
     });
 
     it('should return 400 for incomplete conversation', async () => {
+      const { Call } = require('../../src/models');
+      const call5 = new Call({
+        patientId: patientId,
+        callSid: 'test-call-sid-5',
+        status: 'in-progress',
+        startTime: new Date(),
+        endTime: null,
+        duration: 0
+      });
+      await call5.save();
+      
       const incompleteConversation = new Conversation({
         patientId: patientId,
+        callId: call5._id,
         callSid: 'test-call-sid-5',
         lineItemId: null,
         messages: [],
         history: 'Test incomplete conversation',
         analyzedData: {},
-        metadata: {},
-        startTime: new Date(),
-        endTime: null,
-        duration: 0,
-        status: 'in-progress'
+        metadata: {}
       });
       await incompleteConversation.save();
 

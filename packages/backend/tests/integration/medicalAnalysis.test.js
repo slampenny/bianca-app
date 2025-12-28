@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Patient, Caregiver, Org, Conversation, Message } = require('../../src/models');
+const { Patient, Caregiver, Org, Conversation, Message, Call } = require('../../src/models');
 const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
@@ -53,10 +53,34 @@ beforeAll(async () => {
   });
   await patient.save();
   patientId = patient._id;
+  
+  // Ensure caregiver has access to the patient
+  caregiver.patients.push(patientId);
+  await caregiver.save();
+
+  // Create test calls first (required for conversations)
+  const call1 = new Call({
+    patientId: patientId,
+    callSid: 'medical-test-call-1',
+    status: 'completed',
+    direction: 'outbound',
+    duration: 300000
+  });
+  await call1.save();
+
+  const call2 = new Call({
+    patientId: patientId,
+    callSid: 'medical-test-call-2',
+    status: 'completed',
+    direction: 'outbound',
+    duration: 400000
+  });
+  await call2.save();
 
   // Create some test conversations with medical content
   const conversation1 = new Conversation({
     patientId: patientId,
+    callId: call1._id,
     callSid: 'medical-test-call-1',
     messages: [], // Will add message IDs after creating messages
     startTime: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
@@ -93,6 +117,7 @@ beforeAll(async () => {
 
   const conversation2 = new Conversation({
     patientId: patientId,
+    callId: call2._id,
     callSid: 'medical-test-call-2',
     messages: [], // Will add message IDs after creating messages
     startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
@@ -127,8 +152,10 @@ beforeAll(async () => {
   conversation2.messages = [message3._id, message4._id];
   await conversation2.save();
 
-  // Generate access token
-  accessToken = tokenService.generateToken(caregiver._id);
+  // Generate access token with proper role information (need to pass caregiver object with org populated)
+  const caregiverDoc = await Caregiver.findById(caregiver._id).populate('org');
+  const authTokens = await tokenService.generateAuthTokens(caregiverDoc);
+  accessToken = authTokens.access.token;
 });
 
 afterAll(async () => {
@@ -156,18 +183,18 @@ describe('Medical Analysis API', () => {
         .expect(httpStatus.UNAUTHORIZED);
     });
 
-    it('should return 200 with empty results for non-existent patient', async () => {
+    it('should return 404 for non-existent patient', async () => {
       const nonExistentPatientId = new mongoose.Types.ObjectId();
 
       const res = await request(app)
         .get(`/v1/medical-analysis/results/${nonExistentPatientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(httpStatus.OK);
+        .expect(httpStatus.NOT_FOUND); // Non-existent patient should return 404
       
-      // Should return empty results for non-existent patient
-      expect(res.body).toHaveProperty('success', true);
-      expect(res.body).toHaveProperty('results');
-      expect(res.body.results).toEqual([]);
+      // 404 response should have success: false and a message
+      expect(res.body).toHaveProperty('success', false);
+      expect(res.body).toHaveProperty('message');
+      expect(res.body.message).toContain('not found');
     });
   });
 

@@ -370,13 +370,23 @@ describe('Localized Emergency Detection', () => {
       // Reload emergency phrases in the detector
       await localizedEmergencyDetector.loadPhrases();
 
+      // Create a test org first (required for patient)
+      const { Patient, Org } = require('../../src/models');
+      const testOrg = new Org({
+        name: 'Test Org',
+        email: 'testorg@example.com',
+        phone: '+16045624263',
+        country: 'US'
+      });
+      await testOrg.save();
+
       // Create a test patient
-      const { Patient } = require('../../src/models');
       const patient = new Patient({
         name: 'Test Patient',
         email: 'test@example.com',
         phone: '1234567890',
-        preferredLanguage: 'es'
+        preferredLanguage: 'es',
+        org: testOrg._id
       });
       await patient.save();
       patientId = patient._id;

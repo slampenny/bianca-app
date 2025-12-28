@@ -1,7 +1,7 @@
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { conversationService } = require('../services');
+const { sentimentService } = require('../services');
 const { Call, Caregiver } = require('../models');
 
 const { SentimentTrendDTO, SentimentSummaryDTO } = require('../dtos');
@@ -26,7 +26,7 @@ const getSentimentTrend = catchAsync(async (req, res) => {
     }
   }
 
-  const trendData = await conversationService.getSentimentTrend(patientId, timeRange);
+  const trendData = await sentimentService.getSentimentTrend(patientId, timeRange);
   res.send(SentimentTrendDTO(trendData));
 });
 
@@ -44,7 +44,7 @@ const getSentimentSummary = catchAsync(async (req, res) => {
     }
   }
 
-  const summaryData = await conversationService.getSentimentSummary(patientId);
+  const summaryData = await sentimentService.getSentimentSummary(patientId);
   res.send(SentimentSummaryDTO(summaryData));
 });
 

@@ -18,8 +18,9 @@ const agenda = new Agenda({
 agenda.on('ready', () => {
   logger.info('Agenda is connected and ready!');
 
-  // Schedule your centralized job to run every hour
-  agenda.every('1 hour', 'runSchedules');
+  // Schedule your centralized job to run every 15 minutes to support 15-minute schedule increments
+  agenda.every('15 minutes', 'runSchedules');
+  logger.info('[Agenda] Schedule runner job scheduled to run every 15 minutes');
   
   // Schedule daily billing job based on configuration
   if (config.billing.enableDailyBilling) {
@@ -41,8 +42,10 @@ agenda.on('ready', () => {
 
 // Centralized job definition with distributed locking settings
 agenda.define('runSchedules', { concurrency: 1, lockLifetime: 600000 }, async (job, done) => {
+  logger.info('[Agenda] Starting runSchedules job execution');
   try {
     await runSchedules();
+    logger.info('[Agenda] Completed runSchedules job execution');
     done();
   } catch (error) {
     logger.error(`Error in runSchedules job: ${error}`);
@@ -152,7 +155,7 @@ async function runSchedules() {
     );
     if (!interval) continue;
 
-    // Check if the current UTC time is within 1 hour of the scheduled UTC time
+    // Check if the current UTC time is within 15 minutes of the scheduled UTC time
     // schedule.time is stored in UTC (HH:mm format)
     const [scheduledHour, scheduledMinute] = schedule.time.split(':').map(Number);
     const scheduledTimeUTC = new Date(Date.UTC(
@@ -166,10 +169,10 @@ async function runSchedules() {
     ));
     
     const timeDiff = Math.abs(nowUTC.getTime() - scheduledTimeUTC.getTime());
-    const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
+    const fifteenMinutes = 15 * 60 * 1000; // 15 minutes in milliseconds
     
-    if (timeDiff > oneHour) {
-      logger.info(`Skipping schedule ${schedule.id} - current UTC time ${nowUTC.toISOString()} is more than 1 hour from scheduled UTC time ${schedule.time}`);
+    if (timeDiff > fifteenMinutes) {
+      logger.info(`Skipping schedule ${schedule.id} - current UTC time ${nowUTC.toISOString()} is more than 15 minutes from scheduled UTC time ${schedule.time}`);
       continue;
     }
 

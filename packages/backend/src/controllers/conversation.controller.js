@@ -8,7 +8,33 @@ const { ConversationDTO } = require('../dtos');
 
 const createConversationForPatient = catchAsync(async (req, res) => {
   const { patientId } = req.params;
-  const conversation = await conversationService.createConversationForPatient(patientId);
+  const { callId } = req.body;
+  
+  if (!callId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'callId is required in request body');
+  }
+  
+  const conversation = await conversationService.createConversationForPatient(patientId, callId);
+  
+  // Populate callId to get call data for DTO
+  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes agentId callSid');
+  
+  // Set fields from call for DTO compatibility
+  if (conversation.callId) {
+    conversation.status = conversation.callId.status;
+    conversation.callStatus = conversation.callId.callStatus;
+    conversation.startTime = conversation.callId.startTime;
+    conversation.endTime = conversation.callId.endTime;
+    conversation.duration = conversation.callId.duration;
+    conversation.callStartTime = conversation.callId.callStartTime;
+    conversation.callEndTime = conversation.callId.callEndTime;
+    conversation.callDuration = conversation.callId.callDuration;
+    conversation.callOutcome = conversation.callId.callOutcome;
+    conversation.callNotes = conversation.callId.callNotes;
+    conversation.agentId = conversation.callId.agentId;
+    conversation.callSid = conversation.callId.callSid;
+  }
+  
   res.status(httpStatus.CREATED).send(ConversationDTO(conversation));
 });
 
@@ -16,6 +42,26 @@ const addMessageToConversation = catchAsync(async (req, res) => {
   const { conversationId } = req.params;
   const { role, content } = req.body;
   const conversation = await conversationService.addMessageToConversation(conversationId, role, content);
+  
+  // Populate callId to get call data for DTO
+  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes agentId callSid');
+  
+  // Set fields from call for DTO compatibility
+  if (conversation.callId) {
+    conversation.status = conversation.callId.status;
+    conversation.callStatus = conversation.callId.callStatus;
+    conversation.startTime = conversation.callId.startTime;
+    conversation.endTime = conversation.callId.endTime;
+    conversation.duration = conversation.callId.duration;
+    conversation.callStartTime = conversation.callId.callStartTime;
+    conversation.callEndTime = conversation.callId.callEndTime;
+    conversation.callDuration = conversation.callId.callDuration;
+    conversation.callOutcome = conversation.callId.callOutcome;
+    conversation.callNotes = conversation.callId.callNotes;
+    conversation.agentId = conversation.callId.agentId;
+    conversation.callSid = conversation.callId.callSid;
+  }
+  
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
@@ -23,6 +69,25 @@ const getConversation = catchAsync(async (req, res) => {
   const conversation = await conversationService.getConversationById(req.params.conversationId);
   if (!conversation) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Conversation not found');
+  }
+  
+  // Populate callId to get call data for DTO
+  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes agentId callSid');
+  
+  // Set fields from call for DTO compatibility
+  if (conversation.callId) {
+    conversation.status = conversation.callId.status;
+    conversation.callStatus = conversation.callId.callStatus;
+    conversation.startTime = conversation.callId.startTime;
+    conversation.endTime = conversation.callId.endTime;
+    conversation.duration = conversation.callId.duration;
+    conversation.callStartTime = conversation.callId.callStartTime;
+    conversation.callEndTime = conversation.callId.callEndTime;
+    conversation.callDuration = conversation.callId.callDuration;
+    conversation.callOutcome = conversation.callId.callOutcome;
+    conversation.callNotes = conversation.callId.callNotes;
+    conversation.agentId = conversation.callId.agentId;
+    conversation.callSid = conversation.callId.callSid;
   }
   
   // Check if the caregiver has access to this conversation

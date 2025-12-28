@@ -5,6 +5,7 @@ const { Patient } = require('../models'); // Assuming Patient model includes pho
 const config = require('../config/config');
 const { Call } = require('../models');
 const ApiError = require('../utils/ApiError');
+const logger = require('../config/logger');
 
 const getCallById = async (id) => {
   const call = await Call.findById(id);
@@ -36,8 +37,33 @@ const sendResponseAsCall = async (callSid, textResponse) => {
   throw new ApiError(httpStatus.NOT_IMPLEMENTED, 'sendResponseAsCall needs to be updated to use new service structure');
 };
 
+/**
+ * Get the last contact time for a patient (most recent completed call)
+ * @param {string} patientId - The patient ID
+ * @returns {Date|null} - The endTime of the most recent completed call, or null if none found
+ */
+const getLastContactTime = async (patientId) => {
+  try {
+    // Query Calls directly instead of going through Conversations
+    const lastCall = await Call.findOne({
+      patientId,
+      status: 'completed',
+      endTime: { $exists: true }
+    })
+    .sort({ endTime: -1 }) // Most recent first
+    .select('endTime')
+    .lean();
+    
+    return lastCall?.endTime || null;
+  } catch (err) {
+    logger.error(`[Last Contact Time] Error: ${err.message}`);
+    return null;
+  }
+};
+
 module.exports = {
   getCallById,
   processCallRecording,
   sendResponseAsCall,
+  getLastContactTime,
 };

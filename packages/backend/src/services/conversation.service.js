@@ -193,23 +193,6 @@ const humanizeTimeDelta = (lastContactTime) => {
 /**
  * Get last contact time for a patient
  */
-const getLastContactTime = async (patientId) => {
-  try {
-    const lastConversation = await Conversation.findOne({
-      patientId,
-      endTime: { $exists: true }, // Only completed conversations
-      status: 'completed'
-    })
-    .sort({ endTime: -1 }) // Most recent first
-    .select('endTime')
-    .lean();
-    
-    return lastConversation?.endTime || null;
-  } catch (err) {
-    logger.error(`[Last Contact Time] Error: ${err.message}`);
-    return null;
-  }
-};
 
 /**
  * Get language name from language code
@@ -248,7 +231,8 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
     const conversationHistory = await getConversationHistory(patientId);
     
     // Get last contact time to avoid repetition
-    const lastContactTime = await getLastContactTime(patientId);
+    const { callService } = require('.');
+    const lastContactTime = await callService.getLastContactTime(patientId);
     const lastContactHumanized = lastContactTime ? humanizeTimeDelta(lastContactTime) : null;
 
     // Start with refined Bianca system prompt (voice-first, healthcare-aware)
@@ -378,9 +362,17 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       if (!messages || messages.length === 0) {
         await Conversation.findByIdAndUpdate(conversationId, {
           history: 'No conversation content recorded', // Use existing history field
-          endTime: new Date(),
-          status: 'completed'
         });
+        // Update the associated Call's endTime
+        const { Call } = require('../models');
+        const convWithCall = await Conversation.findById(conversationId).populate('callId');
+        if (convWithCall?.callId) {
+          await Call.findByIdAndUpdate(convWithCall.callId, {
+            endTime: new Date(),
+            status: 'completed',
+            callStatus: 'ended'
+          });
+        }
         return;
       }
 
@@ -399,9 +391,17 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       if (messages.length === 0) {
         await Conversation.findByIdAndUpdate(conversationId, {
           history: 'No conversation content recorded', // Use existing history field
-          endTime: new Date(),
-          status: 'completed'
         });
+        // Update the associated Call's endTime
+        const { Call } = require('../models');
+        const convWithCall = await Conversation.findById(conversationId).populate('callId');
+        if (convWithCall?.callId) {
+          await Call.findByIdAndUpdate(convWithCall.callId, {
+            endTime: new Date(),
+            status: 'completed',
+            callStatus: 'ended'
+          });
+        }
         return;
       }
 
@@ -450,8 +450,6 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     // Update conversation with summary and sentiment analysis
     const updateData = {
       history: summary, // Store summary in your existing history field
-      endTime: new Date(),
-      status: 'completed'
     };
 
     // Add sentiment analysis to analyzedData if successful
@@ -461,6 +459,17 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     }
 
     await Conversation.findByIdAndUpdate(conversationId, updateData);
+    
+    // Update the associated Call's endTime instead of Conversation
+    const { Call } = require('../models');
+    const convWithCall = await Conversation.findById(conversationId).populate('callId');
+    if (convWithCall?.callId) {
+      await Call.findByIdAndUpdate(convWithCall.callId, {
+        endTime: new Date(),
+        status: 'completed',
+        callStatus: 'ended'
+      });
+    }
 
     logger.info(`[Finalize] Successfully finalized conversation ${conversationId} with ${messages.length} messages${sentimentAnalysis && sentimentAnalysis.success ? ' and sentiment analysis' : ''}`);
     
@@ -528,274 +537,7 @@ const getPatientContext = async (patientId) => {
   }
 };
 
-/**
- * Get sentiment trend data for a patient over a specified time range
- */
-const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
-  try {
-    const now = new Date();
-    let startDate;
-
-    // Calculate start date based on time range
-    switch (timeRange) {
-      case 'lastCall':
-        // For lastCall, we'll get the most recent conversation with sentiment analysis
-        const lastConversation = await Conversation.findOne({
-          patientId,
-          'analyzedData.sentiment': { $exists: true }
-        })
-        .select('endTime')
-        .sort({ endTime: -1 })
-        .lean();
-        
-        if (lastConversation) {
-          // Get conversations from the last call date to now
-          startDate = lastConversation.endTime;
-        } else {
-          // No conversations with sentiment analysis, return empty data
-          return {
-            patientId,
-            timeRange,
-            startDate: now.toISOString(),
-            endDate: now.toISOString(),
-            totalConversations: 0,
-            analyzedConversations: 0,
-            dataPoints: [],
-            summary: {
-              averageSentiment: 0,
-              sentimentDistribution: {},
-              trendDirection: 'stable',
-              confidence: 0,
-              keyInsights: []
-            }
-          };
-        }
-        break;
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-        break;
-      case 'lifetime':
-        startDate = new Date(0); // Beginning of time
-        break;
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-    }
-
-    // Get conversations with sentiment analysis for the patient
-    const conversations = await Conversation.find({
-      patientId,
-      endTime: { $gte: startDate, $lte: now },
-      'analyzedData.sentiment': { $exists: true }
-    })
-      .select('_id startTime endTime duration analyzedData')
-      .sort({ endTime: 1 })
-      .lean();
-
-    // Get all conversations (including those without sentiment) for total count
-    const totalConversations = await Conversation.countDocuments({
-      patientId,
-      endTime: { $gte: startDate, $lte: now }
-    });
-
-    // Return raw conversation data for DTO transformation
-    const dataPoints = conversations; // Return raw conversations, let DTO handle transformation
-
-    logger.debug('SentimentTrend sample data', {
-      sampleConversation: dataPoints[0] ? {
-        id: dataPoints[0]._id,
-        date: dataPoints[0].date
-      } : null,
-      sampleSentiment: dataPoints[0]?.analyzedData?.sentiment
-    });
-
-    // Calculate summary statistics
-    const sentimentScores = conversations
-      .map(conv => conv.analyzedData.sentiment?.sentimentScore)
-      .filter(score => score !== undefined);
-
-    const averageSentiment = sentimentScores.length > 0 
-      ? sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length 
-      : 0;
-
-    // Calculate sentiment distribution
-    const sentimentDistribution = conversations.reduce((dist, conv) => {
-      const sentiment = conv.analyzedData.sentiment?.overallSentiment || 'unknown';
-      dist[sentiment] = (dist[sentiment] || 0) + 1;
-      return dist;
-    }, {});
-
-    // Calculate trend direction using linear regression
-    let trendDirection = 'stable';
-    let confidence = 0;
-    
-    logger.debug('SentimentTrend processing', {
-      patientId,
-      dataPointCount: dataPoints.length
-    });
-    
-    if (dataPoints.length >= 3) {
-      // Sort data points by date (oldest first) for proper trend calculation
-      const sortedDataPoints = dataPoints.sort((a, b) => new Date(a.date) - new Date(b.date));
-      const sentimentScores = sortedDataPoints.map(point => point.sentiment?.sentimentScore || 0);
-      
-      logger.debug('SentimentTrend sorted scores', {
-        patientId,
-        sentimentScores
-      });
-      
-      // Use linear regression to calculate trend
-      trendDirection = calculateLinearTrend(sentimentScores);
-      
-      logger.debug('SentimentTrend calculated direction', {
-        patientId,
-        trendDirection
-      });
-      
-      // Calculate confidence based on data quality and quantity
-      const scoreVariance = calculateVariance(sentimentScores);
-      const dataQuality = Math.min(1, dataPoints.length / 8); // Max at 8+ data points
-      const trendStrength = Math.min(1, scoreVariance * 2); // Higher variance = stronger trend
-      confidence = Math.min(0.95, (dataQuality + trendStrength) / 2);
-    } else if (dataPoints.length >= 2) {
-      // For 2 data points, use simple comparison with lower threshold
-      const sortedDataPoints = dataPoints.sort((a, b) => new Date(a.date) - new Date(b.date));
-      const firstScore = sortedDataPoints[0].sentiment?.sentimentScore || 0;
-      const lastScore = sortedDataPoints[sortedDataPoints.length - 1].sentiment?.sentimentScore || 0;
-      const difference = lastScore - firstScore;
-      
-      logger.debug('SentimentTrend 2-point comparison', {
-        patientId,
-        firstScore,
-        lastScore,
-        difference
-      });
-      
-      if (difference > 0.05) trendDirection = 'improving';
-      else if (difference < -0.05) trendDirection = 'declining';
-      
-      logger.debug('SentimentTrend 2-point direction', {
-        patientId,
-        trendDirection
-      });
-      
-      confidence = Math.min(0.6, dataPoints.length / 5); // Lower confidence for small datasets
-    } else {
-      confidence = 0.2; // Very low confidence for single data point
-    }
-
-    // Generate key insights
-    const keyInsights = [];
-    if (averageSentiment > 0.3) keyInsights.push('Patient shows generally positive sentiment');
-    else if (averageSentiment < -0.3) keyInsights.push('Patient shows generally negative sentiment');
-    
-    if (trendDirection === 'improving') keyInsights.push('Sentiment trend is improving over time');
-    else if (trendDirection === 'declining') keyInsights.push('Sentiment trend is declining over time');
-    
-    if (sentimentDistribution.negative > sentimentDistribution.positive) {
-      keyInsights.push('Patient has more negative than positive conversations');
-    }
-
-    return {
-      patientId,
-      timeRange,
-      startDate,
-      endDate: now,
-      totalConversations,
-      analyzedConversations: conversations.length,
-      dataPoints,
-      summary: {
-        averageSentiment,
-        sentimentDistribution,
-        trendDirection,
-        confidence,
-        keyInsights
-      }
-    };
-
-  } catch (error) {
-    logger.error(`[Sentiment Trend] Error getting sentiment trend for patient ${patientId}: ${error.message}`);
-    throw error;
-  }
-};
-
-/**
- * Get sentiment summary for a patient
- */
-const getSentimentSummary = async (patientId) => {
-  try {
-    // Get recent conversations (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const recentConversations = await Conversation.find({
-      patientId,
-      endTime: { $gte: thirtyDaysAgo }
-    })
-      .select('_id startTime endTime duration analyzedData')
-      .sort({ endTime: -1 })
-      .limit(10)
-      .lean();
-
-    const analyzedConversations = recentConversations.filter(conv => conv.analyzedData?.sentiment);
-    
-    // Calculate summary statistics
-    const sentimentScores = analyzedConversations
-      .map(conv => conv.analyzedData.sentiment?.sentimentScore)
-      .filter(score => score !== undefined);
-
-    const averageSentiment = sentimentScores.length > 0 
-      ? sentimentScores.reduce((sum, score) => sum + score, 0) / sentimentScores.length 
-      : 0;
-
-    // Calculate sentiment distribution
-    const sentimentDistribution = analyzedConversations.reduce((dist, conv) => {
-      const sentiment = conv.analyzedData.sentiment?.overallSentiment || 'unknown';
-      dist[sentiment] = (dist[sentiment] || 0) + 1;
-      return dist;
-    }, {});
-
-    // Calculate trend direction from recent conversations
-    let trendDirection = 'stable';
-    if (analyzedConversations.length >= 3) {
-      const recent = analyzedConversations.slice(0, 3);
-      const older = analyzedConversations.slice(3, 6);
-      
-      if (recent.length > 0 && older.length > 0) {
-        const recentAvg = recent.reduce((sum, conv) => sum + (conv.analyzedData.sentiment?.sentimentScore || 0), 0) / recent.length;
-        const olderAvg = older.reduce((sum, conv) => sum + (conv.analyzedData.sentiment?.sentimentScore || 0), 0) / older.length;
-        
-        if (recentAvg > olderAvg + 0.1) trendDirection = 'improving';
-        else if (recentAvg < olderAvg - 0.1) trendDirection = 'declining';
-      }
-    }
-
-    // Calculate confidence
-    const confidence = Math.min(1, analyzedConversations.length / 5);
-
-    // Generate key insights
-    const keyInsights = [];
-    if (averageSentiment > 0.3) keyInsights.push('Recent conversations show positive sentiment');
-    else if (averageSentiment < -0.3) keyInsights.push('Recent conversations show negative sentiment');
-    
-    if (trendDirection === 'improving') keyInsights.push('Recent sentiment trend is improving');
-    else if (trendDirection === 'declining') keyInsights.push('Recent sentiment trend is declining');
-
-    return {
-      totalConversations: recentConversations.length,
-      analyzedConversations: analyzedConversations.length,
-      averageSentiment,
-      sentimentDistribution,
-      trendDirection,
-      confidence,
-      keyInsights,
-      recentTrend: analyzedConversations.slice(0, 5) // Last 5 analyzed conversations
-    };
-
-  } catch (error) {
-    logger.error(`[Sentiment Summary] Error getting sentiment summary for patient ${patientId}: ${error.message}`);
-    throw error;
-  }
-};
+// getSentimentTrend and getSentimentSummary moved to sentiment.service.js
 
 // Medical Analysis Methods
 // In-memory storage for medical baselines (for testing purposes)
@@ -1304,10 +1046,6 @@ module.exports = {
   finalizeConversation,
   getPatientContext,
   
-  // Sentiment analysis methods
-  getSentimentTrend,
-  getSentimentSummary,
-  
   // Medical analysis methods
   getMedicalBaseline,
   storeMedicalBaseline,
@@ -1316,5 +1054,9 @@ module.exports = {
   storeMedicalAnalysisResult,
   deleteOldMedicalAnalyses,
   getActivePatients,
-  getConversationsByPatientAndDateRange
+  getConversationsByPatientAndDateRange,
+  
+  // Helper functions (exported for use in other services)
+  calculateLinearTrend,
+  calculateVariance
 };

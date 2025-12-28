@@ -552,7 +552,9 @@ const getMedicalAnalysisResults = catchAsync(async (req, res) => {
     }
     // For orgAdmin, verify patient belongs to their org
     else if (caregiver.role === 'orgAdmin') {
-      if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+      const patientOrgId = patient.org?._id ? patient.org._id.toString() : patient.org?.toString();
+      const caregiverOrgId = caregiver.org?._id ? caregiver.org._id.toString() : caregiver.org?.toString();
+      if (patientOrgId && caregiverOrgId && patientOrgId !== caregiverOrgId) {
         return res.status(httpStatus.FORBIDDEN).json({
           success: false,
           message: 'You do not have access to this patient\'s medical analysis'
@@ -621,7 +623,9 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
     }
     // For orgAdmin, verify patient belongs to their org
     else if (caregiver.role === 'orgAdmin') {
-      if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+      const patientOrgId = patient.org?._id ? patient.org._id.toString() : patient.org?.toString();
+      const caregiverOrgId = caregiver.org?._id ? caregiver.org._id.toString() : caregiver.org?.toString();
+      if (patientOrgId && caregiverOrgId && patientOrgId !== caregiverOrgId) {
         return res.status(httpStatus.FORBIDDEN).json({
           success: false,
           message: 'You do not have access to trigger medical analysis for this patient'
@@ -804,7 +808,9 @@ const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
     }
     // For orgAdmin, verify patient belongs to their org
     else if (caregiver.role === 'orgAdmin') {
-      if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+      const patientOrgId = patient.org?._id ? patient.org._id.toString() : patient.org?.toString();
+      const caregiverOrgId = caregiver.org?._id ? caregiver.org._id.toString() : caregiver.org?.toString();
+      if (patientOrgId && caregiverOrgId && patientOrgId !== caregiverOrgId) {
         return res.status(httpStatus.FORBIDDEN).json({
           success: false,
           message: 'You do not have access to this patient\'s medical analysis trends'
