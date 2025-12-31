@@ -303,7 +303,8 @@ export async function loginUserViaUI(page: Page, email: string, password: string
     
     // Check console logs for errors
     const consoleLogs = await page.evaluate(() => {
-      return window.console._logs || []
+      // @ts-ignore - _logs is a test-only property that may be added by test frameworks
+      return (window.console as any)._logs || []
     }).catch(() => [])
     
     if (consoleLogs.length > 0) {
