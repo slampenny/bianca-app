@@ -5,7 +5,10 @@
  *
  * https://reactnative.dev/docs/security#storing-sensitive-info
  */
+const PRIMARY_DOMAIN = "localhost";
+
 export default {
+  PRIMARY_DOMAIN,
   API_URL: "http://localhost:3000/v1",
   persistNavigation: "never", // Disable navigation persistence in tests
 } 

@@ -4,6 +4,7 @@ module.exports = function (api) {
     presets: ["babel-preset-expo"],
     plugins: [
       "@babel/plugin-proposal-export-namespace-from",
+      "@babel/plugin-transform-class-static-block", // Required for Playwright
       "babel-plugin-react-native-web",
       "react-native-reanimated/plugin" // must be last
     ],

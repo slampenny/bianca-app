@@ -6,7 +6,8 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 
 Given('the frontend is running on {string}', async function(baseURL) {
-  this.baseURL = baseURL;
+  // Use environment variable if set (for CI/CD), otherwise use the value from feature file
+  this.baseURL = process.env.FRONTEND_URL || process.env.BASE_URL || baseURL;
 });
 
 Given('the backend is running on {string}', async function(apiURL) {
