@@ -269,7 +269,7 @@ phases:
 
   build:
     commands:
-      - echo "Running all tests: unit tests and Cucumber E2E tests..."
+      - echo "Running all tests - unit tests and Cucumber E2E tests..."
       - |
         # Ensure Node.js 20 is available
         export NVM_DIR="$HOME/.nvm"
