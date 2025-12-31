@@ -236,3 +236,8 @@ export const PatientConsentScreen = () => {
 
 
 
+
+
+
+
+

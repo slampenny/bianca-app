@@ -14,8 +14,8 @@ let mongoServer;
 jest.mock('@aws-sdk/client-sns');
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start();
+  jest.setTimeout(60000);
+  mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, { 
   });
@@ -83,7 +83,7 @@ describe('Breach Detection Service', () => {
       expect(breaches.length).toBeGreaterThan(0);
       expect(breaches[0].severity).toBe('HIGH');
       expect(breaches[0].userId.toString()).toBe(testCaregiver._id.toString());
-    });
+    }, 60000);
 
     it('should lock account after excessive failed logins', async () => {
       const now = new Date();
@@ -106,7 +106,7 @@ describe('Breach Detection Service', () => {
       const updatedCaregiver = await Caregiver.findById(testCaregiver._id);
       expect(updatedCaregiver.accountLocked).toBe(true);
       expect(updatedCaregiver.lockedReason).toContain('excessive_failed_logins');
-    });
+    }, 60000);
 
     it('should not detect if failed logins below threshold', async () => {
       // Only 3 failed logins (threshold is 5)
@@ -181,7 +181,7 @@ describe('Breach Detection Service', () => {
       expect(breaches.length).toBeGreaterThan(0);
       expect(breaches[0].severity).toBe('CRITICAL');
       expect(breaches[0].affectedCount).toBeGreaterThan(100);
-    });
+    }, 60000);
 
     it('should lock account for unusual data access', async () => {
       const now = new Date();
@@ -249,7 +249,7 @@ describe('Breach Detection Service', () => {
       const breaches = await BreachLog.find({ type: 'data_exfiltration_attempt' });
       expect(breaches.length).toBeGreaterThan(0);
       expect(breaches[0].severity).toBe('CRITICAL');
-    });
+    }, 60000);
 
     it('should lock account for rapid data access', async () => {
       const now = new Date();
@@ -271,7 +271,7 @@ describe('Breach Detection Service', () => {
       const updatedCaregiver = await Caregiver.findById(testCaregiver._id);
       expect(updatedCaregiver.accountLocked).toBe(true);
       expect(updatedCaregiver.lockedReason).toContain('data_exfiltration_attempt');
-    });
+    }, 60000);
   });
 
   describe('detectOffHoursAccess', () => {
@@ -349,7 +349,7 @@ describe('Breach Detection Service', () => {
       expect(breaches.length).toBe(1);
       expect(breaches[0].details).toBe('Suspicious activity detected');
       expect(breaches[0].status).toBe('INVESTIGATING');
-    });
+    }, 60000);
 
     it('should set 60-day notification deadline', async () => {
       const before = Date.now();

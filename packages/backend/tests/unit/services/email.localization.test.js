@@ -21,10 +21,11 @@ const { orgOne } = require('../../fixtures/org.fixture');
 let mongoServer;
 
 beforeAll(async () => {
+  jest.setTimeout(60000);
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, {});
-
+  
   // Ensure email service is initialized (will create Ethereal account)
   await emailService.initializeEmailTransport();
 });

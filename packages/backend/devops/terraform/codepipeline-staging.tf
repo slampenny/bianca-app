@@ -263,7 +263,7 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
 
 resource "aws_codebuild_project" "staging_tests" {
   name         = "bianca-staging-tests"
-  description  = "Runs unit tests and Playwright E2E tests for staging pipeline"
+  description  = "Runs unit tests (backend and frontend) and Cucumber E2E tests for staging pipeline"
   service_role = aws_iam_role.codebuild_staging_role.arn
 
   artifacts {

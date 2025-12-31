@@ -4,7 +4,7 @@ const moment = require('moment');
 const config = require('./config');
 const logger = require('./logger');
 const Schedule = require('../models/schedule.model');
-const { patientService, twilioCallService, alertService, paymentService } = require('../services');
+const { patientService, alertService, paymentService } = require('../services');
 const { Org, Patient, Conversation } = require('../models');
 
 const agenda = new Agenda({
@@ -114,7 +114,8 @@ agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async
       return done();
     }
     
-    // Initiate the retry call
+    // Initiate the retry call (lazy load to avoid circular dependency)
+    const { twilioCallService } = require('../services');
     const newCallSid = await twilioCallService.initiateCall(patientId);
     
     // Find the new call record created by initiateCall
@@ -150,10 +151,14 @@ async function runSchedules() {
   for (const schedule of schedules) {
     // Check if today's day matches the schedule's day (using UTC)
     // schedule.time is stored in UTC, so we compare with UTC time
-    const interval = schedule.intervals.find(
-      (i) => i.day === (schedule.frequency === 'weekly' ? nowUTC.getUTCDay() : nowUTC.getUTCDate())
-    );
-    if (!interval) continue;
+    // For daily schedules, intervals can be empty (runs every day)
+    // For weekly/monthly schedules, we need to find a matching interval
+    if (schedule.frequency !== 'daily' && schedule.intervals.length > 0) {
+      const interval = schedule.intervals.find(
+        (i) => i.day === (schedule.frequency === 'weekly' ? nowUTC.getUTCDay() : nowUTC.getUTCDate())
+      );
+      if (!interval) continue;
+    }
 
     // Check if the current UTC time is within 15 minutes of the scheduled UTC time
     // schedule.time is stored in UTC (HH:mm format)
@@ -184,13 +189,45 @@ async function runSchedules() {
       continue;
     }
 
-    const patient = await patientService.getPatientById(schedule.patient);
+    // Get patient with org populated to check consent requirements
+    const patient = await Patient.findById(schedule.patient).populate('org');
     if (!patient) {
       logger.error(`Patient with ID ${schedule.patient} not found for schedule ${schedule.id}`);
       continue;
     }
 
+    if (!patient.org) {
+      logger.error(`Patient ${schedule.patient} has no org for schedule ${schedule.id}`);
+      continue;
+    }
+
+    const org = patient.org;
+    const hasConsent = await patientService.checkPatientConsent(schedule.patient);
+
+    // If org requires consent but patient hasn't consented, skip the call and alert caregivers
+    if (org.requirePatientConsent && !hasConsent) {
+      logger.warn(`Skipping scheduled call for patient ${schedule.patient} - consent required but not given`);
+      
+      await alertService.createAlert({
+        message: `Scheduled call to ${patient.name} was skipped because patient consent is required but has not been obtained. Please obtain consent from the patient before the next scheduled call.`,
+        importance: 'medium',
+        alertType: 'system',
+        relatedPatient: schedule.patient,
+        createdBy: schedule.id,
+        createdModel: 'Schedule',
+        visibility: 'assignedCaregivers',
+        relevanceUntil: moment().add(1, 'week').toISOString(),
+      });
+
+      // Still update nextCallDate so the schedule doesn't keep trying
+      schedule.calculateNextCallDate();
+      await schedule.save();
+      continue;
+    }
+
     try {
+      // Lazy load twilioCallService to avoid circular dependency
+      const { twilioCallService } = require('../services');
       logger.info(`Initiating call for patient with ID: ${schedule.patient}`);
       await twilioCallService.initiateCall(schedule.patient);
 

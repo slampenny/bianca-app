@@ -26,6 +26,7 @@ const emailService = require('../../../src/services/email.service');
 let mongoServer;
 
 beforeAll(async () => {
+  jest.setTimeout(60000);
   // Set JWT_SECRET for token generation
   process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-testing';
   

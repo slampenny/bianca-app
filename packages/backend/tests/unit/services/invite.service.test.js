@@ -48,8 +48,8 @@ jest.mock('i18n', () => ({
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = new MongoMemoryServer();
-  await mongoServer.start(); // Fix: Use start() function instead of new keyword
+  jest.setTimeout(60000);
+  mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, {});
   

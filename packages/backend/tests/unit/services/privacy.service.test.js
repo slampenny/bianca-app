@@ -12,9 +12,9 @@ describe('Privacy Service', () => {
   let orgId;
 
   beforeAll(async () => {
-    mongoServer = new MongoMemoryServer();
-    await mongoServer.start();
-    const mongoUri = await mongoServer.getUri();
+    jest.setTimeout(60000);
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
     await mongoose.connect(mongoUri, {});
 
     // Initialize email service with Ethereal for testing

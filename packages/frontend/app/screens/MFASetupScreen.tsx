@@ -227,13 +227,13 @@ export function MFASetupScreen() {
 
         {qrCode && (
           <View style={styles.qrContainer}>
-            <Image source={{ uri: qrCode }} style={styles.qrCode} />
+            <Image source={{ uri: qrCode }} style={styles.qrCode} testID="mfa-qr-code" accessibilityLabel="mfa-qr-code" />
             {secret && (
               <View style={styles.secretContainer}>
                 <Text style={styles.secretLabel}>
                   {translate("mfa.secretLabel") || "Or enter this secret manually:"}
                 </Text>
-                <Text style={styles.secretValue} selectable>
+                <Text style={styles.secretValue} selectable testID="mfa-secret-key" accessibilityLabel="mfa-secret-key">
                   {secret}
                 </Text>
               </View>
@@ -242,7 +242,7 @@ export function MFASetupScreen() {
         )}
 
         {backupCodes.length > 0 && (
-          <View style={styles.backupCodesContainer}>
+          <View style={styles.backupCodesContainer} testID="mfa-backup-codes" accessibilityLabel="mfa-backup-codes">
             <Text style={styles.backupCodesTitle}>
               {translate("mfa.backupCodesTitle") || "Backup Codes"}
             </Text>
@@ -458,7 +458,7 @@ export function MFASetupScreen() {
       />
 
       {backupCodes.length > 0 && (
-        <View style={styles.backupCodesContainer}>
+        <View style={styles.backupCodesContainer} testID="mfa-backup-codes" accessibilityLabel="mfa-backup-codes">
           <Text style={styles.backupCodesTitle}>
             {translate("mfa.backupCodesTitle") || "New Backup Codes"}
           </Text>

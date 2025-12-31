@@ -269,7 +269,7 @@ phases:
 
   build:
     commands:
-      - echo "Running Playwright E2E tests against Docker containers..."
+      - echo "Running all tests: unit tests and Cucumber E2E tests..."
       - |
         # Ensure Node.js 20 is available
         export NVM_DIR="$HOME/.nvm"
@@ -277,40 +277,113 @@ phases:
         nvm use 20
         # Re-export variables (they may not persist from pre_build)
         FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/frontend"
+        BACKEND_DIR="$CODEBUILD_SRC_DIR/packages/backend"
         export FRONTEND_DIR="$FRONTEND_DIR"
+        export BACKEND_DIR="$BACKEND_DIR"
         
-        echo "Frontend test code: $FRONTEND_DIR"
+        echo "Frontend directory: $FRONTEND_DIR"
+        echo "Backend directory: $BACKEND_DIR"
         echo "Node version: $(node --version)"
-        cd "$FRONTEND_DIR" || exit 1
         
-        # Set headless mode
-        export PLAYWRIGHT_HEADLESS=1
+        # Track overall test status
+        OVERALL_EXIT_CODE=0
+        
+        # Step 1: Run backend unit tests
+        echo ""
+        echo "=========================================="
+        echo "Step 1: Running Backend Unit Tests"
+        echo "=========================================="
+        cd "$BACKEND_DIR" || exit 1
+        set +e  # Don't exit on error, we'll handle it
+        NODE_NO_IOURING=1 yarn test:unit > /tmp/backend-unit-tests.log 2>&1
+        BACKEND_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show output
+        cat /tmp/backend-unit-tests.log
+        echo ""
+        echo "Backend unit tests exit code: $BACKEND_TEST_EXIT_CODE"
+        
+        if [ "$BACKEND_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Backend unit tests failed with exit code $BACKEND_TEST_EXIT_CODE"
+          OVERALL_EXIT_CODE=$BACKEND_TEST_EXIT_CODE
+        else
+          echo "✅ Backend unit tests passed!"
+        fi
+        
+        # Step 2: Run frontend unit tests
+        echo ""
+        echo "=========================================="
+        echo "Step 2: Running Frontend Unit Tests"
+        echo "=========================================="
+        cd "$FRONTEND_DIR" || exit 1
+        set +e  # Don't exit on error, we'll handle it
+        NODE_ENV=test yarn test > /tmp/frontend-unit-tests.log 2>&1
+        FRONTEND_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show output
+        cat /tmp/frontend-unit-tests.log
+        echo ""
+        echo "Frontend unit tests exit code: $FRONTEND_TEST_EXIT_CODE"
+        
+        if [ "$FRONTEND_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Frontend unit tests failed with exit code $FRONTEND_TEST_EXIT_CODE"
+          OVERALL_EXIT_CODE=$FRONTEND_TEST_EXIT_CODE
+        else
+          echo "✅ Frontend unit tests passed!"
+        fi
+        
+        # Step 3: Run Cucumber E2E tests (requires Docker containers from pre_build)
+        echo ""
+        echo "=========================================="
+        echo "Step 3: Running Cucumber E2E Tests"
+        echo "=========================================="
+        cd "$FRONTEND_DIR" || exit 1
         
         # Set frontend URL/port to match Docker container (port 8081, not default 8082)
         export FRONTEND_URL="http://localhost:8081"
         export FRONTEND_PORT="8081"
+        export BASE_URL="http://localhost:8081"
         
-        # Run Playwright tests
-        echo "Running Playwright tests against containers..."
+        # Run Cucumber tests
+        echo "Running Cucumber E2E tests against containers..."
         echo "Frontend URL: $FRONTEND_URL"
-        echo "Frontend Port: $FRONTEND_PORT"
+        echo "Backend URL: http://localhost:3000"
         set +e  # Don't exit on error, we'll handle it
-        NODE_ENV=test npx playwright test --project=chromium --reporter=list > /tmp/playwright-output.log 2>&1
-        TEST_EXIT_CODE=$?
+        NODE_ENV=test yarn test:cucumber > /tmp/cucumber-tests.log 2>&1
+        CUCUMBER_TEST_EXIT_CODE=$?
         set -e  # Re-enable exit on error
         
         # Show output
-        cat /tmp/playwright-output.log
+        cat /tmp/cucumber-tests.log
         echo ""
-        echo "Playwright exit code: $TEST_EXIT_CODE"
+        echo "Cucumber tests exit code: $CUCUMBER_TEST_EXIT_CODE"
         
-        if [ "$TEST_EXIT_CODE" -ne 0 ]; then
-          echo "❌ Tests failed with exit code $TEST_EXIT_CODE"
+        if [ "$CUCUMBER_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Cucumber E2E tests failed with exit code $CUCUMBER_TEST_EXIT_CODE"
           echo "=== Backend Container Logs ==="
           docker logs backend-test --tail 100 || true
           echo "=== Frontend Container Logs ==="
           docker logs frontend-test --tail 100 || true
-          exit $TEST_EXIT_CODE
+          OVERALL_EXIT_CODE=$CUCUMBER_TEST_EXIT_CODE
+        else
+          echo "✅ Cucumber E2E tests passed!"
+        fi
+        
+        # Final summary
+        echo ""
+        echo "=========================================="
+        echo "Test Summary"
+        echo "=========================================="
+        echo "Backend Unit Tests: $([ $BACKEND_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo "Frontend Unit Tests: $([ $FRONTEND_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo "Cucumber E2E Tests: $([ $CUCUMBER_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo ""
+        
+        if [ "$OVERALL_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Some tests failed. Overall exit code: $OVERALL_EXIT_CODE"
+          exit $OVERALL_EXIT_CODE
         fi
         echo "✅ All tests passed!"
 
@@ -321,9 +394,9 @@ phases:
         # Create artifacts directory
         mkdir -p /tmp/playwright-artifacts
         
-        # Copy Playwright reports and test results
-        if [ -d "$FRONTEND_DIR/playwright-report" ]; then
-          cp -r "$FRONTEND_DIR/playwright-report" /tmp/playwright-artifacts/ || true
+        # Copy Cucumber reports and test results
+        if [ -d "$FRONTEND_DIR/test/e2e/cucumber/reports" ]; then
+          cp -r "$FRONTEND_DIR/test/e2e/cucumber/reports" /tmp/playwright-artifacts/cucumber-reports || true
         fi
         if [ -d "$FRONTEND_DIR/test-results" ]; then
           cp -r "$FRONTEND_DIR/test-results" /tmp/playwright-artifacts/ || true
@@ -332,14 +405,20 @@ phases:
         # Copy container logs
         docker logs backend-test > /tmp/playwright-artifacts/backend.log 2>&1 || true
         docker logs frontend-test > /tmp/playwright-artifacts/frontend.log 2>&1 || true
-        if [ -f /tmp/playwright-output.log ]; then
-          cp /tmp/playwright-output.log /tmp/playwright-artifacts/playwright-output.log || true
+        if [ -f /tmp/backend-unit-tests.log ]; then
+          cp /tmp/backend-unit-tests.log /tmp/playwright-artifacts/backend-unit-tests.log || true
+        fi
+        if [ -f /tmp/frontend-unit-tests.log ]; then
+          cp /tmp/frontend-unit-tests.log /tmp/playwright-artifacts/frontend-unit-tests.log || true
+        fi
+        if [ -f /tmp/cucumber-tests.log ]; then
+          cp /tmp/cucumber-tests.log /tmp/playwright-artifacts/cucumber-tests.log || true
         fi
         
         # Create summary file
         {
-          echo "Playwright Test Run Summary"
-          echo "=========================="
+          echo "Test Run Summary"
+          echo "================"
           echo "Build ID: ${CODEBUILD_BUILD_ID}"
           echo "Sequential Build Number: ${SEQUENTIAL_BUILD_NUMBER:-${CODEBUILD_BUILD_NUMBER}}"
           echo "CodeBuild Build Number: ${CODEBUILD_BUILD_NUMBER}"
@@ -350,17 +429,24 @@ phases:
           echo "Yarn Version: $(yarn --version)"
           echo ""
           echo "Test Execution:"
-          echo "- Exit Code: ${TEST_EXIT_CODE:-unknown}"
+          echo "- Backend Unit Tests: $([ ${BACKEND_TEST_EXIT_CODE:-1} -eq 0 ] && echo 'PASSED' || echo 'FAILED')"
+          echo "- Frontend Unit Tests: $([ ${FRONTEND_TEST_EXIT_CODE:-1} -eq 0 ] && echo 'PASSED' || echo 'FAILED')"
+          echo "- Cucumber E2E Tests: $([ ${CUCUMBER_TEST_EXIT_CODE:-1} -eq 0 ] && echo 'PASSED' || echo 'FAILED')"
+          echo "- Overall Exit Code: ${OVERALL_EXIT_CODE:-unknown}"
+          echo ""
+          echo "Test Environment:"
           echo "- Frontend: http://localhost:8081"
           echo "- Backend: http://localhost:3000"
           echo "- MongoDB: mongodb://localhost:27017/bianca-app-test"
           echo ""
           echo "Artifacts:"
-          echo "- Playwright Report: playwright-report/index.html"
+          echo "- Cucumber Reports: cucumber-reports/"
           echo "- Test Results: test-results/"
           echo "- Backend Log: backend.log"
           echo "- Frontend Log: frontend.log"
-          echo "- Playwright Output: playwright-output.log"
+          echo "- Backend Unit Tests: backend-unit-tests.log"
+          echo "- Frontend Unit Tests: frontend-unit-tests.log"
+          echo "- Cucumber Tests: cucumber-tests.log"
         } > /tmp/playwright-artifacts/run-summary.txt
         
         # Copy artifacts to frontend directory for CodeBuild artifact collection
@@ -395,11 +481,13 @@ phases:
           echo "Uploading to S3 bucket: $S3_BUCKET"
           S3_PREFIX="test-results/${BUILD_NUMBER}-${BUILD_ID}"
           
-          # Upload HTML report (most important for viewing failures)
-          if [ -d "$FRONTEND_DIR/playwright-report" ]; then
-            echo "Uploading Playwright HTML report..."
-            aws s3 sync "$FRONTEND_DIR/playwright-report" "s3://${S3_BUCKET}/${S3_PREFIX}/playwright-report/" --quiet || true
-            echo "✅ HTML report uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/playwright-report/index.html"
+          # Upload Cucumber HTML report (most important for viewing failures)
+          if [ -d "$FRONTEND_DIR/test/e2e/cucumber/reports" ]; then
+            echo "Uploading Cucumber HTML report..."
+            aws s3 sync "$FRONTEND_DIR/test/e2e/cucumber/reports" "s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-reports/" --quiet || true
+            if [ -f "$FRONTEND_DIR/test/e2e/cucumber/reports/cucumber-report.html" ]; then
+              echo "✅ HTML report uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-reports/cucumber-report.html"
+            fi
           fi
           
           # Upload test results (screenshots, videos, traces)
@@ -417,17 +505,23 @@ phases:
           if [ -f /tmp/playwright-artifacts/frontend.log ]; then
             aws s3 cp /tmp/playwright-artifacts/frontend.log "s3://${S3_BUCKET}/${S3_PREFIX}/frontend.log" --quiet || true
           fi
-          if [ -f /tmp/playwright-artifacts/playwright-output.log ]; then
-            aws s3 cp /tmp/playwright-artifacts/playwright-output.log "s3://${S3_BUCKET}/${S3_PREFIX}/playwright-output.log" --quiet || true
+          if [ -f /tmp/playwright-artifacts/backend-unit-tests.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/backend-unit-tests.log "s3://${S3_BUCKET}/${S3_PREFIX}/backend-unit-tests.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/frontend-unit-tests.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/frontend-unit-tests.log "s3://${S3_BUCKET}/${S3_PREFIX}/frontend-unit-tests.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/cucumber-tests.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/cucumber-tests.log "s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-tests.log" --quiet || true
           fi
           if [ -f /tmp/playwright-artifacts/run-summary.txt ]; then
             aws s3 cp /tmp/playwright-artifacts/run-summary.txt "s3://${S3_BUCKET}/${S3_PREFIX}/run-summary.txt" --quiet || true
           fi
           
-          # Upload JUnit XML if it exists
-          if [ -f "$FRONTEND_DIR/test-results/junit.xml" ]; then
-            aws s3 cp "$FRONTEND_DIR/test-results/junit.xml" "s3://${S3_BUCKET}/${S3_PREFIX}/junit.xml" --quiet || true
-            echo "✅ JUnit XML uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/junit.xml"
+          # Upload JUnit XML if it exists (from Cucumber)
+          if [ -f "$FRONTEND_DIR/test/e2e/cucumber/reports/cucumber-report.json" ]; then
+            aws s3 cp "$FRONTEND_DIR/test/e2e/cucumber/reports/cucumber-report.json" "s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-report.json" --quiet || true
+            echo "✅ Cucumber JSON report uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-report.json"
           fi
           
           # Create a latest symlink (upload a metadata file pointing to latest)
@@ -437,7 +531,7 @@ phases:
           echo ""
           echo "✅ Test results uploaded to S3:"
           echo "   Base path: s3://${S3_BUCKET}/${S3_PREFIX}/"
-          echo "   HTML Report: s3://${S3_BUCKET}/${S3_PREFIX}/playwright-report/index.html"
+          echo "   Cucumber HTML Report: s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-reports/cucumber-report.html"
           echo "   Latest marker: s3://${S3_BUCKET}/test-results/latest.json"
         fi
       - echo "Cleaning up Docker containers..."
@@ -448,13 +542,14 @@ phases:
 
 artifacts:
   files:
-    - '**/playwright-report/**/*'
+    - '**/cucumber-reports/**/*'
     - '**/test-results/**/*'
-    - '**/test-results/junit.xml'
     - '**/backend.log'
     - '**/frontend.log'
-    - '**/playwright-output.log'
+    - '**/backend-unit-tests.log'
+    - '**/frontend-unit-tests.log'
+    - '**/cucumber-tests.log'
     - '**/run-summary.txt'
   base-directory: '**'
-  name: PlaywrightTestResults
+  name: TestResults
 

@@ -1,5 +1,6 @@
 const EmergencyPhrase = require('../models/emergencyPhrase.model');
 const logger = require('../config/logger');
+const mongoose = require('mongoose');
 
 /**
  * Localized Emergency Detection Service
@@ -32,6 +33,12 @@ class LocalizedEmergencyDetector {
    */
   async loadPhrases() {
     try {
+      // Check if mongoose is connected before attempting query
+      if (mongoose.connection.readyState !== 1) {
+        logger.debug('Mongoose not connected yet, skipping emergency phrase load');
+        return;
+      }
+      
       const phrases = await EmergencyPhrase.find({ isActive: true });
       this.phraseCache.clear();
       
@@ -46,7 +53,12 @@ class LocalizedEmergencyDetector {
       this.lastCacheUpdate = Date.now();
       logger.info(`Loaded ${phrases.length} emergency phrases for ${this.phraseCache.size} languages`);
     } catch (error) {
-      logger.error('Error loading emergency phrases:', error);
+      // Only log as error if mongoose is connected (otherwise it's expected during tests)
+      if (mongoose.connection.readyState === 1) {
+        logger.error('Error loading emergency phrases:', error);
+      } else {
+        logger.debug('Error loading emergency phrases (mongoose not connected):', error.message);
+      }
     }
   }
 
@@ -360,9 +372,19 @@ class LocalizedEmergencyDetector {
 const localizedEmergencyDetector = new LocalizedEmergencyDetector();
 
 // Initialize on module load (async, but won't block)
-localizedEmergencyDetector.initialize().catch((error) => {
-  logger.error('[Localized Emergency Detector] Failed to initialize on startup:', error);
-});
+// Only initialize if mongoose is already connected (to avoid errors during tests)
+if (mongoose.connection.readyState === 1) {
+  localizedEmergencyDetector.initialize().catch((error) => {
+    logger.error('[Localized Emergency Detector] Failed to initialize on startup:', error);
+  });
+} else {
+  // Wait for mongoose connection, then initialize
+  mongoose.connection.once('connected', () => {
+    localizedEmergencyDetector.initialize().catch((error) => {
+      logger.error('[Localized Emergency Detector] Failed to initialize after connection:', error);
+    });
+  });
+}
 
 module.exports = {
   LocalizedEmergencyDetector,

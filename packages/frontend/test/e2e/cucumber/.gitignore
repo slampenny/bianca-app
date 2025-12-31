@@ -1,0 +1,13 @@
+# Cucumber generated files
+reports/
+screenshots/
+
+# Keep directory structure
+!reports/.gitkeep
+!screenshots/.gitkeep
+
+
+
+
+
+
