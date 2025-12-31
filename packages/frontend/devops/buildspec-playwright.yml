@@ -346,6 +346,9 @@ phases:
         export FRONTEND_PORT="8081"
         export BASE_URL="http://localhost:8081"
         
+        # Ensure reports directory exists
+        mkdir -p test/e2e/cucumber/reports
+        
         # Run Cucumber tests
         echo "Running Cucumber E2E tests against containers..."
         echo "Frontend URL: $FRONTEND_URL"
