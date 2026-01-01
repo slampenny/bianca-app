@@ -50,5 +50,5 @@ module.exports = {
     }],
     '^.+\\.tsx?$': 'ts-jest',
     '^.+\\.js$': 'babel-jest',
-  }
+  },
 }

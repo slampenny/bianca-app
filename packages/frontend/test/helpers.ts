@@ -98,6 +98,42 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
     const caregiver = returnType.data.caregiver as Caregiver
     const org = (caregiver.org as any) as Org
     
+    // If email verification is required, verify it first using the test endpoint
+    if (returnType.data.requiresEmailVerification) {
+      try {
+        // Wait a bit for caregiver to be saved to database
+        await new Promise(resolve => setTimeout(resolve, 200))
+        
+        // Retry getting verification token (caregiver might not be immediately available)
+        let verificationResponse
+        let retries = 3
+        while (retries > 0) {
+          try {
+            // DEFAULT_API_CONFIG.url is "http://localhost:3000/v1", so we need /test/...
+            verificationResponse = await axios.post(`${DEFAULT_API_CONFIG.url}/test/send-verification-email`, { email })
+            break
+          } catch (err: any) {
+            retries--
+            if (retries === 0) throw err
+            await new Promise(resolve => setTimeout(resolve, 200))
+          }
+        }
+        
+        const verificationLink = verificationResponse!.data.details.verificationLinks.frontend
+        const tokenMatch = verificationLink.match(/token=([^&]+)/)
+        
+        if (tokenMatch && tokenMatch[1]) {
+          const verifyToken = tokenMatch[1]
+          // Verify the email (DEFAULT_API_CONFIG.url is "http://localhost:3000/v1")
+          await axios.get(`${DEFAULT_API_CONFIG.url}/auth/verify-email?token=${verifyToken}`)
+        } else {
+          throw new Error('Could not extract verification token from test endpoint response')
+        }
+      } catch (verifyError: any) {
+        throw new Error(`Failed to verify email for test user: ${verifyError.message || JSON.stringify(verifyError.response?.data || verifyError)}`)
+      }
+    }
+    
     // Login to get tokens (register doesn't return tokens)
     const loginResult = await authApi.endpoints.login.initiate({ email, password })(
       appStore.dispatch, 
@@ -105,9 +141,20 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
       {}
     )
     
-    let tokens = null
-    if (loginResult.data && 'tokens' in loginResult.data) {
-      tokens = loginResult.data.tokens
+    if ("error" in loginResult || !loginResult.data) {
+      throw new Error(`Login after registration failed: ${JSON.stringify(loginResult.error || 'Unknown error')}`)
+    }
+    
+    // Wait a bit for Redux store to update with tokens from the login matcher
+    // RTK Query matchers update the store asynchronously
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    // Verify tokens are in the store
+    const state = appStore.getState()
+    const tokens = (state.auth.tokens || (loginResult.data && 'tokens' in loginResult.data ? loginResult.data.tokens : null))
+    
+    if (!tokens) {
+      throw new Error(`Login succeeded but tokens not found in store: ${JSON.stringify(loginResult.data)}`)
     }
     
     return {
