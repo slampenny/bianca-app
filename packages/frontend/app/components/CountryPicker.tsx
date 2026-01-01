@@ -40,7 +40,7 @@ function getLocalizedCountryName(countryCode: string, locale: string, fallbackLa
   if (countryCode === 'OTHER') {
     // Try to translate "Other" - fallback to English if translation key doesn't exist
     try {
-      const translated = translate("common.other")
+      const translated = translate("common.other" as any)
       if (translated && translated !== "common.other") {
         return translated
       }

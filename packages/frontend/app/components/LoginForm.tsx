@@ -163,9 +163,10 @@ export const LoginForm: FC<LoginFormProps> = ({
       // - error.status: HTTP status code (e.g., 401) or 'CUSTOM_ERROR'
       // - error.data: Response body from backend (e.g., { code: 401, message: "..." })
       // - error.error: For CUSTOM_ERROR, format is {status: 'CUSTOM_ERROR', error: 'message'}
-      const errorData = error?.data
-      const errorStatus = error?.status
-      const customError = error?.error
+      const errorAny = error as any
+      const errorData = errorAny?.data
+      const errorStatus = errorAny?.status
+      const customError = errorAny?.error
       
       // Handle CUSTOM_ERROR format: {error: {status: 'CUSTOM_ERROR', error: 'Authentication cancelled'}}
       let errorMessage = null

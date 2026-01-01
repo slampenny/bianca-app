@@ -143,13 +143,13 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'initiated':
-        return colors.palette.warning
+        return colors.warning || colors.palette.warning500
       case 'in-progress':
-        return colors.palette.success
+        return colors.success || colors.palette.success500
       case 'completed':
-        return colors.palette.info
+        return colors.info || colors.palette.info500
       case 'failed':
-        return colors.palette.error
+        return colors.error || colors.palette.error500
       default:
         return colors.palette.neutral600
     }
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     color: colors.palette.neutral600,
   },
   endCallButton: {
-    backgroundColor: colors.palette.error,
+    backgroundColor: colors.error || colors.palette.error500,
     borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   errorText: {
-    color: colors.palette.error,
+    color: colors.error || colors.palette.error500,
     fontSize: 12,
     marginBottom: 8,
     textAlign: 'center',

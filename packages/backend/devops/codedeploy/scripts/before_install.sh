@@ -41,6 +41,8 @@ elif [ -d "/opt/bianca-staging" ]; then
   DEPLOY_DIR="/opt/bianca-staging"
   CONTAINER_PREFIX="staging"
   IMAGE_TAG="staging"
+  # CRITICAL: Set NODE_ENV=staging for staging deployment (NOT test!)
+  # Tests run with NODE_ENV=test in the RunTests CodeBuild stage
   NODE_ENV="staging"
   API_BASE_URL="https://staging-api.biancawellness.com"
   WEBSOCKET_URL="wss://staging-api.biancawellness.com"

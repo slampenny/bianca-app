@@ -72,7 +72,12 @@ export async function loginAndGetTokens(email: string, password: string) {
   if (!result.data) {
     throw new Error(`Login failed ${JSON.stringify(result.error)}`);
   }
-  return result.data.tokens;
+  // Login response can be either success with tokens or MFA requirement
+  if ('tokens' in result.data) {
+    return result.data.tokens;
+  } else {
+    throw new Error(`Login requires MFA - cannot get tokens`);
+  }
 }
 
 export function expectError(result: any, status: number, message: string) {
@@ -88,10 +93,27 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
   if ("error" in returnType) {
     throw new Error(`Registration failed with error: ${JSON.stringify(returnType.error)}`)
   } else {
+    // Register endpoint returns: { message, caregiver, requiresEmailVerification }
+    // It does NOT return org or tokens - need to get org from caregiver.org and login for tokens
+    const caregiver = returnType.data.caregiver as Caregiver
+    const org = (caregiver.org as any) as Org
+    
+    // Login to get tokens (register doesn't return tokens)
+    const loginResult = await authApi.endpoints.login.initiate({ email, password })(
+      appStore.dispatch, 
+      appStore.getState, 
+      {}
+    )
+    
+    let tokens = null
+    if (loginResult.data && 'tokens' in loginResult.data) {
+      tokens = loginResult.data.tokens
+    }
+    
     return {
-      org: returnType.data.org as Org,
-      caregiver: returnType.data.caregiver as Caregiver,
-      tokens: returnType.data.tokens,
+      org,
+      caregiver,
+      tokens,
     }
   }
 }

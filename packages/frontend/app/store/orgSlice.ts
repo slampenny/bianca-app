@@ -28,7 +28,8 @@ export const orgSlice = createSlice({
     builder
       .addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
         // Only set org if MFA is not required (when MFA is required, payload only has tempToken)
-        if (!payload.requireMFA && payload.org) {
+        // Login response can be either success with org data or MFA requirement
+        if ('org' in payload && payload.org) {
           state.org = payload.org as Org
         }
       })

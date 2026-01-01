@@ -53,14 +53,14 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
   // Get the display text based on props
   const getDisplayText = () => {
     if (tx) {
-      return translate(tx, txOptions)
+      return translate(tx as any, txOptions)
     }
     return title || ""
   }
 
   const getLoadingText = () => {
     if (loadingTx) {
-      return translate(loadingTx, txOptions)
+      return translate(loadingTx as any, txOptions)
     }
     if (loadingText) {
       return loadingText

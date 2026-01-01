@@ -53,8 +53,8 @@ export const patientSlice = createSlice({
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
       logger.debug("Login matchFulfilled:", payload)
-      // Only set patients if MFA is not required (when MFA is required, payload only has tempToken)
-      if (!payload.requireMFA && payload.caregiver && payload.patients) {
+      // Login response can be either success with patient data or MFA requirement
+      if ('caregiver' in payload && 'patients' in payload && payload.caregiver && payload.patients) {
         state.patients[payload.caregiver.id!] = []
         payload.patients.forEach((patient: Patient) => {
           state.patients[payload.caregiver.id!].push(patient)

@@ -5,9 +5,13 @@ import { RootState } from "../../store/store"
 // Event emitter for auth modal - we'll use a simple callback pattern
 let showAuthModalCallback: ((initialErrorMessage?: string) => void) | null = null
 
+// Extract the api parameter type from the return type of fetchBaseQuery
+type FetchBaseQuery = ReturnType<typeof fetchBaseQuery>
+type BaseQueryApi = Parameters<FetchBaseQuery>[1]
+
 interface PendingRequest {
   args: string | FetchArgs
-  api: unknown
+  api: BaseQueryApi
   extraOptions: unknown
   resolve: (result: unknown) => void
   reject: (error: unknown) => void

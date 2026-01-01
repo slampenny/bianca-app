@@ -132,7 +132,7 @@ function ThemedWebContainer({ children }: { children: React.ReactNode }) {
       width: '100%',
       alignSelf: 'center',
       marginHorizontal: 'auto',
-      backgroundColor: colors.palette.biancaBackground || (isDark ? colors.palette.neutral100 : '#ffffff'),
+      backgroundColor: (colors.palette as any).biancaBackground || colors.background || (isDark ? colors.palette.neutral100 : '#ffffff'),
       minHeight: '100vh',
       boxShadow: isDark 
         ? '0 0 20px rgba(0, 0, 0, 0.5)' 

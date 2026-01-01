@@ -182,7 +182,7 @@ export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
         </Text>
         <View style={styles.selectorContent}>
           <Text style={styles.currentLanguage}>{currentLanguage.nativeName}</Text>
-          <Icon icon="caretDown" size={16} color={colors.palette.neutral600} />
+          <Icon icon={"caretDown" as any} size={16} color={colors.palette.neutral600} />
         </View>
       </Pressable>
 

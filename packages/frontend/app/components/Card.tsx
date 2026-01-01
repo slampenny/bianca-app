@@ -12,7 +12,7 @@ import { spacing } from "../theme"
 import { useTheme } from "../theme/ThemeContext"
 import { Text, TextProps } from "./Text"
 
-type Presets = keyof typeof $containerPresets
+type Presets = "default" | "reversed"
 
 interface CardProps extends TouchableOpacityProps {
   /**

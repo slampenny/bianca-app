@@ -47,7 +47,10 @@ export const alertSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      state.alerts = payload.alerts
+      // Login response can be either success with alerts or MFA requirement
+      if ('alerts' in payload) {
+        state.alerts = payload.alerts
+      }
     })
     builder.addMatcher(alertApi.endpoints.markAllAsRead.matchFulfilled, (state, { payload }) => {
       // Iterate through each alert in the payload

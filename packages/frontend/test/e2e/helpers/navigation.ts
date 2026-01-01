@@ -250,7 +250,13 @@ export async function navigateToSchedules(page: Page) {
   // Now look for the "Manage Schedules" button on the patient screen
   // This button only appears for existing patients (not new patient mode)
   const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"]')
-  const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
+  // Wait for the button to appear or timeout, then count
+  try {
+    await manageSchedulesButton.waitFor({ timeout: 5000, state: 'visible' }).catch(() => {})
+  } catch {
+    // Button doesn't exist, that's okay
+  }
+  const buttonCount = await manageSchedulesButton.count()
   
   if (buttonCount === 0) {
     // Check if we're in new patient mode

@@ -4,7 +4,7 @@ import { Button } from "app/components/Button"
 import { Text } from "app/components/Text"
 import { useNavigation } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
-import { initiateCall } from "../services/api/callWorkflowApi"
+import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { colors } from "app/theme/colors"
 import { useAppDispatch } from "../store/store"
 import { setActiveCall, setCallStatus } from "../store/callSlice"
@@ -28,6 +28,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
   const [error, setError] = useState<string | null>(null)
   const navigation = useNavigation()
   const dispatch = useAppDispatch()
+  const [initiateCallMutation] = useInitiateCallMutation()
 
   const handleCallNow = async () => {
     if (isCalling) return
@@ -36,26 +37,25 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
     setError(null)
     
     try {
-      const response = await initiateCall({
+      const response = await initiateCallMutation({
         patientId,
         callNotes: `Manual call initiated by agent to ${patientName}`
-      })
+      }).unwrap()
       
       // Store call data in Redux
       logger.debug('CallNowButton - Full response:', response)
       logger.debug('CallNowButton - response.conversationId:', response.conversationId)
-      logger.debug('CallNowButton - response.data:', (response as any).data)
-      logger.debug('CallNowButton - response.success:', (response as any).success)
       
       dispatch(setActiveCall(response))
       // Conversation is now created immediately, so conversationId is always available
+      const callNotes = `Manual call initiated by agent to ${patientName}`
       dispatch(setCallStatus({
         conversationId: response.conversationId,
         status: response.status || 'initiated',
-        callStartTime: new Date().toISOString(),
-        callDuration: 0,
+        startTime: new Date().toISOString(),
+        duration: 0,
         callOutcome: null,
-        callNotes: response.callNotes,
+        callNotes,
         patient: {
           _id: patientId,
           name: patientName,
@@ -64,15 +64,14 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
         agent: {
           _id: response.agentId,
           name: response.agentName
-        },
-        status: response.status || "initiated"
+        }
       }))
       
       // Navigate to call screen
-      navigation.navigate("Call" as keyof HomeStackParamList)
+      ;(navigation as any).navigate("Call")
       
     } catch (err: any) {
-      const errorMessage = err?.response?.data?.message || 'Failed to initiate call'
+      const errorMessage = err?.data?.message || err?.message || 'Failed to initiate call'
       setError(errorMessage)
       logger.error('Call initiation error:', err)
     } finally {
@@ -106,7 +105,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   button: {
-    backgroundColor: colors.palette.biancaButtonSelected,
+    backgroundColor: (colors.palette as any).biancaButtonSelected || colors.tint,
     borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -118,7 +117,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   errorText: {
-    color: colors.palette.error,
+    color: colors.palette.angry500,
     fontSize: 12,
     marginBottom: 4,
     textAlign: "center",

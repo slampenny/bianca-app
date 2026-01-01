@@ -1,5 +1,8 @@
 version: 0.2
 
+# CRITICAL: This buildspec is used by the RunTests stage
+# NODE_ENV=test ensures tests use test configuration (Ethereal Mail, test DB, etc.)
+# This is DIFFERENT from staging deploy which uses NODE_ENV=staging
 env:
   variables:
     NODE_ENV: test

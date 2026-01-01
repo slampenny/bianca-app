@@ -166,7 +166,7 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
                   disabled={isLoading}
                   trackColor={{ 
                     false: colors.palette?.neutral300 || "#CCCCCC", 
-                    true: colors.palette?.biancaSuccess || colors.palette?.success500 || "#22C55E"
+                    true: (colors.palette as any)?.biancaSuccess || colors.success || colors.palette?.success500 || "#22C55E"
                   }}
                   // CRITICAL: Thumb should always be white/light for visibility on both dark and light tracks
                   thumbColor="#FFFFFF"

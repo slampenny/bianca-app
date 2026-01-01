@@ -44,12 +44,13 @@ export const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.register.matchFulfilled, (state, { payload }) => {
+      // Register endpoint doesn't return tokens - only caregiver info
       state.currentUser = payload.caregiver
-      state.tokens = payload.tokens
+      // Tokens are not set on register - user needs to verify email first
     })
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
-      // Only set user and tokens if MFA is not required (when MFA is required, payload only has tempToken)
-      if (!payload.requireMFA) {
+      // Login response can be either success with user data or MFA requirement
+      if ('caregiver' in payload && 'tokens' in payload) {
         state.currentUser = payload.caregiver
         state.tokens = payload.tokens
       }

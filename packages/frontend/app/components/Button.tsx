@@ -208,7 +208,7 @@ export function Button(props: ButtonProps) {
     if (preset === 'primary' || preset === 'success' || preset === 'danger' || preset === 'warning') {
       return colors.palette.neutral100 // White spinner on colored buttons
     }
-    return colors.palette.biancaHeader // Dark spinner on default buttons
+    return (colors.palette as any).biancaHeader || colors.text // Dark spinner on default buttons
   }
 
   return (

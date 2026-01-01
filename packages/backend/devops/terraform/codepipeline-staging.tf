@@ -1,6 +1,9 @@
 ################################################################################
 # CODEBUILD PROJECT FOR STAGING (EC2 Deployment)
 ################################################################################
+# NOTE: This project does NOT set NODE_ENV - it builds Docker images for staging
+# The actual NODE_ENV=staging is set during CodeDeploy deployment (see before_install.sh)
+# This ensures the build stage doesn't accidentally use test configuration
 
 resource "aws_codebuild_project" "staging_build" {
   name         = "bianca-staging-build"
@@ -39,6 +42,8 @@ resource "aws_codebuild_project" "staging_build" {
       name  = "AWS_REGION"
       value = var.aws_region
     }
+    # NOTE: NODE_ENV is NOT set here - it's set to "staging" during CodeDeploy deployment
+    # This ensures the build stage doesn't use test configuration
   }
 
   source {
@@ -260,6 +265,9 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
 ################################################################################
 # CODEBUILD PROJECT FOR TESTS (STAGING)
 ################################################################################
+# NOTE: This project runs with NODE_ENV=test to ensure tests use test configuration
+# (e.g., Ethereal Mail instead of SES, test database, etc.)
+# This is DIFFERENT from the staging deploy which uses NODE_ENV=staging
 
 resource "aws_codebuild_project" "staging_tests" {
   name         = "bianca-staging-tests"
@@ -281,6 +289,8 @@ resource "aws_codebuild_project" "staging_tests" {
       name  = "AWS_DEFAULT_REGION"
       value = var.aws_region
     }
+    # CRITICAL: Set NODE_ENV=test for test stage (NOT staging!)
+    # This ensures tests use test configuration (Ethereal Mail, test DB, etc.)
     environment_variable {
       name  = "NODE_ENV"
       value = "test"
