@@ -1,8 +1,8 @@
 {
   "name": "bianca_app_frontend",
-  "displayName": "MyPhoneFriend (Staging)",
+  "displayName": "Bianca (Staging)",
   "expo": {
-    "name": "MyPhoneFriend (Staging)",
+    "name": "Bianca (Staging)",
     "slug": "bianca_app_frontend",
     "scheme": "bianca",
     "version": "1.0.0",
@@ -57,6 +57,7 @@
     },
     "web": {
       "favicon": "./assets/images/app-icon-web-favicon.png",
+      "name": "Bianca",
       "splash": {
         "image": "./assets/images/splash-logo-web.png",
         "resizeMode": "contain",
