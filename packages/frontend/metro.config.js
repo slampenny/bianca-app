@@ -59,10 +59,13 @@ config.resolver = {
     /assets\/images\/app-icon-.*\.png/,
     /assets\/images\/playstore\.png/,
     /assets\/images\/appstore\.png/,
-    // Block test files from production builds
-    /.*\.test\.(ts|tsx|js|jsx)$/,
-    /.*__tests__\/.*/,
-    /test\/.*/,
+    // Block ALL test files from staging and production builds
+    // This ensures test code (describe, it, expect, etc.) never gets bundled
+    /.*\.test\.(ts|tsx|js|jsx|mjs)$/,           // *.test.ts, *.test.tsx, etc.
+    /.*\.spec\.(ts|tsx|js|jsx|mjs)$/,         // *.spec.ts, *.spec.tsx, etc.
+    /.*\.e2e\.test\.(ts|tsx|js|jsx|mjs)$/,    // *.e2e.test.ts, etc.
+    /.*__tests__\/.*/,                         // Any file in __tests__ directories
+    /test\/.*/,                                // Entire test/ directory (e2e tests, fixtures, helpers, etc.)
   ],
   // Add monorepo node_modules resolution
   nodeModulesPaths: [
