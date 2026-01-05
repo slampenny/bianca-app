@@ -65,7 +65,7 @@ config.resolver = {
     /.*\.spec\.(ts|tsx|js|jsx|mjs)$/,         // *.spec.ts, *.spec.tsx, etc.
     /.*\.e2e\.test\.(ts|tsx|js|jsx|mjs)$/,    // *.e2e.test.ts, etc.
     /.*__tests__\/.*/,                         // Any file in __tests__ directories
-    /test\/.*/,                                // Entire test/ directory (e2e tests, fixtures, helpers, etc.)
+    /^test\/.*/,                               // Root-level test/ directory only (e2e tests, fixtures, helpers, etc.)
   ],
   // Add monorepo node_modules resolution
   nodeModulesPaths: [
