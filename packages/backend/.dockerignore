@@ -181,13 +181,17 @@ jspm_packages/
 .DS_Store
 Thumbs.db
 
-# Test files
+# Test files - exclude all test files to prevent Jest globals (describe, it, expect) from being executed in production
 test/
 __tests__/
 *.test.js
 *.test.ts
 *.spec.js
 *.spec.ts
+# Explicitly exclude config.test files (common source of "describe is not defined" errors)
+**/config.test.*
+**/*config.test.*
+**/*.config.test.*
 
 # Documentation
 docs/
