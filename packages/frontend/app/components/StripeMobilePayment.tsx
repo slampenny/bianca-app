@@ -97,7 +97,7 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
       }
 
       const { error } = await initPaymentSheet({
-        merchantDisplayName: 'MyPhoneFriend',
+        merchantDisplayName: 'Bianca',
         paymentIntentClientSecret: '', // We'll create this when needed
         allowsDelayedPaymentMethods: true,
       })
@@ -131,7 +131,7 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
 
       // Initialize payment sheet with SetupIntent
       const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'MyPhoneFriend',
+        merchantDisplayName: 'Bianca',
         paymentIntentClientSecret: clientSecret,
         allowsDelayedPaymentMethods: true,
       })
