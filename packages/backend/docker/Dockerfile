@@ -55,10 +55,7 @@ RUN echo "Build timestamp: ${BUILD_TIMESTAMP:-unknown}, Git commit: ${GIT_COMMIT
 
 # Copy static config files (rarely change)
 # NOTE: .env files are NOT copied - Docker containers should get config from environment variables only
-# Split into multiple COPY commands for better error handling and to avoid issues with missing files
-COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig ./
-COPY --chown=node:node .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc ./
-COPY --chown=node:node LICENSE ecosystem.config.json ./
+COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
 
 # Copy source code (cache will be busted if files change)
 # Using GIT_COMMIT in a comment to help with cache invalidation
