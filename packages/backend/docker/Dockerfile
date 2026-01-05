@@ -53,9 +53,15 @@ ARG GIT_COMMIT
 # This ensures we always get the latest code even with Docker layer caching
 RUN echo "Build timestamp: ${BUILD_TIMESTAMP:-unknown}, Git commit: ${GIT_COMMIT:-unknown}"
 
+# Switch to root to ensure we can copy files properly
+USER root
+
 # Copy static config files (rarely change)
 # NOTE: .env files are NOT copied - Docker containers should get config from environment variables only
-COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
+# Split into multiple COPY commands for better error handling
+COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig ./
+COPY --chown=node:node .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc ./
+COPY --chown=node:node LICENSE ecosystem.config.json ./
 
 # Copy source code (cache will be busted if files change)
 # Using GIT_COMMIT in a comment to help with cache invalidation
@@ -66,6 +72,9 @@ COPY --chown=node:node tests/ ./tests/
 COPY --chown=node:node migrations/ ./migrations/
 COPY --chown=node:node migrate-mongo-config.js ./
 # Note: devops/ directory not needed in container - used only for infrastructure deployment
+
+# Switch back to node user
+USER node
 
 # Production stage - minimal final image
 FROM base AS production
