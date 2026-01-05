@@ -59,6 +59,10 @@ config.resolver = {
     /assets\/images\/app-icon-.*\.png/,
     /assets\/images\/playstore\.png/,
     /assets\/images\/appstore\.png/,
+    // Block test files from production builds
+    /.*\.test\.(ts|tsx|js|jsx)$/,
+    /.*__tests__\/.*/,
+    /test\/.*/,
   ],
   // Add monorepo node_modules resolution
   nodeModulesPaths: [

@@ -13,13 +13,4 @@ const config = {
   persistNavigation: "never", // Disable navigation persistence in tests
 }
 
-export default config
-
-// Simple test to satisfy Jest
-describe('config', () => {
-  it('should export config with required properties', () => {
-    expect(config.PRIMARY_DOMAIN).toBe('localhost')
-    expect(config.API_URL).toBe('http://localhost:3000/v1')
-    expect(config.persistNavigation).toBe('never')
-  })
-}) 
+export default config 
