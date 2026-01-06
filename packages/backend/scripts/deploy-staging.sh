@@ -1,6 +1,6 @@
 #!/bin/bash
-# Deploy staging via CI/CD (GitHub Actions)
-# This script pushes to staging branch and watches the deployment logs
+# Deploy staging via AWS CodePipeline
+# This script pushes to staging branch and monitors the CodePipeline deployment
 
 set -e
 
@@ -11,8 +11,13 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🚀 Deploying to Staging via CI/CD${NC}"
+echo -e "${BLUE}🚀 Deploying to Staging via AWS CodePipeline${NC}"
 echo ""
+
+# Configuration
+AWS_REGION="us-east-2"
+AWS_PROFILE="jordan"
+PIPELINE_NAME="bianca-staging-pipeline"
 
 # Check if we're in a git repo
 if ! git rev-parse --git-dir > /dev/null 2>&1; then
@@ -49,6 +54,7 @@ if [ "$CURRENT_BRANCH" != "staging" ]; then
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         DEPLOY_FROM_CURRENT_BRANCH=true
         echo -e "${BLUE}✅ Will deploy from '$CURRENT_BRANCH' branch${NC}"
+        echo -e "${YELLOW}⚠️  Note: CodePipeline is configured for 'staging' branch. You may need to manually trigger the pipeline.${NC}"
     else
         # Stash any uncommitted changes
         if ! git diff-index --quiet HEAD -- 2>/dev/null; then
@@ -75,62 +81,28 @@ if [ "$CURRENT_BRANCH" != "staging" ]; then
     fi
 fi
 
-# Check GitHub CLI
-if ! command -v gh &> /dev/null; then
-    echo -e "${RED}❌ GitHub CLI (gh) not found!${NC}"
+# Check AWS CLI
+if ! command -v aws &> /dev/null; then
+    echo -e "${RED}❌ AWS CLI not found!${NC}"
     echo ""
     echo "   Install it:"
-    echo "   • Ubuntu/Debian: sudo apt install gh"
-    echo "   • Or: https://cli.github.com/"
+    echo "   • Ubuntu/Debian: sudo apt install awscli"
+    echo "   • Or: https://aws.amazon.com/cli/"
     exit 1
 fi
 
-# Check GitHub CLI version (need 2.0+ for 'gh run' commands)
-GH_VERSION=$(gh version 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "0.0.0")
-if [ -z "$GH_VERSION" ] || [ "$GH_VERSION" = "0.0.0" ]; then
-    echo -e "${YELLOW}⚠️  Could not determine GitHub CLI version${NC}"
-    echo "   Attempting to use anyway..."
-else
-    echo -e "${BLUE}📦 GitHub CLI version: $GH_VERSION${NC}"
+# Check AWS credentials
+echo -e "${BLUE}🔐 Checking AWS credentials...${NC}"
+if ! aws sts get-caller-identity --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null 2>&1; then
+    echo -e "${RED}❌ AWS credentials not configured${NC}"
+    echo "   Please run: aws configure --profile $AWS_PROFILE"
+    exit 1
 fi
-
-# Check GitHub CLI authentication
-echo -e "${BLUE}🔐 Checking GitHub authentication...${NC}"
-if ! gh auth status &> /dev/null; then
-    echo -e "${YELLOW}⚠️  GitHub CLI not authenticated${NC}"
-    echo ""
-    echo "   Starting authentication process..."
-    echo "   (This will open a browser or prompt for token)"
-    echo ""
-    if gh auth login; then
-        echo -e "${GREEN}✅ Authentication successful!${NC}"
-    else
-        echo -e "${RED}❌ Authentication failed${NC}"
-        echo ""
-        echo "   You can authenticate manually:"
-        echo "   gh auth login"
-        echo ""
-        echo "   Or use a token:"
-        echo "   gh auth login --with-token < token.txt"
-        exit 1
-    fi
-else
-    echo -e "${GREEN}✅ GitHub CLI authenticated${NC}"
-fi
-
-echo -e "${GREEN}✅ GitHub CLI ready${NC}"
+echo -e "${GREEN}✅ AWS credentials OK${NC}"
 echo ""
 
-# Get remote URL to check repo
-REPO=$(git remote get-url origin 2>/dev/null | sed -E 's/.*github.com[:/]([^/]+\/[^/]+)(\.git)?$/\1/')
-echo -e "${BLUE}📦 Repository: $REPO${NC}"
-
-# Deploy based on mode
-RUN_ID=""
-RUN_URL=""
-
+# Push to staging branch
 if [ "$DEPLOY_FROM_CURRENT_BRANCH" = true ]; then
-    # Deploy from current branch using workflow_dispatch
     echo ""
     echo -e "${BLUE}📤 Pushing '$CURRENT_BRANCH' branch to remote...${NC}"
     if ! git push origin "$CURRENT_BRANCH" 2>/dev/null; then
@@ -141,145 +113,97 @@ if [ "$DEPLOY_FROM_CURRENT_BRANCH" = true ]; then
         }
     fi
     echo -e "${GREEN}✅ Push successful!${NC}"
-    
     echo ""
-    echo -e "${BLUE}🚀 Triggering workflow for branch '$CURRENT_BRANCH'...${NC}"
-    
-    # Trigger workflow with branch parameter
-    if gh workflow run deploy-staging.yml --ref "$CURRENT_BRANCH" -f branch="$CURRENT_BRANCH" 2>/dev/null; then
-        echo -e "${GREEN}✅ Workflow triggered!${NC}"
-    else
-        echo -e "${RED}❌ Failed to trigger workflow${NC}"
-        echo "   Make sure you have permission to trigger workflows"
-        exit 1
-    fi
-    
-    # Wait a moment for workflow to start
-    echo ""
-    echo -e "${BLUE}⏳ Waiting for workflow to start...${NC}"
-    sleep 5
-    
-    # Get the latest workflow run
-    echo ""
-    echo -e "${BLUE}🔍 Finding workflow run...${NC}"
-    
-    if gh run list --workflow=deploy-staging.yml --help &> /dev/null; then
-        MAX_WAIT=30
-        WAIT_COUNT=0
-        
-        while [ -z "$RUN_ID" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-            RUN_ID=$(gh run list --workflow=deploy-staging.yml --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
-            if [ -z "$RUN_ID" ]; then
-                sleep 2
-                WAIT_COUNT=$((WAIT_COUNT + 2))
-                echo -n "."
-            fi
-        done
-        echo ""
-    fi
+    echo -e "${YELLOW}⚠️  Note: CodePipeline is configured for 'staging' branch.${NC}"
+    echo "   To deploy from this branch, you'll need to manually trigger the pipeline or merge to staging."
 else
     # Traditional deployment: push to staging branch
     echo ""
     echo -e "${BLUE}📤 Pushing to staging branch...${NC}"
     if git push origin staging; then
         echo -e "${GREEN}✅ Push successful!${NC}"
+        echo ""
+        echo -e "${BLUE}⏳ CodePipeline should trigger automatically...${NC}"
     else
         echo -e "${RED}❌ Push failed!${NC}"
         exit 1
     fi
-    
-    # Wait a moment for GitHub to register the push
-    echo ""
-    echo -e "${BLUE}⏳ Waiting for workflow to start...${NC}"
-    sleep 5
-    
-    # Get the latest workflow run
-    echo ""
-    echo -e "${BLUE}🔍 Finding workflow run...${NC}"
-    
-    if gh run list --workflow=deploy-staging.yml --help &> /dev/null; then
-        MAX_WAIT=30
-        WAIT_COUNT=0
-        
-        while [ -z "$RUN_ID" ] && [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-            RUN_ID=$(gh run list --workflow=deploy-staging.yml --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || echo "")
-            if [ -z "$RUN_ID" ]; then
-                sleep 2
-                WAIT_COUNT=$((WAIT_COUNT + 2))
-                echo -n "."
-            fi
-        done
-        echo ""
-    fi
 fi
 
-# Watch the workflow run
-if [ -n "$RUN_ID" ]; then
-    RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
-    echo -e "${GREEN}✅ Found workflow run: $RUN_ID${NC}"
-    echo ""
-    echo -e "${BLUE}📊 Watching deployment logs...${NC}"
-    echo -e "${BLUE}   (Press Ctrl+C to stop watching, but deployment will continue)${NC}"
-    echo ""
-    
-    # Try to watch the logs
-    if gh run watch "$RUN_ID" 2>/dev/null; then
-        # Successfully watched
-        :
-    else
-        echo ""
-        echo -e "${YELLOW}⚠️  Could not watch logs in real-time${NC}"
-        echo "   View logs at: $RUN_URL"
-    fi
-else
-    echo -e "${YELLOW}⚠️  Could not find workflow run automatically${NC}"
-    RUN_URL="https://github.com/$REPO/actions"
-fi
-
-# Get final status
+# Wait a moment for CodePipeline to start
 echo ""
-echo -e "${BLUE}📋 Checking final status...${NC}"
+echo -e "${BLUE}⏳ Waiting for CodePipeline to start...${NC}"
+sleep 5
 
-if [ -n "$RUN_ID" ] && gh run view --help &> /dev/null; then
-    STATUS=$(gh run view "$RUN_ID" --json conclusion --jq '.conclusion' 2>/dev/null || echo "unknown")
-else
-    STATUS="unknown"
-    echo -e "${YELLOW}⚠️  Could not check status automatically${NC}"
-    echo "   Please check manually at: $RUN_URL"
-fi
-
-if [ "$STATUS" = "success" ]; then
-    echo -e "${GREEN}✅ Deployment successful!${NC}"
+# Check pipeline status
+echo ""
+echo -e "${BLUE}🔍 Checking CodePipeline status...${NC}"
+if ! aws codepipeline get-pipeline --name "$PIPELINE_NAME" --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠️  Pipeline '$PIPELINE_NAME' not found or not accessible${NC}"
+    echo "   Deployment may still be in progress via auto-trigger"
     echo ""
-    echo -e "${GREEN}🌐 Staging API: https://staging-api.biancawellness.com${NC}"
-    echo -e "${GREEN}🌐 Staging Frontend: https://staging.biancawellness.com${NC}"
-    echo -e "${GREEN}📊 PostHog Analytics: https://staging-analytics.biancawellness.com${NC}"
-    if [ -n "$RUN_URL" ]; then
-        echo -e "${BLUE}📋 Workflow logs: $RUN_URL${NC}"
-    fi
-    exit 0
-elif [ "$STATUS" = "failure" ] || [ "$STATUS" = "cancelled" ]; then
-    echo -e "${RED}❌ Deployment failed!${NC}"
+    echo -e "${BLUE}💡 You can check pipeline status manually:${NC}"
+    echo "   aws codepipeline list-pipeline-executions \\"
+    echo "     --pipeline-name $PIPELINE_NAME \\"
+    echo "     --profile $AWS_PROFILE \\"
+    echo "     --region $AWS_REGION"
     echo ""
-    if [ -n "$RUN_URL" ]; then
-        echo "   View full logs: $RUN_URL"
-    else
-        echo "   View full logs: https://github.com/$REPO/actions"
-    fi
-    if [ -n "$RUN_ID" ] && gh run view --help &> /dev/null; then
-        echo "   Or run: gh run view $RUN_ID --log"
-    fi
-    exit 1
-else
-    echo -e "${YELLOW}⚠️  Deployment status: $STATUS${NC}"
-    if [ -n "$RUN_URL" ]; then
-        echo "   View logs: $RUN_URL"
-    else
-        echo "   View logs: https://github.com/$REPO/actions"
-    fi
-    echo ""
-    echo -e "${BLUE}💡 Tip: Check the workflow status in your browser${NC}"
-    echo "   $RUN_URL"
+    echo -e "${BLUE}🔗 Or view in AWS Console:${NC}"
+    echo "   https://${AWS_REGION}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${PIPELINE_NAME}/view?region=${AWS_REGION}"
     exit 0
 fi
 
+# Get latest pipeline execution
+LATEST_EXECUTION=$(aws codepipeline list-pipeline-executions \
+    --pipeline-name "$PIPELINE_NAME" \
+    --profile "$AWS_PROFILE" \
+    --region "$AWS_REGION" \
+    --max-results 1 \
+    --query 'pipelineExecutionSummaries[0]' \
+    --output json 2>/dev/null)
+
+if [ -n "$LATEST_EXECUTION" ] && [ "$LATEST_EXECUTION" != "null" ]; then
+    EXECUTION_ID=$(echo "$LATEST_EXECUTION" | grep -o '"pipelineExecutionId":"[^"]*"' | cut -d'"' -f4)
+    STATUS=$(echo "$LATEST_EXECUTION" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    START_TIME=$(echo "$LATEST_EXECUTION" | grep -o '"startTime":"[^"]*"' | cut -d'"' -f4)
+    
+    echo -e "${GREEN}✅ Found pipeline execution: $EXECUTION_ID${NC}"
+    echo "   Status: $STATUS"
+    echo "   Started: $START_TIME"
+    echo ""
+    
+    if [ "$STATUS" = "Succeeded" ]; then
+        echo -e "${GREEN}✅ Deployment successful!${NC}"
+    elif [ "$STATUS" = "InProgress" ]; then
+        echo -e "${YELLOW}⏳ Deployment is still running...${NC}"
+        echo ""
+        echo -e "${BLUE}💡 Monitor progress:${NC}"
+        echo "   aws codepipeline get-pipeline-execution \\"
+        echo "     --pipeline-name $PIPELINE_NAME \\"
+        echo "     --pipeline-execution-id $EXECUTION_ID \\"
+        echo "     --profile $AWS_PROFILE \\"
+        echo "     --region $AWS_REGION"
+    elif [ "$STATUS" = "Failed" ]; then
+        echo -e "${RED}❌ Deployment failed!${NC}"
+    fi
+    
+    echo ""
+    echo -e "${BLUE}🔗 View in AWS Console:${NC}"
+    echo "   https://${AWS_REGION}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${PIPELINE_NAME}/executions/${EXECUTION_ID}/timeline?region=${AWS_REGION}"
+else
+    echo -e "${YELLOW}⚠️  No pipeline executions found yet${NC}"
+    echo "   The pipeline may still be starting, or it may not have triggered automatically."
+    echo ""
+    echo -e "${BLUE}💡 You can manually trigger the pipeline:${NC}"
+    echo "   ./packages/backend/scripts/trigger-staging-pipeline.sh"
+    echo ""
+    echo -e "${BLUE}🔗 Or view in AWS Console:${NC}"
+    echo "   https://${AWS_REGION}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${PIPELINE_NAME}/view?region=${AWS_REGION}"
+fi
+
+echo ""
+echo -e "${GREEN}🌐 Staging API: https://staging-api.biancawellness.com${NC}"
+echo -e "${GREEN}🌐 Staging Frontend: https://staging.biancawellness.com${NC}"
+echo -e "${GREEN}📊 PostHog Analytics: https://staging-analytics.biancawellness.com${NC}"
+echo ""
+echo -e "${YELLOW}⏳ Pipeline typically takes 7-10 minutes to complete${NC}"

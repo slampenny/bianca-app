@@ -67,8 +67,8 @@ test_command "Route53: List hosted zones" \
 test_command "ACM: List certificates" \
     "aws acm list-certificates --profile jordan --query 'CertificateSummaryList[0].DomainName' --output text"
 
-test_command "IAM: Get GitHub Actions role" \
-    "aws iam get-role --role-name github-actions-deploy-role --profile jordan --query 'Role.RoleName' --output text"
+test_command "IAM: Get CodeBuild role" \
+    "aws iam get-role --role-name codebuild-staging-role --profile jordan --query 'Role.RoleName' --output text"
 
 test_command "ECR: Describe repositories" \
     "aws ecr describe-repositories --profile jordan --query 'repositories[0].repositoryName' --output text"

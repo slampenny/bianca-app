@@ -48,15 +48,15 @@ This document summarizes all deployment optimizations implemented to reduce stag
 
 **Time Savings**: ~1-2 minutes
 
-### 5. GitHub Actions CI/CD ✅
-**Location**: `.github/workflows/deploy-staging.yml`
+### 5. AWS CodePipeline CI/CD ✅
+**Location**: `devops/terraform/codepipeline-staging.tf`
 
 **Features**:
 - Auto-deploys when code is pushed to `staging` branch
-- Parallel Docker builds and pushes
+- Parallel Docker builds and pushes via CodeBuild
 - Terraform skip logic
 - Automatic instance startup if stopped
-- SSM-based container updates
+- SSM-based container updates via CodeDeploy
 - Full error handling and status reporting
 
 **Benefits**:
@@ -93,33 +93,11 @@ cd bianca-app-backend
 
 ### Automatic Deployment (CI/CD)
 1. Push code to `staging` branch
-2. GitHub Actions automatically:
-   - Builds images in parallel
+2. AWS CodePipeline automatically:
+   - Triggers CodeBuild to build images in parallel
    - Pushes to ECR
-   - Deploys infrastructure (if changed)
-   - Updates containers
-
-### GitHub Setup (OIDC - No Secrets Needed!)
-
-**No long-lived credentials required!** We use AWS OIDC (OpenID Connect) for secure authentication.
-
-**One-time setup:**
-1. Deploy the OIDC provider and IAM role:
-   ```bash
-   cd bianca-app-backend/devops/terraform
-   terraform apply  # This creates the GitHub Actions IAM role
-   ```
-
-2. Get the role ARN:
-   ```bash
-   terraform output github_actions_role_arn
-   ```
-
-3. Add ONE GitHub Secret:
-   - Go to GitHub repo → Settings → Secrets and variables → Actions
-   - Add secret: `AWS_ROLE_ARN` = (the ARN from step 2)
-
-That's it! No access keys, no secrets to rotate. The role ARN is public and safe to store in GitHub Secrets.
+   - Runs Terraform to deploy infrastructure (if changed)
+   - Uses CodeDeploy to update containers on EC2 instance
 
 ## Branch Strategy
 

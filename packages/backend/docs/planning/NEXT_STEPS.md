@@ -2,10 +2,8 @@
 
 ## ✅ What's Done
 
-1. ✅ OIDC infrastructure deployed
-2. ✅ GitHub secret `AWS_ROLE_ARN` added
-3. ✅ All optimizations implemented
-4. ✅ Workflow file created in backend repo
+1. ✅ All optimizations implemented
+2. ✅ CodePipeline configured for automatic deployments
 
 ## 🚀 Next Steps
 
@@ -22,7 +20,6 @@ git commit -m "feat: Add deployment optimizations and CI/CD
 - Terraform drift fixes (2-3 min savings)
 - Terraform skip logic (2-3 min savings)
 - Optimized container updates (1-2 min savings)
-- GitHub Actions CI/CD with OIDC
 - Total: ~50-65% faster deployments"
 
 # Create/switch to staging branch
@@ -55,12 +52,12 @@ git merge fix/deploy-opti
 git push origin staging
 ```
 
-## 🧪 Testing the Workflow
+## 🧪 Testing the Deployment
 
 Once you push to `staging` branch:
 
-1. Go to GitHub: `https://github.com/slampenny/bianca-backend-app/actions`
-2. You should see a workflow run start automatically
+1. CodePipeline will automatically trigger
+2. Check AWS Console: CodePipeline → bianca-staging-pipeline
 3. Watch it build images in parallel, deploy infrastructure, and update containers
 
 ## 📊 Expected Results
@@ -72,16 +69,16 @@ Once you push to `staging` branch:
 
 ## 🔍 Monitoring
 
-- Check workflow runs: GitHub Actions tab
+- Check pipeline status: AWS CodePipeline Console
 - Check deployment: `https://staging-api.biancawellness.com/health`
 - Check PostHog: `https://staging-analytics.biancawellness.com`
 
 ## 🐛 Troubleshooting
 
-If the workflow fails:
+If the pipeline fails:
 
-1. Check GitHub Actions logs
-2. Verify `AWS_ROLE_ARN` secret is set correctly
+1. Check CodePipeline logs in AWS Console
+2. Check CodeBuild logs for build failures
 3. Check IAM role permissions in AWS Console
-4. Verify OIDC provider exists: `aws iam list-open-id-connect-providers`
+4. Verify pipeline configuration: `aws codepipeline get-pipeline --name bianca-staging-pipeline`
 
