@@ -19,18 +19,30 @@ AWS_REGION="us-east-2"
 
 echo "   Detecting environment..."
 
-# Method 1: Check environment variables first (highest priority)
+# Method 1: Check /etc/environment file first (set by userdata)
+# CodeDeploy scripts don't automatically source /etc/environment, so read it directly
+if [ -f "/etc/environment" ]; then
+  ENV_FROM_FILE=$(grep "^ENVIRONMENT=" /etc/environment 2>/dev/null | cut -d'=' -f2 | tr -d '"' | xargs)
+  if [ -n "$ENV_FROM_FILE" ]; then
+    echo "   ✅ Found ENVIRONMENT in /etc/environment: $ENV_FROM_FILE"
+    DETECTED_ENV="$ENV_FROM_FILE"
+  fi
+fi
+
+# Method 2: Check environment variables (if not already set from /etc/environment)
 # These can be set via userdata, /etc/environment, or manually
-if [ -n "$ENVIRONMENT" ]; then
-  echo "   ✅ Found ENVIRONMENT variable: $ENVIRONMENT"
-  DETECTED_ENV="$ENVIRONMENT"
-elif [ -n "$DEPLOYMENT_ENVIRONMENT" ]; then
-  echo "   ✅ Found DEPLOYMENT_ENVIRONMENT variable: $DEPLOYMENT_ENVIRONMENT"
-  DETECTED_ENV="$DEPLOYMENT_ENVIRONMENT"
-elif [ -n "$NODE_ENV" ] && [ "$NODE_ENV" != "test" ]; then
-  # NODE_ENV can indicate environment, but ignore "test" as that's for test runs
-  echo "   ✅ Found NODE_ENV variable: $NODE_ENV"
-  DETECTED_ENV="$NODE_ENV"
+if [ -z "$DETECTED_ENV" ]; then
+  if [ -n "$ENVIRONMENT" ]; then
+    echo "   ✅ Found ENVIRONMENT variable: $ENVIRONMENT"
+    DETECTED_ENV="$ENVIRONMENT"
+  elif [ -n "$DEPLOYMENT_ENVIRONMENT" ]; then
+    echo "   ✅ Found DEPLOYMENT_ENVIRONMENT variable: $DEPLOYMENT_ENVIRONMENT"
+    DETECTED_ENV="$DEPLOYMENT_ENVIRONMENT"
+  elif [ -n "$NODE_ENV" ] && [ "$NODE_ENV" != "test" ]; then
+    # NODE_ENV can indicate environment, but ignore "test" as that's for test runs
+    echo "   ✅ Found NODE_ENV variable: $NODE_ENV"
+    DETECTED_ENV="$NODE_ENV"
+  fi
 fi
 
 # If we detected an environment from variables, use it
@@ -109,9 +121,18 @@ elif [ -z "$DETECTED_ENV" ]; then
   ENVIRONMENT_TAG=""
   
   # Try instance metadata tags endpoint (preferred method)
+  # Filter out HTML error responses (404 pages)
   if [ -n "$INSTANCE_ID" ]; then
-    INSTANCE_NAME=$(curl -s http://169.254.169.254/latest/meta-data/tags/instance/Name 2>/dev/null || echo "")
-    ENVIRONMENT_TAG=$(curl -s http://169.254.169.254/latest/meta-data/tags/instance/Environment 2>/dev/null || echo "")
+    INSTANCE_NAME_RAW=$(curl -s http://169.254.169.254/latest/meta-data/tags/instance/Name 2>/dev/null || echo "")
+    ENVIRONMENT_TAG_RAW=$(curl -s http://169.254.169.254/latest/meta-data/tags/instance/Environment 2>/dev/null || echo "")
+    
+    # Filter out HTML responses (check if response contains HTML tags)
+    if [ -n "$INSTANCE_NAME_RAW" ] && ! echo "$INSTANCE_NAME_RAW" | grep -q "<html\|<!DOCTYPE"; then
+      INSTANCE_NAME="$INSTANCE_NAME_RAW"
+    fi
+    if [ -n "$ENVIRONMENT_TAG_RAW" ] && ! echo "$ENVIRONMENT_TAG_RAW" | grep -q "<html\|<!DOCTYPE"; then
+      ENVIRONMENT_TAG="$ENVIRONMENT_TAG_RAW"
+    fi
   fi
   
   # Fallback to AWS CLI if metadata tags not available
@@ -121,8 +142,16 @@ elif [ -z "$DETECTED_ENV" ]; then
   fi
   
   echo "   Instance ID: $INSTANCE_ID"
-  echo "   Instance Name tag: $INSTANCE_NAME"
-  echo "   Environment tag: $ENVIRONMENT_TAG"
+  if [ -n "$INSTANCE_NAME" ]; then
+    echo "   Instance Name tag: $INSTANCE_NAME"
+  else
+    echo "   Instance Name tag: (not available)"
+  fi
+  if [ -n "$ENVIRONMENT_TAG" ]; then
+    echo "   Environment tag: $ENVIRONMENT_TAG"
+  else
+    echo "   Environment tag: (not available)"
+  fi
   
   if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "production"; then
     echo "   ✅ Detected production from tags"
@@ -155,22 +184,34 @@ elif [ -z "$DETECTED_ENV" ]; then
   else
     echo "   ❌ CRITICAL ERROR: Cannot determine environment"
     echo "   Environment variables, deployment directories, and instance tags all unavailable"
-    echo "   Instance ID: $INSTANCE_ID"
-    echo "   Instance Name: $INSTANCE_NAME"
-    echo "   Environment Tag: $ENVIRONMENT_TAG"
-    echo "   ENVIRONMENT variable: ${ENVIRONMENT:-not set}"
-    echo "   DEPLOYMENT_ENVIRONMENT variable: ${DEPLOYMENT_ENVIRONMENT:-not set}"
-    echo "   NODE_ENV variable: ${NODE_ENV:-not set}"
+    echo ""
+    echo "   Debug information:"
+    echo "   - Instance ID: ${INSTANCE_ID:-not available}"
+    echo "   - Instance Name tag: ${INSTANCE_NAME:-not available}"
+    echo "   - Environment Tag: ${ENVIRONMENT_TAG:-not available}"
+    echo "   - ENVIRONMENT variable: ${ENVIRONMENT:-not set}"
+    echo "   - DEPLOYMENT_ENVIRONMENT variable: ${DEPLOYMENT_ENVIRONMENT:-not set}"
+    echo "   - NODE_ENV variable: ${NODE_ENV:-not set}"
+    if [ -f "/etc/environment" ]; then
+      echo "   - /etc/environment exists, contents:"
+      grep -i environment /etc/environment 2>/dev/null || echo "      (no ENVIRONMENT found in /etc/environment)"
+    else
+      echo "   - /etc/environment: (file does not exist)"
+    fi
+    echo "   - Deployment directories:"
+    [ -d "/opt/bianca-production" ] && echo "     ✅ /opt/bianca-production exists" || echo "     ❌ /opt/bianca-production does not exist"
+    [ -d "/opt/bianca-staging" ] && echo "     ✅ /opt/bianca-staging exists" || echo "     ❌ /opt/bianca-staging does not exist"
     echo ""
     echo "   This deployment will FAIL to prevent misconfiguration."
     echo "   Please ensure one of the following:"
-    echo "   1. Set ENVIRONMENT, DEPLOYMENT_ENVIRONMENT, or NODE_ENV environment variable"
-    echo "   2. The deployment directory (/opt/bianca-production or /opt/bianca-staging) exists"
-    echo "   3. Instance tags (Name and Environment) are properly set"
-    echo "   4. The instance has IAM permissions to read its own tags"
+    echo "   1. /etc/environment contains ENVIRONMENT=staging or ENVIRONMENT=production (set by userdata)"
+    echo "   2. Set ENVIRONMENT, DEPLOYMENT_ENVIRONMENT, or NODE_ENV environment variable"
+    echo "   3. The deployment directory (/opt/bianca-production or /opt/bianca-staging) exists"
+    echo "   4. Instance tags (Name and Environment) are properly set"
+    echo "   5. The instance has IAM permissions to read its own tags"
     echo ""
-    echo "   For staging: /opt/bianca-staging should exist or set ENVIRONMENT=staging"
-    echo "   For production: /opt/bianca-production should exist or set ENVIRONMENT=production"
+    echo "   For staging: /opt/bianca-staging should exist or ENVIRONMENT=staging in /etc/environment"
+    echo "   For production: /opt/bianca-production should exist or ENVIRONMENT=production in /etc/environment"
     exit 1
   fi
 fi
