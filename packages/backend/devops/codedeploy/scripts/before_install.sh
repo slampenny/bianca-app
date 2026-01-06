@@ -221,6 +221,18 @@ echo "   ✅ Deployment directory: $DEPLOY_DIR"
 echo "   ✅ Container prefix: $CONTAINER_PREFIX"
 echo "   ✅ Image tag: $IMAGE_TAG"
 
+# Ensure ENVIRONMENT is set in /etc/environment for future deployments
+# This helps existing instances that were created before userdata was updated
+if [ -n "$ENVIRONMENT" ]; then
+  if [ ! -f "/etc/environment" ] || ! grep -q "^ENVIRONMENT=" /etc/environment 2>/dev/null; then
+    echo "   📝 Setting ENVIRONMENT=$ENVIRONMENT in /etc/environment for future deployments..."
+    echo "ENVIRONMENT=$ENVIRONMENT" >> /etc/environment
+  elif ! grep -q "^ENVIRONMENT=$ENVIRONMENT$" /etc/environment 2>/dev/null; then
+    echo "   📝 Updating ENVIRONMENT in /etc/environment to $ENVIRONMENT..."
+    sed -i "s/^ENVIRONMENT=.*/ENVIRONMENT=$ENVIRONMENT/" /etc/environment
+  fi
+fi
+
 # Configure Docker log rotation to prevent disk space issues
 echo "   Configuring Docker log rotation..."
 mkdir -p /etc/docker

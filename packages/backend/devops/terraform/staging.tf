@@ -326,9 +326,7 @@ resource "aws_instance" "staging" {
   # On-demand instances can be stopped and restarted to apply user_data changes
   # To apply user_data changes: terraform taint aws_instance.staging && terraform apply
   # Or manually: stop instance, update user_data, start instance
-  lifecycle {
-    ignore_changes = [user_data]
-  }
+  # NOTE: lifecycle block removed to allow userdata updates via taint
 }
 
 # Associate Elastic IP with staging instance
