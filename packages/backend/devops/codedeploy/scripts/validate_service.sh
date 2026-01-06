@@ -163,6 +163,90 @@ if [ "$NGINX_HEALTH_PASSED" = "false" ]; then
   VALIDATION_FAILED=true
 fi
 
+# Check if public URLs are accessible through ALB (CRITICAL - this is what users actually hit)
+echo ""
+echo "   Checking public URLs through ALB..."
+PUBLIC_URLS_PASSED=true
+
+if [ "$DETECTED_ENV" = "staging" ]; then
+  FRONTEND_URL="https://staging.biancawellness.com"
+  API_URL="https://staging-api.biancawellness.com"
+elif [ "$DETECTED_ENV" = "production" ]; then
+  FRONTEND_URL="https://app.biancawellness.com"
+  API_URL="https://api.biancawellness.com"
+else
+  echo "   ⚠️  Unknown environment, skipping public URL checks"
+  FRONTEND_URL=""
+  API_URL=""
+fi
+
+if [ -n "$FRONTEND_URL" ]; then
+  echo "   Testing frontend URL: $FRONTEND_URL"
+  FRONTEND_PUBLIC_PASSED=false
+  for i in {1..10}; do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$FRONTEND_URL" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+      echo "   ✅ Frontend public URL check passed (HTTP $HTTP_CODE, attempt $i)"
+      FRONTEND_PUBLIC_PASSED=true
+      break
+    fi
+    if [ "$HTTP_CODE" = "503" ]; then
+      echo "   ❌ Frontend returned 503 Service Unavailable (attempt $i)" >&2
+      echo "   This indicates the ALB has no healthy targets or maintenance mode is enabled" >&2
+    else
+      echo "   Frontend URL check attempt $i/10 failed (HTTP $HTTP_CODE), retrying in 3 seconds..."
+    fi
+    sleep 3
+  done
+  
+  if [ "$FRONTEND_PUBLIC_PASSED" = "false" ]; then
+    echo "   ❌ Frontend public URL check failed after 10 attempts" >&2
+    echo "   URL: $FRONTEND_URL" >&2
+    echo "   This means users cannot access the site!" >&2
+    PUBLIC_URLS_PASSED=false
+  fi
+fi
+
+if [ -n "$API_URL" ]; then
+  echo "   Testing API URL: $API_URL/health"
+  API_PUBLIC_PASSED=false
+  for i in {1..10}; do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$API_URL/health" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ]; then
+      echo "   ✅ API public URL check passed (HTTP $HTTP_CODE, attempt $i)"
+      API_PUBLIC_PASSED=true
+      break
+    fi
+    if [ "$HTTP_CODE" = "503" ]; then
+      echo "   ❌ API returned 503 Service Unavailable (attempt $i)" >&2
+      echo "   This indicates the ALB has no healthy targets or maintenance mode is enabled" >&2
+    else
+      echo "   API URL check attempt $i/10 failed (HTTP $HTTP_CODE), retrying in 3 seconds..."
+    fi
+    sleep 3
+  done
+  
+  if [ "$API_PUBLIC_PASSED" = "false" ]; then
+    echo "   ❌ API public URL check failed after 10 attempts" >&2
+    echo "   URL: $API_URL/health" >&2
+    echo "   This means users cannot access the API!" >&2
+    PUBLIC_URLS_PASSED=false
+  fi
+fi
+
+if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
+  echo ""
+  echo "   ⚠️  CRITICAL: Public URLs are not accessible!" >&2
+  echo "   This means the deployment appears successful locally but users cannot access it." >&2
+  echo "   Possible causes:" >&2
+  echo "   1. Instance not registered with ALB target groups" >&2
+  echo "   2. ALB target group health checks failing" >&2
+  echo "   3. Security group rules blocking traffic" >&2
+  echo "   4. DNS not pointing to ALB" >&2
+  echo "   5. Maintenance mode still enabled" >&2
+  VALIDATION_FAILED=true
+fi
+
 # Disable maintenance mode once deployment is validated
 if [ -f "/opt/bianca-deployment/devops/maintenance/disable-maintenance.sh" ]; then
     echo "   Disabling maintenance mode..."
@@ -178,8 +262,13 @@ if [ "$VALIDATION_FAILED" = "true" ]; then
   echo "   One or more required checks failed:"
   echo "   - Backend container must be running"
   echo "   - Nginx container must be running"
-  echo "   - Backend health endpoint must respond"
-  echo "   - Nginx must respond on port 80"
+  echo "   - Backend health endpoint must respond (localhost:3000/health)"
+  echo "   - Nginx must respond on port 80 (localhost:80)"
+  if [ -n "$FRONTEND_URL" ] || [ -n "$API_URL" ]; then
+    echo "   - Public URLs must be accessible through ALB"
+    [ -n "$FRONTEND_URL" ] && echo "     Frontend: $FRONTEND_URL"
+    [ -n "$API_URL" ] && echo "     API: $API_URL/health"
+  fi
   echo ""
   echo "   Please check the logs above for details."
   exit 1
