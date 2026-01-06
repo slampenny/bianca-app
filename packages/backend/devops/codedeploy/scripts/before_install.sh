@@ -106,44 +106,21 @@ else
     YARN_COMMAND="yarn dev:staging"
     CLOUDWATCH_LOG_PREFIX="/bianca/staging"
   else
-    echo "   ❌ ERROR: Cannot determine environment"
+    echo "   ❌ CRITICAL ERROR: Cannot determine environment"
     echo "   No deployment directories found and instance tags unavailable"
     echo "   Instance ID: $INSTANCE_ID"
     echo "   Instance Name: $INSTANCE_NAME"
     echo "   Environment Tag: $ENVIRONMENT_TAG"
     echo ""
-    echo "   Attempting to detect from instance ID pattern or defaulting to staging..."
-    # Last resort: check if we can infer from instance ID or other metadata
-    # For now, default to staging as a safer fallback (can be manually corrected)
-    if echo "$INSTANCE_ID" | grep -qi "prod"; then
-      echo "   ⚠️  Inferring production from instance ID pattern"
-      ENVIRONMENT="production"
-      DEPLOY_DIR="/opt/bianca-production"
-      CONTAINER_PREFIX="production"
-      IMAGE_TAG="production"
-      NODE_ENV="production"
-      API_BASE_URL="https://api.biancawellness.com"
-      WEBSOCKET_URL="wss://api.biancawellness.com"
-      FRONTEND_URL="https://app.biancawellness.com"
-      SERVER_NAME_FRONTEND="app.biancawellness.com"
-      SERVER_NAME_API="api.biancawellness.com"
-      YARN_COMMAND="yarn start"
-      CLOUDWATCH_LOG_PREFIX="/bianca/production"
-    else
-      echo "   ⚠️  Defaulting to staging (safer fallback)"
-      ENVIRONMENT="staging"
-      DEPLOY_DIR="/opt/bianca-staging"
-      CONTAINER_PREFIX="staging"
-      IMAGE_TAG="staging"
-      NODE_ENV="staging"
-      API_BASE_URL="https://staging-api.biancawellness.com"
-      WEBSOCKET_URL="wss://staging-api.biancawellness.com"
-      FRONTEND_URL="https://staging.biancawellness.com"
-      SERVER_NAME_FRONTEND="staging.biancawellness.com"
-      SERVER_NAME_API="staging-api.biancawellness.com"
-      YARN_COMMAND="yarn dev:staging"
-      CLOUDWATCH_LOG_PREFIX="/bianca/staging"
-    fi
+    echo "   This deployment will FAIL to prevent misconfiguration."
+    echo "   Please ensure:"
+    echo "   1. The deployment directory (/opt/bianca-production or /opt/bianca-staging) exists"
+    echo "   2. Instance tags (Name and Environment) are properly set"
+    echo "   3. The instance has IAM permissions to read its own tags"
+    echo ""
+    echo "   For staging: /opt/bianca-staging should exist"
+    echo "   For production: /opt/bianca-production should exist"
+    exit 1
   fi
 fi
 
