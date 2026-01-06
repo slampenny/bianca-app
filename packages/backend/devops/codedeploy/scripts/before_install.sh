@@ -55,8 +55,23 @@ else
   # Fallback: Try to get instance tags (may fail due to permissions)
   echo "   ⚠️  No deployment directory found, trying instance tags..."
   INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
-  INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
-  ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
+  
+  # Try to get tags using instance metadata (more reliable than AWS CLI)
+  # First try instance metadata tags endpoint (available on newer instances)
+  INSTANCE_NAME=""
+  ENVIRONMENT_TAG=""
+  
+  # Try instance metadata tags endpoint (preferred method)
+  if [ -n "$INSTANCE_ID" ]; then
+    INSTANCE_NAME=$(curl -s http://169.254.169.254/latest/meta-data/tags/instance/Name 2>/dev/null || echo "")
+    ENVIRONMENT_TAG=$(curl -s http://169.254.169.254/latest/meta-data/tags/instance/Environment 2>/dev/null || echo "")
+  fi
+  
+  # Fallback to AWS CLI if metadata tags not available
+  if [ -z "$INSTANCE_NAME" ] && [ -z "$ENVIRONMENT_TAG" ] && [ -n "$INSTANCE_ID" ]; then
+    INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
+    ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
+  fi
   
   echo "   Instance ID: $INSTANCE_ID"
   echo "   Instance Name tag: $INSTANCE_NAME"
@@ -93,9 +108,42 @@ else
   else
     echo "   ❌ ERROR: Cannot determine environment"
     echo "   No deployment directories found and instance tags unavailable"
+    echo "   Instance ID: $INSTANCE_ID"
     echo "   Instance Name: $INSTANCE_NAME"
     echo "   Environment Tag: $ENVIRONMENT_TAG"
-    exit 1
+    echo ""
+    echo "   Attempting to detect from instance ID pattern or defaulting to staging..."
+    # Last resort: check if we can infer from instance ID or other metadata
+    # For now, default to staging as a safer fallback (can be manually corrected)
+    if echo "$INSTANCE_ID" | grep -qi "prod"; then
+      echo "   ⚠️  Inferring production from instance ID pattern"
+      ENVIRONMENT="production"
+      DEPLOY_DIR="/opt/bianca-production"
+      CONTAINER_PREFIX="production"
+      IMAGE_TAG="production"
+      NODE_ENV="production"
+      API_BASE_URL="https://api.biancawellness.com"
+      WEBSOCKET_URL="wss://api.biancawellness.com"
+      FRONTEND_URL="https://app.biancawellness.com"
+      SERVER_NAME_FRONTEND="app.biancawellness.com"
+      SERVER_NAME_API="api.biancawellness.com"
+      YARN_COMMAND="yarn start"
+      CLOUDWATCH_LOG_PREFIX="/bianca/production"
+    else
+      echo "   ⚠️  Defaulting to staging (safer fallback)"
+      ENVIRONMENT="staging"
+      DEPLOY_DIR="/opt/bianca-staging"
+      CONTAINER_PREFIX="staging"
+      IMAGE_TAG="staging"
+      NODE_ENV="staging"
+      API_BASE_URL="https://staging-api.biancawellness.com"
+      WEBSOCKET_URL="wss://staging-api.biancawellness.com"
+      FRONTEND_URL="https://staging.biancawellness.com"
+      SERVER_NAME_FRONTEND="staging.biancawellness.com"
+      SERVER_NAME_API="staging-api.biancawellness.com"
+      YARN_COMMAND="yarn dev:staging"
+      CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+    fi
   fi
 fi
 
@@ -119,8 +167,11 @@ DOCKER_EOF
 # Restart Docker to apply new log rotation settings
 systemctl restart docker || echo "   ⚠️  Docker restart failed, continuing..."
 
-# Ensure deployment directory exists
+# Ensure deployment directory exists (create if it doesn't)
+echo "   Ensuring deployment directory exists: $DEPLOY_DIR"
 mkdir -p "$DEPLOY_DIR"
+chown -R ec2-user:ec2-user "$DEPLOY_DIR" 2>/dev/null || true
+chmod -R 755 "$DEPLOY_DIR" 2>/dev/null || true
 cd "$DEPLOY_DIR"
 
 # Get instance metadata
