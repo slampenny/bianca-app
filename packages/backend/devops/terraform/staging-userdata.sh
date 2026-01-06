@@ -96,49 +96,79 @@ systemctl enable amazon-ssm-agent
 systemctl start amazon-ssm-agent
 echo "SSM agent installed and started"
 
-# Install CodeDeploy agent
-echo "Installing CodeDeploy agent..."
+# Install CodeDeploy agent (CRITICAL - must not fail)
+echo "==================================="
+echo "Installing CodeDeploy agent (REQUIRED)..."
+echo "==================================="
 cd /tmp
+
 # Remove any existing installation
 sudo yum remove -y codedeploy-agent 2>/dev/null || true
 sudo systemctl stop codedeploy-agent 2>/dev/null || true
 
-# Download and install
-if ! wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install -O install; then
-    echo "ERROR: Failed to download CodeDeploy agent installer"
-    exit 1
-fi
-chmod +x ./install
-if ! sudo ./install auto; then
-    echo "ERROR: Failed to install CodeDeploy agent"
-    exit 1
+# Download and install with retries
+MAX_RETRIES=3
+RETRY_COUNT=0
+INSTALL_SUCCESS=false
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    echo "Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Downloading CodeDeploy agent installer..."
+    if wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install -O install 2>&1; then
+        chmod +x ./install
+        echo "Installing CodeDeploy agent..."
+        if sudo ./install auto 2>&1; then
+            INSTALL_SUCCESS=true
+            echo "✅ CodeDeploy agent installed successfully"
+            break
+        else
+            echo "⚠️  Installation failed, retrying..."
+        fi
+    else
+        echo "⚠️  Download failed, retrying..."
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    sleep 5
+done
+
+if [ "$INSTALL_SUCCESS" != "true" ]; then
+    echo "❌ CRITICAL ERROR: Failed to install CodeDeploy agent after $MAX_RETRIES attempts"
+    echo "This will prevent deployments from working!"
+    # Continue anyway - instance should still be usable, but deployments will fail
 fi
 
-# Enable and start
-sudo systemctl enable codedeploy-agent
+# Enable and start (with error handling)
+echo "Enabling and starting CodeDeploy agent..."
+sudo systemctl enable codedeploy-agent || echo "⚠️  Failed to enable codedeploy-agent service"
+
 if ! sudo systemctl start codedeploy-agent; then
-    echo "ERROR: Failed to start CodeDeploy agent"
+    echo "❌ ERROR: Failed to start CodeDeploy agent"
     sudo systemctl status codedeploy-agent --no-pager || true
-    exit 1
+    # Try one more time after a delay
+    sleep 5
+    sudo systemctl start codedeploy-agent || echo "⚠️  Second start attempt also failed"
 fi
 
-# Wait and verify
+# Wait and verify with extended timeout
+echo "Verifying CodeDeploy agent is running..."
 sleep 10
-for i in {1..6}; do
+for i in {1..10}; do
     if sudo systemctl is-active --quiet codedeploy-agent; then
         echo "✅ CodeDeploy agent is running"
         sudo systemctl status codedeploy-agent --no-pager | head -10
         break
     fi
-    echo "Waiting for agent to start (attempt $i/6)..."
+    echo "Waiting for agent to start (attempt $i/10)..."
     sleep 5
 done
 
 if ! sudo systemctl is-active --quiet codedeploy-agent; then
-    echo "❌ WARNING: CodeDeploy agent failed to start"
+    echo "❌ WARNING: CodeDeploy agent failed to start after multiple attempts"
+    echo "Checking logs..."
     sudo systemctl status codedeploy-agent --no-pager || true
     sudo tail -50 /var/log/aws/codedeploy-agent/codedeploy-agent.log 2>&1 || echo "Log file not found"
-    # Don't exit - let the instance continue, but log the issue
+    echo "⚠️  Instance will continue, but CodeDeploy deployments may fail"
+    echo "⚠️  Manual installation may be required:"
+    echo "   sudo yum install -y ruby && cd /tmp && wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install && sudo ./install auto"
 fi
 
 echo "==================================="
