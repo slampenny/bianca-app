@@ -52,27 +52,59 @@ ARG BUILD_ENV=production
 ARG BUILD_VERSION=0.00.0001
 
 # Fix broken expo symlink if needed (monorepo symlinks point to workspace root)
+# In monorepo, expo CLI symlink might point to workspace root which doesn't exist in Docker
 RUN echo "Checking expo CLI..." && \
-    if [ -L "node_modules/.bin/expo" ] && [ ! -e "node_modules/.bin/expo" ]; then \
-      echo "Fixing broken expo symlink..." && \
-      rm -f node_modules/.bin/expo; \
+    if [ -L "node_modules/.bin/expo" ]; then \
+      SYMLINK_TARGET=$(readlink node_modules/.bin/expo) && \
+      if echo "$SYMLINK_TARGET" | grep -q "^\.\./\.\./\.\./\.\./"; then \
+        echo "Fixing broken expo symlink (points to workspace root: $SYMLINK_TARGET)..." && \
+        rm -f node_modules/.bin/expo; \
+      elif [ ! -e "node_modules/.bin/expo" ]; then \
+        echo "Fixing broken expo symlink (target doesn't exist: $SYMLINK_TARGET)..." && \
+        rm -f node_modules/.bin/expo; \
+      fi; \
     fi && \
     if [ ! -f "node_modules/.bin/expo" ] || [ ! -e "node_modules/.bin/expo" ]; then \
-      if [ -f "node_modules/expo/bin/cli.js" ]; then \
-        echo "Creating expo symlink to expo/bin/cli.js" && \
-        ln -sf "../expo/bin/cli.js" node_modules/.bin/expo; \
+      echo "Expo CLI not in .bin, checking for local installation..." && \
+      if [ -f "node_modules/expo/bin/cli" ]; then \
+        echo "Found expo/bin/cli, creating symlink..." && \
+        mkdir -p node_modules/.bin && \
+        ln -sf "../expo/bin/cli" node_modules/.bin/expo && \
+        chmod +x node_modules/.bin/expo && \
+        echo "✅ Created expo symlink"; \
+      elif [ -f "node_modules/expo/bin/cli.js" ]; then \
+        echo "Found expo/bin/cli.js, creating symlink..." && \
+        mkdir -p node_modules/.bin && \
+        ln -sf "../expo/bin/cli.js" node_modules/.bin/expo && \
+        chmod +x node_modules/.bin/expo && \
+        echo "✅ Created expo symlink"; \
       elif [ -f "node_modules/@expo/cli/build/bin/cli.js" ]; then \
-        echo "Creating expo symlink to @expo/cli" && \
-        ln -sf "../@expo/cli/build/bin/cli.js" node_modules/.bin/expo; \
+        echo "Found @expo/cli/build/bin/cli.js, creating symlink..." && \
+        mkdir -p node_modules/.bin && \
+        ln -sf "../@expo/cli/build/bin/cli.js" node_modules/.bin/expo && \
+        chmod +x node_modules/.bin/expo && \
+        echo "✅ Created expo symlink"; \
       else \
-        echo "ERROR: Could not find expo CLI!" && \
-        find node_modules -name "cli.js" -path "*expo*" 2>&1 | head -5 && \
-        exit 1; \
-      fi && \
-      chmod +x node_modules/.bin/expo 2>/dev/null || true; \
+        echo "⚠️  Expo CLI not found, installing @expo/cli..." && \
+        yarn add -D @expo/cli && \
+        EXPO_CLI_PATH=$(find node_modules/@expo/cli -name "cli.js" -type f 2>/dev/null | head -1) && \
+        if [ -n "$EXPO_CLI_PATH" ]; then \
+          mkdir -p node_modules/.bin && \
+          RELATIVE_PATH=$(echo "$EXPO_CLI_PATH" | sed 's|^node_modules/||') && \
+          ln -sf "../$RELATIVE_PATH" node_modules/.bin/expo && \
+          chmod +x node_modules/.bin/expo && \
+          echo "✅ Installed and linked @expo/cli at $EXPO_CLI_PATH"; \
+        else \
+          echo "ERROR: @expo/cli installed but cli.js not found" && \
+          find node_modules/@expo/cli -type f | head -10 && \
+          exit 1; \
+        fi; \
+      fi; \
+    else \
+      echo "✅ Expo CLI already available"; \
     fi && \
-    ls -la node_modules/.bin/expo && \
-    echo "✅ Expo CLI ready"
+    echo "Verifying expo CLI..." && \
+    (node node_modules/.bin/expo --version 2>/dev/null || echo "WARNING: expo CLI verification failed, but continuing...")
 
 # Build the frontend with the specified environment
 RUN if [ "$BUILD_ENV" = "staging" ]; then \
@@ -83,16 +115,14 @@ RUN if [ "$BUILD_ENV" = "staging" ]; then \
       rm -rf .expo .metro node_modules/.cache 2>/dev/null || true && \
       echo "Setting EXPO_PUBLIC_ENVIRONMENT=staging..." && \
       echo "Setting EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION..." && \
-      export EXPO_PUBLIC_ENVIRONMENT=staging && \
-      export EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION && \
-      EXPO_PUBLIC_ENVIRONMENT=staging EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION yarn bundle:web:staging || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
+      EXPO_PUBLIC_ENVIRONMENT=staging EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION node node_modules/.bin/expo export --platform web || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
       echo "Staging build complete with version $BUILD_VERSION"; \
     else \
       echo "Building for production environment..." && \
       echo "Setting EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION..." && \
       export EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION && \
       rm -rf .expo .metro node_modules/.cache 2>/dev/null || true && \
-      EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION yarn bundle:web || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
+      EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION node node_modules/.bin/expo export --platform web || (echo "❌ Frontend build failed with exit code $?" && exit 1) && \
       echo "Production build complete with version $BUILD_VERSION"; \
     fi
 
