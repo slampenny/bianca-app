@@ -61,7 +61,8 @@ COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.js
 # Using GIT_COMMIT in a comment to help with cache invalidation
 # Build: ${GIT_COMMIT:-unknown}
 COPY --chown=node:node src/ ./src/
-COPY --chown=node:node tests/ ./tests/
+# Only copy test fixtures (needed by seeders), exclude all test files to prevent Jest globals errors
+COPY --chown=node:node tests/fixtures/ ./tests/fixtures/
 # Copy migrations directory and config for database migrations
 COPY --chown=node:node migrations/ ./migrations/
 COPY --chown=node:node migrate-mongo-config.js ./
