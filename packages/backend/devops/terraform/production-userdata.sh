@@ -12,8 +12,8 @@ AWS_ACCOUNT_ID="${aws_account_id}"
 ENVIRONMENT="${environment}"
 
 # Export ENVIRONMENT to /etc/environment so it's available to CodeDeploy scripts
-echo "ENVIRONMENT=${ENVIRONMENT}" >> /etc/environment
-export ENVIRONMENT="${ENVIRONMENT}"
+echo "ENVIRONMENT=$${ENVIRONMENT}" >> /etc/environment
+export ENVIRONMENT="$${ENVIRONMENT}"
 
 # Get instance metadata
 # Use EIP if provided (from Terraform), otherwise fall back to instance metadata

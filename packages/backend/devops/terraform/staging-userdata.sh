@@ -11,8 +11,8 @@ AWS_REGION="${region}"
 ENVIRONMENT="staging"
 
 # Export ENVIRONMENT to /etc/environment so it's available to CodeDeploy scripts
-echo "ENVIRONMENT=${ENVIRONMENT}" >> /etc/environment
-export ENVIRONMENT="${ENVIRONMENT}"
+echo "ENVIRONMENT=$${ENVIRONMENT}" >> /etc/environment
+export ENVIRONMENT="$${ENVIRONMENT}"
 
 echo "Starting minimal staging infrastructure setup..."
 
