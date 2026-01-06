@@ -60,6 +60,68 @@ resource "aws_codebuild_project" "production_build" {
 }
 
 ################################################################################
+# CODEBUILD PROJECT FOR POST-DEPLOYMENT VALIDATION (PRODUCTION)
+################################################################################
+# Validates that the deployed site is actually accessible via public URLs
+# This runs AFTER deployment to catch issues like 503 errors, ALB problems, etc.
+
+resource "aws_codebuild_project" "production_post_deploy_validation" {
+  name         = "bianca-production-post-deploy-validation"
+  description  = "Validates that deployed production site is accessible via public URLs"
+  service_role = aws_iam_role.codebuild_production_role.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = false
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "FRONTEND_URL"
+      value = "https://app.biancawellness.com"
+    }
+    environment_variable {
+      name  = "API_URL"
+      value = "https://api.biancawellness.com"
+    }
+    environment_variable {
+      name  = "MAX_RETRIES"
+      value = "20"
+    }
+    environment_variable {
+      name  = "RETRY_DELAY"
+      value = "10"
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/backend/devops/buildspec-post-deploy-validation.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-production-post-deploy-validation"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-production-post-deploy-validation"
+    Environment = "production"
+  }
+}
+
+################################################################################
 # IAM ROLE FOR CODEBUILD (PRODUCTION)
 ################################################################################
 
@@ -197,7 +259,8 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
           "codebuild:BatchGetBuilds"
         ]
         Resource = [
-          aws_codebuild_project.production_build.arn
+          aws_codebuild_project.production_build.arn,
+          aws_codebuild_project.production_post_deploy_validation.arn
         ]
       },
       {
@@ -313,6 +376,24 @@ resource "aws_codepipeline" "production" {
         ApplicationName     = aws_codedeploy_app.production.name
         DeploymentGroupName = aws_codedeploy_deployment_group.production.deployment_group_name
       }
+    }
+  }
+
+  stage {
+    name = "PostDeployValidation"
+    action {
+      name             = "ValidateDeployment"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["ValidationOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.production_post_deploy_validation.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
     }
   }
 
