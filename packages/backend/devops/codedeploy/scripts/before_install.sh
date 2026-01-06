@@ -22,10 +22,13 @@ echo "   Detecting environment..."
 # Method 1: Check /etc/environment file first (set by userdata)
 # CodeDeploy scripts don't automatically source /etc/environment, so read it directly
 if [ -f "/etc/environment" ]; then
-  ENV_FROM_FILE=$(grep "^ENVIRONMENT=" /etc/environment 2>/dev/null | cut -d'=' -f2 | tr -d '"' | xargs)
+  ENV_FROM_FILE=$(grep "^ENVIRONMENT=" /etc/environment 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" | xargs)
+  # Normalize to lowercase for comparison, but preserve original for use
+  ENV_FROM_FILE_LOWER=$(echo "$ENV_FROM_FILE" | tr '[:upper:]' '[:lower:]')
   if [ -n "$ENV_FROM_FILE" ]; then
     echo "   ✅ Found ENVIRONMENT in /etc/environment: $ENV_FROM_FILE"
-    DETECTED_ENV="$ENV_FROM_FILE"
+    # Use lowercase for detection logic
+    DETECTED_ENV="$ENV_FROM_FILE_LOWER"
   fi
 fi
 
@@ -46,8 +49,10 @@ if [ -z "$DETECTED_ENV" ]; then
 fi
 
 # If we detected an environment from variables, use it
+# Normalize DETECTED_ENV to lowercase for comparison
 if [ -n "$DETECTED_ENV" ]; then
-  if [ "$DETECTED_ENV" = "production" ]; then
+  DETECTED_ENV_LOWER=$(echo "$DETECTED_ENV" | tr '[:upper:]' '[:lower:]')
+  if [ "$DETECTED_ENV_LOWER" = "production" ]; then
     ENVIRONMENT="production"
     DEPLOY_DIR="/opt/bianca-production"
     CONTAINER_PREFIX="production"
@@ -60,7 +65,7 @@ if [ -n "$DETECTED_ENV" ]; then
     SERVER_NAME_API="api.biancawellness.com"
     YARN_COMMAND="yarn start"
     CLOUDWATCH_LOG_PREFIX="/bianca/production"
-  elif [ "$DETECTED_ENV" = "staging" ]; then
+  elif [ "$DETECTED_ENV_LOWER" = "staging" ]; then
     ENVIRONMENT="staging"
     DEPLOY_DIR="/opt/bianca-staging"
     CONTAINER_PREFIX="staging"
@@ -214,6 +219,13 @@ elif [ -z "$DETECTED_ENV" ]; then
     echo "   For production: /opt/bianca-production should exist or ENVIRONMENT=production in /etc/environment"
     exit 1
   fi
+fi
+
+# Final safety check - ensure ENVIRONMENT is set
+if [ -z "$ENVIRONMENT" ]; then
+  echo "   ❌ CRITICAL ERROR: Environment detection failed - ENVIRONMENT is not set"
+  echo "   This should not happen - all detection methods failed"
+  exit 1
 fi
 
 echo "   ✅ Detected environment: $ENVIRONMENT"
