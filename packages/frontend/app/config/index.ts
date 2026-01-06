@@ -16,19 +16,23 @@
 import BaseConfig from "./config.base"
 import ProdConfig from "./config.prod"
 import DevConfig from "./config.dev"
-import TestConfig from "./config.test"
 import StagingConfig from "./config.staging"
 import Constants from "expo-constants"
 import { logger } from "../utils/logger"
 
 // Check for test environment first to avoid window access issues
+// Note: config.test.ts is excluded from staging/production builds via metro.config.js blockList
+// So we can't import it here. In test environments, we'll use DevConfig as a fallback
+// since test environments typically run locally and can use dev settings
 let ExtraConfig = ProdConfig
 
 if (process.env.NODE_ENV === 'test' || 
     process.env.PLAYWRIGHT_TEST === '1' ||
     process.env.JEST_WORKER_ID) {
-  ExtraConfig = TestConfig
-  logger.debug('Using TEST config');
+  // Use DevConfig as fallback for test environments since config.test.ts is blocked in builds
+  // This is safe because test environments typically run locally and can use dev settings
+  ExtraConfig = DevConfig
+  logger.debug('Using DEV config for test environment (config.test.ts excluded from builds)');
 } else {
   // Debug logging (only when not in test environment)
   logger.debug('Config loading - Environment check:', {
