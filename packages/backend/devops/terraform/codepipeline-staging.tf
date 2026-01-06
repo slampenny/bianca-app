@@ -322,6 +322,69 @@ resource "aws_codebuild_project" "staging_smoke_tests" {
 }
 
 ################################################################################
+# CODEBUILD PROJECT FOR POST-DEPLOYMENT VALIDATION (STAGING)
+################################################################################
+# Validates that the deployed site is actually accessible via public URLs
+# This runs AFTER deployment to catch issues like 503 errors, ALB problems, etc.
+# This is different from smoke tests which only test the build locally
+
+resource "aws_codebuild_project" "staging_post_deploy_validation" {
+  name         = "bianca-staging-post-deploy-validation"
+  description  = "Validates that deployed staging site is accessible via public URLs"
+  service_role = aws_iam_role.codebuild_staging_role.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = false
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "FRONTEND_URL"
+      value = "https://staging.biancawellness.com"
+    }
+    environment_variable {
+      name  = "API_URL"
+      value = "https://staging-api.biancawellness.com"
+    }
+    environment_variable {
+      name  = "MAX_RETRIES"
+      value = "20"
+    }
+    environment_variable {
+      name  = "RETRY_DELAY"
+      value = "10"
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/backend/devops/buildspec-post-deploy-validation.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-staging-post-deploy-validation"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-staging-post-deploy-validation"
+    Environment = "staging"
+  }
+}
+
+################################################################################
 # CODEBUILD PROJECT FOR TESTS (STAGING)
 ################################################################################
 # NOTE: This project runs with NODE_ENV=test to ensure tests use test configuration
@@ -523,6 +586,24 @@ resource "aws_codepipeline" "staging" {
         PrimarySource = "SourceOutput"
       }
       run_order = 1  # Same as Deploy - runs in parallel, doesn't block deployment
+    }
+  }
+
+  stage {
+    name = "PostDeployValidation"
+    action {
+      name             = "ValidateDeployment"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["ValidationOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_post_deploy_validation.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
     }
   }
 

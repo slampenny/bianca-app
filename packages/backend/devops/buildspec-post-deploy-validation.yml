@@ -1,0 +1,97 @@
+version: 0.2
+
+# Post-Deployment Validation
+# Tests that the deployed site is actually accessible via public URLs
+# This catches issues like 503 errors, ALB problems, DNS issues, etc.
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting post-deployment validation..."
+      - echo "Frontend URL: $FRONTEND_URL"
+      - echo "API URL: $API_URL"
+      - echo "Max retries: ${MAX_RETRIES:-20}"
+      - echo "Retry delay: ${RETRY_DELAY:-10} seconds"
+
+  build:
+    commands:
+      - |
+        # Function to test URL with retries
+        test_url() {
+          local url=$1
+          local description=$2
+          local max_retries=${MAX_RETRIES:-20}
+          local retry_delay=${RETRY_DELAY:-10}
+          local attempt=1
+          
+          echo "Testing $description: $url"
+          
+          while [ $attempt -le $max_retries ]; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 --connect-timeout 10 "$url" 2>/dev/null || echo "000")
+            
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+              echo "✅ $description is accessible (HTTP $HTTP_CODE, attempt $attempt)"
+              return 0
+            elif [ "$HTTP_CODE" = "503" ]; then
+              echo "❌ $description returned 503 Service Unavailable (attempt $attempt/$max_retries)"
+              echo "   This indicates the ALB has no healthy targets, maintenance mode is enabled, or the service is down"
+            elif [ "$HTTP_CODE" = "000" ]; then
+              echo "⚠️  $description connection failed (attempt $attempt/$max_retries) - may still be deploying"
+            else
+              echo "⚠️  $description returned HTTP $HTTP_CODE (attempt $attempt/$max_retries)"
+            fi
+            
+            if [ $attempt -lt $max_retries ]; then
+              echo "   Waiting ${retry_delay}s before retry..."
+              sleep $retry_delay
+            fi
+            attempt=$((attempt + 1))
+          done
+          
+          echo "❌ $description validation FAILED after $max_retries attempts"
+          echo "   Final HTTP code: $HTTP_CODE"
+          echo "   URL: $url"
+          return 1
+        }
+        
+        # Track failures
+        VALIDATION_FAILED=false
+        
+        # Test frontend URL
+        if ! test_url "$FRONTEND_URL" "Frontend"; then
+          VALIDATION_FAILED=true
+        fi
+        
+        # Test API health endpoint
+        if ! test_url "$API_URL/health" "API health endpoint"; then
+          VALIDATION_FAILED=true
+        fi
+        
+        # Final check
+        if [ "$VALIDATION_FAILED" = "true" ]; then
+          echo ""
+          echo "❌ Post-deployment validation FAILED"
+          echo "   One or more public URLs are not accessible"
+          echo "   This means users cannot access the deployed site"
+          echo ""
+          echo "   Possible causes:"
+          echo "   1. Instance not registered with ALB target groups"
+          echo "   2. ALB target group health checks failing"
+          echo "   3. Security group rules blocking traffic"
+          echo "   4. DNS not pointing to ALB"
+          echo "   5. Maintenance mode still enabled"
+          echo "   6. Containers not running or unhealthy"
+          echo ""
+          echo "   The deployment may have succeeded locally but is not accessible to users"
+          exit 1
+        fi
+        
+        echo ""
+        echo "✅ Post-deployment validation PASSED"
+        echo "   All public URLs are accessible and responding correctly"
+
+  post_build:
+    commands:
+      - echo "✅ Post-deployment validation completed successfully"
+      - echo "The deployed site is accessible and working correctly"
+
