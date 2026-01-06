@@ -5,41 +5,72 @@
 
 echo "🚀 ApplicationStart: Starting new containers..."
 
-# Detect environment - use directory existence as primary method (most reliable)
+# Detect environment - check /etc/environment first, then directories, then instance tags
 AWS_REGION="us-east-2"
 
 echo "   Detecting environment..."
 
-# Primary method: Check which deployment directory exists
-if [ -d "/opt/bianca-production" ]; then
+DETECTED_ENV=""
+
+# Method 1: Check /etc/environment file first (set by userdata)
+if [ -f "/etc/environment" ]; then
+  ENV_FROM_FILE=$(grep "^ENVIRONMENT=" /etc/environment 2>/dev/null | cut -d'=' -f2 | tr -d '"' | xargs)
+  if [ -n "$ENV_FROM_FILE" ]; then
+    echo "   ✅ Found ENVIRONMENT in /etc/environment: $ENV_FROM_FILE"
+    DETECTED_ENV="$ENV_FROM_FILE"
+  fi
+fi
+
+# Method 2: Check environment variables (if not already set from /etc/environment)
+if [ -z "$DETECTED_ENV" ] && [ -n "$ENVIRONMENT" ]; then
+  echo "   ✅ Found ENVIRONMENT variable: $ENVIRONMENT"
+  DETECTED_ENV="$ENVIRONMENT"
+fi
+
+# Method 3: Check which deployment directory exists (if not already set from env vars)
+if [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-production" ]; then
   echo "   ✅ Found /opt/bianca-production directory - using production"
-  DEPLOY_DIR="/opt/bianca-production"
-  CONTAINER_PREFIX="production"
-elif [ -d "/opt/bianca-staging" ]; then
+  DETECTED_ENV="production"
+elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-staging" ]; then
   echo "   ✅ Found /opt/bianca-staging directory - using staging"
-  DEPLOY_DIR="/opt/bianca-staging"
-  CONTAINER_PREFIX="staging"
-else
-  # Fallback: Try to get instance tags (may fail due to permissions)
+  DETECTED_ENV="staging"
+fi
+
+# Method 4: Fallback to instance tags (if not already set)
+if [ -z "$DETECTED_ENV" ]; then
   echo "   ⚠️  No deployment directory found, trying instance tags..."
   INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
-  INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
-  ENVIRONMENT_TAG=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
+  INSTANCE_NAME_RAW=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
+  ENVIRONMENT_TAG_RAW=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Environment`].Value' --output text 2>/dev/null || echo "")
+  
+  # Filter out HTML responses
+  if [ -n "$INSTANCE_NAME_RAW" ] && ! echo "$INSTANCE_NAME_RAW" | grep -q "<html\|<!DOCTYPE"; then
+    INSTANCE_NAME="$INSTANCE_NAME_RAW"
+  fi
+  if [ -n "$ENVIRONMENT_TAG_RAW" ] && ! echo "$ENVIRONMENT_TAG_RAW" | grep -q "<html\|<!DOCTYPE"; then
+    ENVIRONMENT_TAG="$ENVIRONMENT_TAG_RAW"
+  fi
   
   if [ "$ENVIRONMENT_TAG" = "production" ] || echo "$INSTANCE_NAME" | grep -qi "production"; then
     echo "   ✅ Detected production from tags"
-    DEPLOY_DIR="/opt/bianca-production"
-    CONTAINER_PREFIX="production"
+    DETECTED_ENV="production"
   elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
     echo "   ✅ Detected staging from tags"
-    DEPLOY_DIR="/opt/bianca-staging"
-    CONTAINER_PREFIX="staging"
-  else
-    echo "   ❌ ERROR: Cannot determine environment and no deployment directory found"
-    echo "   Instance Name: $INSTANCE_NAME"
-    echo "   Environment Tag: $ENVIRONMENT_TAG"
-    exit 1
+    DETECTED_ENV="staging"
   fi
+fi
+
+# Set deployment variables based on detected environment
+if [ "$DETECTED_ENV" = "production" ]; then
+  DEPLOY_DIR="/opt/bianca-production"
+  CONTAINER_PREFIX="production"
+elif [ "$DETECTED_ENV" = "staging" ]; then
+  DEPLOY_DIR="/opt/bianca-staging"
+  CONTAINER_PREFIX="staging"
+else
+  echo "   ❌ ERROR: Cannot determine environment"
+  echo "   Checked /etc/environment, environment variables, deployment directories, and instance tags"
+  exit 1
 fi
 
 echo "   ✅ Detected deployment directory: $DEPLOY_DIR"
@@ -141,8 +172,8 @@ fi
 # Step 2: Run database migrations
 echo ""
 echo "   🔄 Step 2: Running database migrations..."
-# Determine environment for migrations
-if echo "$INSTANCE_NAME" | grep -qi "production"; then
+# Determine environment for migrations (use detected environment)
+if [ "$DETECTED_ENV" = "production" ]; then
   MIGRATION_NODE_ENV="production"
 else
   MIGRATION_NODE_ENV="staging"
