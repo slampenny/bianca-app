@@ -8,6 +8,11 @@ exec > >(tee /var/log/user-data.log) 2>&1
 # Terraform variables
 AWS_ACCOUNT_ID="${aws_account_id}"
 AWS_REGION="${region}"
+ENVIRONMENT="staging"
+
+# Export ENVIRONMENT to /etc/environment so it's available to CodeDeploy scripts
+echo "ENVIRONMENT=${ENVIRONMENT}" >> /etc/environment
+export ENVIRONMENT="${ENVIRONMENT}"
 
 echo "Starting minimal staging infrastructure setup..."
 
