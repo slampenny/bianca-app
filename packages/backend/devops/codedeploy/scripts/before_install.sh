@@ -14,14 +14,61 @@ if [ -f "/opt/bianca-deployment/devops/maintenance/enable-maintenance.sh" ]; the
     }
 fi
 
-# Detect environment - use directory existence as primary method (most reliable)
-# Fallback to instance tags if directories don't exist yet
+# Detect environment - check environment variables first, then directories, then instance tags
 AWS_REGION="us-east-2"
 
 echo "   Detecting environment..."
 
-# Primary method: Check which deployment directory exists
-if [ -d "/opt/bianca-production" ]; then
+# Method 1: Check environment variables first (highest priority)
+# These can be set via userdata, /etc/environment, or manually
+if [ -n "$ENVIRONMENT" ]; then
+  echo "   ✅ Found ENVIRONMENT variable: $ENVIRONMENT"
+  DETECTED_ENV="$ENVIRONMENT"
+elif [ -n "$DEPLOYMENT_ENVIRONMENT" ]; then
+  echo "   ✅ Found DEPLOYMENT_ENVIRONMENT variable: $DEPLOYMENT_ENVIRONMENT"
+  DETECTED_ENV="$DEPLOYMENT_ENVIRONMENT"
+elif [ -n "$NODE_ENV" ] && [ "$NODE_ENV" != "test" ]; then
+  # NODE_ENV can indicate environment, but ignore "test" as that's for test runs
+  echo "   ✅ Found NODE_ENV variable: $NODE_ENV"
+  DETECTED_ENV="$NODE_ENV"
+fi
+
+# If we detected an environment from variables, use it
+if [ -n "$DETECTED_ENV" ]; then
+  if [ "$DETECTED_ENV" = "production" ]; then
+    ENVIRONMENT="production"
+    DEPLOY_DIR="/opt/bianca-production"
+    CONTAINER_PREFIX="production"
+    IMAGE_TAG="production"
+    NODE_ENV="production"
+    API_BASE_URL="https://api.biancawellness.com"
+    WEBSOCKET_URL="wss://api.biancawellness.com"
+    FRONTEND_URL="https://app.biancawellness.com"
+    SERVER_NAME_FRONTEND="app.biancawellness.com"
+    SERVER_NAME_API="api.biancawellness.com"
+    YARN_COMMAND="yarn start"
+    CLOUDWATCH_LOG_PREFIX="/bianca/production"
+  elif [ "$DETECTED_ENV" = "staging" ]; then
+    ENVIRONMENT="staging"
+    DEPLOY_DIR="/opt/bianca-staging"
+    CONTAINER_PREFIX="staging"
+    IMAGE_TAG="staging"
+    NODE_ENV="staging"
+    API_BASE_URL="https://staging-api.biancawellness.com"
+    WEBSOCKET_URL="wss://staging-api.biancawellness.com"
+    FRONTEND_URL="https://staging.biancawellness.com"
+    SERVER_NAME_FRONTEND="staging.biancawellness.com"
+    SERVER_NAME_API="staging-api.biancawellness.com"
+    YARN_COMMAND="yarn dev:staging"
+    CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+  else
+    echo "   ⚠️  Unknown environment from variables: $DETECTED_ENV, falling back to other methods..."
+    DETECTED_ENV=""
+  fi
+fi
+
+# Method 2: Check which deployment directory exists (if not already set from env vars)
+if [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-production" ]; then
   echo "   ✅ Found /opt/bianca-production directory - using production"
   ENVIRONMENT="production"
   DEPLOY_DIR="/opt/bianca-production"
@@ -35,7 +82,7 @@ if [ -d "/opt/bianca-production" ]; then
   SERVER_NAME_API="api.biancawellness.com"
   YARN_COMMAND="yarn start"
   CLOUDWATCH_LOG_PREFIX="/bianca/production"
-elif [ -d "/opt/bianca-staging" ]; then
+elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-staging" ]; then
   echo "   ✅ Found /opt/bianca-staging directory - using staging"
   ENVIRONMENT="staging"
   DEPLOY_DIR="/opt/bianca-staging"
@@ -51,7 +98,7 @@ elif [ -d "/opt/bianca-staging" ]; then
   SERVER_NAME_API="staging-api.biancawellness.com"
   YARN_COMMAND="yarn dev:staging"
   CLOUDWATCH_LOG_PREFIX="/bianca/staging"
-else
+elif [ -z "$DETECTED_ENV" ]; then
   # Fallback: Try to get instance tags (may fail due to permissions)
   echo "   ⚠️  No deployment directory found, trying instance tags..."
   INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
@@ -107,19 +154,23 @@ else
     CLOUDWATCH_LOG_PREFIX="/bianca/staging"
   else
     echo "   ❌ CRITICAL ERROR: Cannot determine environment"
-    echo "   No deployment directories found and instance tags unavailable"
+    echo "   Environment variables, deployment directories, and instance tags all unavailable"
     echo "   Instance ID: $INSTANCE_ID"
     echo "   Instance Name: $INSTANCE_NAME"
     echo "   Environment Tag: $ENVIRONMENT_TAG"
+    echo "   ENVIRONMENT variable: ${ENVIRONMENT:-not set}"
+    echo "   DEPLOYMENT_ENVIRONMENT variable: ${DEPLOYMENT_ENVIRONMENT:-not set}"
+    echo "   NODE_ENV variable: ${NODE_ENV:-not set}"
     echo ""
     echo "   This deployment will FAIL to prevent misconfiguration."
-    echo "   Please ensure:"
-    echo "   1. The deployment directory (/opt/bianca-production or /opt/bianca-staging) exists"
-    echo "   2. Instance tags (Name and Environment) are properly set"
-    echo "   3. The instance has IAM permissions to read its own tags"
+    echo "   Please ensure one of the following:"
+    echo "   1. Set ENVIRONMENT, DEPLOYMENT_ENVIRONMENT, or NODE_ENV environment variable"
+    echo "   2. The deployment directory (/opt/bianca-production or /opt/bianca-staging) exists"
+    echo "   3. Instance tags (Name and Environment) are properly set"
+    echo "   4. The instance has IAM permissions to read its own tags"
     echo ""
-    echo "   For staging: /opt/bianca-staging should exist"
-    echo "   For production: /opt/bianca-production should exist"
+    echo "   For staging: /opt/bianca-staging should exist or set ENVIRONMENT=staging"
+    echo "   For production: /opt/bianca-production should exist or set ENVIRONMENT=production"
     exit 1
   fi
 fi
