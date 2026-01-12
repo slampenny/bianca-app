@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import { Patient, PatientPages, Caregiver, Conversation } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
+import { setPatientsForCaregiver } from "../../store/patientSlice"
 
 export const patientApi = createApi({
   reducerPath: "patientApi",
@@ -13,6 +14,74 @@ export const patientApi = createApi({
           url: `/patients`,
           method: "POST",
           body: patient,
+        }
+      },
+      async onQueryStarted({ patient }, { dispatch, getState, queryFulfilled }) {
+        console.log('[API CALLBACK] createPatient onQueryStarted - starting')
+        try {
+          const { data: createdPatient } = await queryFulfilled
+          console.log('[API CALLBACK] createPatient onQueryStarted - patient created:', createdPatient.id)
+          console.log('[API CALLBACK] createPatient onQueryStarted - full payload:', JSON.stringify(createdPatient, null, 2))
+          console.log('[API CALLBACK] createPatient onQueryStarted - caregivers array:', createdPatient.caregivers)
+          console.log('[API CALLBACK] createPatient onQueryStarted - caregivers type:', typeof createdPatient.caregivers, Array.isArray(createdPatient.caregivers))
+          
+          // Get current user from state
+          const state = getState() as any
+          console.log('[API CALLBACK] createPatient onQueryStarted - state keys:', Object.keys(state))
+          console.log('[API CALLBACK] createPatient onQueryStarted - auth keys:', state?.auth ? Object.keys(state.auth) : 'no auth')
+          const currentUser = state?.auth?.currentUser || state?.auth?.user
+          console.log('[API CALLBACK] createPatient onQueryStarted - current user:', currentUser?.id, currentUser?.name)
+          
+          // First, try to add to all caregivers in the response
+          if (createdPatient.caregivers && Array.isArray(createdPatient.caregivers) && createdPatient.caregivers.length > 0) {
+            console.log('[API CALLBACK] createPatient onQueryStarted - adding to', createdPatient.caregivers.length, 'caregiver(s):', createdPatient.caregivers)
+            createdPatient.caregivers.forEach((caregiverId: string) => {
+              const userPatients = state?.patient?.patients?.[caregiverId] || []
+              console.log(`[API CALLBACK] createPatient onQueryStarted - caregiver ${caregiverId} currently has ${userPatients.length} patients`)
+              const existingIndex = userPatients.findIndex((p: Patient) => p.id === createdPatient.id)
+              if (existingIndex === -1) {
+                console.log(`[API CALLBACK] createPatient onQueryStarted - dispatching setPatientsForCaregiver for ${caregiverId}`)
+                dispatch(setPatientsForCaregiver({
+                  caregiverId,
+                  patients: [...userPatients, createdPatient],
+                }))
+                console.log(`[API CALLBACK] createPatient onQueryStarted - added to caregiver ${caregiverId}, new count: ${userPatients.length + 1}`)
+              } else {
+                console.log(`[API CALLBACK] createPatient onQueryStarted - patient already exists for caregiver ${caregiverId}`)
+              }
+            })
+          } else {
+            console.log('[API CALLBACK] createPatient onQueryStarted - no caregivers array or empty')
+          }
+          
+          // Also ensure current user gets the patient (fallback)
+          if (currentUser && currentUser.id && createdPatient) {
+            const userPatients = state?.patient?.patients?.[currentUser.id] || []
+            console.log(`[API CALLBACK] createPatient onQueryStarted - current user ${currentUser.id} currently has ${userPatients.length} patients`)
+            const existingIndex = userPatients.findIndex((p: Patient) => p.id === createdPatient.id)
+            
+            if (existingIndex === -1) {
+              console.log('[API CALLBACK] createPatient onQueryStarted - adding to current user as fallback')
+              dispatch(setPatientsForCaregiver({
+                caregiverId: currentUser.id,
+                patients: [...userPatients, createdPatient],
+              }))
+              console.log('[API CALLBACK] createPatient onQueryStarted - patient added to Redux for user', currentUser.id)
+            } else {
+              console.log('[API CALLBACK] createPatient onQueryStarted - patient already exists for current user')
+            }
+          } else {
+            console.log('[API CALLBACK] createPatient onQueryStarted - no current user or patient')
+          }
+          
+          // Check final state
+          const finalState = getState() as any
+          const finalUserPatients = currentUser?.id ? (finalState?.patient?.patients?.[currentUser.id] || []) : []
+          console.log(`[API CALLBACK] createPatient onQueryStarted - final state: user ${currentUser?.id} has ${finalUserPatients.length} patients`)
+          console.log(`[API CALLBACK] createPatient onQueryStarted - final patient IDs:`, finalUserPatients.map((p: Patient) => p.id))
+        } catch (error) {
+          // Error handling - patient creation failed
+          console.error("[API CALLBACK] Error in createPatient onQueryStarted:", error)
         }
       },
     }),

@@ -1,6 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import baseQueryWithReauth from "./baseQueryWithAuth"
-import { DEFAULT_API_CONFIG } from "./api"
 import { Caregiver, Org, AuthTokens, Patient, Alert } from "./api.types"
 
 export interface SSOLoginRequest {
@@ -38,7 +37,7 @@ export interface SSOVerifyResponse {
 
 export const ssoApi = createApi({
   reducerPath: "ssoApi",
-  baseQuery: baseQueryWithReauth(DEFAULT_API_CONFIG.url),
+  baseQuery: baseQueryWithReauth(), // Use null to get dynamic Config.API_URL
   tagTypes: [],
   endpoints: (builder) => ({
     ssoLogin: builder.mutation<SSOLoginResponse, SSOLoginRequest>({

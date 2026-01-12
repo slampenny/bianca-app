@@ -5,7 +5,7 @@ import {
   MedicalAnalysisSummary 
 } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
-import { DEFAULT_API_CONFIG } from "./api"
+import { getDefaultApiConfig } from "./api"
 import { logger } from "../../utils/logger"
 
 export const medicalAnalysisApi = createApi({
@@ -21,8 +21,8 @@ export const medicalAnalysisApi = createApi({
       query: ({ patientId, limit = 10 }) => {
         const url = `/medical-analysis/results/${patientId}`
         logger.debug('Medical Analysis API - getMedicalAnalysisResults:', {
-          baseUrl: DEFAULT_API_CONFIG.url,
-          fullUrl: DEFAULT_API_CONFIG.url + url,
+          baseUrl: getDefaultApiConfig().url,
+          fullUrl: getDefaultApiConfig().url + url,
           patientId,
           limit
         })
@@ -71,8 +71,8 @@ export const medicalAnalysisApi = createApi({
       query: ({ patientId }) => {
         const url = `/medical-analysis/trigger-patient/${patientId}`
         logger.debug('Medical Analysis API - triggerMedicalAnalysis:', {
-          baseUrl: DEFAULT_API_CONFIG.url,
-          fullUrl: DEFAULT_API_CONFIG.url + url,
+          baseUrl: getDefaultApiConfig().url,
+          fullUrl: getDefaultApiConfig().url + url,
           patientId
         })
         return {

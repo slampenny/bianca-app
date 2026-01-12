@@ -1,7 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import { FraudAbuseAnalysisResult } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
-import { DEFAULT_API_CONFIG } from "./api"
+import { getDefaultApiConfig } from "./api"
 import { logger } from "../../utils/logger"
 
 export const fraudAbuseAnalysisApi = createApi({
@@ -17,8 +17,8 @@ export const fraudAbuseAnalysisApi = createApi({
       query: ({ patientId, limit = 10 }) => {
         const url = `/fraud-abuse-analysis/results/${patientId}`
         logger.debug('Fraud Abuse Analysis API - getFraudAbuseAnalysisResults:', {
-          baseUrl: DEFAULT_API_CONFIG.url,
-          fullUrl: DEFAULT_API_CONFIG.url + url,
+          baseUrl: getDefaultApiConfig().url,
+          fullUrl: getDefaultApiConfig().url + url,
           patientId,
           limit
         })
@@ -74,8 +74,8 @@ export const fraudAbuseAnalysisApi = createApi({
       query: ({ patientId }) => {
         const url = `/fraud-abuse-analysis/trigger-patient/${patientId}`
         logger.debug('Fraud Abuse Analysis API - triggerFraudAbuseAnalysis:', {
-          baseUrl: DEFAULT_API_CONFIG.url,
-          fullUrl: DEFAULT_API_CONFIG.url + url,
+          baseUrl: getDefaultApiConfig().url,
+          fullUrl: getDefaultApiConfig().url + url,
           patientId
         })
         return {

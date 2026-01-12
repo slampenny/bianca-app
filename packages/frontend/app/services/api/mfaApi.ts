@@ -1,6 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import baseQueryWithReauth from "./baseQueryWithAuth"
-import { DEFAULT_API_CONFIG } from "./api"
 
 export interface MFAStatus {
   mfaEnabled: boolean
@@ -27,7 +26,7 @@ export interface RegenerateBackupCodesResponse {
 
 export const mfaApi = createApi({
   reducerPath: "mfaApi",
-  baseQuery: baseQueryWithReauth(DEFAULT_API_CONFIG.url),
+  baseQuery: baseQueryWithReauth(), // Use null to get dynamic Config.API_URL
   tagTypes: ["MFAStatus"],
   endpoints: (builder) => ({
     getMFAStatus: builder.query<MFAStatus, void>({
