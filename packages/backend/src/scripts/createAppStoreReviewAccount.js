@@ -7,10 +7,8 @@ const { insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.
 const { insertPatientsAndAddToCaregiver } = require('../../tests/fixtures/patient.fixture');
 
 // App Store Review Account Credentials
-const APP_STORE_REVIEW_EMAIL = 'appreview@biancatechnologies.com';
-const APP_STORE_REVIEW_PASSWORD = '[REDACTED - from Secrets Manager]'; // Strong, memorable password
-const APP_STORE_REVIEW_NAME = 'App Review Tester';
-const APP_STORE_REVIEW_PHONE = '+16045624263';
+// Note: Password should be stored in AWS Secrets Manager as APP_STORE_REVIEW_PASSWORD
+// and will be loaded via config.loadSecrets() before this script runs
 
 /**
  * Create sample conversations for a patient
@@ -19,8 +17,11 @@ async function createSampleConversations(patient) {
   const conversations = [];
   
   // Create a few sample conversations
+  const callId1 = new mongoose.Types.ObjectId();
   const conversation1 = await Conversation.create({
     patient: patient._id,
+    patientId: patient._id,
+    callId: callId1,
     startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
     endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000), // 5 minutes later
     duration: 5 * 60, // 5 minutes in seconds
@@ -50,8 +51,11 @@ async function createSampleConversations(patient) {
   conversations.push(conversation1);
   
   // Create another conversation
+  const callId2 = new mongoose.Types.ObjectId();
   const conversation2 = await Conversation.create({
     patient: patient._id,
+    patientId: patient._id,
+    callId: callId2,
     startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
     endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3 * 60 * 1000), // 3 minutes later
     duration: 3 * 60, // 3 minutes in seconds
@@ -111,6 +115,16 @@ async function createAppStoreReviewAccount() {
     // Load secrets from AWS Secrets Manager (required for OpenAI API key in production/staging)
     await config.loadSecrets();
     console.log('Secrets loaded from AWS Secrets Manager');
+    
+    // Get credentials from config (password should come from Secrets Manager in staging/production)
+    const APP_STORE_REVIEW_EMAIL = config.appStoreReview.email;
+    const APP_STORE_REVIEW_PASSWORD = config.appStoreReview.password;
+    const APP_STORE_REVIEW_NAME = config.appStoreReview.name;
+    const APP_STORE_REVIEW_PHONE = config.appStoreReview.phone;
+    
+    if (!APP_STORE_REVIEW_PASSWORD) {
+      throw new Error('APP_STORE_REVIEW_PASSWORD is not set. Please ensure it is configured in AWS Secrets Manager or .env file.');
+    }
     
     // Connect to the database
     await mongoose.connect(config.mongoose.url);

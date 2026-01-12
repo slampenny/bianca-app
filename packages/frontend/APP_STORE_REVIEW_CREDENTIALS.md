@@ -75,17 +75,21 @@ If you used the automated script, the credentials are:
 
 ```
 Email:    appreview@biancatechnologies.com
-Password: [REDACTED - from Secrets Manager]
+Password: (loaded from AWS Secrets Manager as APP_STORE_REVIEW_PASSWORD)
 ```
 
-**⚠️ Important:** Change the password if you've customized it in the script!
+**⚠️ Important:** 
+- The password is stored in AWS Secrets Manager as `APP_STORE_REVIEW_PASSWORD`
+- For staging/production, ensure this secret is configured in AWS Secrets Manager
+- For local development, you can set it in your `.env` file
+- The default password for dev/test is `[REDACTED - from Secrets Manager]` but should be changed in production
 
 ## What to Provide in App Store Connect
 
 In App Store Connect → Your App → App Review Information:
 
 1. **Username/Email**: `appreview@biancatechnologies.com`
-2. **Password**: `[REDACTED - from Secrets Manager]` (or your custom password)
+2. **Password**: (The password stored in AWS Secrets Manager as `APP_STORE_REVIEW_PASSWORD`)
 3. **Notes** (recommended):
    ```
    This test account includes sample patient data and demonstrates the core 
@@ -102,7 +106,7 @@ In App Store Connect → Your App → App Review Information:
 
 ```
 Username: appreview@biancatechnologies.com
-Password: [REDACTED - from Secrets Manager]
+Password: (from AWS Secrets Manager - APP_STORE_REVIEW_PASSWORD)
 
 Notes:
 This test account includes sample patient data and demonstrates the core 
@@ -116,12 +120,18 @@ for review. All features are accessible without additional setup.
   - The production iOS app connects to `https://api.biancawellness.com`
   - Apple reviewers will use the production app build
   - The account must exist in the production database
+- ✅ **Password Configuration:**
+  - The password is stored in AWS Secrets Manager as `APP_STORE_REVIEW_PASSWORD`
+  - Ensure this secret is configured in your production AWS Secrets Manager
+  - The secret should be added to `MySecretsManagerSecret` (or your environment-specific secret)
+  - For local development, you can set `APP_STORE_REVIEW_PASSWORD` in your `.env` file
 - ✅ Ensure the account has sample data for Apple to review
 - ✅ Test the login on production before submitting
 - ✅ Keep this account active during review
 - ⚠️ Don't use your personal account
 - ⚠️ Don't use accounts with sensitive real patient data
 - ⚠️ Make sure the password meets your app's requirements
+- ⚠️ **Security:** The password is no longer hardcoded in the codebase - it must be configured in AWS Secrets Manager
 
 ## After Review
 

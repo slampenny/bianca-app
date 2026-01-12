@@ -101,6 +101,11 @@ const envVarsSchema = Joi.object({
     then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
     otherwise: Joi.string().optional() // Optional in dev/test environments (can use default for testing)
   }),
+  APP_STORE_REVIEW_PASSWORD: Joi.string().when('NODE_ENV', {
+    is: Joi.string().valid('staging', 'production'),
+    then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
+    otherwise: Joi.string().optional() // Optional in dev/test environments
+  }),
   // **NEW:** Realtime API specific variables
   // Note: Model is auto-selected based on OPENAI_REALTIME_USE_GA:
   // - GA: 'gpt-realtime' (default when useGA=true)
@@ -205,6 +210,13 @@ const baselineConfig = {
     encoding: 'MP3'
   },
   multer: { dest: path.join(__dirname, '../../uploads') },
+  // App Store Review Account Configuration
+  appStoreReview: {
+    email: 'appreview@biancatechnologies.com',
+    password: envVars.APP_STORE_REVIEW_PASSWORD || null, // Must be set in AWS Secrets Manager or .env file
+    name: 'App Review Tester',
+    phone: '+16045624263',
+  },
   // Merge domain-specific configurations
   ...buildAllConfigs(envVars),
 };
@@ -341,6 +353,10 @@ baselineConfig.loadSecrets = async () => {
     // MFA Encryption Key (special case - sets process.env)
     if (secrets.MFA_ENCRYPTION_KEY) {
       process.env.MFA_ENCRYPTION_KEY = secrets.MFA_ENCRYPTION_KEY;
+    }
+    // App Store Review Password (update config)
+    if (secrets.APP_STORE_REVIEW_PASSWORD) {
+      baselineConfig.appStoreReview.password = secrets.APP_STORE_REVIEW_PASSWORD;
     }
     // Mongoose URL
     // if (secrets.MONGODB_URL) {

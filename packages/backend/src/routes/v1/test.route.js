@@ -1584,7 +1584,7 @@ router.post('/openai-connection', auth(), async (req, res) => {
  *       
  *       **Credentials created:**
  *       - Email: appreview@biancatechnologies.com
- *       - Password: [REDACTED - from Secrets Manager]
+ *       - Password: (loaded from AWS Secrets Manager as APP_STORE_REVIEW_PASSWORD)
  *       
  *       **Note:** This account must exist in production since the production iOS app
  *       connects to the production API. The endpoint is idempotent - if the account
@@ -1610,7 +1610,8 @@ router.post('/openai-connection', auth(), async (req, res) => {
  *                       example: appreview@biancatechnologies.com
  *                     password:
  *                       type: string
- *                       example: [REDACTED - from Secrets Manager]
+ *                       description: Password loaded from AWS Secrets Manager
+ *                       example: (from Secrets Manager)
  *                 account:
  *                   type: object
  *                   properties:
@@ -1641,15 +1642,26 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     logger.info('Creating App Store review account via API...');
     
+    // Ensure secrets are loaded (should already be loaded at startup, but ensure it here)
+    await config.loadSecrets();
+    
+    // Get credentials from config (password should come from Secrets Manager in staging/production)
+    const APP_STORE_REVIEW_EMAIL = config.appStoreReview.email;
+    const APP_STORE_REVIEW_PASSWORD = config.appStoreReview.password;
+    const APP_STORE_REVIEW_NAME = config.appStoreReview.name;
+    const APP_STORE_REVIEW_PHONE = config.appStoreReview.phone;
+    
+    if (!APP_STORE_REVIEW_PASSWORD) {
+      return res.status(500).json({
+        success: false,
+        error: 'APP_STORE_REVIEW_PASSWORD is not configured. Please ensure it is set in AWS Secrets Manager or .env file.'
+      });
+    }
+    
     // We need to modify the script to return data instead of just logging
     // Let's create a wrapper that captures the result
     const { Org, Caregiver, Patient, Conversation, Message, Schedule } = require('../../models');
     const bcrypt = require('bcryptjs');
-    
-    const APP_STORE_REVIEW_EMAIL = 'appreview@biancatechnologies.com';
-    const APP_STORE_REVIEW_PASSWORD = '[REDACTED - from Secrets Manager]';
-    const APP_STORE_REVIEW_NAME = 'App Review Tester';
-    const APP_STORE_REVIEW_PHONE = '+16045624263';
     
     // Check if account already exists
     const existingCaregiver = await Caregiver.findOne({ email: APP_STORE_REVIEW_EMAIL });
