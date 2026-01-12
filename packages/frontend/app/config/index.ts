@@ -17,6 +17,7 @@ import BaseConfig from "./config.base"
 import ProdConfig from "./config.prod"
 import DevConfig from "./config.dev"
 import StagingConfig from "./config.staging"
+import DemoConfig from "./config.demo"
 import Constants from "expo-constants"
 import { logger } from "../utils/logger"
 
@@ -54,6 +55,11 @@ if (process.env.NODE_ENV === 'test' ||
     ExtraConfig = DevConfig
     logger.debug('Using DEV config');
   }
+  // Use demo config if running on demo.biancawellness.com
+  else if (typeof window !== 'undefined' && window.location.hostname === 'demo.biancawellness.com') {
+    ExtraConfig = DemoConfig
+    logger.debug('Using DEMO config (demo.biancawellness.com detected)');
+  }
   // Use staging config if explicitly set in Expo config or build-time environment
   else if (Constants.expoConfig?.extra?.environment === 'staging' || 
            process.env.EXPO_PUBLIC_ENVIRONMENT === 'staging') {
@@ -65,6 +71,13 @@ if (process.env.NODE_ENV === 'test' ||
 }
 
 const Config = { ...BaseConfig, ...ExtraConfig }
+
+// Runtime override: If running on demo.biancawellness.com, force API_URL to use same origin
+// This works even if the bundle was built with staging config
+if (typeof window !== 'undefined' && window.location.hostname === 'demo.biancawellness.com') {
+  Config.API_URL = `https://demo.biancawellness.com/v1`
+  logger.debug('Runtime override: Using demo API URL (same origin)');
+}
 
 logger.debug('Final API_URL:', Config.API_URL);
 
