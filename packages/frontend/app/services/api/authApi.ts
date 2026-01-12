@@ -1,11 +1,11 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import { DEFAULT_API_CONFIG } from "./api"
+import { getDefaultApiConfig } from "./api"
 import { Alert, Org, Caregiver, Patient, AuthTokens } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const authApi = createApi({
   reducerPath: "authApi",
-  baseQuery: baseQueryWithReauth(DEFAULT_API_CONFIG.url),
+  baseQuery: baseQueryWithReauth(), // Use null to get dynamic Config.API_URL
   endpoints: (builder) => ({
     register: builder.mutation<
       { message: string; caregiver: Caregiver; requiresEmailVerification: boolean },

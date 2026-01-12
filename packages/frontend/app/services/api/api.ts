@@ -11,11 +11,16 @@ import type { ApiConfig } from "./api.types"
 
 /**
  * Configuring the apisauce instance.
+ * Note: We use a getter function to ensure Config.API_URL is read dynamically
+ * after any runtime overrides (e.g., for demo.biancawellness.com)
  */
-export const DEFAULT_API_CONFIG: ApiConfig = {
-  url: Config.API_URL,
+export const getDefaultApiConfig = (): ApiConfig => ({
+  url: Config.API_URL, // Read dynamically to pick up runtime overrides
   timeout: 10000,
-}
+})
+
+// For backward compatibility, export a constant that reads dynamically
+export const DEFAULT_API_CONFIG: ApiConfig = getDefaultApiConfig()
 
 /**
  * Manages all requests to the API. You can use this class to build out
@@ -28,8 +33,8 @@ export class Api {
   /**
    * Set up our API instance. Keep this lightweight!
    */
-  constructor(config: ApiConfig = DEFAULT_API_CONFIG) {
-    this.config = config
+  constructor(config: ApiConfig | null = null) {
+    this.config = config || getDefaultApiConfig() // Use getter to get fresh Config.API_URL
     this.apisauce = create({
       baseURL: this.config.url,
       timeout: this.config.timeout,

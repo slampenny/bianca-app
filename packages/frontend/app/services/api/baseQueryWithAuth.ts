@@ -1,5 +1,5 @@
 import { fetchBaseQuery, BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query/react"
-import { DEFAULT_API_CONFIG } from "./api"
+import { getDefaultApiConfig } from "./api"
 import { RootState } from "../../store/store"
 
 // Event emitter for auth modal - we'll use a simple callback pattern
@@ -46,7 +46,7 @@ export function notifyAuthSuccess() {
       try {
         // Recreate baseQuery to get fresh token from updated state
         const baseQuery = fetchBaseQuery({
-          baseUrl: DEFAULT_API_CONFIG.url,
+          baseUrl: getDefaultApiConfig().url, // Read dynamically to get fresh Config.API_URL
           prepareHeaders: (headers, { getState }) => {
             const token = (getState() as RootState).auth.tokens?.access?.token
             if (token) {
@@ -78,10 +78,12 @@ export function notifyAuthCancelled() {
 
 // Create the base query with auth handling
 function baseQueryWithReauth(
-  baseUrl: string = DEFAULT_API_CONFIG.url,
+  baseUrl: string | null = null, // Allow null to use dynamic config
 ): BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> {
+  // Read Config.API_URL dynamically to pick up runtime overrides
+  const effectiveBaseUrl = baseUrl || getDefaultApiConfig().url
   const baseQuery = fetchBaseQuery({
-    baseUrl,
+    baseUrl: effectiveBaseUrl,
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as RootState).auth.tokens?.access?.token
       if (token) {
