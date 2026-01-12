@@ -16,7 +16,10 @@ class PlaywrightWorld {
     this.browser = null;
     this.context = null;
     this.page = null;
-    this.baseURL = parameters.baseURL || process.env.FRONTEND_URL || 'http://localhost:8082';
+    // Use centralized port configuration from cucumber.config.js worldParameters
+    // This ensures all tests use the same port - if wrong, all fail consistently
+    // Priority: worldParameters (from config) > FRONTEND_URL env var > BASE_URL env var > default (8084)
+    this.baseURL = parameters.baseURL || process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:8084';
     this.apiURL = parameters.apiURL || process.env.API_URL || 'http://localhost:3000';
   }
 
@@ -50,10 +53,15 @@ class PlaywrightWorld {
       console.log('[Page Crash] Page crashed but continuing...');
     });
     
-    // Listen for console errors but don't fail on them
+    // Listen for console messages and log them
     this.page.on('console', (msg) => {
-      if (msg.type() === 'error') {
-        console.log('[Console Error]', msg.text());
+      const text = msg.text();
+      const type = msg.type();
+      // Log all console messages that contain our debug tags
+      if (text.includes('[REDUX') || text.includes('[API CALLBACK') || text.includes('[PATIENT SCREEN') || text.includes('createPatient') || text.includes('matchFulfilled')) {
+        console.log(`[Browser Console ${type}]`, text);
+      } else if (type === 'error') {
+        console.log('[Console Error]', text);
       }
     });
   }

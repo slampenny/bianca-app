@@ -78,6 +78,19 @@ if [ -n "$DETECTED_ENV" ]; then
     SERVER_NAME_API="staging-api.biancawellness.com"
     YARN_COMMAND="yarn dev:staging"
     CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+  elif [ "$DETECTED_ENV_LOWER" = "demo" ]; then
+    ENVIRONMENT="demo"
+    DEPLOY_DIR="/opt/bianca-demo"
+    CONTAINER_PREFIX="demo"
+    IMAGE_TAG="staging"  # Demo uses staging images
+    NODE_ENV="development"  # Demo uses development mode
+    API_BASE_URL="https://demo.biancawellness.com/v1"
+    WEBSOCKET_URL="wss://demo.biancawellness.com/v1"
+    FRONTEND_URL="https://demo.biancawellness.com"
+    SERVER_NAME_FRONTEND="demo.biancawellness.com"
+    SERVER_NAME_API="demo.biancawellness.com"
+    YARN_COMMAND="yarn dev"  # Demo uses dev mode
+    CLOUDWATCH_LOG_PREFIX="/bianca/demo"
   else
     echo "   ⚠️  Unknown environment from variables: $DETECTED_ENV, falling back to other methods..."
     DETECTED_ENV=""
@@ -115,6 +128,20 @@ elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-staging" ]; then
   SERVER_NAME_API="staging-api.biancawellness.com"
   YARN_COMMAND="yarn dev:staging"
   CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-demo" ]; then
+  echo "   ✅ Found /opt/bianca-demo directory - using demo"
+  ENVIRONMENT="demo"
+  DEPLOY_DIR="/opt/bianca-demo"
+  CONTAINER_PREFIX="demo"
+  IMAGE_TAG="staging"  # Demo uses staging images
+  NODE_ENV="development"  # Demo uses development mode
+  API_BASE_URL="https://demo.biancawellness.com/v1"
+  WEBSOCKET_URL="wss://demo.biancawellness.com/v1"
+  FRONTEND_URL="https://demo.biancawellness.com"
+  SERVER_NAME_FRONTEND="demo.biancawellness.com"
+  SERVER_NAME_API="demo.biancawellness.com"
+  YARN_COMMAND="yarn dev"  # Demo uses dev mode
+  CLOUDWATCH_LOG_PREFIX="/bianca/demo"
 elif [ -z "$DETECTED_ENV" ]; then
   # Fallback: Try to get instance tags (may fail due to permissions)
   echo "   ⚠️  No deployment directory found, trying instance tags..."
@@ -186,6 +213,20 @@ elif [ -z "$DETECTED_ENV" ]; then
     SERVER_NAME_API="staging-api.biancawellness.com"
     YARN_COMMAND="yarn dev:staging"
     CLOUDWATCH_LOG_PREFIX="/bianca/staging"
+  elif [ "$ENVIRONMENT_TAG" = "demo" ] || echo "$INSTANCE_NAME" | grep -qi "demo"; then
+    echo "   ✅ Detected demo from tags"
+    ENVIRONMENT="demo"
+    DEPLOY_DIR="/opt/bianca-demo"
+    CONTAINER_PREFIX="demo"
+    IMAGE_TAG="staging"  # Demo uses staging images
+    NODE_ENV="development"  # Demo uses development mode
+    API_BASE_URL="https://demo.biancawellness.com/v1"
+    WEBSOCKET_URL="wss://demo.biancawellness.com/v1"
+    FRONTEND_URL="https://demo.biancawellness.com"
+    SERVER_NAME_FRONTEND="demo.biancawellness.com"
+    SERVER_NAME_API="demo.biancawellness.com"
+    YARN_COMMAND="yarn dev"  # Demo uses dev mode
+    CLOUDWATCH_LOG_PREFIX="/bianca/demo"
   else
     echo "   ❌ CRITICAL ERROR: Cannot determine environment"
     echo "   Environment variables, deployment directories, and instance tags all unavailable"
@@ -480,6 +521,16 @@ server {
     location = /maintenance.html {
         root /opt;
         add_header Content-Type text/html;
+    }
+    
+    # Proxy .well-known requests to backend API (for Universal Links)
+    location /.well-known {
+        proxy_pass http://app:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
     }
     
     location / {

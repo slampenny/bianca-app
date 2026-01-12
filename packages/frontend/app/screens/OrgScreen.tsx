@@ -76,6 +76,9 @@ export function OrgScreen() {
   // Check if user has permission to invite caregivers
   const canInviteCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
   
+  // Check if user has permission to view caregivers (only orgadmins)
+  const canViewCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
+  
   // Check if user has permission to edit org details
   const canEditOrg = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
 
@@ -488,15 +491,17 @@ export function OrgScreen() {
         </Text>
         
         <View style={styles.actionsGrid}>
-          <Button 
-            preset="default"
-            text={translate("orgScreen.viewCaregivers")}
-            onPress={handleViewCaregivers} 
-            testID="view-caregivers-button"
-            accessibilityLabel="view-caregivers-button"
-            style={styles.actionButton}
-            textStyle={styles.actionButtonText}
-          />
+          {canViewCaregivers && (
+            <Button 
+              preset="default"
+              text={translate("orgScreen.viewCaregivers")}
+              onPress={handleViewCaregivers} 
+              testID="view-caregivers-button"
+              accessibilityLabel="view-caregivers-button"
+              style={styles.actionButton}
+              textStyle={styles.actionButtonText}
+            />
+          )}
           
           {canInviteCaregivers && (
             <Button 

@@ -1065,6 +1065,102 @@ resource "aws_efs_file_system_policy" "mongodb_policy" {
 }
 
 ################################################################################
+# SHARED APPLICATION LOAD BALANCER - For Demo and WordPress
+################################################################################
+
+# Shared ALB Security Group for Demo and WordPress
+resource "aws_security_group" "shared_alb" {
+  name        = "bianca-shared-alb-sg"
+  description = "Security group for shared ALB (demo and wordpress)"
+  vpc_id      = aws_vpc.main.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP"
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS"
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound"
+  }
+
+  tags = {
+    Name        = "bianca-shared-alb-sg"
+    Environment = "shared"
+    Purpose     = "Demo and WordPress ALB"
+  }
+}
+
+# Shared ALB for Demo and WordPress (consolidation to reduce costs)
+resource "aws_lb" "shared" {
+  name               = "bianca-shared-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.shared_alb.id]
+  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id]
+
+  enable_deletion_protection = false
+  enable_http2               = true
+  idle_timeout               = 60
+
+  tags = {
+    Name        = "bianca-shared-alb"
+    Environment = "shared"
+    Purpose     = "Demo and WordPress"
+  }
+}
+
+# HTTP Listener - redirects to HTTPS
+resource "aws_lb_listener" "shared_http" {
+  load_balancer_arn = aws_lb.shared.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
+
+# HTTPS Listener - uses host-based routing
+resource "aws_lb_listener" "shared_https" {
+  load_balancer_arn = aws_lb.shared.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06"
+  certificate_arn   = aws_acm_certificate_validation.primary_domain_cert.certificate_arn
+
+  # Default action (will be overridden by host-based rules)
+  default_action {
+    type = "fixed-response"
+    fixed_response {
+      content_type = "text/plain"
+      message_body   = "No matching host header"
+      status_code   = "404"
+    }
+  }
+}
+
+################################################################################
 # APPLICATION LOAD BALANCER (ALB) - For Bianca App HTTP/S Traffic
 ################################################################################
 
@@ -2060,6 +2156,7 @@ resource "aws_acm_certificate" "primary_domain_cert" {
     "app.${var.primary_domain}",
     "staging.${var.primary_domain}",
     "staging-api.${var.primary_domain}",
+    "demo.${var.primary_domain}",
     "sip.${var.primary_domain}",
     "staging-sip.${var.primary_domain}",
   ]

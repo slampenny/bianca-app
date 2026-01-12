@@ -12,8 +12,9 @@
 # Data source to find the WordPress ALB (same one used by myphonefriend.com)
 # The ALB name is "bianca-wordpress-alb"
 # Note: This assumes the ALB exists. If it doesn't, you may need to:
-# 1. Deploy WordPress first (terraform apply with create_wordpress=true), OR
-# 2. Reference the ALB from the terraform-wordpress workspace using a data source
+# Data source to find the WordPress ALB
+# Note: WordPress ALB exists but is not managed by Terraform (create_wordpress=false)
+# We reference it by name to restore DNS records
 data "aws_lb" "wordpress" {
   name = "bianca-wordpress-alb"
 }

@@ -1,7 +1,9 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Schedule } from "../services/api/api.types"
-import { patientApi, scheduleApi } from "../services/api"
+// Import APIs directly to break circular dependency with app/services/api/index.ts
+import { patientApi } from "../services/api/patientApi"
+import { scheduleApi } from "../services/api/scheduleApi"
 
 interface ScheduleState {
   schedule: Schedule

@@ -188,8 +188,8 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
             const currentSearch = window.location.search
             const fullPath = currentPath + currentSearch
             
-            // Allow reset-password and signup URLs
-            if (fullPath.includes('reset-password') || fullPath.includes('signup')) {
+            // Allow reset-password, signup, and verify-email URLs
+            if (fullPath.includes('reset-password') || fullPath.includes('signup') || fullPath.includes('auth/verify-email')) {
               return window.location.href
             }
             
@@ -249,30 +249,31 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   // We disable linking when:
   // 1. User is logged out
   // 2. We're on web
-  // 3. We're on a protected route (not reset-password or signup)
+  // 3. We're on a protected route (not reset-password, signup, or verify-email)
   // CRITICAL: We must check this synchronously during render, before NavigationContainer reads the URL
   const shouldDisableLinking = !isLoggedIn && typeof window !== 'undefined' &&
     (() => {
       const currentPath = window.location.pathname
-      // Disable linking if we're on a protected route (unless it's reset-password or signup)
+      // Disable linking if we're on a protected route (unless it's reset-password, signup, or verify-email)
       const isProtectedRoute = currentPath.includes('MainTabs') || 
                                currentPath.includes('/Home') || 
                                currentPath.includes('/Profile') || 
                                currentPath.includes('/Logout') ||
                                currentPath.startsWith('/MainTabs')
       const isUnauthRoute = currentPath.includes('reset-password') || 
-                            currentPath.includes('signup')
+                            currentPath.includes('signup') ||
+                            currentPath.includes('auth/verify-email')
       return isProtectedRoute && !isUnauthRoute
     })()
   
-  // Determine initial state - allow reset-password and signup routes when logged out
+  // Determine initial state - allow reset-password, signup, and verify-email routes when logged out
   // This must be called AFTER shouldDisableLinking is calculated
   const getInitialState = () => {
     if (isLoggedIn) {
       return initialState || navigationPersistenceProps.initialState
     }
     
-    // When logged out, check if we're on reset-password or signup (web only)
+    // When logged out, check if we're on reset-password, signup, or verify-email (web only)
     if (typeof window !== 'undefined') {
       const currentPath = window.location.pathname
       const currentSearch = window.location.search
@@ -284,6 +285,10 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
       }
       if (fullPath.includes('signup')) {
         // Return undefined to let linking handle signup route
+        return undefined
+      }
+      if (fullPath.includes('auth/verify-email')) {
+        // Return undefined to let linking handle verify-email route
         return undefined
       }
       

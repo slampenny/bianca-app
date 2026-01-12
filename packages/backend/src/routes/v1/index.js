@@ -22,6 +22,7 @@ const stripeRoute = require('./stripe.route');
 const testRoute = require('./test.route');
 const twilioRoute = require('./twilioCall.route');
 const callWorkflowRoute = require('./callWorkflow.route');
+const demoRoute = require('./demo.route');
 const docsRoute = require('./docs.route');
 
 const router = express.Router();
@@ -114,6 +115,10 @@ const defaultRoutes = [
   {
     path: '/twilio',
     route: twilioRoute,
+  },
+  {
+    path: '/demo',
+    route: demoRoute,
   },
 ];
 

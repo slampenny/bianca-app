@@ -1,7 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Org, Caregiver } from "../services/api/api.types"
-import { authApi } from "app/services/api"
+// Import API directly to break circular dependency with app/services/api/index.ts
+import { authApi } from "../services/api/authApi"
 
 interface OrgState {
   org: Org | null

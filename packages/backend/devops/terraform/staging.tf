@@ -545,6 +545,9 @@ resource "aws_route53_record" "staging_frontend_primary" {
   }
 }
 
+# NOTE: Demo subdomain now points to its own infrastructure (see demo.tf)
+# This record has been moved to demo.tf for isolation
+
 # ACM Certificate for staging (legacy domain)
 data "aws_acm_certificate" "staging_cert" {
   domain      = "*.myphonefriend.com"

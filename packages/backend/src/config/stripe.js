@@ -3,16 +3,20 @@ const Stripe = require('stripe');
 const config = require('./config');
 const logger = require('./logger');
 
-// Initialize Stripe with the secret key
-const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: '2023-10-16', // Lock in a specific Stripe API version
-});
+// Initialize Stripe with the secret key (only if key is provided)
+let stripe = null;
+if (config.stripe.secretKey) {
+  stripe = new Stripe(config.stripe.secretKey, {
+    apiVersion: '2023-10-16', // Lock in a specific Stripe API version
+  });
+  // Log Stripe mode on initialization
+  logger.info(`Stripe initialized in ${config.stripe.mode} mode`);
+} else {
+  logger.warn('Stripe secret key not provided - Stripe features will be disabled');
+}
 
-// Log Stripe mode on initialization
-logger.info(`Stripe initialized in ${config.stripe.mode} mode`);
-
-// Add test helpers in development and test environments
-if (config.env !== 'production') {
+// Add test helpers in development and test environments (only if Stripe is initialized)
+if (config.env !== 'production' && stripe) {
   /**
    * Get test card details for testing Stripe integration
    * @returns {Object} Object containing various test card information

@@ -43,46 +43,8 @@ variable "wordpress_key_pair_name" {
 # SECURITY GROUPS (need to be defined before ALB and instance)
 ################################################################################
 
-# Security Group for WordPress ALB (defined first to avoid circular dependency)
-resource "aws_security_group" "wordpress_alb" {
-  count       = var.create_wordpress ? 1 : 0
-  name        = "bianca-wordpress-alb-sg"
-  description = "Security group for WordPress ALB"
-  vpc_id      = aws_subnet.public_a.vpc_id # Use same VPC as subnets
-
-  # HTTP from internet
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTP"
-  }
-
-  # HTTPS from internet
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "HTTPS"
-  }
-
-  # Allow all outbound
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound"
-  }
-
-  tags = {
-    Name        = "bianca-wordpress-alb-sg"
-    Environment = var.environment
-    Project     = "bianca"
-  }
-}
+# WordPress ALB security group removed - now using shared ALB security group from main.tf
+# The shared ALB security group (aws_security_group.shared_alb) is defined in main.tf
 
 # Security Group for WordPress EC2 instance
 resource "aws_security_group" "wordpress" {
@@ -91,13 +53,13 @@ resource "aws_security_group" "wordpress" {
   description = "Security group for WordPress instance"
   vpc_id      = aws_subnet.public_a.vpc_id # Use same VPC as subnets
 
-  # Allow traffic only from ALB
+  # Allow traffic only from shared ALB
   ingress {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.wordpress_alb[0].id]
-    description     = "HTTP from ALB"
+    security_groups = [aws_security_group.shared_alb.id]
+    description     = "HTTP from shared ALB"
   }
 
   # SSH (restrict to your IP in production)
@@ -241,29 +203,8 @@ resource "aws_ebs_volume" "wordpress_db" {
 # APPLICATION LOAD BALANCER FOR WORDPRESS
 ################################################################################
 
-# Application Load Balancer for WordPress
-resource "aws_lb" "wordpress" {
-  count              = var.create_wordpress ? 1 : 0
-  name               = "bianca-wordpress-alb"
-  internal           = false
-  load_balancer_type = "application"
-  security_groups    = [aws_security_group.wordpress_alb[0].id]
-  subnets            = [aws_subnet.public_a.id, aws_subnet.public_b.id] # Need at least 2 subnets in different AZs
-
-  enable_deletion_protection = false
-  enable_http2               = true
-  idle_timeout               = 60
-
-  depends_on = [
-    aws_security_group.wordpress_alb,
-  ]
-
-  tags = {
-    Name        = "bianca-wordpress-alb"
-    Environment = var.environment
-    Project     = "bianca"
-  }
-}
+# WordPress now uses shared ALB (consolidated with Demo to reduce costs)
+# The shared ALB is defined in main.tf
 
 # Target Group for WordPress instance
 resource "aws_lb_target_group" "wordpress" {
@@ -301,36 +242,23 @@ resource "aws_lb_target_group_attachment" "wordpress" {
   port             = 80
 }
 
-# ALB Listener - HTTP (redirect to HTTPS)
-resource "aws_lb_listener" "wordpress_http" {
-  count             = var.create_wordpress ? 1 : 0
-  load_balancer_arn = aws_lb.wordpress[0].arn
-  port              = "80"
-  protocol          = "HTTP"
+# HTTP redirect is handled by shared ALB listener in main.tf
 
-  default_action {
-    type = "redirect"
+# Host-based routing rule for WordPress (biancawellness.com and www.biancawellness.com)
+resource "aws_lb_listener_rule" "wordpress" {
+  count        = var.create_wordpress ? 1 : 0
+  listener_arn = aws_lb_listener.shared_https.arn
+  priority     = 20
 
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
-    }
-  }
-}
-
-# ALB Listener - HTTPS (uses ACM certificate)
-resource "aws_lb_listener" "wordpress_https" {
-  count             = var.create_wordpress ? 1 : 0
-  load_balancer_arn = aws_lb.wordpress[0].arn
-  port              = "443"
-  protocol          = "HTTPS"
-  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
-  certificate_arn   = aws_acm_certificate_validation.wordpress_cert[0].certificate_arn
-
-  default_action {
+  action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.wordpress[0].arn
+  }
+
+  condition {
+    host_header {
+      values = [var.primary_domain, "www.${var.primary_domain}"]
+    }
   }
 }
 
@@ -338,7 +266,7 @@ resource "aws_lb_listener" "wordpress_https" {
 # Redirect myphonefriend.com → biancawellness.com
 resource "aws_lb_listener_rule" "wordpress_root_redirect" {
   count        = var.create_wordpress ? 1 : 0
-  listener_arn = aws_lb_listener.wordpress_https[0].arn
+  listener_arn = aws_lb_listener.shared_https.arn
   priority     = 50
 
   action {
@@ -362,7 +290,7 @@ resource "aws_lb_listener_rule" "wordpress_root_redirect" {
 # Redirect www.myphonefriend.com → www.biancawellness.com
 resource "aws_lb_listener_rule" "wordpress_www_redirect" {
   count        = var.create_wordpress ? 1 : 0
-  listener_arn = aws_lb_listener.wordpress_https[0].arn
+  listener_arn = aws_lb_listener.shared_https.arn
   priority     = 51
 
   action {
@@ -628,8 +556,8 @@ resource "aws_route53_record" "wordpress_root" {
   allow_overwrite = true # Allow Terraform to manage existing records
 
   alias {
-    name                   = aws_lb.wordpress[0].dns_name
-    zone_id                = aws_lb.wordpress[0].zone_id
+    name                   = aws_lb.shared.dns_name
+    zone_id                = aws_lb.shared.zone_id
     evaluate_target_health = true
   }
 
@@ -648,8 +576,8 @@ resource "aws_route53_record" "wordpress_www" {
   allow_overwrite = true # Allow Terraform to manage existing records
 
   alias {
-    name                   = aws_lb.wordpress[0].dns_name
-    zone_id                = aws_lb.wordpress[0].zone_id
+    name                   = aws_lb.shared.dns_name
+    zone_id                = aws_lb.shared.zone_id
     evaluate_target_health = true
   }
 
@@ -713,11 +641,11 @@ output "wordpress_certificate_arn" {
 }
 
 output "wordpress_alb_dns" {
-  value       = var.create_wordpress ? aws_lb.wordpress[0].dns_name : null
-  description = "DNS name of the WordPress Application Load Balancer"
+  value       = var.create_wordpress ? aws_lb.shared.dns_name : null
+  description = "DNS name of the shared Application Load Balancer (used by WordPress and Demo)"
 }
 
 output "wordpress_alb_arn" {
-  value       = var.create_wordpress ? aws_lb.wordpress[0].arn : null
-  description = "ARN of the WordPress Application Load Balancer"
+  value       = var.create_wordpress ? aws_lb.shared.arn : null
+  description = "ARN of the shared Application Load Balancer (used by WordPress and Demo)"
 }

@@ -57,7 +57,7 @@ export const UnauthStack = () => {
   return (
     <LoginStack.Navigator 
       screenOptions={{ headerShown: false }}
-      initialRouteName="Login"
+      // Don't set initialRouteName - let React Navigation linking handle it based on URL
     >
       <LoginStack.Screen name="Login" component={LoginScreen} options={() => ({ title: translate("headers.login") })} />
       <LoginStack.Screen name="Register" component={RegisterScreen} options={() => ({ title: translate("headers.register") })} />

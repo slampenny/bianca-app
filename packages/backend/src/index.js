@@ -182,6 +182,15 @@ async function startServer() {
       logger.info('=============================');
       logger.info(`📊 Health check: http://localhost:${port}/health`);
       logger.info(`📧 Email test: http://localhost:${port}/v1/test/email`);
+    }).on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        logger.error(`Port ${port} is already in use. Another instance may be running.`);
+        logger.error('Please stop the other instance or use a different port.');
+        process.exit(1);
+      } else {
+        logger.error('Server error:', err);
+        process.exit(1);
+      }
     });
 
     // Set up graceful shutdown handlers

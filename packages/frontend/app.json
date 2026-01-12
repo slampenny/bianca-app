@@ -43,7 +43,8 @@
     "ios": {
       "icon": "./assets/images/appstore.png",
       "supportsTablet": true,
-      "bundleIdentifier": "com.negascout.bianca",
+      "bundleIdentifier": "com.biancatechnologies.bianca",
+      "buildNumber": "1",
       "associatedDomains": [
         "applinks:app.biancawellness.com",
         "applinks:staging.biancawellness.com"
@@ -56,7 +57,11 @@
       },
       "infoPlist": {
         "NSMicrophoneUsageDescription": "This app needs access to the microphone to make phone calls for wellness checks.",
-        "NSCameraUsageDescription": "This app may need access to the camera for profile pictures."
+        "NSCameraUsageDescription": "This app may need access to the camera for profile pictures.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "web": {

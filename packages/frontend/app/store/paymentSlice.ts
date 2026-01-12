@@ -2,7 +2,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Invoice } from "../services/api/api.types"
-import { paymentApi } from "app/services/api"
+// Import API directly to break circular dependency with app/services/api/index.ts
+import { paymentApi } from "../services/api/paymentApi"
 import { logger } from "../utils/logger"
 
 interface PaymentState {

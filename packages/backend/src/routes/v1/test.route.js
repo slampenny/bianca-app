@@ -1570,4 +1570,267 @@ router.post('/openai-connection', auth(), async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /test/create-app-store-review-account:
+ *   post:
+ *     summary: Create App Store review test account
+ *     description: |
+ *       Creates a dedicated test account for App Store review with sample data.
+ *       This account includes:
+ *       - Organization and caregiver account
+ *       - 2 sample patients with conversations and schedules
+ *       - All necessary sample data for Apple reviewers
+ *       
+ *       **Credentials created:**
+ *       - Email: appreview@biancatechnologies.com
+ *       - Password: [REDACTED - from Secrets Manager]
+ *       
+ *       **Note:** This account must exist in production since the production iOS app
+ *       connects to the production API. The endpoint is idempotent - if the account
+ *       already exists, it will return an error.
+ *     tags: [Test]
+ *     responses:
+ *       "200":
+ *         description: App Store review account created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 credentials:
+ *                   type: object
+ *                   properties:
+ *                     email:
+ *                       type: string
+ *                       example: appreview@biancatechnologies.com
+ *                     password:
+ *                       type: string
+ *                       example: [REDACTED - from Secrets Manager]
+ *                 account:
+ *                   type: object
+ *                   properties:
+ *                     organization:
+ *                       type: string
+ *                       description: Organization name
+ *                     caregiver:
+ *                       type: string
+ *                       description: Caregiver email
+ *                     patients:
+ *                       type: number
+ *                       description: Number of patients created
+ *                     conversations:
+ *                       type: number
+ *                       description: Number of conversations created
+ *                     schedules:
+ *                       type: number
+ *                       description: Number of schedules created
+ *       "400":
+ *         description: Account already exists
+ *       "500":
+ *         description: Error creating account
+ */
+router.post('/create-app-store-review-account', async (req, res) => {
+  try {
+
+    const createAppStoreReviewAccount = require('../../scripts/createAppStoreReviewAccount');
+    
+    logger.info('Creating App Store review account via API...');
+    
+    // We need to modify the script to return data instead of just logging
+    // Let's create a wrapper that captures the result
+    const { Org, Caregiver, Patient, Conversation, Message, Schedule } = require('../../models');
+    const bcrypt = require('bcryptjs');
+    
+    const APP_STORE_REVIEW_EMAIL = 'appreview@biancatechnologies.com';
+    const APP_STORE_REVIEW_PASSWORD = '[REDACTED - from Secrets Manager]';
+    const APP_STORE_REVIEW_NAME = 'App Review Tester';
+    const APP_STORE_REVIEW_PHONE = '+16045624263';
+    
+    // Check if account already exists
+    const existingCaregiver = await Caregiver.findOne({ email: APP_STORE_REVIEW_EMAIL });
+    if (existingCaregiver) {
+      return res.status(400).json({
+        success: false,
+        error: 'App Store review account already exists',
+        email: APP_STORE_REVIEW_EMAIL,
+        message: 'If you want to recreate it, delete the existing account first.'
+      });
+    }
+    
+    // Hash the password
+    const salt = bcrypt.genSaltSync(8);
+    const hashedPassword = bcrypt.hashSync(APP_STORE_REVIEW_PASSWORD, salt);
+    
+    // Create organization
+    const org = await Org.create({
+      name: 'App Review Test Organization',
+      email: APP_STORE_REVIEW_EMAIL,
+      country: 'CA',
+    });
+    
+    // Create caregiver account
+    const caregiver = await Caregiver.create({
+      name: APP_STORE_REVIEW_NAME,
+      email: APP_STORE_REVIEW_EMAIL,
+      phone: APP_STORE_REVIEW_PHONE,
+      password: hashedPassword,
+      role: 'orgAdmin',
+      org: org._id,
+      patients: [],
+      isEmailVerified: true,
+      isPhoneVerified: true,
+    });
+    
+    // Add caregiver to org
+    org.caregivers.push(caregiver._id);
+    await org.save();
+    
+    // Create sample patients
+    const patient1 = await Patient.create({
+      name: 'Sample Patient One',
+      email: 'sample.patient1@example.com',
+      phone: '+16045624264',
+      caregivers: [caregiver._id],
+      org: org._id,
+      schedules: [],
+      isActive: true,
+    });
+    
+    const patient2 = await Patient.create({
+      name: 'Sample Patient Two',
+      email: 'sample.patient2@example.com',
+      phone: '+16045624265',
+      caregivers: [caregiver._id],
+      org: org._id,
+      schedules: [],
+      isActive: true,
+    });
+    
+    // Add patients to caregiver
+    caregiver.patients.push(patient1._id, patient2._id);
+    await caregiver.save();
+    
+    // Create sample conversations
+    const conversation1 = await Conversation.create({
+      patient: patient1._id,
+      startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000),
+      duration: 5 * 60,
+      status: 'completed',
+      transcript: 'Hello, how are you feeling today? I\'m doing well, thank you for checking in.',
+      summary: 'Routine wellness check - patient is doing well',
+      sentiment: 'positive',
+      isActive: true,
+    });
+    
+    await Message.create({
+      conversation: conversation1._id,
+      patient: patient1._id,
+      content: 'Hello, how are you feeling today?',
+      role: 'system',
+      timestamp: conversation1.startTime,
+    });
+    
+    await Message.create({
+      conversation: conversation1._id,
+      patient: patient1._id,
+      content: 'I\'m doing well, thank you for checking in.',
+      role: 'user',
+      timestamp: new Date(conversation1.startTime.getTime() + 30 * 1000),
+    });
+    
+    const conversation2 = await Conversation.create({
+      patient: patient1._id,
+      startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3 * 60 * 1000),
+      duration: 3 * 60,
+      status: 'completed',
+      transcript: 'Good morning! How did you sleep? I slept well, thank you.',
+      summary: 'Morning check-in - patient slept well',
+      sentiment: 'positive',
+      isActive: true,
+    });
+    
+    const conversation3 = await Conversation.create({
+      patient: patient2._id,
+      startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 1000),
+      duration: 4 * 60,
+      status: 'completed',
+      transcript: 'How are you today? I\'m feeling great, thanks!',
+      summary: 'Daily check-in - patient feeling great',
+      sentiment: 'positive',
+      isActive: true,
+    });
+    
+    // Create sample schedules
+    const schedule1 = await Schedule.create({
+      patient: patient1._id,
+      caregiver: caregiver._id,
+      type: 'daily',
+      time: '09:00',
+      timezone: 'America/Vancouver',
+      isActive: true,
+      enabled: true,
+    });
+    
+    const schedule2 = await Schedule.create({
+      patient: patient1._id,
+      caregiver: caregiver._id,
+      type: 'weekly',
+      dayOfWeek: 1,
+      time: '14:00',
+      timezone: 'America/Vancouver',
+      isActive: true,
+      enabled: true,
+    });
+    
+    const schedule3 = await Schedule.create({
+      patient: patient2._id,
+      caregiver: caregiver._id,
+      type: 'daily',
+      time: '10:00',
+      timezone: 'America/Vancouver',
+      isActive: true,
+      enabled: true,
+    });
+    
+    // Add schedules to patients
+    patient1.schedules.push(schedule1._id, schedule2._id);
+    patient2.schedules.push(schedule3._id);
+    await patient1.save();
+    await patient2.save();
+    
+    logger.info('App Store review account created successfully via API');
+    
+    res.json({
+      success: true,
+      message: 'App Store review account created successfully',
+      credentials: {
+        email: APP_STORE_REVIEW_EMAIL,
+        password: APP_STORE_REVIEW_PASSWORD,
+      },
+      account: {
+        organization: org.name,
+        caregiver: caregiver.email,
+        patients: 2,
+        conversations: 3,
+        schedules: 3,
+      },
+    });
+  } catch (error) {
+    logger.error('Error creating App Store review account:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: config.env === 'development' || config.env === 'staging' ? error.stack : undefined
+    });
+  }
+});
+
 module.exports = router;

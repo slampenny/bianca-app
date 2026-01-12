@@ -15,8 +15,9 @@ import AvatarPicker from "../components/AvatarPicker"
 import { CaregiverAssignmentModal } from "../components/CaregiverAssignmentModal"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
-import { getPatient, setPatient } from "../store/patientSlice"
+import { getPatient, setPatient, setPatientsForCaregiver, getPatientsForCaregiver } from "../store/patientSlice"
 import { getCurrentUser } from "../store/authSlice"
+import { store } from "../store/store"
 import {
   useCreatePatientMutation,
   useUpdatePatientMutation,
@@ -293,6 +294,7 @@ function PatientScreen() {
         // --- New patient creation flow ---
 
         // 1. Create Patient record (potentially without final avatar URL yet)
+        console.log('[PATIENT SCREEN] Creating patient with data:', { name, email, phone, preferredLanguage })
         const createdPatient = await createPatient({
           patient: {
             // id is assigned by backend
@@ -304,6 +306,8 @@ function PatientScreen() {
             avatar: undefined, // Or defaultAvatarUrl - depends on backend logic
           },
         }).unwrap()
+        console.log('[PATIENT SCREEN] Patient created, response:', JSON.stringify(createdPatient, null, 2))
+        console.log('[PATIENT SCREEN] Created patient caregivers array:', createdPatient.caregivers)
 
         let finalPatient = createdPatient // This holds the patient data *after* creation
 
@@ -335,7 +339,40 @@ function PatientScreen() {
         }
 
         // 4. Update Redux with the final patient data (either with or without uploaded avatar)
+        console.log('[PATIENT SCREEN] Dispatching setPatient with:', JSON.stringify(finalPatient, null, 2))
         dispatch(setPatient(finalPatient))
+        
+        // 5. Ensure patient is added to current user's patient list
+        // The reducer and onQueryStarted callback should handle this via the caregivers array
+        // But as a fallback, we'll also add it here if the caregivers array includes the current user
+        console.log('[PATIENT SCREEN] Current user:', currentUser?.id, currentUser?.name)
+        console.log('[PATIENT SCREEN] Final patient caregivers:', finalPatient.caregivers)
+        if (currentUser && currentUser.id && finalPatient) {
+          // Get current state from store
+          const state = store.getState()
+          const userPatients = getPatientsForCaregiver(state, currentUser.id)
+          console.log(`[PATIENT SCREEN] Current user ${currentUser.id} has ${userPatients.length} patients in Redux`)
+          console.log(`[PATIENT SCREEN] Current user patient IDs:`, userPatients.map(p => p.id))
+          
+          const existingIndex = userPatients.findIndex((p) => p.id === finalPatient.id)
+          if (existingIndex === -1) {
+            console.log(`[PATIENT SCREEN] Patient ${finalPatient.id} not in Redux, adding it...`)
+            dispatch(setPatientsForCaregiver({
+              caregiverId: currentUser.id,
+              patients: [...userPatients, finalPatient],
+            }))
+            // Check state after dispatch
+            const newState = store.getState()
+            const newUserPatients = getPatientsForCaregiver(newState, currentUser.id)
+            console.log(`[PATIENT SCREEN] After dispatch, user ${currentUser.id} has ${newUserPatients.length} patients`)
+            console.log(`[PATIENT SCREEN] After dispatch, patient IDs:`, newUserPatients.map(p => p.id))
+          } else {
+            console.log(`[PATIENT SCREEN] Patient ${finalPatient.id} already in Redux at index ${existingIndex}`)
+          }
+        } else {
+          console.log('[PATIENT SCREEN] Cannot add patient - missing currentUser or finalPatient')
+        }
+        
         setSuccessMessage("Patient created successfully!") // Show success message
         
         // Clear any existing timeout

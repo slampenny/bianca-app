@@ -34,6 +34,9 @@ if [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-production" ]; then
 elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-staging" ]; then
   echo "   ✅ Found /opt/bianca-staging directory - using staging"
   DETECTED_ENV="staging"
+elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-demo" ]; then
+  echo "   ✅ Found /opt/bianca-demo directory - using demo"
+  DETECTED_ENV="demo"
 fi
 
 # Method 4: Fallback to instance tags (if not already set)
@@ -57,6 +60,9 @@ if [ -z "$DETECTED_ENV" ]; then
   elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
     echo "   ✅ Detected staging from tags"
     DETECTED_ENV="staging"
+  elif [ "$ENVIRONMENT_TAG" = "demo" ] || echo "$INSTANCE_NAME" | grep -qi "demo"; then
+    echo "   ✅ Detected demo from tags"
+    DETECTED_ENV="demo"
   fi
 fi
 
@@ -67,6 +73,9 @@ if [ "$DETECTED_ENV" = "production" ]; then
 elif [ "$DETECTED_ENV" = "staging" ]; then
   DEPLOY_DIR="/opt/bianca-staging"
   CONTAINER_PREFIX="staging"
+elif [ "$DETECTED_ENV" = "demo" ]; then
+  DEPLOY_DIR="/opt/bianca-demo"
+  CONTAINER_PREFIX="demo"
 else
   echo "   ❌ ERROR: Cannot determine environment"
   echo "   Checked /etc/environment, environment variables, deployment directories, and instance tags"
@@ -175,6 +184,8 @@ echo "   🔄 Step 2: Running database migrations..."
 # Determine environment for migrations (use detected environment)
 if [ "$DETECTED_ENV" = "production" ]; then
   MIGRATION_NODE_ENV="production"
+elif [ "$DETECTED_ENV" = "demo" ]; then
+  MIGRATION_NODE_ENV="development"  # Demo uses development environment
 else
   MIGRATION_NODE_ENV="staging"
 fi

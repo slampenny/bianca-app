@@ -1,8 +1,10 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Patient } from "../services/api/api.types"
-import { authApi, patientApi } from "app/services/api"
-import { ssoApi } from "app/services/api/ssoApi"
+// Import APIs directly to break circular dependency with app/services/api/index.ts
+import { authApi } from "../services/api/authApi"
+import { patientApi } from "../services/api/patientApi"
+import { ssoApi } from "../services/api/ssoApi"
 import { logger } from "../utils/logger"
 
 interface PatientState {
@@ -39,7 +41,20 @@ export const patientSlice = createSlice({
       action: PayloadAction<{ caregiverId: string; patients: Patient[] }>,
     ) => {
       logger.debug("setPatientsForCaregiver called for caregiver:", action.payload.caregiverId)
-      state.patients[action.payload.caregiverId] = action.payload.patients
+      const { caregiverId, patients } = action.payload
+      if (!state.patients[caregiverId]) {
+        state.patients[caregiverId] = []
+      }
+      // Merge new patients with existing ones, avoiding duplicates
+      patients.forEach((patient) => {
+        const existingIndex = state.patients[caregiverId].findIndex((p) => p.id === patient.id)
+        if (existingIndex === -1) {
+          state.patients[caregiverId].push(patient)
+        } else {
+          // Update existing patient
+          state.patients[caregiverId][existingIndex] = patient
+        }
+      })
     },
     clearPatient: (state) => {
       logger.debug("clearPatient called")
@@ -52,13 +67,39 @@ export const patientSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
+      console.log('[REDUX REDUCER] Login matchFulfilled - merging patient list')
       logger.debug("Login matchFulfilled:", payload)
       // Login response can be either success with patient data or MFA requirement
       if ('caregiver' in payload && 'patients' in payload && payload.caregiver && payload.patients) {
-        state.patients[payload.caregiver.id!] = []
+        const caregiverId = payload.caregiver.id!
+        const beforeCount = state.patients[caregiverId]?.length || 0
+        console.log(`[REDUX REDUCER] Login: merging ${beforeCount} existing patients with ${payload.patients.length} from API for caregiver ${caregiverId}`)
+        
+        // Initialize array if it doesn't exist
+        if (!state.patients[caregiverId]) {
+          state.patients[caregiverId] = []
+        }
+        
+        // Merge patients from login response with existing patients
+        // This preserves any newly created patients that might not be in the login response yet
         payload.patients.forEach((patient: Patient) => {
-          state.patients[payload.caregiver.id!].push(patient)
+          const existingIndex = state.patients[caregiverId].findIndex((p) => p.id === patient.id)
+          if (existingIndex === -1) {
+            // Patient not in existing list, add it
+            state.patients[caregiverId].push(patient)
+            console.log(`[REDUX REDUCER] Login: added patient ${patient.id} (${patient.name}) from API`)
+          } else {
+            // Patient exists, update it with latest data from API
+            state.patients[caregiverId][existingIndex] = patient
+            console.log(`[REDUX REDUCER] Login: updated patient ${patient.id} (${patient.name}) from API`)
+          }
         })
+        
+        const afterCount = state.patients[caregiverId].length
+        console.log(`[REDUX REDUCER] Login: after merge, caregiver ${caregiverId} has ${afterCount} patients (was ${beforeCount})`)
+        if (afterCount > beforeCount) {
+          console.log(`[REDUX REDUCER] Login: merge added ${afterCount - beforeCount} new patients`)
+        }
       }
     })
     // Handle SSO login - patients come in the response
@@ -81,40 +122,50 @@ export const patientSlice = createSlice({
       state.patients = {}
     })
     builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state, { payload }) => {
+      console.log('[REDUX REDUCER] createPatient.matchFulfilled called')
+      console.log('[REDUX REDUCER] Payload:', JSON.stringify(payload, null, 2))
+      console.log('[REDUX REDUCER] Payload caregivers array:', payload.caregivers)
+      console.log('[REDUX REDUCER] Payload caregivers type:', typeof payload.caregivers, Array.isArray(payload.caregivers))
       logger.debug("createPatient matchFulfilled:", payload)
+      logger.debug("createPatient matchFulfilled - caregivers array:", payload.caregivers)
       state.patient = payload
       
       // Add the patient to all caregivers' patient lists
-      if (state.patient && state.patient.caregivers) {
-        state.patient.caregivers.forEach((caregiverId: string) => {
+      // The backend should include the current user in the caregivers array
+      if (payload && payload.caregivers && Array.isArray(payload.caregivers) && payload.caregivers.length > 0) {
+        console.log(`[REDUX REDUCER] Adding patient to ${payload.caregivers.length} caregiver(s) lists:`, payload.caregivers)
+        logger.debug(`Adding patient to ${payload.caregivers.length} caregiver(s) lists`)
+        payload.caregivers.forEach((caregiverId: string) => {
           if (!state.patients[caregiverId]) {
             state.patients[caregiverId] = []
+            console.log(`[REDUX REDUCER] Created new patient list for caregiver ${caregiverId}`)
           }
           // Check if patient already exists to avoid duplicates
           const existingIndex = state.patients[caregiverId].findIndex(p => p.id === payload.id)
           if (existingIndex === -1) {
             state.patients[caregiverId].push(payload)
+            console.log(`[REDUX REDUCER] Patient ${payload.id} added to caregiver ${caregiverId}'s list. Total: ${state.patients[caregiverId].length}`)
+            logger.debug(`Patient added to caregiver ${caregiverId}'s list. Total: ${state.patients[caregiverId].length}`)
+          } else {
+            console.log(`[REDUX REDUCER] Patient ${payload.id} already exists in caregiver ${caregiverId}'s list`)
+            logger.debug(`Patient already exists in caregiver ${caregiverId}'s list`)
           }
         })
-      }
-      
-      // Also add to the current user's patient list if not already there
-      // This is a fallback in case the caregivers array is not populated
-      const currentUser = (state as any).auth?.user
-      if (currentUser && currentUser.id) {
-        logger.debug(`Adding patient to current user's list: ${currentUser.id}`)
-        if (!state.patients[currentUser.id]) {
-          state.patients[currentUser.id] = []
-        }
-        const existingIndex = state.patients[currentUser.id].findIndex(p => p.id === payload.id)
-        if (existingIndex === -1) {
-          state.patients[currentUser.id].push(payload)
-          logger.debug(`Patient added to user ${currentUser.id}'s list. Total patients: ${state.patients[currentUser.id].length}`)
-        } else {
-          logger.debug(`Patient already exists in user ${currentUser.id}'s list`)
-        }
+        console.log(`[REDUX REDUCER] Final state.patients keys:`, Object.keys(state.patients))
+        console.log(`[REDUX REDUCER] Final state.patients:`, JSON.stringify(Object.fromEntries(
+          Object.entries(state.patients).map(([k, v]) => [k, (v as Patient[]).map(p => ({ id: p.id, name: p.name }))])
+        ), null, 2))
       } else {
-        logger.debug('No current user found in auth state')
+        console.log('[REDUX REDUCER] No caregivers array or empty array in payload')
+        console.log('[REDUX REDUCER] Payload structure:', {
+          hasPayload: !!payload,
+          hasCaregivers: !!(payload && payload.caregivers),
+          caregiversValue: payload?.caregivers,
+          caregiversType: typeof payload?.caregivers,
+          isArray: Array.isArray(payload?.caregivers),
+          length: Array.isArray(payload?.caregivers) ? payload.caregivers.length : 'N/A'
+        })
+        logger.debug('createPatient matchFulfilled - no caregivers array or empty array in payload')
       }
     })
     builder.addMatcher(patientApi.endpoints.updatePatient.matchFulfilled, (state, { payload }) => {

@@ -13,18 +13,24 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "dev": "yarn workspace @bianca-app/backend dev & yarn workspace @bianca-app/frontend start",
+    "dev": "bash scripts/dev.sh",
+    "dev:safe": "bash scripts/check-ports.sh && yarn workspace @bianca-app/backend dev & yarn workspace @bianca-app/frontend web",
     "dev:backend": "yarn workspace @bianca-app/backend dev",
-    "dev:frontend": "yarn workspace @bianca-app/frontend start",
+    "dev:frontend": "yarn workspace @bianca-app/frontend web",
     "dev:staging": "yarn workspace @bianca-app/backend dev:staging",
     "dev:test": "yarn workspace @bianca-app/backend dev:test",
+    "down": "yarn workspace @bianca-app/backend down",
     "test": "yarn workspace @bianca-app/backend test",
     "test:unit": "yarn workspace @bianca-app/backend test:unit",
     "test:integration": "yarn workspace @bianca-app/backend test:integration",
     "lint": "yarn workspace @bianca-app/backend lint",
     "lint:fix": "yarn workspace @bianca-app/backend lint:fix",
     "prettier": "yarn workspace @bianca-app/backend prettier",
-    "prettier:fix": "yarn workspace @bianca-app/backend prettier:fix"
+    "prettier:fix": "yarn workspace @bianca-app/backend prettier:fix",
+    "demo:up": "yarn workspace @bianca-app/backend demo:up",
+    "demo:down": "yarn workspace @bianca-app/backend demo:down",
+    "demo:seed": "yarn workspace @bianca-app/backend demo:seed",
+    "demo:update": "yarn workspace @bianca-app/backend demo:update"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

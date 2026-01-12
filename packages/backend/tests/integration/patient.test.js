@@ -56,6 +56,7 @@ describe('Patient routes', () => {
         phone: patientOne.phone,
         isEmailVerified: false,
         preferredLanguage: "en",
+        consented: true,
         caregivers: expect.arrayContaining([]),
         schedules: expect.arrayContaining([]),
       });
@@ -233,13 +234,13 @@ describe('Patient routes', () => {
 
       expect(res.body).toEqual({
         id: patient.id,
-        org: null,
+        org: patient.org.toString(),
         name: updateBody.name,
         email: updateBody.email.toLowerCase(),
         phone: patient.phone,
-        org: patient.org.toString(),
         isEmailVerified: patient.isEmailVerified,
         preferredLanguage: "en",
+        consented: true,
         caregivers: expect.arrayContaining([]),
         schedules: expect.arrayContaining([]),
       });
@@ -388,13 +389,13 @@ describe('Patient routes', () => {
 
         expect(res.body).toEqual({
           id: patient.id,
-          org: null,
+          org: patient.org.toString(),
           name: updateBody.name,
           email: updateBody.email.toLowerCase(),
           phone: updateBody.phone,
-          org: patient.org.toString(),
           isEmailVerified: patient.isEmailVerified,
           preferredLanguage: "en",
+          consented: true,
           caregivers: expect.arrayContaining([]),
           schedules: expect.arrayContaining([]),
         });
@@ -528,6 +529,7 @@ describe('Patient routes', () => {
         phone: patient.phone,
         isEmailVerified: patient.isEmailVerified,
         preferredLanguage: "en",
+        consented: true,
         caregivers: expect.arrayContaining([caregiver.id]),
         schedules: expect.arrayContaining([]),
       });
@@ -555,6 +557,7 @@ describe('Patient routes', () => {
         phone: patient.phone,
         isEmailVerified: patient.isEmailVerified,
         preferredLanguage: "en",
+        consented: true,
         caregivers: expect.arrayContaining([]),
         schedules: expect.arrayContaining([]),
       });

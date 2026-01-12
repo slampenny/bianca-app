@@ -7,7 +7,6 @@ import { useTheme } from "../theme/ThemeContext"
 import type { ThemeColors } from "../types"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
-import { LoginForm } from "../components/LoginForm"
 
 interface AuthModalContextType {
   showAuthModal: () => void
@@ -23,6 +22,17 @@ export const useAuthModal = () => {
     throw new Error("useAuthModal must be used within AuthModalProvider")
   }
   return context
+}
+
+// Lazy load LoginForm to break circular dependency
+// This is evaluated at runtime, not at module load time, breaking the cycle
+let LoginFormComponent: React.ComponentType<any> | null = null
+const getLoginForm = () => {
+  if (!LoginFormComponent) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    LoginFormComponent = require("../components/LoginForm").LoginForm
+  }
+  return LoginFormComponent
 }
 
 interface AuthModalProviderProps {
@@ -119,6 +129,7 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
   }, [])
 
   const styles = createStyles(colors)
+  const LoginForm = getLoginForm()
 
   return (
     <AuthModalContext.Provider value={{ showAuthModal, hideAuthModal, isVisible }}>

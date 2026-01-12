@@ -4,9 +4,9 @@ Feature: Patient Management Workflow
   So that I can coordinate care and monitor wellness
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
-    And I am logged in as "caregiver"
+    And I am logged in as "orgAdmin"
 
   Scenario: View patient list
     When I navigate to the patients screen
@@ -17,6 +17,7 @@ Feature: Patient Management Workflow
     When I navigate to the patients screen
     And I click the "Add Patient" button
     And I enter patient name "John Doe"
+    And I enter patient email "john.doe@example.com"
     And I enter patient phone "+16045624264"
     And I submit the patient form
     Then I should see the new patient in the list

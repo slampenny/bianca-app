@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
-import { authApi, alertApi } from "../services/api"
+// Import APIs directly to break circular dependency with app/services/api/index.ts
+import { authApi } from "../services/api/authApi"
+import { alertApi } from "../services/api/alertApi"
 import { Alert } from "../services/api/api.types"
 import { getCurrentUser } from "./authSlice"
 import { logger } from "../utils/logger"

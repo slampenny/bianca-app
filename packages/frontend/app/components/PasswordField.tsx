@@ -57,12 +57,13 @@ export const PasswordField = forwardRef<TextInput, PasswordFieldProps>((props, r
   const currentPassword = passwordValue || value || ""
   const isUsingDefaultValidation = !validatePassword
 
-  // Check password rules (only show full rules if using default validation)
+  // Check password rules
   const hasMinLength = currentPassword.length >= 8
   const hasLowercase = /[a-z]/.test(currentPassword)
   const hasUppercase = /[A-Z]/.test(currentPassword)
   const hasNumber = /\d/.test(currentPassword)
   const hasSpecialChar = /[^A-Za-z\d]/.test(currentPassword)
+  const hasLetter = /[a-zA-Z]/.test(currentPassword) // For backend-compatible validation
   const isValidPassword = passwordValidator(currentPassword)
 
   // For confirm password field, check if passwords match
@@ -73,8 +74,9 @@ export const PasswordField = forwardRef<TextInput, PasswordFieldProps>((props, r
   // Determine if confirm password field should show error (red border)
   const showConfirmError = isConfirmField && comparePassword && currentPassword.length > 0 && !passwordsMatch
 
-  // Password rules to display - only show full rules if using default validation
-  // Otherwise, show a simple "meets requirements" indicator
+  // Password rules to display
+  // If using default validation, show full rules (uppercase, lowercase, number, special char)
+  // If using custom validation, show backend-compatible rules (8+ chars, 1 letter, 1 number)
   const passwordRules = isUsingDefaultValidation
     ? [
         { rule: "At least 8 characters", met: hasMinLength },
@@ -84,7 +86,9 @@ export const PasswordField = forwardRef<TextInput, PasswordFieldProps>((props, r
         { rule: "One special character", met: hasSpecialChar },
       ]
     : [
-        { rule: "Meets password requirements", met: isValidPassword },
+        { rule: "At least 8 characters", met: hasMinLength },
+        { rule: "At least one letter", met: hasLetter },
+        { rule: "At least one number", met: hasNumber },
       ]
 
   // Eye icon accessory component

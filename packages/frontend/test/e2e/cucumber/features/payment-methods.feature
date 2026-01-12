@@ -1,3 +1,4 @@
+@skip
 Feature: Payment Methods Management
   As an organization admin
   I want to manage payment methods

@@ -69,7 +69,7 @@ export function Icon(props: IconProps) {
 
   const $imageStyle: StyleProp<ImageStyle> = [
     $imageStyleBase,
-    color !== undefined && { tintColor: color },
+    // tintColor and resizeMode should be props, not style
     size !== undefined && { width: size, height: size },
     $imageStyleOverride,
   ]
@@ -80,7 +80,12 @@ export function Icon(props: IconProps) {
       {...WrapperProps}
       style={$containerStyleOverride}
     >
-      <Image style={$imageStyle} source={iconRegistry[icon]} />
+      <Image 
+        style={$imageStyle} 
+        source={iconRegistry[icon]}
+        resizeMode="contain"
+        {...(color !== undefined && { tintColor: color })}
+      />
     </Wrapper>
   )
 }
@@ -105,5 +110,5 @@ export const iconRegistry = {
 }
 
 const $imageStyleBase: ImageStyle = {
-  resizeMode: "contain",
+  // resizeMode moved to Image props to fix deprecation warning
 }

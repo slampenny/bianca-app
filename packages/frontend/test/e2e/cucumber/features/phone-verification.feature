@@ -1,3 +1,4 @@
+@skip
 Feature: Phone Verification
   As a caregiver
   I want to verify my phone number

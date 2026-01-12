@@ -1,7 +1,9 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Conversation } from "../services/api/api.types"
-import { patientApi, conversationApi } from "../services/api"
+// Import APIs directly to break circular dependency with app/services/api/index.ts
+import { patientApi } from "../services/api/patientApi"
+import { conversationApi } from "../services/api/conversationApi"
 import { setActiveCall } from "./callSlice"
 import { logger } from "../utils/logger"
 

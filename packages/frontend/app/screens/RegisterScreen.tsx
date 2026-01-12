@@ -96,8 +96,9 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
   // Validation helpers
   const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  // Backend requires: at least 8 characters, at least 1 letter, and at least 1 number
   const validatePassword = (password: string) =>
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(password)
+    /^(?=.*[a-zA-Z])(?=.*\d).{8,}$/.test(password)
   const validatePhone = (phone: string) => /^(\+1\d{10}|\d{10,})$/.test(phone)
 
   // Validate all inputs and set appropriate error messages
@@ -128,7 +129,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
     // Password validation
     if (!validatePassword(password)) {
       setPasswordError(
-        "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
+        "Password must be at least 8 characters and contain at least one letter and one number",
       )
       isValid = false
     }

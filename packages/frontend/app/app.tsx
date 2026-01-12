@@ -52,10 +52,8 @@ const config = {
     MainTabs: "MainTabs",
     EmailVerified: "email-verified",
     VerifyEmail: {
-      path: "auth/verify-email/:token?",
-      parse: {
-        token: (value: string) => value || undefined,
-      },
+      path: "auth/verify-email",
+      exact: true,
     },
     Signup: "signup",
     ConfirmReset: "reset-password",
@@ -159,6 +157,16 @@ function App(props: AppProps) {
   const [areFontsLoaded] = useFonts(customFontsToLoad)
 
   const onBeforeLiftPersistGate = () => {
+    // Expose store on window after rehydration for testing (web only)
+    try {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        (window as any).__REDUX_STORE__ = store
+        // Only expose as __REDUX_STORE__ to avoid conflicts with window.store
+        console.log('[APP] Redux store exposed on window after rehydration')
+      }
+    } catch (e) {
+      // Ignore errors when exposing store on window
+    }
     // If your initialization scripts run very fast, it's good to show the splash screen for just a bit longer to prevent flicker.
     // Slightly delaying splash screen hiding for better UX; can be customized or removed as needed,
     // Note: (vanilla Android) The splash-screen will not appear if you launch your app via the terminal or Android Studio. Kill the app and launch it normally by tapping on the launcher icon. https://stackoverflow.com/a/69831106

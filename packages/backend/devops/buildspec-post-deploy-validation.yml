@@ -8,10 +8,11 @@ phases:
   pre_build:
     commands:
       - echo "Starting post-deployment validation..."
-      - echo "Frontend URL: $FRONTEND_URL"
-      - echo "API URL: $API_URL"
-      - echo "Max retries: ${MAX_RETRIES:-20}"
-      - echo "Retry delay: ${RETRY_DELAY:-10} seconds"
+      - |
+        echo "Frontend URL: ${FRONTEND_URL}"
+        echo "API URL: ${API_URL}"
+        echo "Max retries: ${MAX_RETRIES:-20}"
+        echo "Retry delay: ${RETRY_DELAY:-10} seconds"
 
   build:
     commands:

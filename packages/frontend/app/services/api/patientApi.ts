@@ -1,7 +1,13 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import { Patient, PatientPages, Caregiver, Conversation } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
-import { setPatientsForCaregiver } from "../../store/patientSlice"
+
+// Lazy import to break circular dependency with patientSlice
+// This function loads the action only when needed (at runtime)
+const getSetPatientsForCaregiver = () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("../../store/patientSlice").setPatientsForCaregiver
+}
 
 export const patientApi = createApi({
   reducerPath: "patientApi",
@@ -41,6 +47,7 @@ export const patientApi = createApi({
               const existingIndex = userPatients.findIndex((p: Patient) => p.id === createdPatient.id)
               if (existingIndex === -1) {
                 console.log(`[API CALLBACK] createPatient onQueryStarted - dispatching setPatientsForCaregiver for ${caregiverId}`)
+                const setPatientsForCaregiver = getSetPatientsForCaregiver()
                 dispatch(setPatientsForCaregiver({
                   caregiverId,
                   patients: [...userPatients, createdPatient],
@@ -62,6 +69,7 @@ export const patientApi = createApi({
             
             if (existingIndex === -1) {
               console.log('[API CALLBACK] createPatient onQueryStarted - adding to current user as fallback')
+              const setPatientsForCaregiver = getSetPatientsForCaregiver()
               dispatch(setPatientsForCaregiver({
                 caregiverId: currentUser.id,
                 patients: [...userPatients, createdPatient],

@@ -28,8 +28,8 @@ export function CaregiversScreen() {
 
   const { refetch } = useSyncOrgCaregivers()
 
-  // Everyone should be able to view caregivers (backend handles filtering)
-  const isAuthorized = true
+  // Only orgadmins can view caregivers
+  const isAuthorized = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
 
   // Debug logging
   logger.debug('CaregiversScreen Debug:', {
@@ -232,14 +232,16 @@ export function CaregiversScreen() {
         ListEmptyComponent={ListEmpty}
       />
 
-      <Button
-        text={translate("caregiversScreen.addCaregiver")}
-        onPress={handleAddCaregiver}
-        preset="success"
-        style={styles.addButton}
-        textStyle={styles.addButtonText}
-        testID="add-caregiver-button"
-      />
+      {isAuthorized && (
+        <Button
+          text={translate("caregiversScreen.addCaregiver")}
+          onPress={handleAddCaregiver}
+          preset="success"
+          style={styles.addButton}
+          textStyle={styles.addButtonText}
+          testID="add-caregiver-button"
+        />
+      )}
     </Screen>
   )
 }

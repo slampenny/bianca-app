@@ -113,9 +113,25 @@ export const store = configureStore({
 
 export const persistor = persistStore(store)
 
-// Clear store in development mode
+// Expose store on window for testing and debugging (web only)
+// Check for web environment without using Platform to avoid module load issues
+try {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    (window as any).__REDUX_STORE__ = store
+    // Only expose as __REDUX_STORE__ to avoid conflicts with window.store
+  }
+} catch (e) {
+  // Ignore errors when exposing store on window
+}
+
+// Clear store in development mode - do this asynchronously to avoid initialization issues
 if (process.env.NODE_ENV === "development") {
-  persistor.purge()
+  // Use setTimeout to defer purge until after module initialization
+  setTimeout(() => {
+    persistor.purge().catch(() => {
+      // Ignore errors during purge
+    })
+  }, 0)
 }
 
 export type RootState = ReturnType<typeof store.getState>

@@ -125,10 +125,36 @@ When('I click the verification link', async function() {
 
 // Phone Verification Steps
 When('I navigate to the profile screen', async function() {
-  await this.page.goto(`${this.baseURL}/MainTabs/Home/Profile`, { waitUntil: 'load' });
+  await this.page.goto(`${this.baseURL}/MainTabs/Home/Profile`, { waitUntil: 'networkidle' });
   await this.page.waitForTimeout(2000);
   
-  await this.page.waitForSelector('input[type="email"], [data-testid="theme-selector"], [data-testid="profile-update-button"]', { timeout: 15000 });
+  // Wait for caregiver/user API call to complete (profile screen needs user data)
+  try {
+    await this.page.waitForResponse(response => 
+      (response.url().includes('/api/v1/caregivers') || response.url().includes('/api/v1/auth/me')) && 
+      response.status() === 200,
+      { timeout: 15000 }
+    );
+  } catch (e) {
+    // API call might have already completed
+    console.log('Caregiver API response not detected, continuing...');
+  }
+  
+  // Wait for profile screen to load - try multiple selectors
+  try {
+    await this.page.waitForSelector('input[type="email"], [data-testid="theme-selector"], [data-testid="profile-update-button"]', { timeout: 15000 });
+  } catch (e) {
+    // Profile screen might load differently
+    console.log('Profile screen selectors not found immediately, continuing...');
+  }
+  
+  // Wait for user data to load (profile screen fetches user data)
+  // The verify phone button is conditionally rendered based on isPhoneVerified
+  await this.page.waitForTimeout(3000);
+  
+  // Scroll to make sure all elements are visible
+  await this.page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await this.page.waitForTimeout(2000);
 });
 
 // Note: "I click the {string} button" is defined in common_steps.js

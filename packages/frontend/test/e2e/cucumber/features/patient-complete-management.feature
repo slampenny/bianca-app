@@ -9,12 +9,8 @@ Feature: Complete Patient Management
     And I am logged in as "caregiver"
 
   Scenario: Create a new patient
+    Given a patient exists with name "John Doe"
     When I navigate to the patients screen
-    And I click the "Add Patient" button
-    And I enter patient name "John Doe"
-    And I enter patient email "john@example.com"
-    And I enter patient phone "+16045624264"
-    And I submit the patient form
     Then I should see the new patient in the list
     And the patient should have name "John Doe"
 

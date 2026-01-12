@@ -27,16 +27,41 @@ export function HomeScreen() {
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   const { colors, isLoading: themeLoading } = useTheme()
   
-  // Memoize the patients selector to prevent unnecessary re-renders
-  const patientsSelector = React.useMemo(
-    () => (state: RootState) => {
-      const patientList = currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []
-      return patientList
-    },
-    [currentUser?.id]
-  )
+  // Get patients from Redux - get currentUser first, then patients
+  // This ensures we re-render when either currentUser or patients change
+  const patients = useSelector((state: RootState) => {
+    const user = state.auth.currentUser || state.auth.user
+    if (!user || !user.id) {
+      console.log(`[HOMESCREEN] No current user in Redux`)
+      return []
+    }
+    const patientList = getPatientsForCaregiver(state, user.id)
+    // Always log in test mode to debug
+    console.log(`[HOMESCREEN] useSelector: user.id=${user.id}, patientCount=${patientList.length}`)
+    if (patientList.length === 0) {
+      console.log(`[HOMESCREEN] Patient list empty! Redux state.patient.patients keys:`, Object.keys(state.patient.patients || {}))
+      console.log(`[HOMESCREEN] Redux state.patient.patients[${user.id}]:`, state.patient.patients[user.id]?.length || 0, 'patients')
+      if (state.patient.patients[user.id]) {
+        console.log(`[HOMESCREEN] First 3 patient IDs in Redux:`, state.patient.patients[user.id].slice(0, 3).map(p => p.id))
+      }
+    } else {
+      console.log(`[HOMESCREEN] First 3 patient IDs:`, patientList.slice(0, 3).map(p => p.id))
+    }
+    return patientList
+  })
   
-  const patients = useSelector(patientsSelector)
+  // Debug logging when patients change
+  React.useEffect(() => {
+    console.log(`[HOMESCREEN] Component rendered: patients.count=${patients.length}, currentUser.id=${currentUser?.id}`)
+    if (patients.length > 0) {
+      console.log(`[HOMESCREEN] First 3 patient IDs:`, patients.slice(0, 3).map(p => p.id))
+      console.log(`[HOMESCREEN] FlatList will render ${patients.length} patients`)
+    } else if (currentUser?.id) {
+      console.log(`[HOMESCREEN] Patient list is empty for user ${currentUser.id}`)
+    } else {
+      console.log(`[HOMESCREEN] No current user`)
+    }
+  }, [patients.length, currentUser?.id, patients])
   
 
   
@@ -160,7 +185,7 @@ export function HomeScreen() {
               preset="primary"
               text="" // Empty text for icon-only button
               onPress={() => handlePatientPress(item)}
-              testID={`edit-patient-button-${item.name}`}
+              testID={`edit-patient-button-${item.id}`}
               accessibilityLabel={`Edit ${item.name}`}
               accessibilityHint="Opens patient details for editing"
               style={styles.editButton}
@@ -181,9 +206,15 @@ export function HomeScreen() {
 
   const ListEmpty = () => <Text style={styles.noUsersText} testID="home-no-patients">{translate("homeScreen.noPatientsFound")}</Text>
 
+  // Don't return null during theme loading - render with default theme instead
+  // This prevents the component from not rendering during async theme loading
   if (themeLoading) {
-    return null
+    console.log('[HOMESCREEN] themeLoading is true, but rendering anyway with default colors')
+    // Continue rendering - useTheme will return default theme if loading
   }
+  
+  // Debug log to confirm component is rendering
+  console.log('[HOMESCREEN] Component rendering: currentUser.id=', currentUser?.id, 'patients.count=', patients.length, 'themeLoading=', themeLoading)
 
   const styles = createStyles(colors)
 
@@ -205,6 +236,8 @@ export function HomeScreen() {
         contentContainerStyle={styles.listContentContainer}
         ListEmptyComponent={ListEmpty}
         testID="patient-list"
+        extraData={patients.length} // Force re-render when patient count changes
+        removeClippedSubviews={false} // Ensure all items are rendered (important for testing)
       />
 
       {/* Footer (Add Patient) with Tooltip */}

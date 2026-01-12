@@ -22,9 +22,13 @@ module.exports = {
     },
     publishQuiet: true,
     strict: false, // Set to false initially to allow undefined steps
-    tags: process.env.CUCUMBER_TAGS || '',
+    tags: process.env.CUCUMBER_TAGS ? `${process.env.CUCUMBER_TAGS} and not @skip` : 'not @skip',
     worldParameters: {
-      baseURL: process.env.FRONTEND_URL || 'http://localhost:8082',
+      // Centralized port configuration - all tests use this
+      // Priority: FRONTEND_URL env var > BASE_URL env var > default (8084)
+      // If port is wrong, ALL tests will fail consistently (not just some)
+      // Default port is 8084 (common dev port) - override with FRONTEND_URL if different
+      baseURL: process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:8084',
       apiURL: process.env.API_URL || 'http://localhost:3000',
     }
   }

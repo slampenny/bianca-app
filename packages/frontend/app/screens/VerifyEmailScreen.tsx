@@ -67,6 +67,16 @@ export const VerifyEmailScreen = () => {
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [verifyEmail, { isLoading: isVerifying }] = useVerifyEmailMutation()
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[VerifyEmailScreen] Component mounted', {
+      pathname: typeof window !== 'undefined' ? window.location.pathname : 'N/A',
+      search: typeof window !== 'undefined' ? window.location.search : 'N/A',
+      routeParams: route.params,
+      isLoggedIn
+    })
+  }, [])
+
   // Extract token from route params
   // React Navigation linking should automatically parse ?token=... from URL on web
   // On mobile, Universal Links will pass it via route params
@@ -165,8 +175,17 @@ export const VerifyEmailScreen = () => {
               dispatch(setOrg(result.org))
             }
             
-            // Navigate to EmailVerifiedScreen which will replace itself with MainTabs
-            navigation.navigate("EmailVerified" as never)
+            // Wait a moment for Redux state to update and stack to switch to AuthStack
+            // Then use resetRoot to navigate to EmailVerifiedScreen in AuthStack
+            // EmailVerifiedScreen will show for 3 seconds then navigate to MainTabs
+            setTimeout(() => {
+              if (navigationRef.isReady()) {
+                resetRoot({
+                  index: 0,
+                  routes: [{ name: "EmailVerified" as never }],
+                })
+              }
+            }, 100)
           } else {
             // No tokens (HTML response) - just navigate to EmailVerifiedScreen
             navigation.navigate("EmailVerified" as never)

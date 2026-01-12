@@ -22,7 +22,7 @@ router.get('/apple-app-site-association', (req, res) => {
           // Format: TEAM_ID.BUNDLE_ID
           // Get Team ID from: https://developer.apple.com/account
           // Or from Xcode: Preferences → Accounts → Select your account → Team ID
-          appID: 'TEAM_ID.com.negascout.bianca', // TODO: Replace TEAM_ID with your Apple Team ID
+          appID: 'AN755FXH2P.com.biancatechnologies.bianca',
           paths: [
             '/v1/auth/verify-email*',
             '/auth/verify-email*',
@@ -33,7 +33,7 @@ router.get('/apple-app-site-association', (req, res) => {
     },
     // Optional: Add webcredentials for password autofill
     webcredentials: {
-      apps: ['TEAM_ID.com.negascout.bianca'], // Replace TEAM_ID with your Apple Team ID
+      apps: ['AN755FXH2P.com.biancatechnologies.bianca'],
     },
   };
   
