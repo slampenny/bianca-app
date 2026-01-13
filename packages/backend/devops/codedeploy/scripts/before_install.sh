@@ -82,14 +82,14 @@ if [ -n "$DETECTED_ENV" ]; then
     ENVIRONMENT="demo"
     DEPLOY_DIR="/opt/bianca-demo"
     CONTAINER_PREFIX="demo"
-    IMAGE_TAG="staging"  # Demo uses staging images
-    NODE_ENV="development"  # Demo uses development mode
+    IMAGE_TAG="production"  # Demo uses production images
+    NODE_ENV="production"  # Demo uses production mode
     API_BASE_URL="https://demo.biancawellness.com/v1"
     WEBSOCKET_URL="wss://demo.biancawellness.com/v1"
     FRONTEND_URL="https://demo.biancawellness.com"
     SERVER_NAME_FRONTEND="demo.biancawellness.com"
     SERVER_NAME_API="demo.biancawellness.com"
-    YARN_COMMAND="yarn dev"  # Demo uses dev mode
+    YARN_COMMAND="yarn start"  # Demo uses production mode
     CLOUDWATCH_LOG_PREFIX="/bianca/demo"
   else
     echo "   ⚠️  Unknown environment from variables: $DETECTED_ENV, falling back to other methods..."
@@ -133,14 +133,14 @@ elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-demo" ]; then
   ENVIRONMENT="demo"
   DEPLOY_DIR="/opt/bianca-demo"
   CONTAINER_PREFIX="demo"
-  IMAGE_TAG="staging"  # Demo uses staging images
-  NODE_ENV="development"  # Demo uses development mode
+  IMAGE_TAG="production"  # Demo uses production images
+  NODE_ENV="production"  # Demo uses production mode
   API_BASE_URL="https://demo.biancawellness.com/v1"
   WEBSOCKET_URL="wss://demo.biancawellness.com/v1"
   FRONTEND_URL="https://demo.biancawellness.com"
   SERVER_NAME_FRONTEND="demo.biancawellness.com"
   SERVER_NAME_API="demo.biancawellness.com"
-  YARN_COMMAND="yarn dev"  # Demo uses dev mode
+  YARN_COMMAND="yarn start"  # Demo uses production mode
   CLOUDWATCH_LOG_PREFIX="/bianca/demo"
 elif [ -z "$DETECTED_ENV" ]; then
   # Fallback: Try to get instance tags (may fail due to permissions)
@@ -218,14 +218,14 @@ elif [ -z "$DETECTED_ENV" ]; then
     ENVIRONMENT="demo"
     DEPLOY_DIR="/opt/bianca-demo"
     CONTAINER_PREFIX="demo"
-    IMAGE_TAG="staging"  # Demo uses staging images
-    NODE_ENV="development"  # Demo uses development mode
+    IMAGE_TAG="production"  # Demo uses production images
+    NODE_ENV="production"  # Demo uses production mode
     API_BASE_URL="https://demo.biancawellness.com/v1"
     WEBSOCKET_URL="wss://demo.biancawellness.com/v1"
     FRONTEND_URL="https://demo.biancawellness.com"
     SERVER_NAME_FRONTEND="demo.biancawellness.com"
     SERVER_NAME_API="demo.biancawellness.com"
-    YARN_COMMAND="yarn dev"  # Demo uses dev mode
+    YARN_COMMAND="yarn start"  # Demo uses production mode
     CLOUDWATCH_LOG_PREFIX="/bianca/demo"
   else
     echo "   ❌ CRITICAL ERROR: Cannot determine environment"
@@ -368,12 +368,6 @@ echo "   ✅ Secrets fetched successfully"
 # Create docker-compose.yml
 echo "   Creating docker-compose.yml..."
 
-# Set USE_SES_IN_DEV for demo environment (to enable real email sending)
-if [ "$ENVIRONMENT" = "demo" ]; then
-  USE_SES_IN_DEV_VALUE="true"
-else
-  USE_SES_IN_DEV_VALUE="false"
-fi
 
 cat > docker-compose.yml <<EOF
 version: '3.8'
@@ -451,7 +445,6 @@ services:
       - ASTERISK_PUBLIC_IP=$PUBLIC_IP
       - AWS_SES_REGION=$AWS_REGION
       - EMAIL_FROM=no-reply@biancawellness.com
-      - USE_SES_IN_DEV=$USE_SES_IN_DEV_VALUE
       - TWILIO_PHONENUMBER=+19285758645
       - TWILIO_ACCOUNTSID=$TWILIO_ACCOUNTSID
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef

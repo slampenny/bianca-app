@@ -185,7 +185,7 @@ echo "   🔄 Step 2: Running database migrations..."
 if [ "$DETECTED_ENV" = "production" ]; then
   MIGRATION_NODE_ENV="production"
 elif [ "$DETECTED_ENV" = "demo" ]; then
-  MIGRATION_NODE_ENV="development"  # Demo uses development environment
+  MIGRATION_NODE_ENV="production"  # Demo uses production environment
 else
   MIGRATION_NODE_ENV="staging"
 fi
