@@ -367,6 +367,14 @@ echo "   ✅ Secrets fetched successfully"
 
 # Create docker-compose.yml
 echo "   Creating docker-compose.yml..."
+
+# Set USE_SES_IN_DEV for demo environment (to enable real email sending)
+if [ "$ENVIRONMENT" = "demo" ]; then
+  USE_SES_IN_DEV_VALUE="true"
+else
+  USE_SES_IN_DEV_VALUE="false"
+fi
+
 cat > docker-compose.yml <<EOF
 version: '3.8'
 
@@ -443,6 +451,7 @@ services:
       - ASTERISK_PUBLIC_IP=$PUBLIC_IP
       - AWS_SES_REGION=$AWS_REGION
       - EMAIL_FROM=no-reply@biancawellness.com
+      - USE_SES_IN_DEV=$USE_SES_IN_DEV_VALUE
       - TWILIO_PHONENUMBER=+19285758645
       - TWILIO_ACCOUNTSID=$TWILIO_ACCOUNTSID
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
