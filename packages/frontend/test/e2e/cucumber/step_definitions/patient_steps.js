@@ -1181,7 +1181,7 @@ When('I click on the patient {string}', async function(patientName) {
       if (editCount > 0) {
         console.log(`[DEBUG] Found edit button for patient ${this.createdPatientId} on attempt ${attempts + 1}`);
         await editButton.click();
-        await this.page.waitForURL(url => typeof url === 'string' && (url.includes('/Patient') || url.includes('/patient')), { timeout: 3000 });
+        await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 3000 });
         return; // Success!
       }
     }
@@ -1210,7 +1210,7 @@ When('I click on the patient {string}', async function(patientName) {
     const editCount = await editButton.count();
     if (editCount > 0) {
       await editButton.click();
-      await this.page.waitForURL(url => url.includes('/Patient') || url.includes('/patient'), { timeout: 3000 });
+      await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 3000 });
       return; // Success!
     }
   }
