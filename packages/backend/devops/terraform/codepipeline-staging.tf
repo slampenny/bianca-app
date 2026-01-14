@@ -153,6 +153,13 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
           "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-Staging-*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "codepipeline:GetPipeline"
+        ]
+        Resource = "arn:aws:codepipeline:${var.aws_region}:${var.aws_account_id}:bianca-staging-pipeline"
       }
     ]
   })
