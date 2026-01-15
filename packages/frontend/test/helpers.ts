@@ -7,6 +7,12 @@ import { store as appStore } from "../app/store/store"
 import { alertApi, authApi, patientApi } from "../app/services/api/"
 import { Alert, Org, Caregiver, Patient } from "../app/services/api/api.types"
 
+const buildApiUrl = (path: string) => {
+  const base = DEFAULT_API_CONFIG.url.replace(/\/$/, "")
+  const suffix = path.startsWith("/") ? path.slice(1) : path
+  return `${base}/${suffix}`
+}
+
 export function setupApiStore(api: any) {
   const store = configureStore({
     reducer: {
@@ -26,7 +32,7 @@ export function generateUniqueEmail() {
 
 export async function cleanTestDatabase() {
   try {
-    await axios.post(`${DEFAULT_API_CONFIG.url}test/clean`);
+    await axios.post(buildApiUrl("/test/clean"));
   } catch (error) {
     console.error('Failed to clean test database', error);
   }
@@ -42,7 +48,7 @@ export async function registerNewAlert(alert: Partial<Alert>): Promise<Alert> {
 
 export async function createCaregiver(orgId: string, caregiver: Partial<Caregiver>) {
   try {
-    const response = await axios.post(`${DEFAULT_API_CONFIG.url}test/create-caregiver`, { orgId, ...caregiver });
+    const response = await axios.post(buildApiUrl("/test/create-caregiver"), { orgId, ...caregiver });
     return response.data as Caregiver;
   } catch (error) {
     if (error instanceof Error) {
