@@ -17,6 +17,31 @@ function getParts(struct, allParts = []) {
   return allParts;
 }
 
+function extractTokens(emailText = '', emailHtml = '') {
+  const verificationTokenMatch = emailText.match(/verify-email\?token=([^\s&]+)/) || 
+                                 emailHtml.match(/verify-email\?token=([^"'\s&]+)/);
+  const verificationToken = verificationTokenMatch ? verificationTokenMatch[1] : null;
+  
+  const inviteTokenMatch = emailText.match(/signup\?token=([^\s&]+)/) || 
+                           emailHtml.match(/signup\?token=([^"'\s&]+)/);
+  const inviteToken = inviteTokenMatch ? inviteTokenMatch[1] : null;
+  
+  const resetTokenMatch = emailText.match(/reset-password\?token=([^\s&]+)/) || 
+                          emailHtml.match(/reset-password\?token=([^"'\s&]+)/);
+  const resetToken = resetTokenMatch ? resetTokenMatch[1] : null;
+  
+  const consentTokenMatch = emailText.match(/patient\/consent[?&]token=([^\s&]+)/) || 
+                            emailHtml.match(/patient\/consent[?&]token=([^"'\s&]+)/);
+  const consentToken = consentTokenMatch ? consentTokenMatch[1] : null;
+
+  return {
+    verification: verificationToken,
+    invite: inviteToken,
+    resetPassword: resetToken,
+    consent: consentToken,
+  };
+}
+
 /**
  * Retrieve the last email from Ethereal for a given recipient
  * @param {string} recipientEmail - Email address to search for
@@ -27,6 +52,24 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
   const emailStatus = emailService.getStatus();
   
   if (!emailStatus.etherealAccount) {
+    if (process.env.NODE_ENV === 'test') {
+      const captured = emailService.getLastCapturedEmail(recipientEmail);
+      if (!captured) {
+        throw new Error('No emails found in inbox');
+      }
+      const emailText = captured.text || '';
+      const emailHtml = captured.html || '';
+      return {
+        subject: captured.subject,
+        from: captured.from,
+        to: captured.to,
+        text: emailText,
+        html: emailHtml,
+        date: captured.date,
+        tokens: extractTokens(emailText, emailHtml),
+        raw: captured,
+      };
+    }
     throw new Error('Ethereal account not available. Make sure NODE_ENV is development or test.');
   }
 
@@ -170,26 +213,6 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
       const emailText = parsed.text || '';
       const emailHtml = parsed.html || '';
       
-      // Extract verification token (from verify-email links)
-      const verificationTokenMatch = emailText.match(/verify-email\?token=([^\s&]+)/) || 
-                                     emailHtml.match(/verify-email\?token=([^"'\s&]+)/);
-      const verificationToken = verificationTokenMatch ? verificationTokenMatch[1] : null;
-      
-      // Extract invite token (from signup?token links)
-      const inviteTokenMatch = emailText.match(/signup\?token=([^\s&]+)/) || 
-                               emailHtml.match(/signup\?token=([^"'\s&]+)/);
-      const inviteToken = inviteTokenMatch ? inviteTokenMatch[1] : null;
-      
-      // Extract reset password token (from reset-password links)
-      const resetTokenMatch = emailText.match(/reset-password\?token=([^\s&]+)/) || 
-                              emailHtml.match(/reset-password\?token=([^"'\s&]+)/);
-      const resetToken = resetTokenMatch ? resetTokenMatch[1] : null;
-      
-      // Extract patient consent token (from patient/consent links)
-      const consentTokenMatch = emailText.match(/patient\/consent[?&]token=([^\s&]+)/) || 
-                                emailHtml.match(/patient\/consent[?&]token=([^"'\s&]+)/);
-      const consentToken = consentTokenMatch ? consentTokenMatch[1] : null;
-      
       logger.info(`[Ethereal Email Retriever] Retrieved email for ${recipientEmail}: ${parsed.subject}`);
       
       return {
@@ -199,12 +222,7 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
         text: emailText,
         html: emailHtml,
         date: parsed.date,
-        tokens: {
-          verification: verificationToken,
-          invite: inviteToken,
-          resetPassword: resetToken,
-          consent: consentToken,
-        },
+        tokens: extractTokens(emailText, emailHtml),
         raw: parsed,
       };
   } catch (error) {

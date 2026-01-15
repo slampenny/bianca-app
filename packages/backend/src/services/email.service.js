@@ -26,6 +26,38 @@ let etherealTestAccount = null; // To store Ethereal account details if used
 let isInitialized = false;
 let initializationPromise = null; // To prevent multiple concurrent initializations
 let forceEthereal = false; // Flag to force Ethereal even if SES is available
+const capturedEmails = [];
+
+const captureTestEmail = (mailOptions) => {
+  const record = {
+    id: `test-email-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    from: mailOptions.from,
+    to: mailOptions.to,
+    subject: mailOptions.subject,
+    text: mailOptions.text,
+    html: mailOptions.html,
+    attachments: mailOptions.attachments,
+    date: new Date(),
+  };
+  capturedEmails.push(record);
+  return record;
+};
+
+const getLastCapturedEmail = (recipientEmail) => {
+  if (!recipientEmail) {
+    return capturedEmails[capturedEmails.length - 1] || null;
+  }
+  const lowered = recipientEmail.toLowerCase();
+  const matches = capturedEmails.filter((email) => {
+    const to = Array.isArray(email.to) ? email.to.join(',') : String(email.to || '');
+    return to.toLowerCase().includes(lowered);
+  });
+  return matches[matches.length - 1] || null;
+};
+
+const clearCapturedEmails = () => {
+  capturedEmails.length = 0;
+};
 
 /**
  * Initializes the email transport.
@@ -239,6 +271,25 @@ const sendEmail = async (to, subject, text, html, attachments = null) => {
       error.code = 'EENVELOPE';
       logger.error('Email send failed: No recipients defined', { to, subject });
       throw error;
+    }
+
+    if (config.env === 'test') {
+      const senderAddress = config.email.from || 'no-reply@test.local';
+      const mailOptions = {
+        from: senderAddress,
+        to,
+        subject,
+        text,
+        ...(html ? { html } : {}),
+        ...(attachments ? { attachments } : {}),
+      };
+      const record = captureTestEmail(mailOptions);
+      logger.info(`[Email Service] Captured test email to ${to} with subject: ${subject}`);
+      return {
+        messageId: record.id,
+        envelope: { from: senderAddress, to },
+        accepted: [to],
+      };
     }
 
     // Ensure transport is initialized
@@ -889,5 +940,7 @@ module.exports = {
   sendPatientConsentRequestEmail,
   getStatus,
   isReady,
-  forceEtherealInitialization
+  forceEtherealInitialization,
+  getLastCapturedEmail,
+  clearCapturedEmails
 };

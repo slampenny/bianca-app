@@ -298,8 +298,10 @@ phases:
         echo "=========================================="
         cd "$BACKEND_DIR" || exit 1
         set +e  # Don't exit on error, we'll handle it
-        NODE_NO_IOURING=1 yarn test:unit > /tmp/backend-unit-tests.log 2>&1
-        BACKEND_TEST_EXIT_CODE=$?
+        set -o pipefail
+        NODE_NO_IOURING=1 timeout 40m yarn test:unit --forceExit 2>&1 | tee /tmp/backend-unit-tests.log
+        BACKEND_TEST_EXIT_CODE=${PIPESTATUS[0]}
+        set +o pipefail
         set -e  # Re-enable exit on error
         
         # Show output
@@ -321,8 +323,10 @@ phases:
         echo "=========================================="
         cd "$FRONTEND_DIR" || exit 1
         set +e  # Don't exit on error, we'll handle it
-        NODE_ENV=test yarn test > /tmp/frontend-unit-tests.log 2>&1
-        FRONTEND_TEST_EXIT_CODE=$?
+        set -o pipefail
+        NODE_ENV=test timeout 20m yarn test 2>&1 | tee /tmp/frontend-unit-tests.log
+        FRONTEND_TEST_EXIT_CODE=${PIPESTATUS[0]}
+        set +o pipefail
         set -e  # Re-enable exit on error
         
         # Show output
@@ -357,8 +361,10 @@ phases:
         echo "Frontend URL: $FRONTEND_URL"
         echo "Backend URL: http://localhost:3000"
         set +e  # Don't exit on error, we'll handle it
-        NODE_ENV=test yarn test:cucumber > /tmp/cucumber-tests.log 2>&1
-        CUCUMBER_TEST_EXIT_CODE=$?
+        set -o pipefail
+        NODE_ENV=test timeout 40m yarn test:cucumber 2>&1 | tee /tmp/cucumber-tests.log
+        CUCUMBER_TEST_EXIT_CODE=${PIPESTATUS[0]}
+        set +o pipefail
         set -e  # Re-enable exit on error
         
         # Show output

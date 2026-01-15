@@ -93,6 +93,22 @@ function cleanupTimers() {
   timeoutsToCleanup.clear();
 }
 
+afterEach(() => {
+  try {
+    const emailService = require('../src/services/email.service');
+    if (emailService && typeof emailService.clearCapturedEmails === 'function') {
+      emailService.clearCapturedEmails();
+    }
+  } catch (error) {
+    // Ignore errors if service doesn't exist or methods don't exist
+  }
+  try {
+    jest.useRealTimers();
+  } catch (error) {
+    // Ignore errors if timers are already real
+  }
+});
+
 // Global cleanup after all tests
 afterAll(async () => {
   // Wait a bit for any pending operations
