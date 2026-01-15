@@ -1,6 +1,6 @@
 import { fetchBaseQuery, BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query/react"
 import { getDefaultApiConfig } from "./api"
-import { RootState } from "../../store/store"
+import type { RootState } from "../../store/store"
 
 // Event emitter for auth modal - we'll use a simple callback pattern
 let showAuthModalCallback: ((initialErrorMessage?: string) => void) | null = null

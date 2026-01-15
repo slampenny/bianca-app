@@ -1,5 +1,6 @@
 // we always make sure 'react-native' gets included first
 import * as ReactNative from "react-native"
+import en from "../app/i18n/en"
 import mockFile from "./mockFile"
 
 // libraries to mock
@@ -27,10 +28,26 @@ jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
 )
 
+const resolveTranslation = (key: string) => {
+  return key.split(".").reduce((value: any, part) => value?.[part], en)
+}
+
+const interpolate = (value: string, params?: Record<string, string>) => {
+  if (!params) return value
+  return value.replace(/\{\{\s*([\w.]+)\s*\}\}|\%\{([\w.]+)\}/g, (_match, key1, key2) => {
+    const key = key1 || key2
+    return params[key] ?? _match
+  })
+}
+
 jest.mock("i18n-js", () => ({
   currentLocale: () => "en",
-  t: (key: string, params: Record<string, string>) => {
-    return `${key} ${JSON.stringify(params)}`
+  t: (key: string, params?: Record<string, string>) => {
+    const value = resolveTranslation(key)
+    if (typeof value !== "string") {
+      return key
+    }
+    return interpolate(value, params)
   },
 }))
 

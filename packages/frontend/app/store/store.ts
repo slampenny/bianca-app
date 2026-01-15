@@ -76,9 +76,16 @@ const authPersistConfig = {
   blacklist: ["authEmail"], // Exclude authEmail from persistence to prevent fake@example.org from appearing in production
 }
 
+const apiEntries = Object.entries(apiServices).filter(([key, api]) => {
+  if (!api) {
+    console.warn(`[store] Missing API service: ${key}`)
+  }
+  return Boolean(api)
+})
+
 // Build API reducers dynamically
 const apiReducers = Object.fromEntries(
-  Object.values(apiServices).map((api) => [api.reducerPath, api.reducer])
+  apiEntries.map(([, api]) => [api.reducerPath, api.reducer])
 )
 
 const rootReducer = combineReducers({
@@ -99,7 +106,7 @@ const rootReducer = combineReducers({
 const persistedReducer = persistReducer(persistConfig, rootReducer)
 
 // Build API middleware dynamically
-const apiMiddleware = Object.values(apiServices).map((api) => api.middleware)
+const apiMiddleware = apiEntries.map(([, api]) => api.middleware)
 
 export const store = configureStore({
   reducer: persistedReducer,

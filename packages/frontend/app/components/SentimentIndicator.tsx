@@ -23,7 +23,12 @@ export function SentimentIndicator({
   if (!sentiment) {
     return (
       <View style={[styles.container, style]}>
-        <Icon icon="question" size={getIconSize(size)} color={colors.textDim} />
+        <Icon
+          icon="question"
+          size={getIconSize(size)}
+          color={colors.textDim}
+          testID="icon-question"
+        />
         <Text style={[styles.text, getTextStyle(size)]} text="No data" />
       </View>
     )
@@ -33,12 +38,13 @@ export function SentimentIndicator({
   const confidence = sentiment.confidence || 0
 
   return (
-    <View style={[styles.container, style]}>
+      <View style={[styles.container, style]}>
       <View style={styles.iconContainer}>
         <Icon
           icon={sentimentConfig.icon}
           size={getIconSize(size)}
           color={sentimentConfig.color}
+          testID={`icon-${sentimentConfig.icon}`}
         />
         {confidence < 0.7 && (
           <View style={[styles.lowConfidenceBadge, { backgroundColor: colors.error }]}>

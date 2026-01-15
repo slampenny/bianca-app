@@ -61,12 +61,7 @@ async function startServer() {
       logger.info('✅ Email service initialized successfully');
     } catch (emailError) {
       logger.error('❌ Email service initialization failed:', emailError);
-      if (config.env === 'production') {
-        logger.error('Email service is critical in production, exiting...');
-        process.exit(1);
-      } else {
-        logger.warn('Continuing without email service in development...');
-      }
+      logger.warn('Continuing without email service. Email features will be unavailable.');
     }
 
     // Connect to MongoDB (Your existing logic is perfect)
@@ -161,12 +156,7 @@ async function startServer() {
       logger.info('✅ Medical analysis scheduler initialized successfully');
     } catch (schedulerError) {
       logger.error('❌ Medical analysis scheduler initialization failed:', schedulerError);
-      if (config.env === 'production') {
-        logger.error('Medical analysis scheduler is critical in production, exiting...');
-        process.exit(1);
-      } else {
-        logger.warn('Continuing without medical analysis scheduler in development...');
-      }
+      logger.warn('Continuing without medical analysis scheduler. Scheduled analysis will be unavailable.');
     }
 
     // Create and start the HTTP server

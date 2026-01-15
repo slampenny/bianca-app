@@ -40,15 +40,19 @@ module.exports = {
     "jest-runner",
     `<rootDir>/node_modules/(?!${thirdPartyIgnorePatterns.join("|")})`,
   ],
-  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/.maestro/", "@react-native"],
+  testPathIgnorePatterns: [
+    "<rootDir>/node_modules/",
+    "<rootDir>/.maestro/",
+    "<rootDir>/test/e2e/",
+    "<rootDir>/app/config/config.test.ts",
+    "@react-native",
+  ],
   setupFiles: ["<rootDir>/test/setup.ts"],
   transform: {
-    '^.+\\.test.tsx?$': ['ts-jest', {
-      tsconfig: '<rootDir>/test/test-tsconfig.json',      
+    '^.+\\.(ts|tsx)$': ['ts-jest', {
+      tsconfig: '<rootDir>/test/test-tsconfig.json',
       diagnostics: false,
-      isolatedModules: true,
     }],
-    '^.+\\.tsx?$': 'ts-jest',
     '^.+\\.js$': 'babel-jest',
   },
 }

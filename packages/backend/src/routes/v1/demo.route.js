@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const seedDatabaseDemo = require('../../scripts/seedDatabaseDemo');
 const logger = require('../../config/logger');
+const config = require('../../config/config');
+
+const allowedDemoHosts = new Set([
+  `demo.${config.primaryDomain}`,
+  'demo.myphonefriend.com'
+]);
+
+const isDemoHost = (req) => {
+  const hostname = (req.hostname || '').toLowerCase();
+  return allowedDemoHosts.has(hostname);
+};
+
+const canAccessDemoReset = (req) => config.env === 'staging' || isDemoHost(req);
 
 /**
  * @swagger
@@ -64,6 +77,13 @@ const logger = require('../../config/logger');
  *                   example: "Failed to reset demo database"
  */
 router.post('/reset', async (req, res) => {
+  if (!canAccessDemoReset(req)) {
+    return res.status(404).json({
+      success: false,
+      message: 'Not found'
+    });
+  }
+
   try {
     logger.info('Demo database reset requested');
     

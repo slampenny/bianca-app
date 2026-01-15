@@ -1,5 +1,4 @@
 // app/services/api/__tests__/sentimentApi.test.ts
-import { EnhancedStore } from "@reduxjs/toolkit"
 import { sentimentApi, orgApi, patientApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
 import { registerNewOrgAndCaregiver, createPatientInOrg } from "../../../../test/helpers"
@@ -119,7 +118,7 @@ const mockSentimentAnalysis: SentimentAnalysis = {
 }
 
 describe("sentimentApi", () => {
-  let store: EnhancedStore<RootState>
+  let store: typeof appStore
   let org: Org
   let orgId: string
   let patient: Patient

@@ -1,5 +1,4 @@
 // app/services/api/__tests__/paymentApiWithFixtures.test.ts
-import { EnhancedStore } from "@reduxjs/toolkit"
 import { paymentApi, conversationApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
 import { registerNewOrgAndCaregiver, createPatientInOrg, generateUniqueEmail } from "../../../../test/helpers"
@@ -8,7 +7,7 @@ import { newConversation } from "../../../../test/fixtures/conversation.fixture"
 import { Org } from "../api.types"
 
 describe("paymentApi", () => {
-  let store: EnhancedStore<RootState>
+  let store: typeof appStore
   let org: Org
   let orgId: string
   let patient: any

@@ -59,6 +59,7 @@ export function SentimentDashboard({
   return (
     <ScrollView
       style={[styles.container, style]}
+      testID="sentiment-dashboard-scroll"
       refreshControl={
         <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
       }

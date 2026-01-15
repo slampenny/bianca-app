@@ -4,7 +4,7 @@
     "allowJs": false,
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
-    "jsx": "react-native",
+    "jsx": "react-jsx",
     "module": "es2015",
     "moduleResolution": "node",
     "noImplicitAny": false,
@@ -14,6 +14,7 @@
     "sourceMap": true,
     "target": "esnext",
     "lib": ["esnext", "dom"],
+    "isolatedModules": true,
     "skipLibCheck": true,
     "resolveJsonModule": true
   },

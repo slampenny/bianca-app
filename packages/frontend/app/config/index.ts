@@ -21,6 +21,9 @@ import DemoConfig from "./config.demo"
 import Constants from "expo-constants"
 import { logger } from "../utils/logger"
 
+const browserHostname =
+  typeof window !== "undefined" ? window.location?.hostname : undefined
+
 // Check for test environment first to avoid window access issues
 // Note: config.test.ts is excluded from staging/production builds via metro.config.js blockList
 // So we can't import it here. In test environments, we'll use DevConfig as a fallback
@@ -42,11 +45,11 @@ if (process.env.NODE_ENV === 'test' ||
     PLAYWRIGHT_TEST: process.env.PLAYWRIGHT_TEST,
     JEST_WORKER_ID: process.env.JEST_WORKER_ID,
     expo_environment: Constants.expoConfig?.extra?.environment || 'undefined',
-    window_location: typeof window !== 'undefined' ? window.location.hostname : 'undefined'
+    window_location: browserHostname ?? 'undefined'
   });
 
   // For web: if running on localhost, use dev config (for local testing and Playwright tests)
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  if (browserHostname === 'localhost') {
     ExtraConfig = DevConfig
     logger.debug('Using DEV config (localhost detected)');
   }
@@ -56,7 +59,7 @@ if (process.env.NODE_ENV === 'test' ||
     logger.debug('Using DEV config');
   }
   // Use demo config if running on demo.biancawellness.com
-  else if (typeof window !== 'undefined' && window.location.hostname === 'demo.biancawellness.com') {
+  else if (browserHostname === 'demo.biancawellness.com') {
     ExtraConfig = DemoConfig
     logger.debug('Using DEMO config (demo.biancawellness.com detected)');
   }
@@ -74,7 +77,7 @@ const Config = { ...BaseConfig, ...ExtraConfig }
 
 // Runtime override: If running on demo.biancawellness.com, force API_URL to use same origin
 // This works even if the bundle was built with staging config
-if (typeof window !== 'undefined' && window.location.hostname === 'demo.biancawellness.com') {
+if (browserHostname === 'demo.biancawellness.com') {
   Config.API_URL = `https://demo.biancawellness.com/v1`
   logger.debug('Runtime override: Using demo API URL (same origin)');
 }

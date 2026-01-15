@@ -254,7 +254,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         </Text>
       )}
       
-      <View style={styles.banner}>
+      <View style={styles.banner} testID="call-status-banner">
         <View style={styles.statusSection}>
           <View 
             style={[styles.statusBadge, { backgroundColor: getStatusColor(status) }]}

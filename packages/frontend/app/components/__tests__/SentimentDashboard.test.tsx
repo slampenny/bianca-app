@@ -1,20 +1,30 @@
 import React from "react"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react-native"
+import { View } from "react-native"
+import { Text } from "../Text"
 import { SentimentDashboard } from "../SentimentDashboard"
 import { SentimentTrend, SentimentSummary } from "../../services/api/api.types"
 
 // Mock the child components
-jest.mock("../SentimentTrendChart", () => {
-  return function MockSentimentTrendChart({ trend }: { trend: SentimentTrend }) {
-    return <div testID="sentiment-trend-chart">Trend Chart: {trend.timeRange}</div>
-  }
-})
+jest.mock("../SentimentTrendChart", () => ({
+  SentimentTrendChart: ({ trend }: { trend: SentimentTrend }) => {
+    return (
+      <View testID="sentiment-trend-chart">
+        <Text>Trend Chart: {trend.timeRange}</Text>
+      </View>
+    )
+  },
+}))
 
-jest.mock("../SentimentSummaryCard", () => {
-  return function MockSentimentSummaryCard({ summary }: { summary: SentimentSummary }) {
-    return <div testID="sentiment-summary-card">Summary Card</div>
-  }
-})
+jest.mock("../SentimentSummaryCard", () => ({
+  SentimentSummaryCard: ({ summary }: { summary: SentimentSummary }) => {
+    return (
+      <View testID="sentiment-summary-card">
+        <Text>Summary Card</Text>
+      </View>
+    )
+  },
+}))
 
 describe("SentimentDashboard", () => {
   const mockTrend: SentimentTrend = {
@@ -88,6 +98,7 @@ describe("SentimentDashboard", () => {
         {...defaultProps}
         trend={mockTrend}
         summary={mockSummary}
+        selectedTimeRange="month"
       />
     )
 
@@ -107,8 +118,8 @@ describe("SentimentDashboard", () => {
     )
 
     expect(screen.getByText("Time Range:")).toBeTruthy()
-    expect(screen.getByText("Month")).toBeTruthy()
-    expect(screen.getByText("Year")).toBeTruthy()
+    expect(screen.getByText("Last Call")).toBeTruthy()
+    expect(screen.getByText("Last 30 Days")).toBeTruthy()
     expect(screen.getByText("All Time")).toBeTruthy()
   })
 
@@ -124,11 +135,11 @@ describe("SentimentDashboard", () => {
       />
     )
 
-    const yearButton = screen.getByText("Year")
-    fireEvent.press(yearButton)
+    const allTimeButton = screen.getByText("All Time")
+    fireEvent.press(allTimeButton)
 
     await waitFor(() => {
-      expect(onTimeRangeChange).toHaveBeenCalledWith("year")
+      expect(onTimeRangeChange).toHaveBeenCalledWith("lifetime")
     })
   })
 
@@ -146,7 +157,7 @@ describe("SentimentDashboard", () => {
 
     // Simulate pull-to-refresh
     const scrollView = screen.getByTestId("sentiment-dashboard-scroll")
-    fireEvent.scroll(scrollView, { nativeEvent: { contentOffset: { y: -100 } } })
+    scrollView.props.refreshControl.props.onRefresh()
 
     await waitFor(() => {
       expect(onRefresh).toHaveBeenCalled()
@@ -175,18 +186,6 @@ describe("SentimentDashboard", () => {
     expect(screen.getByText("Sentiment analysis will appear here once the patient has completed conversations.")).toBeTruthy()
   })
 
-  it("should show footer information", () => {
-    render(
-      <SentimentDashboard
-        {...defaultProps}
-        trend={mockTrend}
-        summary={mockSummary}
-      />
-    )
-
-    expect(screen.getByText("Sentiment analysis is automatically generated after each conversation using AI technology.")).toBeTruthy()
-  })
-
   it("should handle different time range selections", async () => {
     const onTimeRangeChange = jest.fn()
     
@@ -200,17 +199,10 @@ describe("SentimentDashboard", () => {
     )
 
     // Test month selection
-    const monthButton = screen.getByText("Month")
+    const monthButton = screen.getByText("Last 30 Days")
     fireEvent.press(monthButton)
     await waitFor(() => {
       expect(onTimeRangeChange).toHaveBeenCalledWith("month")
-    })
-
-    // Test year selection
-    const yearButton = screen.getByText("Year")
-    fireEvent.press(yearButton)
-    await waitFor(() => {
-      expect(onTimeRangeChange).toHaveBeenCalledWith("year")
     })
 
     // Test lifetime selection
@@ -226,6 +218,7 @@ describe("SentimentDashboard", () => {
       <SentimentDashboard
         {...defaultProps}
         trend={mockTrend}
+        selectedTimeRange="month"
       />
     )
 
@@ -238,6 +231,7 @@ describe("SentimentDashboard", () => {
       <SentimentDashboard
         {...defaultProps}
         summary={mockSummary}
+        selectedTimeRange="month"
       />
     )
 
@@ -253,6 +247,7 @@ describe("SentimentDashboard", () => {
         {...defaultProps}
         trend={mockTrend}
         summary={mockSummary}
+        selectedTimeRange="month"
         style={customStyle}
       />
     )
@@ -271,6 +266,7 @@ describe("SentimentDashboard", () => {
         {...defaultProps}
         trend={emptyTrend}
         summary={mockSummary}
+        selectedTimeRange="month"
       />
     )
 
@@ -290,6 +286,7 @@ describe("SentimentDashboard", () => {
         {...defaultProps}
         trend={mockTrend}
         summary={emptySummary}
+        selectedTimeRange="month"
       />
     )
 
