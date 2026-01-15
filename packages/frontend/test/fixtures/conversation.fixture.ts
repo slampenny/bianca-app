@@ -12,6 +12,7 @@ export function newConversation(patientId: string): Partial<Conversation> {
   ];
 
   return {
+    callId: `TEST_CALL_ID_${Date.now()}`,
     callSid: `TEST_CALL_SID_${Date.now()}`,
     patientId,
     lineItemId: null,

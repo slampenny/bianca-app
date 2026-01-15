@@ -123,8 +123,20 @@ describe("sentimentApi", () => {
   let orgId: string
   let patient: Patient
   let patientId: string
+  const originalFetch = global.fetch
+
+  const createMockResponse = <T,>(data: T, options?: { ok?: boolean; status?: number }) => {
+    const response = {
+      ok: options?.ok ?? true,
+      status: options?.status ?? 200,
+      json: () => Promise.resolve(data),
+      clone: () => response,
+    }
+    return response
+  }
 
   beforeEach(async () => {
+    global.fetch = originalFetch
     store = appStore
     const testCaregiver = newCaregiver()
     const response = await registerNewOrgAndCaregiver(
@@ -155,16 +167,14 @@ describe("sentimentApi", () => {
     } catch (error) {
       // Ignore cleanup errors
     }
+    global.fetch = originalFetch
     jest.clearAllMocks()
   })
 
   describe("getSentimentTrend", () => {
     it("should fetch sentiment trend for patient", async () => {
       // Mock the API response
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockSentimentTrend),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentTrend))
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -190,10 +200,9 @@ describe("sentimentApi", () => {
       const timeRanges = ["month", "year", "lifetime"] as const
       
       for (const timeRange of timeRanges) {
-        const mockFetch = jest.fn().mockResolvedValue({
-          ok: true,
-          json: () => Promise.resolve({ ...mockSentimentTrend, timeRange }),
-        })
+        const mockFetch = jest.fn().mockResolvedValue(
+          createMockResponse({ ...mockSentimentTrend, timeRange })
+        )
         global.fetch = mockFetch
 
         const result = await store.dispatch(
@@ -209,11 +218,9 @@ describe("sentimentApi", () => {
     })
 
     it("should handle API errors", async () => {
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        json: () => Promise.resolve({ message: "Patient not found" }),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(
+        createMockResponse({ message: "Patient not found" }, { ok: false, status: 404 })
+      )
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -230,10 +237,7 @@ describe("sentimentApi", () => {
 
   describe("getSentimentSummary", () => {
     it("should fetch sentiment summary for patient", async () => {
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockSentimentSummary),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentSummary))
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -255,11 +259,9 @@ describe("sentimentApi", () => {
     })
 
     it("should handle API errors", async () => {
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        json: () => Promise.resolve({ message: "Patient not found" }),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(
+        createMockResponse({ message: "Patient not found" }, { ok: false, status: 404 })
+      )
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -283,10 +285,7 @@ describe("sentimentApi", () => {
         hasSentimentAnalysis: true
       }
 
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockResponse))
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -316,10 +315,7 @@ describe("sentimentApi", () => {
         hasSentimentAnalysis: false
       }
 
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockResponse))
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -344,10 +340,7 @@ describe("sentimentApi", () => {
         analyzedAt: "2024-01-25T09:05:00.000Z"
       }
 
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockResponse),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockResponse))
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -371,11 +364,12 @@ describe("sentimentApi", () => {
 
     it("should handle analysis errors", async () => {
       const conversationId = "test-conversation-id"
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ message: "Conversation has no messages to analyze" }),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(
+        createMockResponse(
+          { message: "Conversation has no messages to analyze" },
+          { ok: false, status: 400 }
+        )
+      )
       global.fetch = mockFetch
 
       const result = await store.dispatch(
@@ -391,10 +385,7 @@ describe("sentimentApi", () => {
 
   describe("caching and invalidation", () => {
     it("should cache sentiment trend data", async () => {
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockSentimentTrend),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentTrend))
       global.fetch = mockFetch
 
       // First call
@@ -418,10 +409,7 @@ describe("sentimentApi", () => {
     })
 
     it("should invalidate cache when analyzing conversation", async () => {
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(mockSentimentTrend),
-      })
+      const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentTrend))
       global.fetch = mockFetch
 
       // First, fetch sentiment trend
@@ -433,15 +421,14 @@ describe("sentimentApi", () => {
       )
 
       // Then analyze a conversation (should invalidate cache)
-      const mockAnalysisFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({
+      const mockAnalysisFetch = jest.fn().mockResolvedValue(
+        createMockResponse({
           success: true,
           conversationId: "test-conversation-id",
           sentiment: mockSentimentAnalysis,
           analyzedAt: "2024-01-25T09:05:00.000Z"
-        }),
-      })
+        })
+      )
       global.fetch = mockAnalysisFetch
 
       await store.dispatch(

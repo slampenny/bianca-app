@@ -309,57 +309,28 @@ describe('Breach Detection Service', () => {
     });
 
     it('should not detect during normal hours', async () => {
-      // Skip this test if it's currently off-hours (10 PM - 6 AM)
-      // The function only runs during off-hours, so we can't test the "normal hours" case
-      // during off-hours
-      const currentHour = new Date().getHours();
-      const isOffHours = currentHour >= 22 || currentHour < 7;
-      
-      if (isOffHours) {
-        // During off-hours, create an audit log with a timestamp that's more than 10 minutes ago
-        // so it won't be detected (the function only checks last 10 minutes)
-        const oldTime = new Date(Date.now() - 15 * 60 * 1000); // 15 minutes ago
-        oldTime.setHours(14, 30, 0, 0); // Set to 2:30 PM (but it's actually 15 min ago)
-        
-        await AuditLog.create({
-          timestamp: oldTime,
-          userId: testCaregiver._id,
-          userRole: 'staff',
-          action: 'READ',
-          resource: 'patient',
-          resourceId: 'patient-123',
-          outcome: 'SUCCESS',
-          ipAddress: '192.168.1.100',
-          complianceFlags: {
-            phiAccessed: true
-          }
-        });
+      jest.useFakeTimers();
+      const normalHoursTime = new Date();
+      normalHoursTime.setHours(14, 30, 0, 0); // 2:30 PM
+      jest.setSystemTime(normalHoursTime);
 
-        const result = await breachDetectionService.detectOffHoursAccess();
-        // Should return 0 because the log is more than 10 minutes old
-        expect(result).toBe(0);
-      } else {
-        // During normal hours, the function returns 0 immediately without checking logs
-        const normalHoursTime = new Date();
-        normalHoursTime.setHours(14, 30, 0, 0); // 2:30 PM
-        
-        await AuditLog.create({
-          timestamp: normalHoursTime,
-          userId: testCaregiver._id,
-          userRole: 'staff',
-          action: 'READ',
-          resource: 'patient',
-          resourceId: 'patient-123',
-          outcome: 'SUCCESS',
-          ipAddress: '192.168.1.100',
-          complianceFlags: {
-            phiAccessed: true
-          }
-        });
+      await AuditLog.create({
+        timestamp: normalHoursTime,
+        userId: testCaregiver._id,
+        userRole: 'staff',
+        action: 'READ',
+        resource: 'patient',
+        resourceId: 'patient-123',
+        outcome: 'SUCCESS',
+        ipAddress: '192.168.1.100',
+        complianceFlags: {
+          phiAccessed: true
+        }
+      });
 
-        const result = await breachDetectionService.detectOffHoursAccess();
-        expect(result).toBe(0);
-      }
+      const result = await breachDetectionService.detectOffHoursAccess();
+      expect(result).toBe(0);
+      jest.useRealTimers();
     });
   });
 
