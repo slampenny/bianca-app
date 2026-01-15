@@ -349,7 +349,7 @@ function ProfileScreen() {
                         }, 5000)
                       }
                     }}
-                    preset="link"
+                    preset="default"
                     style={styles.verifyButton}
                     disabled={isResendingEmail}
                     loading={isResendingEmail}
@@ -546,8 +546,7 @@ const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
     marginRight: 8,
   },
   verifyButton: {
-    // Match the update buttons - default preset already has border
-    // In dark mode, the border from default preset will be visible
+    // Match the verify phone button default preset styling
     alignSelf: "flex-start", // Align to left like a link button
     marginTop: 4,
   },

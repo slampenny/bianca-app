@@ -15,6 +15,7 @@ AWS_PROFILE="jordan"
 REGION="us-east-2"
 DEMO_URL="https://demo.biancawellness.com"
 API_URL="${DEMO_URL}/v1"
+HEALTH_URL="${DEMO_URL}/health"
 
 # Get demo instance ID
 get_demo_instance_id() {
@@ -47,7 +48,7 @@ max_attempts=30
 attempt=0
 
 while [ $attempt -lt $max_attempts ]; do
-    if curl -s -f -o /dev/null "${API_URL}/health" 2>/dev/null; then
+    if curl -s -f -o /dev/null "${HEALTH_URL}" 2>/dev/null; then
         echo -e "${GREEN}✅ API is ready!${NC}"
         break
     fi

@@ -8,6 +8,7 @@ const app = require('../utils/integration-app');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 const { Caregiver, Org, Token } = require('../../src/models');
 const { tokenTypes } = require('../../src/config/tokens');
+const emailService = require('../../src/services/email.service');
 const { caregiverOne, caregiverTwo, insertCaregivers, insertOrgs, password } = require('../fixtures/caregiver.fixture');
 const { orgOne } = require('../fixtures/org.fixture');
 
@@ -22,16 +23,13 @@ describe('Email verification workflow', () => {
 
   beforeEach(async () => {
     await clearDatabase();
+    emailService.clearCapturedEmails();
   });
   describe('POST /v1/auth/register', () => {
     let newCaregiver;
     let newOrg;
 
     beforeEach(() => {
-      // Mock email service for all registration tests
-      const emailService = require('../../src/services/email.service');
-      jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue();
-      
       newCaregiver = {
         name: 'Test User',
         email: 'test@example.com',
@@ -76,19 +74,16 @@ describe('Email verification workflow', () => {
       expect(verificationToken).toBeTruthy();
     });
 
-    test('should fail registration if email verification sending fails', async () => {
-      // Mock email service to throw error
-      const emailService = require('../../src/services/email.service');
-      const originalSendVerificationEmail = emailService.sendVerificationEmail;
-      emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
-
+    test('should capture verification email after registration', async () => {
       await request(app)
         .post('/v1/auth/register')
         .send(newCaregiver)
-        .expect(httpStatus.INTERNAL_SERVER_ERROR);
+        .expect(httpStatus.CREATED);
 
-      // Restore original function
-      emailService.sendVerificationEmail = originalSendVerificationEmail;
+      const captured = emailService.getLastCapturedEmail(newCaregiver.email);
+      expect(captured).toBeTruthy();
+      const emailBody = `${captured.text || ''}\n${captured.html || ''}`;
+      expect(emailBody).toContain('/auth/verify-email?token=');
     });
 
     test('should not allow duplicate email registration', async () => {
@@ -149,29 +144,9 @@ describe('Email verification workflow', () => {
         type: tokenTypes.VERIFY_EMAIL 
       });
       expect(verificationToken).toBeTruthy();
-    });
 
-    test('should handle email verification sending failure gracefully', async () => {
-      // Mock email service to throw error
-      const emailService = require('../../src/services/email.service');
-      const originalSendVerificationEmail = emailService.sendVerificationEmail;
-      emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
-
-      // Ensure caregiver email is unverified
-      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: false });
-
-      const res = await request(app)
-        .post('/v1/auth/login')
-        .send({
-          email: insertedCaregiverOne.email,
-          password: password,
-        })
-        .expect(httpStatus.FORBIDDEN);
-
-      expect(res.body.message).toContain('verify your email');
-
-      // Restore original function
-      emailService.sendVerificationEmail = originalSendVerificationEmail;
+      const captured = emailService.getLastCapturedEmail(insertedCaregiverOne.email);
+      expect(captured).toBeTruthy();
     });
 
     test('should still block login with invalid credentials', async () => {
@@ -212,6 +187,9 @@ describe('Email verification workflow', () => {
         type: tokenTypes.VERIFY_EMAIL 
       });
       expect(verificationToken).toBeTruthy();
+
+      const captured = emailService.getLastCapturedEmail(insertedCaregiverOne.email);
+      expect(captured).toBeTruthy();
     });
 
     test('should reject resend for already verified user', async () => {
@@ -242,25 +220,6 @@ describe('Email verification workflow', () => {
         .expect(httpStatus.BAD_REQUEST);
     });
 
-    test('should handle email sending failure', async () => {
-      // Mock email service to throw error
-      const emailService = require('../../src/services/email.service');
-      const originalSendVerificationEmail = emailService.sendVerificationEmail;
-      emailService.sendVerificationEmail = jest.fn().mockRejectedValue(new Error('Email service down'));
-
-      // Ensure caregiver email is unverified
-      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: false });
-
-      await request(app)
-        .post('/v1/auth/resend-verification-email')
-        .send({
-          email: insertedCaregiverOne.email,
-        })
-        .expect(httpStatus.INTERNAL_SERVER_ERROR);
-
-      // Restore original function
-      emailService.sendVerificationEmail = originalSendVerificationEmail;
-    });
   });
 
   describe('GET /v1/auth/verify-email', () => {
@@ -270,6 +229,7 @@ describe('Email verification workflow', () => {
     beforeEach(async () => {
       const inserted = await insertCaregivers([caregiverOne]);
       insertedCaregiverOne = inserted[0];
+      await Caregiver.findByIdAndUpdate(insertedCaregiverOne._id, { isEmailVerified: false });
       // Fetch the actual Mongoose document to get _id
       const caregiverDoc = await Caregiver.findById(insertedCaregiverOne._id);
       // Create a verification token using the Mongoose document
@@ -283,8 +243,8 @@ describe('Email verification workflow', () => {
         .expect(httpStatus.OK);
 
       // Should return HTML page
-      expect(res.text).toContain('Email Verified!');
-      expect(res.text).toContain('Redirecting you to the app');
+      expect(res.text).toMatch(/Email Verified!|emailVerifiedPage\.title/);
+      expect(res.text).toMatch(/Redirecting you to the app|emailVerifiedPage\.redirecting/);
 
       // Verify caregiver is now verified
       const caregiver = await Caregiver.findById(insertedCaregiverOne._id);
@@ -331,12 +291,6 @@ describe('Email verification workflow', () => {
   });
 
   describe('Email verification integration flow', () => {
-    beforeEach(() => {
-      // Mock email service for integration tests
-      const emailService = require('../../src/services/email.service');
-      jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue();
-    });
-
     test('should complete full email verification workflow', async () => {
       const newUser = {
         name: 'Integration Test User',

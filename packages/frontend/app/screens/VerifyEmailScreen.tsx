@@ -2,14 +2,15 @@ import React, { useEffect, useState } from "react"
 import { View, StyleSheet, Linking } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
 import { useSelector, useDispatch } from "react-redux"
-import { isAuthenticated, setAuthTokens, setCurrentUser, setAuthEmail } from "app/store/authSlice"
-import { setCaregiver } from "app/store/caregiverSlice"
+import { isAuthenticated, setAuthTokens, setCurrentUser, setAuthEmail, getCurrentUser } from "app/store/authSlice"
+import { setCaregiver, getCaregiver } from "app/store/caregiverSlice"
 import { setOrg } from "app/store/orgSlice"
 import { Screen, Text, Button } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { spacing } from "app/theme"
 import { translate } from "app/i18n"
 import type { ThemeColors } from "../types"
+import type { Caregiver } from "app/services/api/api.types"
 import { navigationRef } from "app/navigators/navigationUtilities"
 import { useVerifyEmailMutation } from "app/services/api/authApi"
 import { logger } from "../utils/logger"
@@ -63,6 +64,8 @@ export const VerifyEmailScreen = () => {
   const dispatch = useDispatch()
   const { colors, isLoading: themeLoading } = useTheme()
   const isLoggedIn = useSelector(isAuthenticated)
+  const currentUser = useSelector(getCurrentUser)
+  const caregiver = useSelector(getCaregiver)
   const [status, setStatus] = useState<"verifying" | "success" | "error">("verifying")
   const [errorMessage, setErrorMessage] = useState<string>("")
   const [verifyEmail, { isLoading: isVerifying }] = useVerifyEmailMutation()
@@ -163,6 +166,13 @@ export const VerifyEmailScreen = () => {
         const result = await verifyEmail({ token }).unwrap()
         
         if (result.success) {
+          const applyVerifiedStatus = (user: Caregiver | null | undefined) => {
+            if (!user || user.isEmailVerified) return
+            const updatedUser = { ...user, isEmailVerified: true }
+            dispatch(setCurrentUser(updatedUser))
+            dispatch(setCaregiver(updatedUser))
+          }
+
           // If we got tokens back, automatically log the user in
           if (result.tokens && result.caregiver) {
             // Set tokens and user data for auto-login
@@ -186,7 +196,14 @@ export const VerifyEmailScreen = () => {
                 })
               }
             }, 100)
+          } else if (result.caregiver) {
+            dispatch(setCurrentUser(result.caregiver))
+            dispatch(setCaregiver(result.caregiver))
           } else {
+            if (isLoggedIn) {
+              applyVerifiedStatus(currentUser)
+              applyVerifiedStatus(caregiver)
+            }
             // No tokens (HTML response) - just navigate to EmailVerifiedScreen
             navigation.navigate("EmailVerified" as never)
           }
