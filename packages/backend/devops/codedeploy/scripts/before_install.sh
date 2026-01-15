@@ -274,6 +274,22 @@ echo "   ✅ Deployment directory: $DEPLOY_DIR"
 echo "   ✅ Container prefix: $CONTAINER_PREFIX"
 echo "   ✅ Image tag: $IMAGE_TAG"
 
+# Set Twilio caller ID by environment (demo uses dedicated number)
+case "$ENVIRONMENT" in
+  production)
+    TWILIO_PHONENUMBER="+19786256514"
+    ;;
+  staging)
+    TWILIO_PHONENUMBER="+19285758645"
+    ;;
+  demo)
+    TWILIO_PHONENUMBER="+16047060134"
+    ;;
+  *)
+    TWILIO_PHONENUMBER="+19285758645"
+    ;;
+esac
+
 # Ensure ENVIRONMENT is set in /etc/environment for future deployments
 # This helps existing instances that were created before userdata was updated
 if [ -n "$ENVIRONMENT" ]; then
@@ -445,7 +461,7 @@ services:
       - ASTERISK_PUBLIC_IP=$PUBLIC_IP
       - AWS_SES_REGION=$AWS_REGION
       - EMAIL_FROM=no-reply@biancawellness.com
-      - TWILIO_PHONENUMBER=+19285758645
+      - TWILIO_PHONENUMBER=$TWILIO_PHONENUMBER
       - TWILIO_ACCOUNTSID=$TWILIO_ACCOUNTSID
       - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
       - RTP_LISTENER_HOST=0.0.0.0

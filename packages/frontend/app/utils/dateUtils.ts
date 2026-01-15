@@ -4,12 +4,14 @@
  * @returns Formatted duration string (e.g., "2m 30s", "45s")
  */
 export const formatDuration = (seconds: number): string => {
-  if (seconds < 60) {
-    return `${seconds}s`
+  const wholeSeconds = Math.ceil(seconds)
+
+  if (wholeSeconds < 60) {
+    return `${wholeSeconds}s`
   }
   
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
+  const minutes = Math.floor(wholeSeconds / 60)
+  const remainingSeconds = wholeSeconds % 60
   
   if (remainingSeconds === 0) {
     return `${minutes}m`

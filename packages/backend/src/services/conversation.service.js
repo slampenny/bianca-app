@@ -420,12 +420,17 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     }
     
     const summaryPrompt = "Create a concise summary of this patient conversation with Bianca, highlighting key topics discussed, any concerns raised, and the patient's overall mood or needs.";
+    let summary = 'Summary generation failed - manual review needed';
     
-    const summary = await langChainAPI.summarizeConversation(
-      summaryPrompt,
-      conversationText,
-      userDomain
-    );
+    try {
+      summary = await langChainAPI.summarizeConversation(
+        summaryPrompt,
+        conversationText,
+        userDomain
+      );
+    } catch (summaryErr) {
+      logger.error(`[Finalize] Error generating summary for conversation ${conversationId}: ${summaryErr.message}`);
+    }
 
     // Perform sentiment analysis on the conversation
     let sentimentAnalysis = null;
@@ -441,10 +446,15 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       if (sentimentAnalysis.success) {
         logger.info(`[Finalize] Sentiment analysis completed for conversation ${conversationId}: ${sentimentAnalysis.data.overallSentiment}`);
       } else {
-        logger.warn(`[Finalize] Sentiment analysis failed for conversation ${conversationId}: ${sentimentAnalysis.error}`);
+        logger.warn(
+          `[Finalize] Sentiment analysis failed for conversation ${conversationId}: ${sentimentAnalysis.error}`
+        );
       }
     } catch (sentimentErr) {
-      logger.error(`[Finalize] Error during sentiment analysis for conversation ${conversationId}: ${sentimentErr.message}`);
+      logger.error(
+        `[Finalize] Error during sentiment analysis for conversation ${conversationId}: ${sentimentErr.message}`,
+        sentimentErr
+      );
     }
 
     // Update conversation with summary and sentiment analysis
@@ -476,8 +486,14 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     // Trigger medical and fraud/abuse analysis after call completion (async, don't wait)
     if (conversation.patientId) {
       const patientId = conversation.patientId._id || conversation.patientId;
+      logger.info(
+        `[Finalize] Scheduling post-call analysis for patient ${patientId} from conversation ${conversationId}`
+      );
       triggerAnalysisAfterCall(patientId).catch(err => {
-        logger.error(`[Finalize] Error triggering analysis after call for patient ${patientId}: ${err.message}`);
+        logger.error(
+          `[Finalize] Error triggering analysis after call for patient ${patientId}: ${err.message}`,
+          err
+        );
       });
     }
     
@@ -940,6 +956,9 @@ const triggerAnalysisAfterCall = async (patientId) => {
       
       // Get all conversations for the patient
       const conversations = await getConversationsByPatient(patientId);
+      logger.info(
+        `[Analysis Trigger] Medical analysis input for patient ${patientId}: ${conversations.length} conversations`
+      );
       
       if (conversations.length > 0) {
         // Get baseline analysis (previous result)
@@ -947,7 +966,14 @@ const triggerAnalysisAfterCall = async (patientId) => {
         const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
         
         // Perform medical pattern analysis
+        logger.info(
+          `[Analysis Trigger] Medical analysis baseline ${baseline ? 'found' : 'missing'} for patient ${patientId}`
+        );
         const analysisResult = await analyzer.analyzeMonth(conversations, baseline);
+        logger.info(
+          `[Analysis Trigger] Medical analysis result for patient ${patientId}: ` +
+          `confidence=${analysisResult?.confidence || 'unknown'}, warnings=${analysisResult?.warnings?.length || 0}`
+        );
         
         // Store analysis result
         const resultToStore = {
@@ -958,6 +984,10 @@ const triggerAnalysisAfterCall = async (patientId) => {
         };
         
         await storeMedicalAnalysisResult(patientId, resultToStore);
+        logger.info(
+          `[Analysis Trigger] Medical analysis stored for patient ${patientId} ` +
+          `(conversations=${conversations.length})`
+        );
         
         logger.info(`[Analysis Trigger] Medical analysis completed for patient ${patientId}`, {
           conversationCount: conversations.length,
@@ -977,6 +1007,9 @@ const triggerAnalysisAfterCall = async (patientId) => {
       
       // Get all conversations for the patient
       const conversations = await getConversationsByPatient(patientId);
+      logger.info(
+        `[Analysis Trigger] Fraud/abuse analysis input for patient ${patientId}: ${conversations.length} conversations`
+      );
       
       if (conversations.length > 0) {
         // Get baseline analysis (previous result)
@@ -987,7 +1020,14 @@ const triggerAnalysisAfterCall = async (patientId) => {
         const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
         
         // Perform fraud/abuse analysis
+        logger.info(
+          `[Analysis Trigger] Fraud/abuse baseline ${baseline ? 'found' : 'missing'} for patient ${patientId}`
+        );
         const analysisResult = await analyzer.analyzeConversations(conversations, baseline);
+        logger.info(
+          `[Analysis Trigger] Fraud/abuse analysis result for patient ${patientId}: ` +
+          `confidence=${analysisResult?.confidence || 'unknown'}, warnings=${analysisResult?.warnings?.length || 0}`
+        );
         
         // Store analysis result
         const resultToStore = {
