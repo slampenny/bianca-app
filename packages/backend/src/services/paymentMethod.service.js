@@ -7,6 +7,16 @@ const logger = require('../config/logger');
 
 const isStripeDisabled = () => {
   const stripeEnabled = process.env.ENABLE_STRIPE === 'true';
+  // Don't bypass if Stripe is mocked (has jest mock functions) - tests need to call mocks
+  const isStripeMocked = stripe && typeof stripe === 'object' && 
+    (stripe.paymentMethods?.retrieve?.mockImplementation || 
+     stripe.customers?.create?.mockImplementation ||
+     stripe.paymentMethods?.attach?.mockImplementation);
+  
+  if (isStripeMocked) {
+    return false; // Let tests use their mocks
+  }
+  
   return (
     !stripe ||
     process.env.DISABLE_STRIPE === 'true' ||
