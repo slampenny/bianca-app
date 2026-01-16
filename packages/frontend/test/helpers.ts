@@ -4,7 +4,7 @@ import axios from 'axios';
 import { DEFAULT_API_CONFIG } from '../app/services/api/api';
 
 import { store as appStore } from "../app/store/store"
-import { alertApi, authApi, patientApi } from "../app/services/api/"
+import { alertApi, authApi, patientApi, orgApi } from "../app/services/api/"
 import { Alert, Org, Caregiver, Patient } from "../app/services/api/api.types"
 
 const buildApiUrl = (path: string) => {
@@ -102,7 +102,10 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
     // Register endpoint returns: { message, caregiver, requiresEmailVerification }
     // It does NOT return org or tokens - need to get org from caregiver.org and login for tokens
     const caregiver = returnType.data.caregiver as Caregiver
-    const org = (caregiver.org as any) as Org
+    const rawOrg = caregiver.org as any
+    const orgId = typeof rawOrg === "string"
+      ? rawOrg
+      : (rawOrg?.id || rawOrg?._id)
     
     // If email verification is required, verify it first using the test endpoint
     if (returnType.data.requiresEmailVerification) {
@@ -163,6 +166,22 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
       throw new Error(`Login succeeded but tokens not found in store: ${JSON.stringify(loginResult.data)}`)
     }
     
+    let org: Org
+    if (orgId) {
+      const orgResult = await orgApi.endpoints.getOrg.initiate({ orgId })(
+        appStore.dispatch,
+        appStore.getState,
+        {},
+      )
+      if ("data" in orgResult && orgResult.data) {
+        org = orgResult.data as Org
+      } else {
+        org = { id: orgId } as Org
+      }
+    } else {
+      org = rawOrg as Org
+    }
+
     return {
       org,
       caregiver,

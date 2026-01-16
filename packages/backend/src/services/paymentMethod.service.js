@@ -1,8 +1,18 @@
 const httpStatus = require('http-status');
 const stripe = require('../config/stripe');
+const config = require('../config/config');
 const { Org, PaymentMethod } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+
+const isStripeDisabled = () => {
+  const stripeEnabled = process.env.ENABLE_STRIPE === 'true';
+  return (
+    !stripe ||
+    process.env.DISABLE_STRIPE === 'true' ||
+    (config.env !== 'production' && !stripeEnabled)
+  );
+};
 
 /**
  * Attach a payment method to an organization
@@ -18,6 +28,37 @@ const attachPaymentMethod = async (orgId, paymentMethodId) => {
   }
 
   try {
+    if (isStripeDisabled()) {
+      if (config.env === 'production') {
+        throw new ApiError(httpStatus.SERVICE_UNAVAILABLE, 'Stripe is not configured');
+      }
+
+      // In dev/test, create a local payment method without Stripe.
+      const existingMethods = await PaymentMethod.countDocuments({ org: orgId });
+      const stubbedMethod = await PaymentMethod.create({
+        stripePaymentMethodId: paymentMethodId,
+        org: orgId,
+        type: 'card',
+        brand: 'visa',
+        last4: '4242',
+        expMonth: 12,
+        expYear: new Date().getFullYear() + 1,
+        isDefault: existingMethods === 0,
+      });
+
+      if (!org.stripeCustomerId) {
+        org.stripeCustomerId = `cus_stub_${org.id}`;
+      }
+      if (!org.paymentMethods) {
+        org.paymentMethods = [];
+      }
+      org.paymentMethods.push(stubbedMethod.id);
+      await org.save();
+
+      logger.warn('Stripe disabled - created local payment method stub');
+      return stubbedMethod;
+    }
+
     // Ensure the org has a Stripe customer ID
     if (!org.stripeCustomerId) {
       // Create a customer in Stripe if needed
@@ -259,35 +300,41 @@ const setDefaultPaymentMethod = async (orgId, paymentMethodId) => {
   }
 
   try {
-    // Ensure the org has a Stripe customer ID
-    if (!org.stripeCustomerId) {
-      // Create a customer in Stripe if needed
-      const customer = await stripe.customers.create({
-        name: org.name,
-        metadata: {
-          orgId: org.id,
-        },
-      });
-      org.stripeCustomerId = customer.id;
-      await org.save();
-      logger.info(`Created Stripe customer for org: ${org.name} (${org.id})`);
-    }
+    if (isStripeDisabled()) {
+      if (!org.stripeCustomerId) {
+        org.stripeCustomerId = `cus_stub_${org.id}`;
+        await org.save();
+      }
+    } else {
+      // Ensure the org has a Stripe customer ID
+      if (!org.stripeCustomerId) {
+        // Create a customer in Stripe if needed
+        const customer = await stripe.customers.create({
+          name: org.name,
+          metadata: {
+            orgId: org.id,
+          },
+        });
+        org.stripeCustomerId = customer.id;
+        await org.save();
+        logger.info(`Created Stripe customer for org: ${org.name} (${org.id})`);
+      }
 
-    // First set as default in Stripe (if the payment method exists)
-    try {
-      await stripe.customers.update(org.stripeCustomerId, {
-        invoice_settings: {
-          default_payment_method: paymentMethod.stripePaymentMethodId,
-        },
-      });
-    } catch (stripeError) {
-      // If the payment method doesn't exist in Stripe, log a warning but continue
-      if (stripeError.type === 'StripeInvalidRequestError' && 
-          stripeError.code === 'resource_missing') {
-        logger.warn(`Payment method ${paymentMethod.stripePaymentMethodId} not found in Stripe, proceeding with local update only`);
-      } else {
-        // For other Stripe errors, re-throw
-        throw stripeError;
+      // First set as default in Stripe (if the payment method exists)
+      try {
+        await stripe.customers.update(org.stripeCustomerId, {
+          invoice_settings: {
+            default_payment_method: paymentMethod.stripePaymentMethodId,
+          },
+        });
+      } catch (stripeError) {
+        // If the payment method doesn't exist in Stripe, log a warning but continue
+        if (stripeError.type === 'StripeInvalidRequestError' && stripeError.code === 'resource_missing') {
+          logger.warn(`Payment method ${paymentMethod.stripePaymentMethodId} not found in Stripe, proceeding with local update only`);
+        } else {
+          // For other Stripe errors, re-throw
+          throw stripeError;
+        }
       }
     }
 
@@ -346,34 +393,32 @@ const detachPaymentMethod = async (orgId, paymentMethodId) => {
   }
 
   try {
-    try {
-      // First detach from Stripe
-      await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
-
-      // Then delete from our database
-      await PaymentMethod.deleteOne({ _id: paymentMethodId });
-
-      // Remove reference from the org
-      const index = org.paymentMethods.indexOf(paymentMethodId);
-      if (index > -1) {
-        org.paymentMethods.splice(index, 1);
-        await org.save();
+    if (!isStripeDisabled()) {
+      try {
+        // First detach from Stripe
+        await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
+      } catch (stripeError) {
+        // If the error is that the payment method isn't attached, we can proceed
+        if (stripeError.message && stripeError.message.includes('not attached to a customer')) {
+          logger.warn(`Payment method ${paymentMethodId} not found in Stripe, proceeding with local deletion`);
+        } else {
+          // For other Stripe errors, re-throw
+          throw stripeError;
+        }
       }
-
-      return paymentMethodId;
-    } catch (stripeError) {
-      // If the error is that the payment method isn't attached, we can proceed
-      // with deleting it from our database anyway
-      if (stripeError.message && stripeError.message.includes('not attached to a customer')) {
-        logger.warn(`Payment method ${paymentMethodId} not found in Stripe, proceeding with local deletion`);
-      } else {
-        // For other Stripe errors, re-throw
-        throw stripeError;
-      }
-
-      // Proceed with deleting from database and updating org
-      await PaymentMethod.deleteOne({ _id: paymentMethodId });
     }
+
+    // Then delete from our database
+    await PaymentMethod.deleteOne({ _id: paymentMethodId });
+
+    // Remove reference from the org
+    const index = org.paymentMethods.indexOf(paymentMethodId);
+    if (index > -1) {
+      org.paymentMethods.splice(index, 1);
+      await org.save();
+    }
+
+    return paymentMethodId;
   } catch (error) {
     logger.error(`Error detaching payment method ${paymentMethodId}:`, error);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Error deleting payment method');

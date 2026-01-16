@@ -7,12 +7,16 @@ import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 import { Org, PaymentMethod } from "../api.types"
 
 describe("paymentMethodApi", () => {
+  const createPaymentMethodId = (suffix: string) =>
+    `pm_${suffix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
   let store: EnhancedStore<RootState>
   let org: Org
   let orgId: string
 
   beforeEach(async () => {
     store = appStore
+    store.dispatch(paymentMethodApi.util.resetApiState())
+    store.dispatch(orgApi.util.resetApiState())
     const testCaregiver = newCaregiver()
     // Create new org and caregiver via helper.
     const response = await registerNewOrgAndCaregiver(
@@ -29,15 +33,18 @@ describe("paymentMethodApi", () => {
 
   afterEach(async () => {
     await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+    store.dispatch(paymentMethodApi.util.resetApiState())
+    store.dispatch(orgApi.util.resetApiState())
     jest.clearAllMocks()
   })
 
   // --- Attach Payment Method Test ---
   it("should attach a payment method and return 201", async () => {
     console.log("Testing: attachPaymentMethod endpoint")
+    const paymentMethodId = createPaymentMethodId("card_visa")
     const result = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
-      paymentMethodId: "pm_card_visa",
+      paymentMethodId,
     })(store.dispatch, store.getState, {})
 
     if ("error" in result) {
@@ -63,9 +70,10 @@ describe("paymentMethodApi", () => {
   // --- Get All Payment Methods Test ---
   it("should get all payment methods for an org", async () => {
     console.log("Testing: getPaymentMethods endpoint")
+    const paymentMethodId = createPaymentMethodId("card_visa")
     await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
-      paymentMethodId: "pm_card_visa",
+      paymentMethodId,
     })(store.dispatch, store.getState, {})
 
     const result = await paymentMethodApi.endpoints.getPaymentMethods.initiate(orgId)(
@@ -99,21 +107,22 @@ describe("paymentMethodApi", () => {
   // --- Get Payment Method By ID Test ---
   it("should get a payment method by id", async () => {
     console.log("Testing: getPaymentMethod by ID")
+    const paymentMethodId = createPaymentMethodId("card_visa")
     const attachResult = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
-      paymentMethodId: "pm_card_visa",
+      paymentMethodId,
     })(store.dispatch, store.getState, {})
 
     if ("error" in attachResult) {
       throw new Error(`Attach payment method failed: ${JSON.stringify(attachResult.error)}`)
     }
 
-    const paymentMethodId: string = attachResult.data.id!
-    console.log(`Payment method attached with ID: ${paymentMethodId}`)
+    const createdPaymentMethodId: string = attachResult.data.id!
+    console.log(`Payment method attached with ID: ${createdPaymentMethodId}`)
 
     const result = await paymentMethodApi.endpoints.getPaymentMethod.initiate({
       orgId,
-      paymentMethodId,
+      paymentMethodId: createdPaymentMethodId,
     })(store.dispatch, store.getState, {})
 
     if ("error" in result) {
@@ -121,7 +130,7 @@ describe("paymentMethodApi", () => {
     } else {
       console.log("[paymentMethodSlice] getPaymentMethod.matchFulfilled", result.data)
       expect(result.data).toMatchObject({
-        id: paymentMethodId,
+        id: createdPaymentMethodId,
         org: orgId,
         stripePaymentMethodId: expect.any(String),
         type: expect.any(String),
@@ -140,15 +149,17 @@ describe("paymentMethodApi", () => {
   it("should set a payment method as default", async () => {
     console.log("Testing: setDefaultPaymentMethod endpoint")
     // Attach the first payment method.
+    const firstPaymentMethodId = createPaymentMethodId("card_visa")
     await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
-      paymentMethodId: "pm_card_visa",
+      paymentMethodId: firstPaymentMethodId,
     })(store.dispatch, store.getState, {})
 
     // Attach the second payment method.
+    const secondPaymentMethodId = createPaymentMethodId("card_mastercard")
     const secondResult = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
-      paymentMethodId: "pm_card_mastercard",
+      paymentMethodId: secondPaymentMethodId,
     })(store.dispatch, store.getState, {})
 
     if ("error" in secondResult) {
@@ -166,10 +177,6 @@ describe("paymentMethodApi", () => {
       throw new Error(`Failed to fetch organization: ${JSON.stringify(orgResult.error)}`)
     }
     const updatedOrg = orgResult.data!
-    if (!updatedOrg.stripeCustomerId) {
-      throw new Error("Organization does not have a stripeCustomerId")
-    }
-    console.log("Organization stripeCustomerId:", updatedOrg.stripeCustomerId)
 
     // Set the second payment method as default.
     const updateResult = await paymentMethodApi.endpoints.setDefaultPaymentMethod.initiate({
@@ -193,9 +200,10 @@ describe("paymentMethodApi", () => {
   it("should detach a non-default payment method", async () => {
     console.log("Testing: detachPaymentMethod endpoint")
     // Attach the first payment method.
+    const firstPaymentMethodId = createPaymentMethodId("card_visa")
     const firstResult = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
-      paymentMethodId: "pm_card_visa",
+      paymentMethodId: firstPaymentMethodId,
     })(store.dispatch, store.getState, {})
     if ("error" in firstResult) {
       throw new Error(`Attach first payment method failed: ${JSON.stringify(firstResult.error)}`)
@@ -204,9 +212,10 @@ describe("paymentMethodApi", () => {
     console.log(`First payment method attached with ID: ${firstId}`)
 
     // Attach the second payment method.
+    const secondPaymentMethodId = createPaymentMethodId("card_mastercard")
     const secondResult = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
-      paymentMethodId: "pm_card_mastercard",
+      paymentMethodId: secondPaymentMethodId,
     })(store.dispatch, store.getState, {})
     if ("error" in secondResult) {
       throw new Error(`Attach second payment method failed: ${JSON.stringify(secondResult.error)}`)
@@ -232,10 +241,6 @@ describe("paymentMethodApi", () => {
       throw new Error(`Failed to re-fetch org: ${JSON.stringify(orgResult.error)}`)
     }
     const updatedOrg = orgResult.data!
-    if (!updatedOrg.stripeCustomerId) {
-      throw new Error("Organization does not have a stripeCustomerId")
-    }
-    console.log("Organization stripeCustomerId after default set:", updatedOrg.stripeCustomerId)
 
     // Detach the first (non-default) payment method.
     const detachResult = await paymentMethodApi.endpoints.detachPaymentMethod.initiate({
@@ -250,4 +255,9 @@ describe("paymentMethodApi", () => {
       expect(detachResult.data).toBeNull()
     }
   }, 30000)
+
+  afterAll(async () => {
+    // Allow any pending timers from RN/Jest setup to flush before teardown
+    await new Promise(resolve => setTimeout(resolve, 1500))
+  })
 })

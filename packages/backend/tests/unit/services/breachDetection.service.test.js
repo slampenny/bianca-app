@@ -309,10 +309,9 @@ describe('Breach Detection Service', () => {
     });
 
     it('should not detect during normal hours', async () => {
-      jest.useFakeTimers();
       const normalHoursTime = new Date();
       normalHoursTime.setHours(14, 30, 0, 0); // 2:30 PM
-      jest.setSystemTime(normalHoursTime);
+      const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(normalHoursTime.getTime());
 
       await AuditLog.create({
         timestamp: normalHoursTime,
@@ -330,7 +329,7 @@ describe('Breach Detection Service', () => {
 
       const result = await breachDetectionService.detectOffHoursAccess();
       expect(result).toBe(0);
-      jest.useRealTimers();
+      dateNowSpy.mockRestore();
     });
   });
 

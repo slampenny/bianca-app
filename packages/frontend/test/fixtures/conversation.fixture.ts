@@ -1,6 +1,15 @@
 // conversation.fixture.ts
 import { Conversation, Message } from '../../app/services/api/api.types';
 
+const createObjectId = () => {
+  const hex = '0123456789abcdef';
+  let id = '';
+  for (let i = 0; i < 24; i += 1) {
+    id += hex[Math.floor(Math.random() * hex.length)];
+  }
+  return id;
+};
+
 export function newConversation(patientId: string): Partial<Conversation> {
   const startTime = new Date();
   const endTime = new Date(startTime.getTime() + 60000); // 1 minute later
@@ -12,7 +21,7 @@ export function newConversation(patientId: string): Partial<Conversation> {
   ];
 
   return {
-    callId: `TEST_CALL_ID_${Date.now()}`,
+    callId: createObjectId(),
     callSid: `TEST_CALL_SID_${Date.now()}`,
     patientId,
     lineItemId: null,

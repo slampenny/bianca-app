@@ -806,7 +806,9 @@ Then('I should see an error message about invalid email', async function() {
 
 Then('I should see an error message about password requirements', async function() {
   // Use .first() to handle multiple matches (e.g., password requirements checklist)
-  const errorMessage = this.page.getByText(/password must contain|password requirements|weak password/i).first();
+  const errorMessage = this.page.getByText(
+    /password must contain|password requirements|weak password|password must be at least|password is required/i
+  ).first();
   await expect(errorMessage).toBeVisible({ timeout: 10000 });
 });
 

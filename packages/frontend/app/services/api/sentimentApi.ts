@@ -18,6 +18,7 @@ export const sentimentApi = createApi({
       }),
       providesTags: (result, error, { patientId, timeRange }) => [
         { type: "SentimentTrend", id: `${patientId}-${timeRange}` },
+        { type: "SentimentTrend", id: "LIST" },
       ],
     }),
 
@@ -28,6 +29,7 @@ export const sentimentApi = createApi({
       }),
       providesTags: (result, error, { patientId }) => [
         { type: "SentimentSummary", id: patientId },
+        { type: "SentimentSummary", id: "LIST" },
       ],
     }),
 
