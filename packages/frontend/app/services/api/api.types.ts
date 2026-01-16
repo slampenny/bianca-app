@@ -37,6 +37,9 @@ export interface Caregiver {
   role: CaregiverRole
   patients: string[] // Assuming this is the ID of the caregiver
   preferredLanguage?: string
+  isEmailVerified?: boolean
+  isPhoneVerified?: boolean
+  ssoProvider?: "google" | "microsoft" | null
 }
 
 export interface AlertPages {

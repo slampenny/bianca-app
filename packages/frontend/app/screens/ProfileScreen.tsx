@@ -49,11 +49,14 @@ function ProfileScreen() {
   const currentUser = useSelector(getCaregiver)
   const inviteToken = useSelector(getInviteToken)
   
+  const isSsoUser = Boolean(currentUser?.ssoProvider)
+  const isEmailVerified = Boolean(currentUser?.isEmailVerified || isSsoUser)
+
   // Check if user needs to complete profile
   // Profile is incomplete if email is not verified OR phone is missing (not just unverified)
   // Users can continue with unverified phone, but need verified email and a phone number present
   const hasMissingPhone = !currentUser?.phone || (typeof currentUser.phone === 'string' && currentUser.phone.trim() === '')
-  const isUnverified = !currentUser?.isEmailVerified || hasMissingPhone
+  const isUnverified = !isEmailVerified || hasMissingPhone
   const hasUnverifiedPhone = currentUser?.phone && typeof currentUser.phone === 'string' && currentUser.phone.trim() !== '' && !currentUser?.isPhoneVerified
 
   // Mutations for editing profile
@@ -135,7 +138,7 @@ function ProfileScreen() {
   useEffect(() => {
     // Only block if email is unverified OR phone is missing
     // Don't block if phone exists but is just unverified
-    const shouldBlock = !currentUser?.isEmailVerified || hasMissingPhone
+    const shouldBlock = !isEmailVerified || hasMissingPhone
     
     if (shouldBlock) {
       const unsubscribe = navigation.addListener('beforeRemove', (e) => {
@@ -156,7 +159,7 @@ function ProfileScreen() {
 
       return unsubscribe
     }
-  }, [navigation, currentUser?.isEmailVerified, hasMissingPhone, showInfo])
+  }, [navigation, isEmailVerified, hasMissingPhone, showInfo])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -320,7 +323,7 @@ function ProfileScreen() {
                 status={emailError ? "error" : undefined}
                 helper={emailError || undefined}
               />
-              {currentUser?.isEmailVerified ? (
+              {isEmailVerified ? (
                 <View style={styles.verificationStatus}>
                   <Text style={styles.verificationText}>
                     ✓ {translate("profileScreen.emailVerified") || "Email Verified"}
