@@ -425,12 +425,12 @@ class CognitiveDeclineDetector {
     let weightedScore = 0;
     let totalWeight = 0;
 
-    // Filler words contribution
-    weightedScore += analyses.fillerWords.density * 10000 * this.weights.fillerWords;
+    // Filler words contribution (density is 0-1, convert to 0-100)
+    weightedScore += analyses.fillerWords.density * 100 * this.weights.fillerWords;
     totalWeight += this.weights.fillerWords;
 
-    // Vague references contribution
-    weightedScore += analyses.vagueReferences.density * 10000 * this.weights.vagueReferences;
+    // Vague references contribution (density is 0-1, convert to 0-100)
+    weightedScore += analyses.vagueReferences.density * 100 * this.weights.vagueReferences;
     totalWeight += this.weights.vagueReferences;
 
     // Temporal confusion contribution (count-based)
