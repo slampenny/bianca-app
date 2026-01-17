@@ -366,7 +366,7 @@ phases:
         cd "$FRONTEND_DIR" || exit 1
         set +e  # Don't exit on error, we'll handle it
         # Stream logs and cap runtime to avoid silent hangs (use bash for pipefail)
-        bash -lc 'set -o pipefail; NODE_ENV=test timeout 20m yarn test 2>&1 | tee /tmp/frontend-unit-tests.log'
+        bash -lc 'set -o pipefail; NODE_ENV=test timeout 20m yarn test --forceExit --runInBand 2>&1 | tee /tmp/frontend-unit-tests.log'
         FRONTEND_TEST_EXIT_CODE=$?
         set -e  # Re-enable exit on error
         

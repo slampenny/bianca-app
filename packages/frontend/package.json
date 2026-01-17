@@ -28,7 +28,7 @@
     "format": "prettier --write \"app/**/*.{js,jsx,json,md,ts,tsx}\"",
     "lint": "eslint App.tsx app test --fix --ext .js,.ts,.tsx && npm run format",
     "patch": "patch-package",
-    "test": "jest",
+    "test": "jest --forceExit",
     "test:watch": "jest --watch",
     "test:maestro": "maestro test .maestro/FavoritePodcast.yaml",
     "test:web:e2e": "NODE_ENV=test npx playwright test",
