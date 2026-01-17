@@ -99,20 +99,57 @@ const queryConversationsByPatient = async (patientId, options) => {
     sortBy: sortBy,
   });
   
-  // Sort results to ensure proper ordering (handle cases where startTime might be null)
+  // Verify all results have _id immediately after pagination
   if (result.results && result.results.length > 0) {
+    const missingIds = result.results.filter(c => !c._id && !c.id);
+    if (missingIds.length > 0) {
+      logger.error('[Conversation Service] Conversations missing _id after pagination!', {
+        missingCount: missingIds.length,
+        totalCount: result.results.length,
+        sample: missingIds[0] ? {
+          keys: Object.keys(missingIds[0]),
+          constructor: missingIds[0].constructor?.name,
+          isMongooseDoc: missingIds[0].constructor?.name === 'model',
+        } : null,
+      });
+    }
+    
+    // Log before sort
+    logger.debug('[Conversation Service] Before sort - checking _id presence', {
+      allHave_id: result.results.every(c => c._id !== undefined),
+      allHaveId: result.results.every(c => c.id !== undefined),
+      sample_id: result.results[0]?._id?.toString(),
+      sample_id_type: typeof result.results[0]?._id,
+      sample_constructor: result.results[0]?.constructor?.name,
+    });
+    
+    // Sort results to ensure proper ordering (handle cases where startTime might be null)
+    // IMPORTANT: Access properties carefully to avoid triggering toJSON conversion
     result.results.sort((a, b) => {
-      // Use startTime if available, otherwise use createdAt
-      const timeA = a.startTime || a.createdAt || new Date(0);
-      const timeB = b.startTime || b.createdAt || new Date(0);
+      // Use get() method to safely access properties without triggering toJSON
+      const timeA = (a.get && a.get('startTime')) || a.startTime || (a.get && a.get('createdAt')) || a.createdAt || new Date(0);
+      const timeB = (b.get && b.get('startTime')) || b.startTime || (b.get && b.get('createdAt')) || b.createdAt || new Date(0);
       return new Date(timeB) - new Date(timeA); // Descending order (newest first)
+    });
+    
+    // Log after sort
+    logger.debug('[Conversation Service] After sort - checking _id presence', {
+      allHave_id: result.results.every(c => c._id !== undefined),
+      allHaveId: result.results.every(c => c.id !== undefined),
+      sample_id: result.results[0]?._id?.toString(),
+      sample_id_type: typeof result.results[0]?._id,
+      sample_constructor: result.results[0]?.constructor?.name,
     });
   }
   
   // Debug logging
   logger.info(`[Conversation Service] Found ${result.totalResults} total conversations, returning ${result.results.length} for page ${result.page}`);
   logger.info(`[Conversation Service] Conversation IDs:`, result.results.map(c => ({ 
-    id: c._id, 
+    _id: c._id?.toString(),
+    id: c.id?.toString(),
+    has_id: c._id !== undefined,
+    hasId: c.id !== undefined,
+    constructor: c.constructor?.name,
     status: c.status, 
     startTime: c.startTime,
     createdAt: c.createdAt,

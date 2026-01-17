@@ -114,6 +114,7 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
           <Image
             source={{ uri: image }}
             style={styles.avatarImage}
+            resizeMode="cover"
             onError={(e) => console.error("Error loading image:", e.nativeEvent.error)}
           />
         ) : (
@@ -149,7 +150,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   avatarImage: {
     height: "100%",
-    resizeMode: "cover",
     width: "100%",
   },
   avatarPlaceholder: {

@@ -90,14 +90,26 @@ export const conversationSlice = createSlice({
           resultsCount: payload.results?.length || 0
         });
         
+        // Only update if we have a valid payload with results array
         // For the first page, replace all conversations
         if (payload.page === 1) {
-          state.conversations = payload.results || [];
-          logger.debug('[ConversationSlice] Set first page conversations:', payload.results?.map(c => ({ id: c.id, startTime: c.startTime })));
+          // Only update if we have results - don't clear conversations if API returns empty array
+          // This prevents clearing conversations when API returns empty due to cache/304 issues
+          if (payload.results !== undefined && payload.results.length > 0) {
+            state.conversations = payload.results;
+            logger.debug('[ConversationSlice] Set first page conversations:', payload.results?.map(c => ({ id: c.id, startTime: c.startTime })));
+          } else if (payload.results !== undefined && payload.results.length === 0 && state.conversations.length === 0) {
+            // Only clear if we explicitly got empty AND we don't have any conversations already
+            // This allows API to clear conversations when patient has none, but preserves them during loading
+            state.conversations = [];
+            logger.debug('[ConversationSlice] Cleared conversations (patient has none)');
+          }
         } else {
           // For subsequent pages, append to existing conversations
-          state.conversations = [...state.conversations, ...(payload.results || [])];
-          logger.debug('[ConversationSlice] Appended page conversations, total:', state.conversations.length);
+          if (payload.results && payload.results.length > 0) {
+            state.conversations = [...state.conversations, ...payload.results];
+            logger.debug('[ConversationSlice] Appended page conversations, total:', state.conversations.length);
+          }
         }
         
         // Set the first conversation as the current one if we have conversations

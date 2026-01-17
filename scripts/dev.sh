@@ -16,9 +16,6 @@ cleanup() {
   if [ ! -z "$FRONTEND_PID" ]; then
     kill $FRONTEND_PID 2>/dev/null || true
   fi
-  if [ ! -z "$DOCKER_LOGS_PID" ]; then
-    kill $DOCKER_LOGS_PID 2>/dev/null || true
-  fi
   if [ ! -z "$BACKEND_LOGS_PID" ]; then
     kill $BACKEND_LOGS_PID 2>/dev/null || true
   fi
@@ -40,14 +37,7 @@ BACKEND_PID=$!
 # Wait a moment for backend to start docker services
 sleep 3
 
-# Start tailing docker-compose logs in background
-echo "Tailing docker-compose logs..."
-cd packages/backend
-docker compose --env-file .env -f docker/docker-compose.yml -f docker/docker-compose.dev.yml logs -f mongodb redis asterisk 2>/dev/null &
-DOCKER_LOGS_PID=$!
-cd ../..
-
-# Start tailing backend logs in background
+# Start tailing backend logs in foreground (this will be the main output)
 echo "Tailing backend logs..."
 tail -f /tmp/backend-dev.log &
 BACKEND_LOGS_PID=$!
@@ -65,12 +55,11 @@ echo ""
 echo "=========================================="
 echo "Backend PID: $BACKEND_PID"
 echo "Frontend PID: $FRONTEND_PID"
-echo "Docker logs PID: $DOCKER_LOGS_PID"
 echo "Backend logs PID: $BACKEND_LOGS_PID"
 echo "=========================================="
 echo "Both servers starting... Press Ctrl+C to stop"
 echo ""
-echo "Docker-compose logs (mongodb, redis, asterisk) and backend logs are being tailed above."
+echo "Backend logs are being tailed above."
 echo ""
 
 # Wait for all background jobs (this keeps the script running)

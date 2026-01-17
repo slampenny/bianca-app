@@ -4,8 +4,8 @@
  */
 
 // Frontend URL for E2E tests
-export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8082'
-export const FRONTEND_PORT = process.env.FRONTEND_PORT || '8082'
+export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8084'
+export const FRONTEND_PORT = process.env.FRONTEND_PORT || '8084'
 
 // Backend URL for E2E tests
 export const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000'

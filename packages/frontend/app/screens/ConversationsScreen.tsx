@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback, useMemo } from "react"
 import { View, StyleSheet, ActivityIndicator, FlatList, RefreshControl } from "react-native"
 import { Text } from "../components"
 import { useSelector, useDispatch } from "react-redux"
@@ -177,7 +177,11 @@ export function ConversationsScreen() {
       limit: 10,
       sortBy: 'startTime:desc'
     },
-    { skip: !patient?.id },
+    { 
+      skip: !patient?.id,
+      // Force refetch on mount to ensure fresh data
+      refetchOnMountOrArgChange: true,
+    },
   )
 
   // Handle pagination state
@@ -199,8 +203,13 @@ export function ConversationsScreen() {
     if (patient?.id) {
       setPage(1)
       setHasMore(true)
-      dispatch(clearConversations())
+      // Force refetch when patient changes to ensure we get fresh data
+      // Don't clear conversations here - let the API response handle it
+      // This prevents conversations from disappearing during the API call
       refetch()
+    } else {
+      // If no patient, clear conversations
+      dispatch(clearConversations())
     }
   }, [patient?.id, refetch, dispatch])
 
@@ -236,7 +245,8 @@ export function ConversationsScreen() {
     setRefreshing(true)
     setPage(1)
     setHasMore(true)
-    dispatch(clearConversations())
+    // Don't clear conversations on refresh - let the API response update them
+    // This prevents conversations from disappearing during refresh
     await refetch()
     setRefreshing(false)
   }
@@ -250,27 +260,35 @@ export function ConversationsScreen() {
     
     setExpandedConversations(prev => {
       logger.debug('[ConversationsScreen] Toggling conversation:', conversationId, 'Current expanded:', Array.from(prev))
-      const newExpanded = new Set(prev)
-      if (newExpanded.has(conversationId)) {
-        newExpanded.delete(conversationId)
+      
+      // If this conversation is already expanded, collapse it
+      if (prev.has(conversationId)) {
         logger.debug('[ConversationsScreen] Collapsing conversation:', conversationId)
+        const newExpanded = new Set<string>()
+        return newExpanded
       } else {
-        newExpanded.add(conversationId)
+        // Otherwise, expand only this conversation (collapse all others)
         logger.debug('[ConversationsScreen] Expanding conversation:', conversationId)
+        const newExpanded = new Set<string>([conversationId])
+        
         // Set this conversation as the current one in Redux
         // Use conversationsData.results if available, otherwise fall back to Redux conversations
         const allConversations = conversationsData?.results || conversations
-        const conversation = allConversations.find((c: any) => c.id === conversationId)
+        // Try to find by id first, then by callSid as fallback
+        const conversation = allConversations.find((c: any) => 
+          c.id === conversationId || c.callSid === conversationId
+        )
         if (conversation) {
           dispatch(setConversation(conversation))
         }
+        
+        logger.debug('[ConversationsScreen] New expanded set:', Array.from(newExpanded))
+        return newExpanded
       }
-      logger.debug('[ConversationsScreen] New expanded set:', Array.from(newExpanded))
-      return newExpanded
     })
   }, [conversationsData, conversations, dispatch])
 
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
@@ -282,15 +300,15 @@ export function ConversationsScreen() {
     } else {
       return date.toLocaleDateString()
     }
-  }
+  }, [])
 
-  const getConversationPreview = (messages: Message[]) => {
+  const getConversationPreview = useCallback((messages: Message[]) => {
     if (messages.length === 0) return translate("conversationsScreen.noMessages")
     const lastMessage = messages[messages.length - 1]
     return lastMessage.content.length > 50 
       ? lastMessage.content.substring(0, 50) + "..."
       : lastMessage.content
-  }
+  }, [])
 
   if (themeLoading) {
     return null
@@ -309,22 +327,24 @@ export function ConversationsScreen() {
     )
   }
 
-  const renderConversation = ({ item }: { item: Conversation }) => {
-    // Guard against invalid IDs - if ID is missing, conversation cannot be expanded
-    const conversationId = item.id
-    if (!conversationId) {
-      logger.warn('[ConversationsScreen] Conversation missing ID, cannot expand')
-    }
-    const isExpanded = conversationId ? expandedConversations.has(conversationId) : false
+  const renderConversation = ({ item, index }: { item: Conversation; index: number }) => {
+    // Use ID if available, otherwise use callSid or index as fallback
+    const conversationId = item.id || item.callSid || `temp-${index}`
+    const isExpanded = expandedConversations.has(conversationId)
     const messageCount = item.messages?.length || 0
     const lastMessage = item.messages?.[item.messages.length - 1]
     const conversationDate = lastMessage?.createdAt || item.startTime || new Date().toISOString()
 
+    const handlePress = () => {
+      logger.debug('[ConversationsScreen] Card pressed for conversation:', conversationId)
+      toggleConversation(conversationId)
+    }
+
     return (
       <Card 
         style={styles.conversationCard} 
-        testID={`conversation-card-${conversationId || 'unknown'}`}
-        accessibilityLabel={`conversation-card-${conversationId || 'unknown'}`}
+        testID={`conversation-card-${conversationId}`}
+        accessibilityLabel={`conversation-card-${conversationId}`}
         heading={`Conversation ${formatDate(conversationDate)}`}
         content={`${getConversationPreview(item.messages || [])}\n${messageCount} message${messageCount !== 1 ? 's' : ''}`}
         RightComponent={
@@ -347,11 +367,11 @@ export function ConversationsScreen() {
             <ConversationMessages
               messages={item.messages || []}
               style={styles.messagesContainer}
-              data-testid={`messages-container-${conversationId || 'unknown'}`}
+              data-testid={`messages-container-${conversationId}`}
             />
           ) : undefined
         }
-        onPress={() => conversationId && toggleConversation(conversationId)}
+        onPress={handlePress}
       />
     )
   }
@@ -367,7 +387,29 @@ export function ConversationsScreen() {
 
   // Conversations are already sorted by the backend (startTime:desc)
   // Use conversationsData.results if available (from API), otherwise fall back to Redux conversations
-  const conversationsToRender = conversationsData?.results || conversations
+  // Prioritize API data when available, but also show Redux data as fallback
+  // Important: Only use Redux conversations if API hasn't loaded yet (isLoading) or if API data is undefined
+  const conversationsToRender = useMemo(() => {
+    // If API has loaded (!isLoading) and has results, use API results
+    // BUT: If API returns empty array and we have Redux conversations, keep showing Redux until API has real data
+    if (!isLoading && conversationsData?.results !== undefined) {
+      // If API returned empty array but we have conversations in Redux, keep showing Redux
+      // This handles the case where API returns empty due to cache/304 but we have data
+      if (conversationsData.results.length === 0 && conversations && conversations.length > 0) {
+        return conversations
+      }
+      return conversationsData.results
+    }
+    // While loading or if API data is undefined, show Redux conversations as fallback
+    if (conversations && conversations.length > 0) {
+      return conversations
+    }
+    // Default to empty array
+    return []
+  }, [conversationsData?.results, conversations, isLoading])
+
+  // Determine if we should show the list (not loading, no error, or have data to show)
+  const shouldShowList = !isLoading || conversationsToRender.length > 0
 
   return (
     <Screen preset="scroll" testID="conversations-screen">
@@ -381,13 +423,15 @@ export function ConversationsScreen() {
         </View>
       )}
 
-      {/* Loading/Error States */}
-      {isLoading && !refreshing && (
+      {/* Loading State - only show if we have no data */}
+      {isLoading && !refreshing && conversationsToRender.length === 0 && (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={colors.palette.biancaButtonSelected} />
         </View>
       )}
-      {error && (
+      
+      {/* Error State */}
+      {error && conversationsToRender.length === 0 && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
             {activeCall 
@@ -398,11 +442,11 @@ export function ConversationsScreen() {
         </View>
       )}
 
-      {/* Conversations List */}
-      {!isLoading && !error && (
+      {/* Conversations List - show if we have data OR if not loading/error */}
+      {shouldShowList && (
         <FlatList
           data={conversationsToRender}
-          keyExtractor={(item, index) => item.id ? String(item.id) : String(index)}
+          keyExtractor={(item, index) => item.id ? String(item.id) : (item.callSid ? String(item.callSid) : String(index))}
           renderItem={renderConversation}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.listContent}
@@ -417,7 +461,7 @@ export function ConversationsScreen() {
           onEndReached={loadMoreConversations}
           onEndReachedThreshold={0.1}
           ListFooterComponent={
-            hasMore && !isLoading ? (
+            hasMore && isLoading ? (
               <View style={styles.loadMoreContainer}>
                 <ActivityIndicator size="small" color={colors.palette.biancaButtonSelected} />
                 <Text style={styles.loadMoreText}>{translate("conversationsScreen.loadingMoreConversations")}</Text>

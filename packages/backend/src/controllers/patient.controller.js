@@ -229,9 +229,36 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
   const result = await conversationService.queryConversationsByPatient(patientId, options);
   
   // Apply DTO to each conversation in the results
+  // Filter out any conversations that fail DTO transformation (missing IDs, etc.)
+  const transformedResults = [];
+  for (const conversation of result.results) {
+    try {
+      // Verify conversation has an ID before processing
+      if (!conversation._id && !conversation.id) {
+        logger.error('[PatientController] Conversation missing ID before DTO transformation', {
+          conversation_type: conversation.constructor?.name,
+          has__id: conversation._id !== undefined,
+          has_id: conversation.id !== undefined,
+          keys: Object.keys(conversation),
+        });
+        continue; // Skip this conversation
+      }
+      transformedResults.push(ConversationDTO(conversation));
+    } catch (error) {
+      logger.error('[PatientController] Error transforming conversation with DTO', {
+        error: error.message,
+        conversation_id: conversation._id || conversation.id,
+        conversation_type: conversation.constructor?.name,
+      });
+      // Skip this conversation rather than failing the entire request
+      continue;
+    }
+  }
+  
   const transformedResult = {
     ...result,
-    results: result.results.map((conversation) => ConversationDTO(conversation)),
+    results: transformedResults,
+    totalResults: transformedResults.length, // Update count to reflect filtered results
   };
   
   res.status(httpStatus.OK).send(transformedResult);
