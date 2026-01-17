@@ -232,8 +232,25 @@ phases:
           fi
         done
         if [ "$SEED_SUCCESS" = "false" ]; then
-          echo "⚠️  Database seeding failed, but continuing..."
-          docker logs backend-test | tail -50 || true
+          echo "❌ ERROR: Database seeding failed - tests will fail without test users!"
+          echo "Backend logs (last 100 lines):"
+          docker logs backend-test --tail 100 || true
+          echo ""
+          echo "❌ Failing build - database must be seeded for tests to pass"
+          exit 1
+        fi
+        # Verify seeding worked by checking if we can login with test credentials
+        echo "Verifying test users exist by attempting login..."
+        LOGIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/auth/login \
+          -H "Content-Type: application/json" \
+          -d '{"email":"fake@example.org","password":"Password1"}' 2>/dev/null || echo "")
+        LOGIN_HTTP_CODE=$(echo "$LOGIN_RESPONSE" | tail -n1)
+        if [ "$LOGIN_HTTP_CODE" = "200" ]; then
+          echo "✅ Test user login successful - database seeded correctly"
+        else
+          echo "⚠️  Warning: Test user login failed (HTTP $LOGIN_HTTP_CODE)"
+          echo "This may cause test failures, but continuing..."
+          echo "Login response: $(echo "$LOGIN_RESPONSE" | head -n1)"
         fi
       - echo "Starting frontend container..."
       - |
