@@ -7,11 +7,22 @@ const { expect } = require('@playwright/test');
 
 When('I enter invite email {string}', async function(email) {
   // Try multiple selectors for invite email input
-  let emailInput = this.page.getByTestId('invite-email-input').first();
+  // The invite is done through CaregiverScreen, which uses "caregiver-email-input"
+  let emailInput = this.page.getByTestId('caregiver-email-input').first();
   let inputCount = await emailInput.count().catch(() => 0);
   
   if (inputCount === 0) {
+    emailInput = this.page.getByTestId('invite-email-input').first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
+  
+  if (inputCount === 0) {
     emailInput = this.page.locator('[data-testid="invite-email-input"]').first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
+  
+  if (inputCount === 0) {
+    emailInput = this.page.locator('[data-testid="caregiver-email-input"]').first();
     inputCount = await emailInput.count().catch(() => 0);
   }
   
@@ -22,6 +33,13 @@ When('I enter invite email {string}', async function(email) {
   
   if (inputCount === 0) {
     emailInput = this.page.getByLabel(/email/i).first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
+  
+  if (inputCount === 0) {
+    // Wait a bit more for the form to load
+    await this.page.waitForTimeout(2000);
+    emailInput = this.page.getByTestId('caregiver-email-input').first();
     inputCount = await emailInput.count().catch(() => 0);
   }
   
