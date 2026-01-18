@@ -6,7 +6,7 @@ Feature: Complete Patient Management
   Background:
     Given the frontend is running on "http://localhost:8082"
     And the backend is running on "http://localhost:3000"
-    And I am logged in as "caregiver"
+    And I am logged in as "orgAdmin"
 
   Scenario: Create a new patient
     Given a patient exists with name "John Doe"

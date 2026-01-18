@@ -6,8 +6,28 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 
 When('I enter invite email {string}', async function(email) {
-  const emailInput = this.page.getByTestId('invite-email-input')
-    .or(this.page.locator('input[type="email"]').first());
+  // Try multiple selectors for invite email input
+  let emailInput = this.page.getByTestId('invite-email-input').first();
+  let inputCount = await emailInput.count().catch(() => 0);
+  
+  if (inputCount === 0) {
+    emailInput = this.page.locator('[data-testid="invite-email-input"]').first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
+  
+  if (inputCount === 0) {
+    emailInput = this.page.locator('input[type="email"]').first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
+  
+  if (inputCount === 0) {
+    emailInput = this.page.getByLabel(/email/i).first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
+  
+  if (inputCount === 0) {
+    throw new Error('Invite email input not found on page');
+  }
   
   await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   await emailInput.fill(email);
