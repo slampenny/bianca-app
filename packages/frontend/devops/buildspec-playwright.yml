@@ -389,6 +389,47 @@ phases:
         echo "=========================================="
         cd "$FRONTEND_DIR" || exit 1
         
+        # Re-seed database before Cucumber tests to ensure test users exist
+        # (Database might have been cleared or backend container might have restarted)
+        echo "Re-seeding database before Cucumber tests..."
+        sleep 2
+        SEED_SUCCESS=false
+        for attempt in 1 2 3; do
+          echo "Seeding attempt $attempt before Cucumber tests..."
+          SEED_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/test/seed)
+          SEED_HTTP_CODE=$(echo "$SEED_RESPONSE" | tail -n1)
+          if [ "$SEED_HTTP_CODE" = "200" ]; then
+            echo "✅ Database re-seeded successfully before Cucumber tests"
+            SEED_SUCCESS=true
+            break
+          else
+            echo "⚠️  Seeding attempt $attempt failed with HTTP $SEED_HTTP_CODE"
+            if [ $attempt -lt 3 ]; then
+              sleep 5
+            fi
+          fi
+        done
+        if [ "$SEED_SUCCESS" = "false" ]; then
+          echo "❌ ERROR: Database re-seeding failed before Cucumber tests"
+          echo "Backend logs (last 50 lines):"
+          docker logs backend-test --tail 50 || true
+          echo "Continuing anyway - tests may fail..."
+        fi
+        
+        # Verify test users exist by attempting login
+        echo "Verifying test users exist before Cucumber tests..."
+        LOGIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/auth/login \
+          -H "Content-Type: application/json" \
+          -d '{"email":"fake@example.org","password":"Password1"}' 2>/dev/null || echo "")
+        LOGIN_HTTP_CODE=$(echo "$LOGIN_RESPONSE" | tail -n1)
+        if [ "$LOGIN_HTTP_CODE" = "200" ]; then
+          echo "✅ Test user login successful - database ready for Cucumber tests"
+        else
+          echo "⚠️  Warning: Test user login failed (HTTP $LOGIN_HTTP_CODE) before Cucumber tests"
+          echo "Login response: $(echo "$LOGIN_RESPONSE" | head -n1)"
+          echo "This may cause Cucumber test failures"
+        fi
+        
         # Set frontend URL/port to match Docker container (port 8081, not default 8082)
         export FRONTEND_URL="http://localhost:8081"
         export FRONTEND_PORT="8081"

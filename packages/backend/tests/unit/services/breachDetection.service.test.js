@@ -311,7 +311,24 @@ describe('Breach Detection Service', () => {
     it('should not detect during normal hours', async () => {
       const normalHoursTime = new Date();
       normalHoursTime.setHours(14, 30, 0, 0); // 2:30 PM
-      const dateNowSpy = jest.spyOn(Date, 'now').mockReturnValue(normalHoursTime.getTime());
+      const mockTimestamp = normalHoursTime.getTime();
+      
+      // Mock Date using the same pattern as agenda tests
+      const OriginalDate = global.Date;
+      
+      const MockDate = function(...args) {
+        if (args.length === 0) {
+          return new OriginalDate(mockTimestamp);
+        }
+        return new OriginalDate(...args);
+      };
+      
+      MockDate.now = jest.fn(() => mockTimestamp);
+      MockDate.UTC = OriginalDate.UTC.bind(OriginalDate);
+      MockDate.parse = OriginalDate.parse;
+      MockDate.prototype = OriginalDate.prototype;
+      Object.setPrototypeOf(MockDate, OriginalDate);
+      global.Date = MockDate;
 
       await AuditLog.create({
         timestamp: normalHoursTime,
@@ -329,7 +346,9 @@ describe('Breach Detection Service', () => {
 
       const result = await breachDetectionService.detectOffHoursAccess();
       expect(result).toBe(0);
-      dateNowSpy.mockRestore();
+      
+      // Restore Date
+      global.Date = OriginalDate;
     });
   });
 

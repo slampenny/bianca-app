@@ -13,6 +13,24 @@ const { Caregiver, Org } = require('../../../src/models');
 const emailService = require('../../../src/services/email.service');
 const tokenService = require('../../../src/services/token.service');
 const etherealEmailRetriever = require('../../../src/services/etherealEmailRetriever.service');
+
+// Helper to get captured email or fallback to Ethereal
+async function getEmailContent(recipientEmail, timeoutMs = 20000) {
+  // In test mode, try captured emails first (faster and more reliable)
+  if (process.env.NODE_ENV === 'test') {
+    const captured = emailService.getLastCapturedEmail(recipientEmail);
+    if (captured) {
+      return {
+        subject: captured.subject,
+        text: captured.text || '',
+        html: captured.html || '',
+        date: captured.date,
+      };
+    }
+  }
+  // Fallback to Ethereal retrieval if capture didn't work
+  return await etherealEmailRetriever.waitForEmail(recipientEmail, timeoutMs);
+}
 const { insertOrgs } = require('../../fixtures/org.fixture');
 const { insertCaregiversAndAddToOrg } = require('../../fixtures/caregiver.fixture');
 const { caregiverOne } = require('../../fixtures/caregiver.fixture');
@@ -43,8 +61,11 @@ describe('Email Service - Localization', () => {
     await Caregiver.deleteMany();
     await Org.deleteMany();
     
-    // Ensure email service is initialized with Ethereal for testing
-    // This will use Ethereal in test environment
+    // Clear captured emails from previous tests
+    emailService.clearCapturedEmails();
+    
+    // Ensure email service is initialized
+    // In test mode, this will capture emails in memory instead of sending via Ethereal
     await emailService.initializeEmailTransport();
   });
 
@@ -73,9 +94,9 @@ describe('Email Service - Localization', () => {
         'en'
       );
 
-      // Wait a moment for email to arrive in Ethereal, then retrieve it
-      // Use waitForEmail which polls until email arrives
-      const emailContent = await etherealEmailRetriever.waitForEmail(caregiver.email, 20000);
+      // Wait a moment for email to be captured, then retrieve it
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const emailContent = await getEmailContent(caregiver.email, 20000);
       
       // Verify English content
       expect(emailContent).toBeTruthy();
@@ -106,9 +127,9 @@ describe('Email Service - Localization', () => {
         'es'
       );
 
-      // Wait a moment for email to arrive in Ethereal, then retrieve it
-      // Use waitForEmail which polls until email arrives
-      const emailContent = await etherealEmailRetriever.waitForEmail(caregiver.email, 20000);
+      // Wait a moment for email to be captured, then retrieve it
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const emailContent = await getEmailContent(caregiver.email, 20000);
       
       // Verify Spanish content
       expect(emailContent).toBeTruthy();
@@ -139,9 +160,9 @@ describe('Email Service - Localization', () => {
         'fr'
       );
 
-      // Wait a moment for email to arrive in Ethereal, then retrieve it
-      // Use waitForEmail which polls until email arrives
-      const emailContent = await etherealEmailRetriever.waitForEmail(caregiver.email, 20000);
+      // Wait a moment for email to be captured, then retrieve it
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const emailContent = await getEmailContent(caregiver.email, 20000);
       
       // Verify French content
       expect(emailContent).toBeTruthy();
@@ -172,9 +193,9 @@ describe('Email Service - Localization', () => {
         caregiver.preferredLanguage || 'en'
       );
 
-      // Wait a moment for email to arrive in Ethereal, then retrieve it
-      // Use waitForEmail which polls until email arrives
-      const emailContent = await etherealEmailRetriever.waitForEmail(caregiver.email, 20000);
+      // Wait a moment for email to be captured, then retrieve it
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const emailContent = await getEmailContent(caregiver.email, 20000);
       
       // Should be in Spanish (caregiver's preferred language)
       expect(emailContent).toBeTruthy();
@@ -195,10 +216,10 @@ describe('Email Service - Localization', () => {
         'en'
       );
 
-      // Wait a moment for email to arrive in Ethereal
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait a moment for email to be captured
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      const emailContent = await etherealEmailRetriever.retrieveLastEmail(testEmail, 10000);
+      const emailContent = await getEmailContent(testEmail, 10000);
       
       expect(emailContent).toBeTruthy();
       expect(emailContent.subject).toContain('Password Reset Request');
@@ -219,10 +240,10 @@ describe('Email Service - Localization', () => {
         'es'
       );
 
-      // Wait a moment for email to arrive in Ethereal
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait a moment for email to be captured
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      const emailContent = await etherealEmailRetriever.retrieveLastEmail(testEmail, 10000);
+      const emailContent = await getEmailContent(testEmail, 10000);
       
       expect(emailContent).toBeTruthy();
       expect(emailContent.subject).toContain('restablecimiento de contraseña');
@@ -245,10 +266,10 @@ describe('Email Service - Localization', () => {
         'en'
       );
 
-      // Wait a moment for email to arrive in Ethereal
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait a moment for email to be captured
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      const emailContent = await etherealEmailRetriever.retrieveLastEmail(testEmail, 10000);
+      const emailContent = await getEmailContent(testEmail, 10000);
       
       expect(emailContent).toBeTruthy();
       expect(emailContent.subject).toContain('Invitation to Join');
@@ -269,10 +290,10 @@ describe('Email Service - Localization', () => {
         'es'
       );
 
-      // Wait a moment for email to arrive in Ethereal
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait a moment for email to be captured
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      const emailContent = await etherealEmailRetriever.retrieveLastEmail(testEmail, 10000);
+      const emailContent = await getEmailContent(testEmail, 10000);
       
       expect(emailContent).toBeTruthy();
       expect(emailContent.subject).toContain('Invitación para unirse');
