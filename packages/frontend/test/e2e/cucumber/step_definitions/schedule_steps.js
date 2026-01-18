@@ -34,8 +34,8 @@ Given('I am on the schedules screen', async function() {
   if (editButtonCount === 0 && patientCardCount === 0) {
     // No patients found - check if user has permission to create patients
     // If not, try to use existing patients from database or skip
-    const addButton = this.page.getByTestId('add-patient-button').first();
-    const addButtonCount = await addButton.count().catch(() => 0);
+    let addButton = this.page.getByTestId('add-patient-button').first();
+    let addButtonCount = await addButton.count().catch(() => 0);
     const isDisabled = addButtonCount > 0 ? await addButton.getAttribute('disabled').catch(() => null) : null;
     
     // If add button is disabled, user doesn't have permission - skip patient creation
@@ -81,9 +81,9 @@ Given('I am on the schedules screen', async function() {
         }
       }
     
-    // Try multiple ways to find add button
-    let addButton = this.page.getByTestId('add-patient-button').first();
-    let addButtonCount = await addButton.count();
+    // Try multiple ways to find add button (reuse variable from above)
+    addButton = this.page.getByTestId('add-patient-button').first();
+    addButtonCount = await addButton.count();
     
     if (addButtonCount === 0) {
       addButton = this.page.locator('[data-testid="add-patient-button"]').first();
