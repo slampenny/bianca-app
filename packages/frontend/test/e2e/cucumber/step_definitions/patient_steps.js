@@ -1180,7 +1180,23 @@ When('I click on the patient {string}', async function(patientName) {
       const editCount = await editButton.count();
       if (editCount > 0) {
         console.log(`[DEBUG] Found edit button for patient ${this.createdPatientId} on attempt ${attempts + 1}`);
-        await editButton.click();
+        
+        // Scroll into view and wait for visibility
+        try {
+          await editButton.scrollIntoViewIfNeeded();
+          await editButton.waitFor({ state: 'visible', timeout: 5000 });
+        } catch (e) {
+          console.log(`[DEBUG] Button found but not immediately visible, trying force click`);
+        }
+        
+        // Try regular click first, then force click if needed
+        try {
+          await editButton.click({ timeout: 5000 });
+        } catch (e) {
+          console.log(`[DEBUG] Regular click failed, trying force click`);
+          await editButton.click({ force: true });
+        }
+        
         await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 3000 });
         return; // Success!
       }

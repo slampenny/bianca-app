@@ -6,10 +6,33 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 
 When('I enter invite email {string}', async function(email) {
+  // After clicking "Invite Caregiver", we navigate to CaregiverScreen
+  // Wait for navigation to complete and screen to load
+  await this.page.waitForTimeout(2000);
+  
+  // Wait for CaregiverScreen to be visible (check for caregiver screen elements)
+  const caregiverScreen = this.page.locator('[data-testid="caregiver-screen"], [data-testid*="caregiver"]');
+  await caregiverScreen.first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  
+  // Also wait for URL to indicate we're on caregiver screen
+  await this.page.waitForURL(url => url.pathname.includes('/Caregiver') || url.pathname.includes('/caregiver'), { timeout: 10000 }).catch(() => {});
+  
   // Try multiple selectors for invite email input
   // The invite is done through CaregiverScreen, which uses "caregiver-email-input"
   let emailInput = this.page.getByTestId('caregiver-email-input').first();
   let inputCount = await emailInput.count().catch(() => 0);
+  
+  if (inputCount === 0) {
+    // Wait a bit more for React to render
+    await this.page.waitForTimeout(2000);
+    emailInput = this.page.getByTestId('caregiver-email-input').first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
+  
+  if (inputCount === 0) {
+    emailInput = this.page.locator('[data-testid="caregiver-email-input"]').first();
+    inputCount = await emailInput.count().catch(() => 0);
+  }
   
   if (inputCount === 0) {
     emailInput = this.page.getByTestId('invite-email-input').first();
@@ -18,11 +41,6 @@ When('I enter invite email {string}', async function(email) {
   
   if (inputCount === 0) {
     emailInput = this.page.locator('[data-testid="invite-email-input"]').first();
-    inputCount = await emailInput.count().catch(() => 0);
-  }
-  
-  if (inputCount === 0) {
-    emailInput = this.page.locator('[data-testid="caregiver-email-input"]').first();
     inputCount = await emailInput.count().catch(() => 0);
   }
   
@@ -37,13 +55,11 @@ When('I enter invite email {string}', async function(email) {
   }
   
   if (inputCount === 0) {
-    // Wait a bit more for the form to load
-    await this.page.waitForTimeout(2000);
-    emailInput = this.page.getByTestId('caregiver-email-input').first();
-    inputCount = await emailInput.count().catch(() => 0);
-  }
-  
-  if (inputCount === 0) {
+    // Debug: Check what's actually on the page
+    const pageContent = await this.page.content();
+    const hasCaregiverScreen = pageContent.includes('caregiver-screen') || await this.page.getByTestId('caregiver-screen').count() > 0;
+    const allInputs = await this.page.locator('input').count();
+    console.log(`[DEBUG] Invite email input not found. Has caregiver screen: ${hasCaregiverScreen}, Total inputs: ${allInputs}`);
     throw new Error('Invite email input not found on page');
   }
   
