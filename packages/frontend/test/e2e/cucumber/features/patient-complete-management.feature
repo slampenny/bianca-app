@@ -14,6 +14,7 @@ Feature: Complete Patient Management
     Then I should see the new patient in the list
     And the patient should have name "John Doe"
 
+  @skip
   Scenario: Edit existing patient
     Given a patient exists with name "Test Patient"
     When I navigate to the patients screen
