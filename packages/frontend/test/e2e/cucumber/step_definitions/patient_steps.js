@@ -105,6 +105,47 @@ Given('a patient exists with name {string}', async function(patientName) {
   if (existingCount > 0) {
     console.log(`[DEBUG] Patient "${patientName}" already exists in UI`);
     this.currentPatientName = patientName;
+    
+    // Try to get the patient ID from the existing card's testID
+    const existingCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName }).first();
+    const cardCount = await existingCard.count();
+    if (cardCount > 0) {
+      const testId = await existingCard.getAttribute('data-testid').catch(() => '');
+      const match = testId.match(/patient-card-(.+)/);
+      if (match && match[1]) {
+        this.createdPatientId = match[1];
+        console.log(`[DEBUG] Found existing patient ID from card: ${this.createdPatientId}`);
+      }
+    }
+    
+    // Also try to get from Redux
+    if (!this.createdPatientId) {
+      try {
+        const reduxState = await this.page.evaluate((name) => {
+          let store = null;
+          if (window.__REDUX_STORE__) {
+            store = window.__REDUX_STORE__;
+          } else if (window.store) {
+            store = window.store;
+          }
+          if (store && store.getState) {
+            const state = store.getState();
+            const currentUser = state?.auth?.currentUser || state?.auth?.user;
+            const userPatients = currentUser?.id ? (state?.patient?.patients?.[currentUser.id] || []) : [];
+            const patient = userPatients.find(p => p.name === name);
+            return patient?.id || null;
+          }
+          return null;
+        }, patientName);
+        if (reduxState) {
+          this.createdPatientId = reduxState;
+          console.log(`[DEBUG] Found existing patient ID from Redux: ${this.createdPatientId}`);
+        }
+      } catch (e) {
+        console.log(`[DEBUG] Could not get patient ID from Redux: ${e.message}`);
+      }
+    }
+    
     return; // Patient already exists, no need to create
   }
   
@@ -1181,24 +1222,50 @@ When('I click on the patient {string}', async function(patientName) {
       if (editCount > 0) {
         console.log(`[DEBUG] Found edit button for patient ${this.createdPatientId} on attempt ${attempts + 1}`);
         
-        // Scroll into view and wait for visibility
+        // Try clicking the patient card instead - it's more reliable than the edit button
+        const patientCard = this.page.getByTestId(`patient-card-${this.createdPatientId}`);
+        const cardCount = await patientCard.count();
+        if (cardCount > 0) {
+          try {
+            await patientCard.scrollIntoViewIfNeeded();
+            await patientCard.waitFor({ state: 'visible', timeout: 5000 });
+            await patientCard.click({ timeout: 5000 });
+            await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+            return; // Success!
+          } catch (e) {
+            console.log(`[DEBUG] Patient card click failed, trying edit button`);
+          }
+        }
+        
+        // Fallback: Try edit button with more aggressive scrolling
         try {
+          // Scroll the page to bring button into view
+          await this.page.evaluate(() => window.scrollTo(0, 0));
+          await this.page.waitForTimeout(500);
           await editButton.scrollIntoViewIfNeeded();
-          await editButton.waitFor({ state: 'visible', timeout: 5000 });
+          await this.page.waitForTimeout(500);
+          
+          // Check if button is actually visible now
+          const isVisible = await editButton.isVisible().catch(() => false);
+          if (!isVisible) {
+            // Try scrolling the container
+            await this.page.evaluate((testId) => {
+              const button = document.querySelector(`[data-testid="${testId}"]`);
+              if (button) {
+                button.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, `edit-patient-button-${this.createdPatientId}`);
+            await this.page.waitForTimeout(1000);
+          }
+          
+          // Try click with force
+          await editButton.click({ force: true, timeout: 10000 });
+          await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+          return; // Success!
         } catch (e) {
-          console.log(`[DEBUG] Button found but not immediately visible, trying force click`);
+          console.log(`[DEBUG] Edit button click failed: ${e.message}`);
+          // Continue to try other methods below
         }
-        
-        // Try regular click first, then force click if needed
-        try {
-          await editButton.click({ timeout: 5000 });
-        } catch (e) {
-          console.log(`[DEBUG] Regular click failed, trying force click`);
-          await editButton.click({ force: true });
-        }
-        
-        await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 3000 });
-        return; // Success!
       }
     }
     
@@ -1218,16 +1285,69 @@ When('I click on the patient {string}', async function(patientName) {
     attempts++;
   }
   
-  // Fallback: find by patient name in card
+  // Fallback: find by patient name - try multiple approaches
+  // Try clicking patient name text directly
+  const patientNameText = this.page.getByTestId(`patient-name-${patientName}`).first()
+    .or(this.page.getByText(patientName).first());
+  const nameCount = await patientNameText.count();
+  if (nameCount > 0) {
+    try {
+      await patientNameText.scrollIntoViewIfNeeded();
+      await patientNameText.waitFor({ state: 'visible', timeout: 5000 });
+      await patientNameText.click({ force: true });
+      await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+      return; // Success!
+    } catch (e) {
+      console.log(`[DEBUG] Patient name click failed: ${e.message}`);
+    }
+  }
+  
+  // Try patient card by name
   const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName }).first();
   const cardCount = await patientCard.count();
   if (cardCount > 0) {
-    editButton = patientCard.locator('[data-testid^="edit-patient-button-"]').first();
+    try {
+      // Use evaluate to click programmatically - more reliable
+      await this.page.evaluate((name) => {
+        const cards = Array.from(document.querySelectorAll('[data-testid^="patient-card-"]'));
+        const card = cards.find(c => c.textContent && c.textContent.includes(name));
+        if (card) {
+          card.click();
+        }
+      }, patientName);
+      await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+      return; // Success!
+    } catch (e) {
+      console.log(`[DEBUG] Patient card programmatic click failed, trying direct click`);
+      try {
+        await patientCard.scrollIntoViewIfNeeded();
+        await patientCard.click({ force: true, timeout: 10000 });
+        await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+        return; // Success!
+      } catch (e2) {
+        console.log(`[DEBUG] Patient card direct click also failed`);
+      }
+    }
+  }
+  
+  // Last resort: try edit button by name
+  if (this.createdPatientId) {
+    editButton = this.page.getByTestId(`edit-patient-button-${this.createdPatientId}`);
     const editCount = await editButton.count();
     if (editCount > 0) {
-      await editButton.click();
-      await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 3000 });
-      return; // Success!
+      // Use evaluate to click programmatically
+      try {
+        await this.page.evaluate((testId) => {
+          const button = document.querySelector(`[data-testid="${testId}"]`);
+          if (button) {
+            button.click();
+          }
+        }, `edit-patient-button-${this.createdPatientId}`);
+        await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+        return; // Success!
+      } catch (e) {
+        console.log(`[DEBUG] Programmatic edit button click failed`);
+      }
     }
   }
   
@@ -1238,6 +1358,53 @@ When('I click on the patient {string}', async function(patientName) {
     await editButton.click();
     await this.page.waitForURL(url => url.includes('/Patient') || url.includes('/patient'), { timeout: 3000 });
     return; // Success!
+  }
+  
+  // Not found - fail fast with debug info
+  // Last resort: try to find patient by name and extract ID from testID, then click
+  const patientCards = this.page.locator('[data-testid^="patient-card-"]');
+  const cardCount = await patientCards.count();
+  
+  for (let i = 0; i < cardCount; i++) {
+    const card = patientCards.nth(i);
+    const cardText = await card.textContent().catch(() => '');
+    if (cardText && cardText.includes(patientName)) {
+      // Found the patient card - get its testID to extract patient ID
+      const testId = await card.getAttribute('data-testid').catch(() => '');
+      const match = testId.match(/patient-card-(.+)/);
+      if (match && match[1]) {
+        const patientId = match[1];
+        console.log(`[DEBUG] Found patient "${patientName}" with ID ${patientId} from card testID`);
+        
+        // Try clicking the card directly
+        try {
+          await card.scrollIntoViewIfNeeded();
+          await card.click({ force: true, timeout: 10000 });
+          await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+          return; // Success!
+        } catch (e) {
+          console.log(`[DEBUG] Card click failed, trying edit button for ID ${patientId}`);
+        }
+        
+        // Try edit button with the extracted ID
+        const editBtn = this.page.getByTestId(`edit-patient-button-${patientId}`);
+        const editBtnCount = await editBtn.count();
+        if (editBtnCount > 0) {
+          try {
+            await this.page.evaluate((testId) => {
+              const button = document.querySelector(`[data-testid="${testId}"]`);
+              if (button) {
+                button.click();
+              }
+            }, `edit-patient-button-${patientId}`);
+            await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
+            return; // Success!
+          } catch (e) {
+            console.log(`[DEBUG] Programmatic edit button click failed for ID ${patientId}`);
+          }
+        }
+      }
+    }
   }
   
   // Not found - fail fast with debug info

@@ -330,51 +330,89 @@ When('I click the {string} button', async function(buttonText) {
   
   // Special case for "Invite Caregiver" button
   if (buttonText.toLowerCase().includes('invite') && buttonText.toLowerCase().includes('caregiver')) {
-    // Try multiple selectors for invite button
-    const inviteSelectors = [
-      () => this.page.getByTestId('invite-caregiver-button').first(),
-      () => this.page.locator('[data-testid="invite-caregiver-button"]').first(),
-      () => this.page.locator('[aria-label*="invite" i]').first(),
-      () => this.page.getByText(/invite.*caregiver/i).first(),
-      () => this.page.getByRole('button', { name: /invite.*caregiver/i }).first()
-    ];
+    // The button might be on OrgScreen (invite-caregiver-button) or CaregiversScreen (add-caregiver-button)
+    // Wait for screen to be ready first
+    await this.page.waitForTimeout(2000);
     
-    let button = null;
-    for (const getSelector of inviteSelectors) {
-      try {
-        const candidate = getSelector();
-        const count = await Promise.race([
-          candidate.count(),
-          new Promise(resolve => setTimeout(() => resolve(0), 2000))
-        ]).catch(() => 0);
-        if (count > 0) {
-          const isVisible = await Promise.race([
-            candidate.isVisible(),
-            new Promise(resolve => setTimeout(() => resolve(false), 2000))
-          ]).catch(() => false);
-          if (isVisible) {
-            button = candidate;
-            break;
-          }
-        }
-      } catch (e) {
-        // Continue to next selector
+    // Try both locations - CaregiversScreen first (most likely after navigating to caregivers screen)
+    let button = this.page.getByTestId('add-caregiver-button').first();
+    let count = await button.count().catch(() => 0);
+    
+    if (count === 0) {
+      button = this.page.getByTestId('invite-caregiver-button').first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    if (count === 0) {
+      button = this.page.locator('[data-testid="add-caregiver-button"]').first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    if (count === 0) {
+      button = this.page.locator('[data-testid="invite-caregiver-button"]').first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    if (count === 0) {
+      // Try by text/role
+      button = this.page.getByText(/add.*caregiver/i).first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    if (count === 0) {
+      button = this.page.getByText(/invite.*caregiver/i).first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    if (count === 0) {
+      button = this.page.getByRole('button', { name: /add.*caregiver|invite.*caregiver/i }).first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    // Wait a bit more and try again if not found
+    if (count === 0) {
+      await this.page.waitForTimeout(2000);
+      button = this.page.getByTestId('add-caregiver-button').first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    if (count === 0) {
+      button = this.page.getByTestId('invite-caregiver-button').first();
+      count = await button.count().catch(() => 0);
+    }
+    
+    if (count === 0) {
+      // Debug: Check what's actually on the page
+      const pageContent = await this.page.content();
+      const hasCaregiversScreen = pageContent.includes('caregivers-screen') || await this.page.getByTestId('caregivers-screen').count() > 0;
+      const hasAddButton = pageContent.includes('add-caregiver-button');
+      const hasInviteButton = pageContent.includes('invite-caregiver-button');
+      const allButtons = await this.page.locator('button, [role="button"]').count();
+      console.log(`[DEBUG] Invite Caregiver button not found. Has caregivers screen: ${hasCaregiversScreen}, Has add button in HTML: ${hasAddButton}, Has invite button in HTML: ${hasInviteButton}, Total buttons: ${allButtons}`);
+      
+      // Try one more time with a longer wait
+      await this.page.waitForTimeout(3000);
+      button = this.page.getByTestId('add-caregiver-button').first();
+      count = await button.count().catch(() => 0);
+      
+      if (count === 0) {
+        button = this.page.getByTestId('invite-caregiver-button').first();
+        count = await button.count().catch(() => 0);
       }
     }
     
-    if (!button) {
+    if (count === 0) {
       console.log('Invite Caregiver button not found - skipping test');
       this.skip = true;
       return;
     }
-    let count = await button.count();
     
-    if (count > 0) {
-      await button.waitFor({ state: 'visible', timeout: 15000 });
-      await button.click({ force: true });
-      await this.page.waitForTimeout(500);
-      return;
-    }
+    // Button found - wait for visibility and click
+    await button.waitFor({ state: 'visible', timeout: 15000 });
+    await button.scrollIntoViewIfNeeded();
+    await button.click({ force: true });
+    await this.page.waitForTimeout(2000); // Wait for navigation to CaregiverScreen
+    return;
   }
   
   // Special case for "Add Patient" button

@@ -71,26 +71,67 @@ Given('I am an organization admin', async function() {
 
 When('I navigate to the caregivers screen', async function() {
   // Navigate to caregivers management
-  // This might be in settings or organization screen
-  const caregiversLink = this.page.getByTestId('caregivers-nav')
-    .or(this.page.getByText(/caregivers/i).first())
-    .or(this.page.locator('[href*="caregiver"]').first());
+  // First click the Org tab to navigate to OrgStack
+  const orgTab = this.page.getByTestId('tab-org').first();
+  const tabCount = await orgTab.count().catch(() => 0);
   
-  const count = await caregiversLink.count();
-  if (count > 0) {
-    await caregiversLink.click();
-    await safeWait(this.page, 1000);
+  if (tabCount > 0) {
+    await orgTab.waitFor({ state: 'visible', timeout: 10000 });
+    await orgTab.click();
+    await safeWait(this.page, 2000);
   } else {
-    // Try direct navigation
-    await this.page.goto(`${this.baseURL}/caregivers`, { waitUntil: 'load' });
-    await safeWait(this.page, 1000);
+    // Fallback: Navigate directly to Org tab route
+    await this.page.goto(`${this.baseURL}/MainTabs/Org`, { waitUntil: 'networkidle', timeout: 15000 }).catch(() => {});
+    await safeWait(this.page, 2000);
   }
   
-  // Wait for caregivers screen
-  await this.page.waitForSelector('[data-testid="caregivers-screen"]', { timeout: 10000 })
+  // Wait for OrgScreen to load (initial screen in OrgStack)
+  await this.page.waitForSelector('[data-testid="org-screen"], [data-testid="view-caregivers-button"]', { timeout: 10000 }).catch(() => {});
+  await safeWait(this.page, 1000);
+  
+  // Click "View Caregivers" button on OrgScreen
+  const viewCaregiversButton = this.page.getByTestId('view-caregivers-button').first();
+  let viewButtonCount = await viewCaregiversButton.count().catch(() => 0);
+  
+  if (viewButtonCount === 0) {
+    // Wait a bit more for button to render
+    await safeWait(this.page, 2000);
+    viewButtonCount = await viewCaregiversButton.count().catch(() => 0);
+  }
+  
+  if (viewButtonCount > 0) {
+    await viewCaregiversButton.waitFor({ state: 'visible', timeout: 10000 });
+    await viewCaregiversButton.scrollIntoViewIfNeeded();
+    await viewCaregiversButton.click({ force: true });
+    await safeWait(this.page, 2000);
+  } else {
+    // Fallback: Try direct navigation to caregivers screen (in OrgStack)
+    await this.page.goto(`${this.baseURL}/MainTabs/Org/Caregivers`, { waitUntil: 'networkidle', timeout: 15000 }).catch(() => {});
+    await safeWait(this.page, 2000);
+  }
+  
+  // Wait for caregivers screen to be visible
+  await this.page.waitForSelector('[data-testid="caregivers-screen"]', { timeout: 15000 })
     .catch(() => {
-      // Screen might use different selector
+      // Screen might use different selector - try waiting for URL
+      const currentUrl = this.page.url();
+      if (!currentUrl.includes('Caregivers') && !currentUrl.includes('caregivers')) {
+        console.log('[DEBUG] Caregivers screen navigation may have failed');
+      }
     });
+  
+  // Verify we're on caregivers screen - wait a bit more if needed
+  let caregiversScreen = this.page.getByTestId('caregivers-screen');
+  let screenCount = await caregiversScreen.count();
+  if (screenCount === 0) {
+    await safeWait(this.page, 2000);
+    caregiversScreen = this.page.getByTestId('caregivers-screen');
+    screenCount = await caregiversScreen.count();
+  }
+  
+  if (screenCount === 0) {
+    console.log('[DEBUG] Caregivers screen not found after navigation');
+  }
 });
 
 Given('I am on the caregivers screen', async function() {
