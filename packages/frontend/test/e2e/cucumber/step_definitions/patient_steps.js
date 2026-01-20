@@ -1355,8 +1355,8 @@ When('I click on the patient {string}', async function(patientName) {
   const allPatientCards = this.page.locator('[data-testid^="patient-card-"]');
   const totalCardCount = await allPatientCards.count();
   
-  for (let i = 0; i < cardCount; i++) {
-    const card = patientCards.nth(i);
+  for (let i = 0; i < totalCardCount; i++) {
+    const card = allPatientCards.nth(i);
     const cardText = await card.textContent().catch(() => '');
     if (cardText && cardText.includes(patientName)) {
       // Found the patient card - get its testID to extract patient ID
