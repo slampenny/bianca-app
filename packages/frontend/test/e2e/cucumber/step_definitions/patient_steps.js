@@ -1304,8 +1304,8 @@ When('I click on the patient {string}', async function(patientName) {
   
   // Try patient card by name
   const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName }).first();
-  const cardCount = await patientCard.count();
-  if (cardCount > 0) {
+  const patientCardCount = await patientCard.count();
+  if (patientCardCount > 0) {
     try {
       // Use evaluate to click programmatically - more reliable
       await this.page.evaluate((name) => {
@@ -1330,11 +1330,11 @@ When('I click on the patient {string}', async function(patientName) {
     }
   }
   
-  // Last resort: try edit button by name
+  // Last resort: try edit button by ID if we have it
   if (this.createdPatientId) {
     editButton = this.page.getByTestId(`edit-patient-button-${this.createdPatientId}`);
-    const editCount = await editButton.count();
-    if (editCount > 0) {
+    const editCountById = await editButton.count();
+    if (editCountById > 0) {
       // Use evaluate to click programmatically
       try {
         await this.page.evaluate((testId) => {
@@ -1351,19 +1351,9 @@ When('I click on the patient {string}', async function(patientName) {
     }
   }
   
-  // Last resort: try by name (might match multiple)
-  editButton = this.page.getByTestId(`edit-patient-button-${patientName}`).first();
-  const editCount = await editButton.count();
-  if (editCount > 0) {
-    await editButton.click();
-    await this.page.waitForURL(url => url.includes('/Patient') || url.includes('/patient'), { timeout: 3000 });
-    return; // Success!
-  }
-  
-  // Not found - fail fast with debug info
   // Last resort: try to find patient by name and extract ID from testID, then click
-  const patientCards = this.page.locator('[data-testid^="patient-card-"]');
-  const cardCount = await patientCards.count();
+  const allPatientCards = this.page.locator('[data-testid^="patient-card-"]');
+  const totalCardCount = await allPatientCards.count();
   
   for (let i = 0; i < cardCount; i++) {
     const card = patientCards.nth(i);
