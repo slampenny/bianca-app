@@ -1213,6 +1213,8 @@ When('I click on the patient {string}', async function(patientName) {
   let editButton = null;
   let attempts = 0;
   const maxAttempts = 5; // Reduced from 15 to avoid long timeouts
+  
+  while (attempts < maxAttempts) {
     // First try by patient ID (most reliable - unique)
     if (this.createdPatientId) {
       editButton = this.page.getByTestId(`edit-patient-button-${this.createdPatientId}`);
