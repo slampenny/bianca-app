@@ -1212,9 +1212,7 @@ When('I click on the patient {string}', async function(patientName) {
   // Retry loop to wait for patient to appear in UI
   let editButton = null;
   let attempts = 0;
-  const maxAttempts = 15;
-  
-  while (attempts < maxAttempts) {
+  const maxAttempts = 5; // Reduced from 15 to avoid long timeouts
     // First try by patient ID (most reliable - unique)
     if (this.createdPatientId) {
       editButton = this.page.getByTestId(`edit-patient-button-${this.createdPatientId}`);
