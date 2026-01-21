@@ -28,7 +28,10 @@ phases:
           echo "Testing $description: $url"
           
           while [ $attempt -le $max_retries ]; do
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 --connect-timeout 10 "$url" 2>/dev/null || echo "000")
+            # Capture both HTTP code and response body for debugging
+            RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 30 --connect-timeout 10 "$url" 2>&1 || echo -e "\n000")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            RESPONSE_BODY=$(echo "$RESPONSE" | head -n -1)
             
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
               echo "✅ $description is accessible (HTTP $HTTP_CODE, attempt $attempt)"
@@ -36,10 +39,17 @@ phases:
             elif [ "$HTTP_CODE" = "503" ]; then
               echo "❌ $description returned 503 Service Unavailable (attempt $attempt/$max_retries)"
               echo "   This indicates the ALB has no healthy targets, maintenance mode is enabled, or the service is down"
+              echo "   Response: ${RESPONSE_BODY:0:200}"
             elif [ "$HTTP_CODE" = "000" ]; then
               echo "⚠️  $description connection failed (attempt $attempt/$max_retries) - may still be deploying"
+              echo "   Error: ${RESPONSE_BODY:0:200}"
+            elif [ "$HTTP_CODE" = "502" ] || [ "$HTTP_CODE" = "504" ]; then
+              echo "⚠️  $description returned HTTP $HTTP_CODE Bad Gateway (attempt $attempt/$max_retries)"
+              echo "   This may indicate the backend is still starting up or ALB can't reach targets"
+              echo "   Response: ${RESPONSE_BODY:0:200}"
             else
               echo "⚠️  $description returned HTTP $HTTP_CODE (attempt $attempt/$max_retries)"
+              echo "   Response: ${RESPONSE_BODY:0:200}"
             fi
             
             if [ $attempt -lt $max_retries ]; then
