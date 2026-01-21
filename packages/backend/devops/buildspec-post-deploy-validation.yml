@@ -17,6 +17,11 @@ phases:
   build:
     commands:
       - |
+        # Wait for ALB to register the instance and pass health checks
+        # Containers may be running but ALB needs time to register and health check
+        echo "Waiting 60 seconds for ALB to register instance and pass health checks..."
+        sleep 60
+        
         # Function to test URL with retries
         test_url() {
           local url=$1
