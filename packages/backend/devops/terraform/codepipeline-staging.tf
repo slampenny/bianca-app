@@ -221,7 +221,8 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
         Resource = [
           aws_codebuild_project.staging_build.arn,
           aws_codebuild_project.staging_smoke_tests.arn,
-          aws_codebuild_project.staging_tests.arn
+          aws_codebuild_project.staging_tests.arn,
+          aws_codebuild_project.staging_post_deploy_validation.arn
         ]
       },
       {
