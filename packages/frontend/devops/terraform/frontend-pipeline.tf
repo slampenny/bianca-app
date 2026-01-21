@@ -225,6 +225,103 @@ resource "aws_codebuild_project" "frontend_project" {
   tags = { Name = "bianca-frontend-build" }
 }
 
+# --- CodeBuild project for Frontend Tests (Demo) ---
+resource "aws_codebuild_project" "frontend_tests" {
+  name         = "bianca-frontend-tests"
+  description  = "Runs unit tests (backend and frontend) and Cucumber E2E tests for frontend/demo pipeline"
+  service_role = data.terraform_remote_state.backend.outputs.codebuild_role_arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_MEDIUM"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = "us-east-2"
+    }
+    # CRITICAL: Set NODE_ENV=test for test stage
+    environment_variable {
+      name  = "NODE_ENV"
+      value = "test"
+    }
+    environment_variable {
+      name  = "MONGODB_URL"
+      value = "mongodb://localhost:27017/bianca-app-test"
+    }
+    environment_variable {
+      name  = "API_BASE_URL"
+      value = "http://localhost:3000/v1"
+    }
+    environment_variable {
+      name  = "AWS_SECRET_ID"
+      value = "MySecretsManagerSecret"
+    }
+    environment_variable {
+      name  = "AWS_REGION"
+      value = "us-east-2"
+    }
+    environment_variable {
+      name  = "ECR_REGISTRY"
+      value = "730335291008.dkr.ecr.us-east-2.amazonaws.com"
+    }
+    # Inject secrets from Secrets Manager
+    environment_variable {
+      name  = "JWT_SECRET"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:JWT_SECRET::"
+    }
+    environment_variable {
+      name  = "STRIPE_SECRET_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:STRIPE_SECRET_KEY::"
+    }
+    environment_variable {
+      name  = "STRIPE_PUBLISHABLE_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:STRIPE_PUBLISHABLE_KEY::"
+    }
+    environment_variable {
+      name  = "OPENAI_API_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:OPENAI_API_KEY::"
+    }
+    environment_variable {
+      name  = "MFA_ENCRYPTION_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:MFA_ENCRYPTION_KEY::"
+    }
+    environment_variable {
+      name  = "TWILIO_AUTHTOKEN"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:TWILIO_AUTHTOKEN::"
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/frontend/devops/buildspec-playwright.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-frontend-tests"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-frontend-tests"
+    Environment = "demo"
+  }
+}
+
 # --- CodePipeline for Frontend ---
 variable "frontend_github_owner" {
   description = "GitHub owner for the frontend repo"
@@ -299,6 +396,24 @@ resource "aws_codepipeline" "frontend_pipeline" {
       output_artifacts = ["BuildOutputFrontend"]
       configuration = {
         ProjectName = aws_codebuild_project.frontend_project.name
+      }
+      run_order = 1
+    }
+  }
+
+  stage {
+    name = "RunTests"
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutputFrontend"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.frontend_tests.name
+        PrimarySource = "SourceOutput"
       }
       run_order = 1
     }

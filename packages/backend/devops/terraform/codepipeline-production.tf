@@ -60,6 +60,111 @@ resource "aws_codebuild_project" "production_build" {
 }
 
 ################################################################################
+# CODEBUILD PROJECT FOR TESTS (PRODUCTION)
+################################################################################
+# NOTE: This project runs with NODE_ENV=test to ensure tests use test configuration
+# (e.g., Ethereal Mail instead of SES, test database, etc.)
+# This is DIFFERENT from the production deploy which uses NODE_ENV=production
+
+resource "aws_codebuild_project" "production_tests" {
+  name         = "bianca-production-tests"
+  description  = "Runs unit tests (backend and frontend) and Cucumber E2E tests for production pipeline"
+  service_role = aws_iam_role.codebuild_production_role.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_MEDIUM"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = true
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    # CRITICAL: Set NODE_ENV=test for test stage (NOT production!)
+    # This ensures tests use test configuration (Ethereal Mail, test DB, etc.)
+    environment_variable {
+      name  = "NODE_ENV"
+      value = "test"
+    }
+    environment_variable {
+      name  = "MONGODB_URL"
+      value = "mongodb://localhost:27017/bianca-app-test"
+    }
+    environment_variable {
+      name  = "API_BASE_URL"
+      value = "http://localhost:3000/v1"
+    }
+    # Production secrets - inject directly from AWS Secrets Manager
+    environment_variable {
+      name  = "AWS_SECRET_ID"
+      value = "MySecretsManagerSecret"
+    }
+    environment_variable {
+      name  = "AWS_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "ECR_REGISTRY"
+      value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+    }
+    # Inject secrets from Secrets Manager (CodeBuild handles permissions automatically)
+    environment_variable {
+      name  = "JWT_SECRET"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:JWT_SECRET::"
+    }
+    environment_variable {
+      name  = "STRIPE_SECRET_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:STRIPE_SECRET_KEY::"
+    }
+    environment_variable {
+      name  = "STRIPE_PUBLISHABLE_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:STRIPE_PUBLISHABLE_KEY::"
+    }
+    environment_variable {
+      name  = "OPENAI_API_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:OPENAI_API_KEY::"
+    }
+    environment_variable {
+      name  = "MFA_ENCRYPTION_KEY"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:MFA_ENCRYPTION_KEY::"
+    }
+    environment_variable {
+      name  = "TWILIO_AUTHTOKEN"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret:TWILIO_AUTHTOKEN::"
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/frontend/devops/buildspec-playwright.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-production-tests"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-production-tests"
+    Environment = "production"
+  }
+}
+
+################################################################################
 # CODEBUILD PROJECT FOR POST-DEPLOYMENT VALIDATION (PRODUCTION)
 ################################################################################
 # Validates that the deployed site is actually accessible via public URLs
@@ -260,6 +365,7 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
         ]
         Resource = [
           aws_codebuild_project.production_build.arn,
+          aws_codebuild_project.production_tests.arn,
           aws_codebuild_project.production_post_deploy_validation.arn
         ]
       },
@@ -311,9 +417,8 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
   })
 }
 
-# NOTE: Production pipeline does NOT run tests
-# Tests are only run in staging via the RunTests stage
-# This ensures production deployments are not blocked by test failures
+# NOTE: Production pipeline runs tests BEFORE deployment
+# Tests must pass before deployment proceeds to prevent deploying broken code
 
 ################################################################################
 # CODEPIPELINE FOR PRODUCTION
@@ -360,6 +465,24 @@ resource "aws_codepipeline" "production" {
         ProjectName   = aws_codebuild_project.production_build.name
         PrimarySource = "SourceOutput"
       }
+    }
+  }
+
+  stage {
+    name = "RunTests"
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.production_tests.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
     }
   }
 
