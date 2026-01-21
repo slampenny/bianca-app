@@ -1213,13 +1213,29 @@ When('I click on the patient {string}', async function(patientName) {
     // Wait for home screen elements to appear
     await this.page.waitForSelector('[data-testid="home-header"], [data-testid="patient-list"], [data-testid="add-patient-button"]', { timeout: 10000 }).catch(() => {});
     await safeWait(this.page, 2000);
+    
+    // Also wait for patients API to reload the list
+    try {
+      await this.page.waitForResponse(response => 
+        response.url().includes('/v1/patients') && response.status() === 200,
+        { timeout: 15000 }
+      );
+      await safeWait(this.page, 2000);
+    } catch (e) {
+      console.log('[DEBUG] Patients API response not detected after navigating from schedules, continuing...');
+    }
   }
   
   // Wait briefly for patient list to render
-  await this.page.getByTestId('patient-list').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  await this.page.getByTestId('patient-list').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   
   // Wait for React to re-render after Redux updates - give it more time
+  // Especially important after navigating from schedules screen
   await safeWait(this.page, 3000);
+  
+  // Verify we can see patient cards
+  const patientCardsVisible = await this.page.locator('[data-testid^="patient-card-"]').count();
+  console.log(`[DEBUG] Found ${patientCardsVisible} patient cards after navigation`);
   
   // Retry loop to wait for patient to appear in UI
   let editButton = null;
@@ -1249,33 +1265,34 @@ When('I click on the patient {string}', async function(patientName) {
           }
         }
         
-        // Fallback: Try edit button with more aggressive scrolling
+        // Fallback: Try edit button - use programmatic click to avoid scrolling issues
         try {
-          // Scroll the page to bring button into view
-          await this.page.evaluate(() => window.scrollTo(0, 0));
-          await this.page.waitForTimeout(500);
-          await editButton.scrollIntoViewIfNeeded();
-          await this.page.waitForTimeout(500);
+          // Use programmatic click directly - more reliable than scrolling
+          const clicked = await this.page.evaluate((testId) => {
+            const button = document.querySelector(`[data-testid="${testId}"]`);
+            if (button) {
+              button.click();
+              return true;
+            }
+            return false;
+          }, `edit-patient-button-${this.createdPatientId}`);
           
-          // Check if button is actually visible now
-          const isVisible = await editButton.isVisible().catch(() => false);
-          if (!isVisible) {
-            // Try scrolling the container
-            await this.page.evaluate((testId) => {
-              const button = document.querySelector(`[data-testid="${testId}"]`);
-              if (button) {
-                button.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-            }, `edit-patient-button-${this.createdPatientId}`);
+          if (clicked) {
+            // Wait for navigation
             await this.page.waitForTimeout(1000);
+            const currentUrl = this.page.url();
+            if (currentUrl.includes('/Patient') || currentUrl.includes('/patient')) {
+              return; // Success!
+            }
+            // Also check for patient form
+            const nameInput = this.page.getByTestId('patient-name-input');
+            const inputCount = await nameInput.count().catch(() => 0);
+            if (inputCount > 0) {
+              return; // Success - we're on patient screen
+            }
           }
-          
-          // Try click with force
-          await editButton.click({ force: true, timeout: 10000 });
-          await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
-          return; // Success!
         } catch (e) {
-          console.log(`[DEBUG] Edit button click failed: ${e.message}`);
+          console.log(`[DEBUG] Programmatic edit button click failed: ${e.message}`);
           // Continue to try other methods below
         }
       }
