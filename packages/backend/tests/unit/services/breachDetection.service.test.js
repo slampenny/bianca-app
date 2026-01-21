@@ -276,35 +276,51 @@ describe('Breach Detection Service', () => {
 
   describe('detectOffHoursAccess', () => {
     it('should detect off-hours PHI access', async () => {
-      // Note: This detection only runs during actual off-hours (10 PM - 6 AM)
-      // Create an audit log with recent timestamp
-      const recentTime = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes ago
+      // Mock Date to ensure consistent test behavior - set to off-hours (2 AM)
+      const OriginalDate = global.Date;
+      const offHoursTime = new Date();
+      offHoursTime.setHours(2, 0, 0, 0); // 2 AM - definitely off-hours
+      const mockTimestamp = offHoursTime.getTime();
       
-      await AuditLog.create({
-        timestamp: recentTime,
-        userId: testCaregiver._id,
-        userRole: 'staff',
-        action: 'READ',
-        resource: 'patient',
-        resourceId: 'patient-123',
-        outcome: 'SUCCESS',
-        ipAddress: '192.168.1.100',
-        complianceFlags: {
-          phiAccessed: true
+      const MockDate = function(...args) {
+        if (args.length === 0) {
+          return new OriginalDate(mockTimestamp);
         }
-      });
-
-      const result = await breachDetectionService.detectOffHoursAccess();
-
-      // Result depends on current time - if it's off-hours, it should detect
-      // Otherwise it returns 0 (detection only runs during off-hours as a cron job)
-      const currentHour = new Date().getHours();
-      const isOffHours = currentHour >= 22 || currentHour < 7;
+        return new OriginalDate(...args);
+      };
       
-      if (isOffHours) {
+      MockDate.now = jest.fn(() => mockTimestamp);
+      MockDate.UTC = OriginalDate.UTC.bind(OriginalDate);
+      MockDate.parse = OriginalDate.parse;
+      MockDate.prototype = OriginalDate.prototype;
+      Object.setPrototypeOf(MockDate, OriginalDate);
+      global.Date = MockDate;
+      
+      try {
+        // Create an audit log with recent timestamp (within last 10 minutes)
+        const recentTime = new Date(mockTimestamp - 2 * 60 * 1000); // 2 minutes ago
+        
+        await AuditLog.create({
+          timestamp: recentTime,
+          userId: testCaregiver._id,
+          userRole: 'staff',
+          action: 'READ',
+          resource: 'patient',
+          resourceId: 'patient-123',
+          outcome: 'SUCCESS',
+          ipAddress: '192.168.1.100',
+          complianceFlags: {
+            phiAccessed: true
+          }
+        });
+
+        const result = await breachDetectionService.detectOffHoursAccess();
+
+        // Since we're mocking off-hours time, it should detect
         expect(result).toBeGreaterThan(0);
-      } else {
-        expect(result).toBe(0);
+      } finally {
+        // Restore original Date
+        global.Date = OriginalDate;
       }
     });
 
