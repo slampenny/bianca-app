@@ -77,45 +77,91 @@ fi
 
 echo "   Checking container health..."
 
+# Determine which docker compose command to use
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD="docker-compose"
+else
+  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  exit 1
+fi
+
 # Wait a bit for containers to fully start
 sleep 20
 
-# Check if all required containers are running
-echo "   Checking container status..."
-CONTAINER_STATUS=$(docker ps --filter "name=${CONTAINER_PREFIX}_" --format "{{.Names}}\t{{.Status}}" || true)
-echo "$CONTAINER_STATUS"
+# Check container status with retries - if containers aren't running, try to start them
+echo "   Verifying containers are running (with retries if needed)..."
+MAX_RETRIES=10
+RETRY_DELAY=5
+RETRY_COUNT=0
+ALL_CONTAINERS_RUNNING=false
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  # Check if containers are running
+  NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
+  FRONTEND_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_frontend" --format "{{.Names}}" | wc -l)
+  APP_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
+  
+  echo "   Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Nginx=$NGINX_RUNNING, Frontend=$FRONTEND_RUNNING, App=$APP_RUNNING"
+  
+  if [ "$NGINX_RUNNING" -gt 0 ] && [ "$FRONTEND_RUNNING" -gt 0 ] && [ "$APP_RUNNING" -gt 0 ]; then
+    ALL_CONTAINERS_RUNNING=true
+    echo "   ✅ All required containers are running"
+    break
+  fi
+  
+  # If containers aren't running, try to start them
+  if [ "$NGINX_RUNNING" -eq 0 ] || [ "$FRONTEND_RUNNING" -eq 0 ] || [ "$APP_RUNNING" -eq 0 ]; then
+    echo "   ⚠️  Some containers not running, attempting to start..."
+    
+    # Try to start containers
+    if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
+      docker compose up -d --remove-orphans 2>&1 | head -20 || true
+    else
+      docker-compose up -d --remove-orphans 2>&1 | head -20 || true
+    fi
+    
+    sleep $RETRY_DELAY
+  fi
+  
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+done
 
 # Track validation failures
 VALIDATION_FAILED=false
 
-# Check if backend container is running
-BACKEND_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
-if [ "$BACKEND_RUNNING" -eq 0 ]; then
-  echo "❌ Backend container is not running" >&2
-  echo "   Checking for container errors..." >&2
-  docker ps -a --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}\t{{.Status}}\t{{.Image}}" || true
-  docker logs ${CONTAINER_PREFIX}_app --tail 50 2>&1 || true
+# Check if all required containers are running
+if [ "$ALL_CONTAINERS_RUNNING" = "false" ]; then
+  echo "   ❌ ERROR: Required containers are still not running after $MAX_RETRIES attempts" >&2
   VALIDATION_FAILED=true
+  
+  # Show detailed error information
+  echo "   Container status:" >&2
+  docker ps -a --filter "name=${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" >&2 || true
+  
+  echo "   Checking container logs..." >&2
+  if [ "$NGINX_RUNNING" -eq 0 ]; then
+    echo "   Nginx logs:" >&2
+    docker logs ${CONTAINER_PREFIX}_nginx --tail 30 2>&1 || echo "   Nginx container not found" >&2
+  fi
+  if [ "$FRONTEND_RUNNING" -eq 0 ]; then
+    echo "   Frontend logs:" >&2
+    docker logs ${CONTAINER_PREFIX}_frontend --tail 20 2>&1 || echo "   Frontend container not found" >&2
+  fi
+  if [ "$APP_RUNNING" -eq 0 ]; then
+    echo "   App logs:" >&2
+    docker logs ${CONTAINER_PREFIX}_app --tail 20 2>&1 || echo "   App container not found" >&2
+  fi
 else
+  # Display container status
+  echo ""
+  echo "   Container status:"
+  CONTAINER_STATUS=$(docker ps --filter "name=${CONTAINER_PREFIX}_" --format "{{.Names}}\t{{.Status}}" || true)
+  echo "$CONTAINER_STATUS"
+  
   echo "✅ Backend container is running"
-fi
-
-# Check if nginx container is running (required for public access)
-NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
-if [ "$NGINX_RUNNING" -eq 0 ]; then
-  echo "❌ Nginx container is not running (required for public access)" >&2
-  docker ps -a --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}\t{{.Status}}\t{{.Image}}" || true
-  docker logs ${CONTAINER_PREFIX}_nginx --tail 50 2>&1 || true
-  VALIDATION_FAILED=true
-else
   echo "✅ Nginx container is running"
-fi
-
-# Check if frontend container is running (optional - don't fail if missing)
-FRONTEND_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_frontend" --format "{{.Names}}" | wc -l)
-if [ "$FRONTEND_RUNNING" -eq 0 ]; then
-  echo "⚠️  Frontend container is not running (may still be starting)"
-else
   echo "✅ Frontend container is running"
 fi
 

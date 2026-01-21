@@ -311,77 +311,6 @@ fi
 echo "   Waiting 15 seconds for containers to initialize..."
 sleep 15
 
-# Check container status with retries
-echo ""
-echo "   Verifying containers are running (with retries)..."
-MAX_RETRIES=10
-RETRY_DELAY=5
-RETRY_COUNT=0
-ALL_CONTAINERS_RUNNING=false
-
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-  # Check if containers are running
-  NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
-  FRONTEND_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_frontend" --format "{{.Names}}" | wc -l)
-  APP_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
-  
-  echo "   Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Nginx=$NGINX_RUNNING, Frontend=$FRONTEND_RUNNING, App=$APP_RUNNING"
-  
-  if [ "$NGINX_RUNNING" -gt 0 ] && [ "$FRONTEND_RUNNING" -gt 0 ] && [ "$APP_RUNNING" -gt 0 ]; then
-    ALL_CONTAINERS_RUNNING=true
-    echo "   ✅ All required containers are running"
-    break
-  fi
-  
-  # If containers aren't running, try to start them again
-  if [ "$NGINX_RUNNING" -eq 0 ] || [ "$FRONTEND_RUNNING" -eq 0 ] || [ "$APP_RUNNING" -eq 0 ]; then
-    echo "   ⚠️  Some containers not running, attempting to start..."
-    
-    # Try to start containers again
-    if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
-      docker compose up -d --remove-orphans 2>&1 | head -20 || true
-    else
-      docker-compose up -d --remove-orphans 2>&1 | head -20 || true
-    fi
-    
-    sleep $RETRY_DELAY
-  fi
-  
-  RETRY_COUNT=$((RETRY_COUNT + 1))
-done
-
-# Final check - fail if containers still aren't running
-if [ "$ALL_CONTAINERS_RUNNING" = "false" ]; then
-  echo "   ❌ ERROR: Required containers are still not running after $MAX_RETRIES attempts" >&2
-  echo "   Container status:" >&2
-  docker ps -a --filter "name=${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" >&2 || true
-  
-  echo "   Checking container logs..." >&2
-  if [ "$NGINX_RUNNING" -eq 0 ]; then
-    echo "   Nginx logs:" >&2
-    docker logs ${CONTAINER_PREFIX}_nginx --tail 30 2>&1 || echo "   Nginx container not found" >&2
-  fi
-  if [ "$FRONTEND_RUNNING" -eq 0 ]; then
-    echo "   Frontend logs:" >&2
-    docker logs ${CONTAINER_PREFIX}_frontend --tail 20 2>&1 || echo "   Frontend container not found" >&2
-  fi
-  if [ "$APP_RUNNING" -eq 0 ]; then
-    echo "   App logs:" >&2
-    docker logs ${CONTAINER_PREFIX}_app --tail 20 2>&1 || echo "   App container not found" >&2
-  fi
-  
-  echo "   Checking docker-compose.yml..." >&2
-  ls -la docker-compose.yml >&2 || echo "   docker-compose.yml NOT FOUND!" >&2
-  
-  if [ -f /tmp/docker_start.log ]; then
-    echo "   Docker compose startup log:" >&2
-    tail -50 /tmp/docker_start.log >&2
-  fi
-  
-  echo "❌ ApplicationStart FAILED - Required containers did not start" >&2
-  exit 1
-fi
-
 # Display container status
 echo ""
 echo "   Container status:"
@@ -392,16 +321,5 @@ else
   echo "   ⚠️  WARNING: Could not list containers" >&2
 fi
 
-# Verify nginx is listening on port 80
 echo ""
-echo "   Verifying port 80 is listening..."
-if ss -tlnp 2>/dev/null | grep :80 > /dev/null || netstat -tlnp 2>/dev/null | grep :80 > /dev/null; then
-  echo "   ✅ Port 80 is listening"
-else
-  echo "   ⚠️  WARNING: Port 80 is NOT listening"
-  echo "   Checking nginx container..."
-  docker logs ${CONTAINER_PREFIX}_nginx --tail 20 2>&1 || echo "   Nginx container not found"
-fi
-
-echo ""
-echo "✅ ApplicationStart completed - All containers are running"
+echo "✅ ApplicationStart completed - Containers started (validation will verify they're running)"
