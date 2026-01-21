@@ -1019,11 +1019,15 @@ Then('the patient should have name {string}', async function(expectedName) {
 When('I click on the patient {string}', async function(patientName) {
   // First, ensure we navigate to the patients screen (home screen where patient list is)
   // This is important because the patient might have been created via API and we need to see the updated list
+  // Also, after creating a patient, the app navigates to the schedules screen, so we need to navigate back
   const currentUrl = this.page.url();
   const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === `${this.baseURL}/`;
+  const isOnSchedulesScreen = currentUrl.includes('/Schedules') || currentUrl.includes('/schedules');
   
-  if (!isOnHomeScreen) {
-    // Navigate to home screen
+  if (!isOnHomeScreen || isOnSchedulesScreen) {
+    // Navigate to home screen (patients list)
+    // If we're on schedules screen, we need to go back to home to see the patient list
+    console.log(`[DEBUG] Not on home screen (URL: ${currentUrl}), navigating to home...`);
     await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
     
     // Check if we got redirected to login (session lost)
@@ -1201,6 +1205,14 @@ When('I click on the patient {string}', async function(patientName) {
   // Check browser is still open before proceeding
   if (this.page.isClosed()) {
     throw new Error('Browser was closed before finding patient');
+  }
+  
+  // If we were on schedules screen, wait for navigation to complete
+  if (isOnSchedulesScreen) {
+    console.log(`[DEBUG] Was on schedules screen, waiting for home screen to load...`);
+    // Wait for home screen elements to appear
+    await this.page.waitForSelector('[data-testid="home-header"], [data-testid="patient-list"], [data-testid="add-patient-button"]', { timeout: 10000 }).catch(() => {});
+    await safeWait(this.page, 2000);
   }
   
   // Wait briefly for patient list to render
