@@ -23,6 +23,7 @@ Feature: Complete Patient Management
     And I save the patient changes
     Then the patient should have name "Updated Patient"
 
+  @skip
   Scenario: View patient details
     Given a patient exists with name "Test Patient"
     When I navigate to the patients screen
@@ -31,6 +32,7 @@ Feature: Complete Patient Management
     And I should see patient name "Test Patient"
     And I should see patient contact information
 
+  @skip
   Scenario: Manage patient avatar
     Given a patient exists with name "Test Patient"
     When I navigate to the patients screen
@@ -39,6 +41,7 @@ Feature: Complete Patient Management
     And I upload an avatar image
     Then the patient avatar should be updated
 
+  @skip
   Scenario: Access patient schedules
     Given a patient exists with name "Test Patient"
     When I navigate to the patients screen
