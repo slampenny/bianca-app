@@ -565,24 +565,6 @@ resource "aws_codepipeline" "staging" {
   }
 
   stage {
-    name = "RunTests"
-    action {
-      name             = "RunTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput", "BuildOutput"]
-      output_artifacts = ["TestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.staging_tests.name
-        PrimarySource = "SourceOutput"
-      }
-      run_order = 1
-    }
-  }
-
-  stage {
     name = "Deploy"
     action {
       name            = "Deploy"
@@ -596,6 +578,22 @@ resource "aws_codepipeline" "staging" {
         DeploymentGroupName = aws_codedeploy_deployment_group.staging.deployment_group_name
       }
       run_order = 1
+    }
+    # Tests run in parallel with Deploy (same run_order) - doesn't block deployment
+    # Tests use Docker containers from build stage for faster, more accurate testing
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_tests.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1  # Same as Deploy - runs in parallel, doesn't block deployment
     }
   }
 
