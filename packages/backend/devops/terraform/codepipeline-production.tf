@@ -129,10 +129,11 @@ resource "aws_codebuild_project" "production_tests" {
       type  = "SECRETS_MANAGER"
       value = "MySecretsManagerSecret:STRIPE_PUBLISHABLE_KEY::"
     }
+    # Use test key for tests - prevents hitting real OpenAI API during test runs
+    # Tests mock OpenAI services, but setting a test key provides extra safety
     environment_variable {
       name  = "OPENAI_API_KEY"
-      type  = "SECRETS_MANAGER"
-      value = "MySecretsManagerSecret:OPENAI_API_KEY::"
+      value = "test-openai-api-key-for-testing-only"
     }
     environment_variable {
       name  = "MFA_ENCRYPTION_KEY"
