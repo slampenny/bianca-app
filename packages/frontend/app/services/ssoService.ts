@@ -6,6 +6,7 @@ import { DEFAULT_API_CONFIG } from './api/api';
 import { ssoApi } from './api/ssoApi';
 import { store } from '../store/store';
 import { logger } from '../utils/logger';
+import Config from '../config';
 
 // Complete the auth session in the browser
 WebBrowser.maybeCompleteAuthSession();
@@ -15,8 +16,26 @@ const GOOGLE_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId;
 const MICROSOFT_CLIENT_ID = Constants.expoConfig?.extra?.microsoftClientId;
 const MICROSOFT_TENANT_ID = Constants.expoConfig?.extra?.microsoftTenantId || 'common';
 
-// Redirect URI for OAuth - Use AuthSession.makeRedirectUri() for now
-const redirectUri = AuthSession.makeRedirectUri();
+// Redirect URI for OAuth
+// On web, use the current origin to ensure it matches OAuth provider configuration
+// On mobile, use the Expo auth redirect URI
+const getRedirectUri = (): string => {
+  if (Platform.OS === 'web') {
+    // For web, use the current origin (window.location.origin)
+    // This ensures it matches what's configured in Google/Microsoft OAuth
+    if (typeof window !== 'undefined' && window.location) {
+      const origin = window.location.origin;
+      logger.debug('OAuth Redirect URI (web):', origin);
+      return origin;
+    }
+    // Fallback to makeRedirectUri if window is not available
+    return AuthSession.makeRedirectUri();
+  }
+  // For mobile, use the standard Expo redirect URI
+  return AuthSession.makeRedirectUri();
+};
+
+const redirectUri = getRedirectUri();
 logger.debug('OAuth Redirect URI:', redirectUri);
 logger.debug('OAuth Client IDs:', {
   google: GOOGLE_CLIENT_ID ? 'configured' : 'missing',
