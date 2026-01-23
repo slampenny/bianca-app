@@ -35,46 +35,106 @@ const login = async (req, res) => {
     let orgForDTO = null;
     
     if (!caregiver) {
-      logger.info('SSO login creating new org and caregiver', { email, name, provider });
-      try {
-        // Create new user through the proper registration workflow
-        const org = await orgService.createOrg(
-        {
-          email: email,
-          name: `${name}'s Organization`,
-          // phone will be set later when user completes profile
-        },
-        {
-          email: email,
-          name: name,
-          // phone will be set later when user completes profile
-          password: null, // SSO users don't have passwords
-          ssoProvider: provider,
-          ssoProviderId: providerId,
-          avatar: picture,
-          isEmailVerified: true, // SSO users are pre-verified
-          role: 'orgAdmin', // User creating the org should be orgAdmin from the start
+      // Check if an org exists with this email (but no caregiver)
+      const existingOrg = await Org.findOne({ email });
+      
+      if (existingOrg) {
+        // Org exists but caregiver doesn't - create caregiver and add to existing org
+        logger.info('SSO login: org exists, creating caregiver', { email, name, provider, orgId: existingOrg._id });
+        try {
+          caregiver = await Caregiver.create({
+            email: email,
+            name: name,
+            org: existingOrg._id,
+            password: null, // SSO users don't have passwords
+            ssoProvider: provider,
+            ssoProviderId: providerId,
+            avatar: picture,
+            isEmailVerified: true, // SSO users are pre-verified
+            role: 'orgAdmin', // First caregiver in org should be orgAdmin
+          });
+          
+          // Add caregiver to org
+          existingOrg.caregivers.push(caregiver._id);
+          if (!existingOrg.privacyOfficerId) {
+            existingOrg.privacyOfficerId = caregiver._id;
+          }
+          await existingOrg.save();
+          
+          // Populate org for DTO
+          orgForDTO = existingOrg;
+          
+          // Populate caregiver with org and patients
+          caregiver = await Caregiver.findById(caregiver._id)
+            .populate('org')
+            .populate({
+              path: 'patients',
+              populate: {
+                path: 'schedules',
+                model: 'Schedule',
+              },
+            });
+          
+          logger.info('SSO login successfully created caregiver for existing org', { 
+            orgId: existingOrg._id, 
+            caregiverId: caregiver._id 
+          });
+        } catch (createError) {
+          logger.error('SSO login failed to create caregiver for existing org', {
+            error: createError.message,
+            stack: createError.stack,
+            email,
+            provider,
+            orgId: existingOrg._id
+          });
+          throw new ApiError(
+            httpStatus.INTERNAL_SERVER_ERROR,
+            `Failed to create caregiver: ${createError.message}`
+          );
         }
-        );
+      } else {
+        // Neither org nor caregiver exists - create both
+        logger.info('SSO login creating new org and caregiver', { email, name, provider });
+        try {
+          // Create new user through the proper registration workflow
+          const org = await orgService.createOrg(
+          {
+            email: email,
+            name: `${name}'s Organization`,
+            // phone will be set later when user completes profile
+          },
+          {
+            email: email,
+            name: name,
+            // phone will be set later when user completes profile
+            password: null, // SSO users don't have passwords
+            ssoProvider: provider,
+            ssoProviderId: providerId,
+            avatar: picture,
+            isEmailVerified: true, // SSO users are pre-verified
+            role: 'orgAdmin', // User creating the org should be orgAdmin from the start
+          }
+          );
 
-        caregiver = org.caregivers[0];
-        // Use the org we just created
-        orgForDTO = org;
-        logger.info('SSO login successfully created new org and caregiver', { 
-          orgId: org._id, 
-          caregiverId: caregiver._id 
-        });
-      } catch (createError) {
-        logger.error('SSO login failed to create org and caregiver', {
-          error: createError.message,
-          stack: createError.stack,
-          email,
-          provider
-        });
-        throw new ApiError(
-          httpStatus.INTERNAL_SERVER_ERROR,
-          `Failed to create organization and caregiver: ${createError.message}`
-        );
+          caregiver = org.caregivers[0];
+          // Use the org we just created
+          orgForDTO = org;
+          logger.info('SSO login successfully created new org and caregiver', { 
+            orgId: org._id, 
+            caregiverId: caregiver._id 
+          });
+        } catch (createError) {
+          logger.error('SSO login failed to create org and caregiver', {
+            error: createError.message,
+            stack: createError.stack,
+            email,
+            provider
+          });
+          throw new ApiError(
+            httpStatus.INTERNAL_SERVER_ERROR,
+            `Failed to create organization and caregiver: ${createError.message}`
+          );
+        }
       }
       
       // Send verification email automatically after registration (even though SSO users are pre-verified)
