@@ -5,11 +5,12 @@ const Org = require('../models/org.model');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const logger = require('../config/logger');
+const catchAsync = require('../utils/catchAsync');
 const { tokenService, orgService, emailService, alertService } = require('../services');
 const { tokenTypes } = require('../config/tokens');
 const { CaregiverDTO, OrgDTO, PatientDTO, AlertDTO } = require('../dtos');
 
-const login = async (req, res) => {
+const login = catchAsync(async (req, res) => {
   try {
     const { provider, email, name, id: providerId, picture } = req.body;
     logger.info('SSO login attempt', { provider, email, name, id: providerId });
@@ -295,9 +296,9 @@ const login = async (req, res) => {
       `SSO login failed: ${error.message || 'Unknown error'}`
     );
   }
-};
+});
 
-const verify = async (req, res) => {
+const verify = catchAsync(async (req, res) => {
   try {
     const { provider, token } = req.body;
 
@@ -356,7 +357,7 @@ const verify = async (req, res) => {
       `SSO verification failed: ${error.message || 'Unknown error'}`
     );
   }
-};
+});
 
 module.exports = {
   login,

@@ -187,6 +187,43 @@ if [ "$BACKEND_HEALTH_PASSED" = "false" ]; then
   VALIDATION_FAILED=true
 fi
 
+# Check if actual API endpoints are accessible (CRITICAL - health check might pass but routes might not work)
+echo "   Checking API endpoints are registered and accessible..."
+API_ENDPOINTS_PASSED=false
+TEST_ENDPOINTS=(
+  "/v1/docs"           # Swagger docs (should return 200 or 301/302)
+  "/v1/auth/login"     # Auth endpoint (should return 400/422 for missing body, not 404)
+)
+
+ENDPOINT_FAILURES=0
+for endpoint in "${TEST_ENDPOINTS[@]}"; do
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
+  
+  if [ "$HTTP_CODE" = "000" ]; then
+    echo "   ❌ Endpoint $endpoint: Network error (cannot connect)" >&2
+    ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+  elif [ "$HTTP_CODE" = "404" ]; then
+    echo "   ❌ Endpoint $endpoint: Not found (route not registered) (HTTP 404)" >&2
+    ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+  elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 500 ]; then
+    # 200-499 means the route exists (even if it's a 400/422 for validation errors, that's fine)
+    echo "   ✅ Endpoint $endpoint: Route registered (HTTP $HTTP_CODE)"
+  else
+    echo "   ⚠️  Endpoint $endpoint: Unexpected response (HTTP $HTTP_CODE)" >&2
+    ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+  fi
+done
+
+if [ "$ENDPOINT_FAILURES" -eq 0 ]; then
+  echo "   ✅ All API endpoints are registered and accessible"
+  API_ENDPOINTS_PASSED=true
+else
+  echo "   ❌ $ENDPOINT_FAILURES endpoint(s) failed - routes may not be registered" >&2
+  echo "   Checking backend logs for route registration..." >&2
+  docker logs ${CONTAINER_PREFIX}_app --tail 100 2>&1 | grep -i "route\|listening\|started\|error" | tail -20 || true
+  VALIDATION_FAILED=true
+fi
+
 # Check if nginx is responding on port 80 (REQUIRED for public access)
 echo "   Checking nginx on port 80..."
 NGINX_HEALTH_PASSED=false
@@ -278,6 +315,31 @@ if [ -n "$API_URL" ]; then
     echo "   This means users cannot access the API!" >&2
     PUBLIC_URLS_PASSED=false
   fi
+  
+  # Also test an actual API endpoint through the public URL (not just health)
+  echo "   Testing actual API endpoint through public URL: $API_URL/docs"
+  API_ENDPOINT_PUBLIC_PASSED=false
+  for i in {1..5}; do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$API_URL/docs" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+      echo "   ✅ API endpoint accessible through public URL (HTTP $HTTP_CODE, attempt $i)"
+      API_ENDPOINT_PUBLIC_PASSED=true
+      break
+    fi
+    if [ "$HTTP_CODE" = "000" ]; then
+      echo "   API endpoint check attempt $i/5 failed (network error), retrying in 3 seconds..."
+    elif [ "$HTTP_CODE" = "404" ]; then
+      echo "   ⚠️  API endpoint returned 404 (route may not be accessible through ALB)" >&2
+    else
+      echo "   API endpoint check attempt $i/5 failed (HTTP $HTTP_CODE), retrying in 3 seconds..."
+    fi
+    sleep 3
+  done
+  
+  if [ "$API_ENDPOINT_PUBLIC_PASSED" = "false" ]; then
+    echo "   ⚠️  API endpoint check through public URL failed (this may indicate ALB routing issues)" >&2
+    # Don't fail validation for this, but warn
+  fi
 fi
 
 if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
@@ -309,6 +371,7 @@ if [ "$VALIDATION_FAILED" = "true" ]; then
   echo "   - Backend container must be running"
   echo "   - Nginx container must be running"
   echo "   - Backend health endpoint must respond (localhost:3000/health)"
+  echo "   - API endpoints must be registered and accessible (localhost:3000/v1/*)"
   echo "   - Nginx must respond on port 80 (localhost:80)"
   if [ -n "$FRONTEND_URL" ] || [ -n "$API_URL" ]; then
     echo "   - Public URLs must be accessible through ALB"
