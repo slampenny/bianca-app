@@ -95,6 +95,28 @@ describe('Emergency Detector', () => {
       });
     });
 
+    test('should detect fall variations with contractions and past participles', () => {
+      const testCases = [
+        { text: "I fell", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I've fallen", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I have fallen", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I'm falling", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I am falling", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I fell down", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I've fallen down", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I've tripped", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } },
+        { text: "I've slipped", expected: { severity: 'HIGH', category: 'Physical', phrase: 'fell down' } }
+      ];
+
+      testCases.forEach(({ text, expected }) => {
+        const result = detectEmergency(text);
+        expect(result.isEmergency).toBe(true);
+        expect(result.severity).toBe(expected.severity);
+        expect(result.category).toBe(expected.category);
+        expect(result.matchedPhrase).toBe(expected.phrase);
+      });
+    });
+
     test('should detect MEDIUM severity emergencies', () => {
       const testCases = [
         { text: "I feel sick", expected: { severity: 'MEDIUM', category: 'Medical', phrase: 'feel sick' } },

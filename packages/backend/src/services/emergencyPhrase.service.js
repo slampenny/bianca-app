@@ -347,7 +347,7 @@ const initializeDefaultPhrases = async () => {
       { phrase: 'stroke', pattern: '\\b(stroke|stroke\\s+symptoms)\\b', severity: 'CRITICAL', category: 'Medical', language: 'en' },
       { phrase: 'seizure', pattern: '\\b(seizure|seizing|having\\s+a\\s+seizure)\\b', severity: 'CRITICAL', category: 'Medical', language: 'en' },
       { phrase: 'suicide', pattern: '\\b(suicide|killing\\s+myself|kill\\s+myself|want\\s+to\\s+die|end\\s+my\\s+life)\\b', severity: 'CRITICAL', category: 'Safety', language: 'en' },
-      { phrase: 'fell down', pattern: '\\b(i\\s+fell|fell\\s+down|i\\s+tripped|i\\s+slipped)\\b', severity: 'HIGH', category: 'Physical', language: 'en' },
+      { phrase: 'fell down', pattern: '\\b(i\\s+(?:\\\'ve\\s+|have\\s+)?(?:fallen|fell)|i\\\'?ve\\s+(?:fallen|fell)|i\\s+have\\s+(?:fallen|fell)|(?:i\\s+)?(?:\\\'ve\\s+|have\\s+)?fallen|fell\\s+down|fallen\\s+down|i\\\'?m\\s+falling|i\\s+am\\s+falling|i\\\'?ve\\s+tripped|i\\s+have\\s+tripped|i\\s+tripped|i\\\'?ve\\s+slipped|i\\s+have\\s+slipped|i\\s+slipped)\\b', severity: 'HIGH', category: 'Physical', language: 'en' },
       { phrase: "can't get up", pattern: "\\b(can'?t\\s+get\\s+up|unable\\s+to\\s+get\\s+up|cannot\\s+get\\s+up)\\b", severity: 'HIGH', category: 'Physical', language: 'en' },
       { phrase: 'chest pain', pattern: '\\b(chest\\s+pain|chest\\s+ache|chest\\s+aches|chest\\s+pressure)\\b', severity: 'HIGH', category: 'Medical', language: 'en' },
       { phrase: 'need help', pattern: '\\b(need\\s+help|i\\s+need\\s+help|help\\s+me)\\b', severity: 'MEDIUM', category: 'Request', language: 'en' },
