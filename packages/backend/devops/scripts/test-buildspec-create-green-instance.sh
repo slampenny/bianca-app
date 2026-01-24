@@ -30,12 +30,81 @@ echo "  INSTANCE_PROFILE_NAME: ${INSTANCE_PROFILE_NAME}"
 echo "  KEY_NAME: ${KEY_NAME}"
 echo ""
 
-# Validate YAML syntax first
+# Validate YAML syntax first - use strict validation
 echo "Step 1: Validating YAML syntax..."
+BUILDSPEC_FILE="packages/backend/devops/buildspec-create-green-instance.yml"
+
+# Check 1: Python YAML parser (basic validation)
 if command -v python3 &> /dev/null; then
-    python3 -c "import yaml; yaml.safe_load(open('packages/backend/devops/buildspec-create-green-instance.yml'))" && echo "✓ YAML is valid"
+    if python3 -c "import yaml; yaml.safe_load(open('$BUILDSPEC_FILE'))" 2>/dev/null; then
+        echo "✓ Python YAML parser: Valid"
+    else
+        echo "❌ Python YAML parser: INVALID"
+        exit 1
+    fi
 else
-    echo "⚠ Python3 not found, skipping YAML validation"
+    echo "⚠ Python3 not found, skipping basic YAML validation"
+fi
+
+    # Check 2: CodeBuild-specific validation - check structure matches working buildspecs
+echo "Step 1b: Validating CodeBuild-specific structure..."
+if [ -f "$BUILDSPEC_FILE" ]; then
+    # Check that version is followed directly by phases (CodeBuild is VERY strict)
+    VERSION_LINE=$(grep -n "^version:" "$BUILDSPEC_FILE" | cut -d: -f1)
+    PHASES_LINE=$(grep -n "^phases:" "$BUILDSPEC_FILE" | cut -d: -f1)
+    if [ -n "$VERSION_LINE" ] && [ -n "$PHASES_LINE" ]; then
+        LINES_BETWEEN=$((PHASES_LINE - VERSION_LINE))
+        # CodeBuild requires: version line, then phases line (no blank line in between)
+        # OR: version line, blank line, phases line (exactly 2 lines between)
+        if [ "$LINES_BETWEEN" -eq 1 ]; then
+            echo "✓ Version directly followed by phases (CodeBuild compatible)"
+        elif [ "$LINES_BETWEEN" -eq 2 ]; then
+            # Check if line 2 is blank
+            LINE_2=$(sed -n '2p' "$BUILDSPEC_FILE")
+            if [ -z "$LINE_2" ]; then
+                echo "⚠ WARNING: Blank line after 'version:' - CodeBuild may reject this!"
+                echo "   Recommendation: Remove blank line (version should be directly followed by phases)"
+                echo "   This matches working buildspec: buildspec-staging.yml"
+            else
+                echo "❌ ERROR: Line 2 is not blank but not 'phases:' either"
+                echo "   Line 2 content: '$LINE_2'"
+                exit 1
+            fi
+        else
+            echo "❌ ERROR: Invalid structure - 'phases:' must be on line $((VERSION_LINE + 1)) or $((VERSION_LINE + 2))"
+            echo "   Found 'phases:' on line $PHASES_LINE (should be $((VERSION_LINE + 1)) or $((VERSION_LINE + 2)))"
+            exit 1
+        fi
+    fi
+    
+    # Check for emoji characters that might cause issues
+    if grep -q -P '[^\x00-\x7F]' "$BUILDSPEC_FILE" 2>/dev/null; then
+        echo "⚠ WARNING: Non-ASCII characters found (may cause CodeBuild parsing issues)"
+        grep -n -P '[^\x00-\x7F]' "$BUILDSPEC_FILE" | head -5
+    fi
+    
+    # Compare structure with working buildspec
+    WORKING_BUILDSPEC="packages/backend/devops/buildspec-staging.yml"
+    if [ -f "$WORKING_BUILDSPEC" ]; then
+        WORKING_VERSION_LINE=$(head -1 "$WORKING_BUILDSPEC")
+        TEST_VERSION_LINE=$(head -1 "$BUILDSPEC_FILE")
+        if [ "$WORKING_VERSION_LINE" != "$TEST_VERSION_LINE" ]; then
+            echo "⚠ WARNING: Version line doesn't match working buildspec"
+        fi
+        
+        WORKING_SECOND_LINE=$(sed -n '2p' "$WORKING_BUILDSPEC")
+        TEST_SECOND_LINE=$(sed -n '2p' "$BUILDSPEC_FILE")
+        if [ "$WORKING_SECOND_LINE" != "$TEST_SECOND_LINE" ]; then
+            echo "⚠ WARNING: Line 2 structure differs from working buildspec"
+            echo "   Working: '$WORKING_SECOND_LINE'"
+            echo "   Test:    '$TEST_SECOND_LINE'"
+        fi
+    fi
+    
+    echo "✓ CodeBuild structure validation passed"
+else
+    echo "❌ Buildspec file not found: $BUILDSPEC_FILE"
+    exit 1
 fi
 
 # Check if AWS CLI is available
