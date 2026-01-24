@@ -1,9 +1,5 @@
 version: 0.2
 
-# Blue-Green Deployment: Create Green Instance
-# This stage creates a fresh "green" instance that will receive the new deployment
-# After validation passes, we'll swap DNS/ALB to point to it and terminate the old "blue" instance
-
 phases:
   pre_build:
     commands:
