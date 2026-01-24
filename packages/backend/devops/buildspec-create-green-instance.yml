@@ -15,6 +15,22 @@ phases:
         echo "  Security Group: ${SECURITY_GROUP_ID}"
         echo "  Instance Profile: ${INSTANCE_PROFILE_NAME}"
         echo "  Key Name: ${KEY_NAME}"
+        echo "  AWS Region: ${AWS_DEFAULT_REGION}"
+      - |
+        # Validate required environment variables
+        if [ -z "${LAUNCH_TEMPLATE_NAME}" ]; then
+          echo "ERROR: LAUNCH_TEMPLATE_NAME is not set"
+          exit 1
+        fi
+        if [ -z "${SUBNET_ID}" ]; then
+          echo "ERROR: SUBNET_ID is not set"
+          exit 1
+        fi
+        if [ -z "${SECURITY_GROUP_ID}" ]; then
+          echo "ERROR: SECURITY_GROUP_ID is not set"
+          exit 1
+        fi
+        echo "✅ All required environment variables are set"
 
   build:
     commands:
@@ -25,7 +41,14 @@ phases:
           --launch-template-name ${LAUNCH_TEMPLATE_NAME} \
           --versions '$Latest' \
           --query 'LaunchTemplateVersions[0].VersionNumber' \
-          --output text)
+          --output text 2>&1)
+        
+        if [ $? -ne 0 ] || [ -z "$LAUNCH_TEMPLATE_VERSION" ] || [ "$LAUNCH_TEMPLATE_VERSION" = "None" ]; then
+          echo "ERROR: Failed to get launch template version"
+          echo "Output: $LAUNCH_TEMPLATE_VERSION"
+          exit 1
+        fi
+        
         echo "Using launch template version: $LAUNCH_TEMPLATE_VERSION"
         
         # Find the current "blue" instance (if it exists)
@@ -50,14 +73,24 @@ phases:
           --subnet-id ${SUBNET_ID} \
           --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=bianca-staging-green},{Key=Environment,Value=staging},{Key=DeploymentType,Value=green}]" \
           --query 'Instances[0].InstanceId' \
-          --output text)
+          --output text 2>&1)
+        
+        if [ $? -ne 0 ] || [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
+          echo "ERROR: Failed to create green instance"
+          echo "Output: $GREEN_INSTANCE_ID"
+          exit 1
+        fi
         
         echo "Green instance created: $GREEN_INSTANCE_ID"
         echo "GREEN_INSTANCE_ID=$GREEN_INSTANCE_ID" >> instance-info.txt
         
         # Wait for instance to be running
         echo "Waiting for green instance to be running..."
-        aws ec2 wait instance-running --instance-ids $GREEN_INSTANCE_ID
+        if ! aws ec2 wait instance-running --instance-ids $GREEN_INSTANCE_ID; then
+          echo "ERROR: Instance failed to reach running state"
+          aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].State' --output json
+          exit 1
+        fi
         echo "Green instance is running"
         
         # Wait for instance to pass status checks (2/2 checks)
@@ -118,4 +151,29 @@ phases:
         if [ -f instance-info.txt ]; then
           cat instance-info.txt
           echo "Instance information saved for next pipeline stages"
+        else
+          echo "WARNING: instance-info.txt not found"
+          exit 1
         fi
+      - |
+        # Verify green instance is still running
+        if [ -f instance-info.txt ]; then
+          source instance-info.txt
+          if [ -n "$GREEN_INSTANCE_ID" ]; then
+            INSTANCE_STATE=$(aws ec2 describe-instances \
+              --instance-ids $GREEN_INSTANCE_ID \
+              --query 'Reservations[0].Instances[0].State.Name' \
+              --output text 2>/dev/null || echo "unknown")
+            echo "Final instance state: $INSTANCE_STATE"
+            if [ "$INSTANCE_STATE" != "running" ]; then
+              echo "ERROR: Green instance is not in running state: $INSTANCE_STATE"
+              exit 1
+            fi
+            echo "✅ Green instance verification passed"
+          fi
+        fi
+
+artifacts:
+  files:
+    - instance-info.txt
+  name: GreenInstanceOutput
