@@ -147,6 +147,41 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
       {
         Effect = "Allow"
         Action = [
+          "ec2:RunInstances",
+          "ec2:TerminateInstances",
+          "ec2:DescribeInstanceStatus",
+          "ec2:DescribeInstanceAttribute",
+          "ec2:CreateTags",
+          "ec2:DescribeTags",
+          "ec2:DescribeLaunchTemplates",
+          "ec2:DescribeLaunchTemplateVersions",
+          "ec2:AllocateAddress",
+          "ec2:AssociateAddress",
+          "ec2:DisassociateAddress",
+          "ec2:ReleaseAddress",
+          "ec2:DescribeAddresses",
+          "ec2:AttachVolume",
+          "ec2:DetachVolume",
+          "ec2:DescribeVolumes",
+          "ec2:CreateVolume",
+          "ec2:DeleteVolume"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:DeregisterTargets",
+          "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeLoadBalancers"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
@@ -222,7 +257,9 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
           aws_codebuild_project.staging_build.arn,
           aws_codebuild_project.staging_smoke_tests.arn,
           aws_codebuild_project.staging_tests.arn,
-          aws_codebuild_project.staging_post_deploy_validation.arn
+          aws_codebuild_project.staging_post_deploy_validation.arn,
+          aws_codebuild_project.staging_create_green_instance.arn,
+          aws_codebuild_project.staging_swap_and_terminate.arn
         ]
       },
       {
@@ -388,6 +425,124 @@ resource "aws_codebuild_project" "staging_post_deploy_validation" {
 
   tags = {
     Name        = "bianca-staging-post-deploy-validation"
+    Environment = "staging"
+  }
+}
+
+################################################################################
+# CODEBUILD PROJECT FOR BLUE-GREEN: CREATE GREEN INSTANCE
+################################################################################
+# Creates a new "green" instance before deployment for blue-green deployment
+
+resource "aws_codebuild_project" "staging_create_green_instance" {
+  name         = "bianca-staging-create-green-instance"
+  description  = "Creates a new green instance for blue-green deployment"
+  service_role = aws_iam_role.codebuild_staging_role.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = false
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "LAUNCH_TEMPLATE_NAME"
+      value = aws_launch_template.staging.name
+    }
+    environment_variable {
+      name  = "SUBNET_ID"
+      value = aws_subnet.staging_public.id
+    }
+    environment_variable {
+      name  = "SECURITY_GROUP_ID"
+      value = aws_security_group.staging.id
+    }
+    environment_variable {
+      name  = "INSTANCE_PROFILE_NAME"
+      value = aws_iam_instance_profile.staging_profile.name
+    }
+    environment_variable {
+      name  = "KEY_NAME"
+      value = var.asterisk_key_pair_name
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/backend/devops/buildspec-create-green-instance.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-staging-create-green-instance"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-staging-create-green-instance"
+    Environment = "staging"
+  }
+}
+
+################################################################################
+# CODEBUILD PROJECT FOR BLUE-GREEN: SWAP AND TERMINATE
+################################################################################
+# Swaps ALB target groups to point to green instance, then terminates old blue instance
+
+resource "aws_codebuild_project" "staging_swap_and_terminate" {
+  name         = "bianca-staging-swap-and-terminate"
+  description  = "Swaps ALB target groups to green instance and terminates old blue instance"
+  service_role = aws_iam_role.codebuild_staging_role.arn
+
+  artifacts {
+    type = "CODEPIPELINE"
+  }
+
+  environment {
+    compute_type                = "BUILD_GENERAL1_SMALL"
+    image                       = "aws/codebuild/standard:7.0"
+    type                        = "LINUX_CONTAINER"
+    privileged_mode             = false
+    image_pull_credentials_type = "CODEBUILD"
+
+    environment_variable {
+      name  = "AWS_DEFAULT_REGION"
+      value = var.aws_region
+    }
+    environment_variable {
+      name  = "API_TARGET_GROUP_ARN"
+      value = aws_lb_target_group.staging_api.arn
+    }
+    environment_variable {
+      name  = "FRONTEND_TARGET_GROUP_ARN"
+      value = aws_lb_target_group.staging_frontend.arn
+    }
+  }
+
+  source {
+    type      = "CODEPIPELINE"
+    buildspec = "packages/backend/devops/buildspec-swap-and-terminate.yml"
+  }
+
+  logs_config {
+    cloudwatch_logs {
+      status     = "ENABLED"
+      group_name = "/aws/codebuild/bianca-staging-swap-and-terminate"
+    }
+  }
+
+  tags = {
+    Name        = "bianca-staging-swap-and-terminate"
     Environment = "staging"
   }
 }
@@ -565,6 +720,24 @@ resource "aws_codepipeline" "staging" {
   }
 
   stage {
+    name = "CreateGreenInstance"
+    action {
+      name             = "CreateGreenInstance"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["GreenInstanceOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_create_green_instance.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
+    }
+  }
+
+  stage {
     name = "Deploy"
     action {
       name            = "Deploy"
@@ -575,7 +748,7 @@ resource "aws_codepipeline" "staging" {
       input_artifacts = ["BuildOutput"]
       configuration = {
         ApplicationName     = aws_codedeploy_app.staging.name
-        DeploymentGroupName = aws_codedeploy_deployment_group.staging.deployment_group_name
+        DeploymentGroupName = aws_codedeploy_deployment_group.staging_green.deployment_group_name
       }
       run_order = 1
     }
@@ -605,10 +778,28 @@ resource "aws_codepipeline" "staging" {
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
-      input_artifacts  = ["SourceOutput"]
+      input_artifacts  = ["SourceOutput", "GreenInstanceOutput"]
       output_artifacts = ["ValidationOutput"]
       configuration = {
         ProjectName   = aws_codebuild_project.staging_post_deploy_validation.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
+    }
+  }
+
+  stage {
+    name = "SwapAndTerminate"
+    action {
+      name             = "SwapAndTerminate"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "GreenInstanceOutput"]
+      output_artifacts = ["SwapOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_swap_and_terminate.name
         PrimarySource = "SourceOutput"
       }
       run_order = 1

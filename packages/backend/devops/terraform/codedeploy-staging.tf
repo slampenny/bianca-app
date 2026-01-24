@@ -201,6 +201,7 @@ resource "aws_codedeploy_deployment_group" "staging" {
   deployment_group_name = "bianca-staging-ec2"
   service_role_arn      = aws_iam_role.codedeploy_service_role.arn
 
+  # Target blue instance (current production instance)
   ec2_tag_filter {
     key   = "Name"
     type  = "KEY_AND_VALUE"
@@ -221,6 +222,40 @@ resource "aws_codedeploy_deployment_group" "staging" {
   tags = {
     Environment = "staging"
     Name        = "bianca-staging-ec2"
+  }
+}
+
+################################################################################
+# CODEDEPLOY DEPLOYMENT GROUP FOR GREEN INSTANCES (Blue-Green)
+################################################################################
+
+resource "aws_codedeploy_deployment_group" "staging_green" {
+  app_name              = aws_codedeploy_app.staging.name
+  deployment_group_name = "bianca-staging-green-ec2"
+  service_role_arn      = aws_iam_role.codedeploy_service_role.arn
+
+  # Target green instances (created during blue-green deployment)
+  ec2_tag_filter {
+    key   = "Name"
+    type  = "KEY_AND_VALUE"
+    value = "bianca-staging-green"
+  }
+
+  deployment_config_name = "CodeDeployDefault.AllAtOnce"
+
+  auto_rollback_configuration {
+    enabled = true
+    events  = ["DEPLOYMENT_FAILURE"]
+  }
+
+  alarm_configuration {
+    enabled = false
+  }
+
+  tags = {
+    Environment = "staging"
+    Name        = "bianca-staging-green-ec2"
+    Purpose     = "blue-green-deployment"
   }
 }
 

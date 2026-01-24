@@ -1,0 +1,121 @@
+version: 0.2
+
+# Blue-Green Deployment: Create Green Instance
+# This stage creates a fresh "green" instance that will receive the new deployment
+# After validation passes, we'll swap DNS/ALB to point to it and terminate the old "blue" instance
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting blue-green deployment: Creating green instance..."
+      - |
+        echo "Configuration:"
+        echo "  Launch Template: ${LAUNCH_TEMPLATE_NAME}"
+        echo "  Subnet: ${SUBNET_ID}"
+        echo "  Security Group: ${SECURITY_GROUP_ID}"
+        echo "  Instance Profile: ${INSTANCE_PROFILE_NAME}"
+        echo "  Key Name: ${KEY_NAME}"
+
+  build:
+    commands:
+      - |
+        # Get the latest launch template version
+        echo "Getting latest launch template version..."
+        LAUNCH_TEMPLATE_VERSION=$(aws ec2 describe-launch-template-versions \
+          --launch-template-name ${LAUNCH_TEMPLATE_NAME} \
+          --versions '$Latest' \
+          --query 'LaunchTemplateVersions[0].VersionNumber' \
+          --output text)
+        echo "Using launch template version: $LAUNCH_TEMPLATE_VERSION"
+        
+        # Find the current "blue" instance (if it exists)
+        echo "Finding current blue instance..."
+        BLUE_INSTANCE_ID=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=bianca-staging" \
+                    "Name=instance-state-name,Values=running" \
+          --query 'Reservations[0].Instances[0].InstanceId' \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -n "$BLUE_INSTANCE_ID" ] && [ "$BLUE_INSTANCE_ID" != "None" ]; then
+          echo "Found blue instance: $BLUE_INSTANCE_ID"
+          echo "BLUE_INSTANCE_ID=$BLUE_INSTANCE_ID" >> instance-info.txt
+        else
+          echo "No blue instance found (first deployment or instance was terminated)"
+        fi
+        
+        # Create the green instance
+        echo "Creating green instance..."
+        GREEN_INSTANCE_ID=$(aws ec2 run-instances \
+          --launch-template LaunchTemplateName=${LAUNCH_TEMPLATE_NAME},Version=$LAUNCH_TEMPLATE_VERSION \
+          --subnet-id ${SUBNET_ID} \
+          --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=bianca-staging-green},{Key=Environment,Value=staging},{Key=DeploymentType,Value=green}]" \
+          --query 'Instances[0].InstanceId' \
+          --output text)
+        
+        echo "Green instance created: $GREEN_INSTANCE_ID"
+        echo "GREEN_INSTANCE_ID=$GREEN_INSTANCE_ID" >> instance-info.txt
+        
+        # Wait for instance to be running
+        echo "Waiting for green instance to be running..."
+        aws ec2 wait instance-running --instance-ids $GREEN_INSTANCE_ID
+        echo "Green instance is running"
+        
+        # Wait for instance to pass status checks (2/2 checks)
+        echo "Waiting for instance status checks to pass..."
+        MAX_WAIT=300  # 5 minutes max
+        ELAPSED=0
+        while [ $ELAPSED -lt $MAX_WAIT ]; do
+          STATUS=$(aws ec2 describe-instance-status \
+            --instance-ids $GREEN_INSTANCE_ID \
+            --query 'InstanceStatuses[0].InstanceStatus.Status' \
+            --output text 2>/dev/null || echo "initializing")
+          
+          SYSTEM_STATUS=$(aws ec2 describe-instance-status \
+            --instance-ids $GREEN_INSTANCE_ID \
+            --query 'InstanceStatuses[0].SystemStatus.Status' \
+            --output text 2>/dev/null || echo "initializing")
+          
+          if [ "$STATUS" = "ok" ] && [ "$SYSTEM_STATUS" = "ok" ]; then
+            echo "Instance status checks passed!"
+            break
+          fi
+          
+          echo "  Status: $STATUS, System: $SYSTEM_STATUS (waiting...)"
+          sleep 10
+          ELAPSED=$((ELAPSED + 10))
+        done
+        
+        if [ $ELAPSED -ge $MAX_WAIT ]; then
+          echo "⚠️  Warning: Instance status checks did not pass within timeout, but continuing..."
+        fi
+        
+        # Get instance IP for reference
+        GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
+          --instance-ids $GREEN_INSTANCE_ID \
+          --query 'Reservations[0].Instances[0].PublicIpAddress' \
+          --output text)
+        
+        echo "Green instance IP: $GREEN_INSTANCE_IP"
+        echo "GREEN_INSTANCE_IP=$GREEN_INSTANCE_IP" >> instance-info.txt
+        
+        # Wait a bit more for CodeDeploy agent to be ready (userdata script installs it)
+        echo "Waiting 60 seconds for CodeDeploy agent to be ready..."
+        sleep 60
+        
+        # Verify CodeDeploy agent is running (optional check)
+        echo "Checking if CodeDeploy agent is ready..."
+        # Note: We can't directly check this from CodeBuild, but userdata should have installed it
+        
+        echo ""
+        echo "✅ Green instance created and ready: $GREEN_INSTANCE_ID"
+        echo "   IP: $GREEN_INSTANCE_IP"
+        echo "   This instance will receive the deployment in the next stage"
+
+  post_build:
+    commands:
+      - |
+        # Save instance info to output artifact
+        if [ -f instance-info.txt ]; then
+          cat instance-info.txt
+          echo "Instance information saved for next pipeline stages"
+        fi

@@ -1,25 +1,48 @@
 version: 0.2
 
-# Post-Deployment Validation
-# Tests that the deployed site is actually accessible via public URLs
-# This catches issues like 503 errors, ALB problems, DNS issues, etc.
+# Post-Deployment Validation (Blue-Green)
+# Tests that the green instance is accessible and healthy before swapping traffic
+# For blue-green deployments, we validate the green instance directly by IP
+# before swapping ALB target groups to ensure zero-downtime
 
 phases:
   pre_build:
     commands:
-      - echo "Starting post-deployment validation..."
+      - echo "Starting post-deployment validation (blue-green mode)..."
       - |
         echo "Frontend URL: ${FRONTEND_URL}"
         echo "API URL: ${API_URL}"
         echo "Max retries: ${MAX_RETRIES:-20}"
         echo "Retry delay: ${RETRY_DELAY:-10} seconds"
+        
+        # Read green instance info from previous stage
+        if [ -f instance-info.txt ]; then
+          source instance-info.txt
+          echo "Green instance ID: ${GREEN_INSTANCE_ID:-not found}"
+          echo "Green instance IP: ${GREEN_INSTANCE_IP:-not found}"
+        else
+          echo "⚠️  Warning: instance-info.txt not found, will validate via public URLs"
+        fi
 
   build:
     commands:
       - |
-        # Wait for ALB to register the instance and pass health checks
-        # Containers may be running but ALB needs time to register and health check
-        echo "Waiting 60 seconds for ALB to register instance and pass health checks..."
+        # Determine if we're in blue-green mode (green instance exists)
+        BLUE_GREEN_MODE=false
+        if [ -f instance-info.txt ] && [ -n "$GREEN_INSTANCE_IP" ] && [ "$GREEN_INSTANCE_IP" != "None" ]; then
+          BLUE_GREEN_MODE=true
+          echo "🔵 Blue-Green Mode: Validating green instance directly by IP"
+          echo "   Green instance IP: $GREEN_INSTANCE_IP"
+        else
+          echo "🔵 Standard Mode: Validating via public URLs (ALB)"
+        fi
+        
+        # Wait for instance/containers to be ready
+        if [ "$BLUE_GREEN_MODE" = "true" ]; then
+          echo "Waiting 60 seconds for green instance containers to be ready..."
+        else
+          echo "Waiting 60 seconds for ALB to register instance and pass health checks..."
+        fi
         sleep 60
         
         # Function to test URL with retries
@@ -73,14 +96,40 @@ phases:
         # Track failures
         VALIDATION_FAILED=false
         
-        # Test frontend URL
-        if ! test_url "$FRONTEND_URL" "Frontend"; then
-          VALIDATION_FAILED=true
-        fi
-        
-        # Test API health endpoint
-        if ! test_url "$API_URL/health" "API health endpoint"; then
-          VALIDATION_FAILED=true
+        if [ "$BLUE_GREEN_MODE" = "true" ]; then
+          # Blue-Green Mode: Test green instance directly by IP
+          echo ""
+          echo "Testing green instance directly (bypassing ALB)..."
+          
+          # Test API on green instance (port 3000)
+          GREEN_API_URL="http://${GREEN_INSTANCE_IP}:3000"
+          if ! test_url "$GREEN_API_URL/health" "Green instance API health endpoint"; then
+            VALIDATION_FAILED=true
+          fi
+          
+          # Test frontend on green instance (port 80 via nginx)
+          GREEN_FRONTEND_URL="http://${GREEN_INSTANCE_IP}"
+          if ! test_url "$GREEN_FRONTEND_URL" "Green instance Frontend"; then
+            VALIDATION_FAILED=true
+          fi
+          
+          echo ""
+          echo "✅ Green instance validation complete"
+          echo "   If validation passed, pipeline will proceed to swap traffic"
+        else
+          # Standard Mode: Test via public URLs (ALB)
+          echo ""
+          echo "Testing via public URLs (ALB)..."
+          
+          # Test frontend URL
+          if ! test_url "$FRONTEND_URL" "Frontend"; then
+            VALIDATION_FAILED=true
+          fi
+          
+          # Test API health endpoint
+          if ! test_url "$API_URL/health" "API health endpoint"; then
+            VALIDATION_FAILED=true
+          fi
         fi
         
         # Final check
