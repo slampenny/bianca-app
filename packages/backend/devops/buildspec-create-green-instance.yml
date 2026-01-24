@@ -1,19 +1,17 @@
 version: 0.2
-
 phases:
   pre_build:
     commands:
       - echo "Starting blue-green deployment: Creating green instance..."
       - |
         echo "Configuration:"
-        echo "  Launch Template: ${LAUNCH_TEMPLATE_NAME}"
-        echo "  Subnet: ${SUBNET_ID}"
-        echo "  Security Group: ${SECURITY_GROUP_ID}"
-        echo "  Instance Profile: ${INSTANCE_PROFILE_NAME}"
-        echo "  Key Name: ${KEY_NAME}"
-        echo "  AWS Region: ${AWS_DEFAULT_REGION}"
+        echo "Launch Template: ${LAUNCH_TEMPLATE_NAME}"
+        echo "Subnet: ${SUBNET_ID}"
+        echo "Security Group: ${SECURITY_GROUP_ID}"
+        echo "Instance Profile: ${INSTANCE_PROFILE_NAME}"
+        echo "Key Name: ${KEY_NAME}"
+        echo "AWS Region: ${AWS_DEFAULT_REGION}"
       - |
-        # Validate required environment variables
         if [ -z "${LAUNCH_TEMPLATE_NAME}" ]; then
           echo "ERROR: LAUNCH_TEMPLATE_NAME is not set"
           exit 1
