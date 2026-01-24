@@ -30,7 +30,7 @@ phases:
           echo "ERROR: SECURITY_GROUP_ID is not set"
           exit 1
         fi
-        echo "✅ All required environment variables are set"
+        echo "All required environment variables are set"
 
   build:
     commands:
@@ -63,8 +63,22 @@ phases:
           exit 1
         fi
         
-        ACTUAL_LAUNCH_TEMPLATE_NAME=$(echo "$LAUNCH_TEMPLATE_INFO" | jq -r '.LaunchTemplateName')
-        LAUNCH_TEMPLATE_ID=$(echo "$LAUNCH_TEMPLATE_INFO" | jq -r '.LaunchTemplateId')
+        ACTUAL_LAUNCH_TEMPLATE_NAME=$(aws ec2 describe-launch-templates \
+          --launch-template-names ${LAUNCH_TEMPLATE_NAME} \
+          --query 'LaunchTemplates[0].LaunchTemplateName' \
+          --output text 2>/dev/null || \
+          aws ec2 describe-launch-templates \
+          --filters "Name=launch-template-name,Values=${LAUNCH_TEMPLATE_NAME}*" \
+          --query 'LaunchTemplates[0].LaunchTemplateName' \
+          --output text)
+        LAUNCH_TEMPLATE_ID=$(aws ec2 describe-launch-templates \
+          --launch-template-names $ACTUAL_LAUNCH_TEMPLATE_NAME \
+          --query 'LaunchTemplates[0].LaunchTemplateId' \
+          --output text 2>/dev/null || \
+          aws ec2 describe-launch-templates \
+          --filters "Name=launch-template-name,Values=${LAUNCH_TEMPLATE_NAME}*" \
+          --query 'LaunchTemplates[0].LaunchTemplateId' \
+          --output text)
         echo "Found launch template: $ACTUAL_LAUNCH_TEMPLATE_NAME (ID: $LAUNCH_TEMPLATE_ID)"
         
         # Get the latest launch template version
@@ -155,7 +169,7 @@ phases:
         done
         
         if [ $ELAPSED -ge $MAX_WAIT ]; then
-          echo "⚠️  Warning: Instance status checks did not pass within timeout, but continuing..."
+          echo "WARNING: Instance status checks did not pass within timeout, but continuing..."
         fi
         
         # Get instance IP for reference
@@ -176,7 +190,7 @@ phases:
         # Note: We can't directly check this from CodeBuild, but userdata should have installed it
         
         echo ""
-        echo "✅ Green instance created and ready: $GREEN_INSTANCE_ID"
+        echo "Green instance created and ready: $GREEN_INSTANCE_ID"
         echo "   IP: $GREEN_INSTANCE_IP"
         echo "   This instance will receive the deployment in the next stage"
 
@@ -205,7 +219,7 @@ phases:
               echo "ERROR: Green instance is not in running state: $INSTANCE_STATE"
               exit 1
             fi
-            echo "✅ Green instance verification passed"
+            echo "Green instance verification passed"
           fi
         fi
 
