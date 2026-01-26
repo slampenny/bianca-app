@@ -3,7 +3,8 @@
 # Application deployment is handled by CodeDeploy
 
 set -e
-exec > >(tee /var/log/user-data.log) 2>&1
+# Redirect output to log file (avoiding process substitution for compatibility)
+exec > /var/log/user-data.log 2>&1
 
 # Terraform variables
 AWS_ACCOUNT_ID="${aws_account_id}"
