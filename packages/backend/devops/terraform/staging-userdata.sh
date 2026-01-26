@@ -64,9 +64,9 @@ PUBLIC_IP="${eip_address}"
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 %{ endif ~}
 
-echo "Instance: ${INSTANCE_ID}"
-echo "Private IP: ${PRIVATE_IP}"
-echo "Public IP: ${PUBLIC_IP}"
+echo "Instance: $${INSTANCE_ID}"
+echo "Private IP: $${PRIVATE_IP}"
+echo "Public IP: $${PUBLIC_IP}"
 
 # Create app directory structure
 mkdir -p /opt/bianca-staging
@@ -93,7 +93,7 @@ else
 fi
 
 # Setup cron for ECR refresh (CodeDeploy will handle actual login, but this helps)
-echo "0 */6 * * * root aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com" > /etc/cron.d/ecr-refresh
+echo "0 */6 * * * root aws ecr get-login-password --region $${AWS_REGION} | docker login --username AWS --password-stdin $${AWS_ACCOUNT_ID}.dkr.ecr.$${AWS_REGION}.amazonaws.com" > /etc/cron.d/ecr-refresh
 
 # Install and start SSM agent
 echo "Installing and starting SSM agent..."
@@ -119,7 +119,7 @@ INSTALL_SUCCESS=false
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     echo "Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Downloading CodeDeploy agent installer..."
-    if wget https://aws-codedeploy-${AWS_REGION}.s3.${AWS_REGION}.amazonaws.com/latest/install -O install 2>&1; then
+    if wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install -O install 2>&1; then
         chmod +x ./install
         echo "Installing CodeDeploy agent..."
         if sudo ./install auto 2>&1; then
@@ -174,7 +174,7 @@ if ! sudo systemctl is-active --quiet codedeploy-agent; then
     sudo tail -50 /var/log/aws/codedeploy-agent/codedeploy-agent.log 2>&1 || echo "Log file not found"
     echo "⚠️  Instance will continue, but CodeDeploy deployments may fail"
     echo "⚠️  Manual installation may be required:"
-    echo "   sudo yum install -y ruby && cd /tmp && wget https://aws-codedeploy-${AWS_REGION}.s3.${AWS_REGION}.amazonaws.com/latest/install && sudo ./install auto"
+    echo "   sudo yum install -y ruby && cd /tmp && wget https://aws-codedeploy-$${AWS_REGION}.s3.$${AWS_REGION}.amazonaws.com/latest/install && sudo ./install auto"
 fi
 
 echo "==================================="
