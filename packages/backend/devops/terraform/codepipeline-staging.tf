@@ -195,6 +195,18 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
           "codepipeline:GetPipeline"
         ]
         Resource = "arn:aws:codepipeline:${var.aws_region}:${var.aws_account_id}:bianca-staging-pipeline"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:PassRole"
+        ]
+        Resource = aws_iam_role.staging_instance_role.arn
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ec2.amazonaws.com"
+          }
+        }
       }
     ]
   })
