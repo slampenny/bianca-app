@@ -77,9 +77,24 @@ phases:
         GREEN_INSTANCE_IP=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
         echo "Green instance IP: $GREEN_INSTANCE_IP"
         echo "GREEN_INSTANCE_IP=$GREEN_INSTANCE_IP" >> instance-info.txt
-        echo "Waiting 60 seconds for CodeDeploy agent to be ready..."
-        sleep 60
+        
+        # Verify instance is tagged correctly for CodeDeploy
+        echo "Verifying instance tags..."
+        INSTANCE_NAME=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text)
+        if [ "$INSTANCE_NAME" != "bianca-staging-green" ]; then
+          echo "ERROR: Instance name tag is incorrect: $INSTANCE_NAME (expected: bianca-staging-green)"
+          exit 1
+        fi
+        echo "Instance tags verified: Name=$INSTANCE_NAME"
+        
+        # Wait for CodeDeploy agent to be ready
+        # CodeDeploy agent installation and registration can take 2-3 minutes after instance launch
+        echo "Waiting for CodeDeploy agent to be ready (this can take 2-3 minutes)..."
+        echo "The userdata script installs and starts the CodeDeploy agent, but it needs time to register with AWS."
+        sleep 120  # Wait 2 minutes for agent installation and registration
+        
         echo "Green instance created and ready: $GREEN_INSTANCE_ID"
+        echo "Note: If CodeDeploy fails, the agent may need more time. Check instance logs if needed."
   post_build:
     commands:
       - |
