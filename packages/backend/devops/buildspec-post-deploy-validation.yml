@@ -50,14 +50,40 @@ phases:
   build:
     commands:
       - |
+        # Re-read green instance info (variables from pre_build may not persist)
+        if [ -f instance-info.txt ]; then
+          source instance-info.txt
+        elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
+          source ../CreateGreenInstance/instance-info.txt
+        else
+          # Try to find green instance by tags if not in file
+          GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=bianca-staging-green" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+            GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
+              --instance-ids "$GREEN_INSTANCE_ID" \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text 2>/dev/null || echo "")
+            echo "Discovered green instance: $GREEN_INSTANCE_ID (IP: $GREEN_INSTANCE_IP)"
+          fi
+        fi
+        
         # Determine if we're in blue-green mode (green instance exists)
         BLUE_GREEN_MODE=false
-        if [ -f instance-info.txt ] && [ -n "$GREEN_INSTANCE_IP" ] && [ "$GREEN_INSTANCE_IP" != "None" ]; then
+        if [ -n "$GREEN_INSTANCE_IP" ] && [ "$GREEN_INSTANCE_IP" != "None" ] && [ "$GREEN_INSTANCE_IP" != "" ]; then
           BLUE_GREEN_MODE=true
           echo "🔵 Blue-Green Mode: Validating green instance directly by IP"
+          echo "   Green instance ID: ${GREEN_INSTANCE_ID:-unknown}"
           echo "   Green instance IP: $GREEN_INSTANCE_IP"
         else
-          echo "🔵 Standard Mode: Validating via public URLs (ALB)"
+          echo "❌ ERROR: Cannot find green instance for validation"
+          echo "   This is a blue-green deployment - green instance must exist"
+          echo "   Will NOT validate via public URLs (would test blue instance, not green)"
+          exit 1
         fi
         
         # Wait for instance/containers to be ready
