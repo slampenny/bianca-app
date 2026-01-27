@@ -233,7 +233,11 @@ resource "aws_iam_role_policy" "staging_instance_policy" {
           "ses:GetSendStatistics",
 
           # SNS permissions for emergency notifications
-          "sns:Publish"
+          "sns:Publish",
+
+          # EC2 permissions for reading instance tags (needed by validate_service.sh to detect green instances)
+          "ec2:DescribeInstances",
+          "ec2:DescribeTags"
         ]
         Resource = "*"
       }
