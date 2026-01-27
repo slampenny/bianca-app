@@ -305,6 +305,7 @@ if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
     echo "   This means users cannot access the site!" >&2
     PUBLIC_URLS_PASSED=false
   fi
+  fi
 
   if [ -n "$API_URL" ]; then
     echo "   Testing API URL: $API_URL/health"
