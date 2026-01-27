@@ -87,8 +87,9 @@ else
   exit 1
 fi
 
-# Wait a bit for containers to fully start
-sleep 20
+# Wait a bit for containers to fully start and routes to register
+# Backend routes can take time to register after container starts
+sleep 30
 
 # Check container status with retries - if containers aren't running, try to start them
 echo "   Verifying containers are running (with retries if needed)..."
