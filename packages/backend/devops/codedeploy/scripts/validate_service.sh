@@ -188,30 +188,60 @@ if [ "$BACKEND_HEALTH_PASSED" = "false" ]; then
 fi
 
 # Check if actual API endpoints are accessible (CRITICAL - health check might pass but routes might not work)
-echo "   Checking API endpoints are registered and accessible..."
+# Routes can take time to register after the container starts, so we retry
+echo "   Checking API endpoints are registered and accessible (with retries)..."
 API_ENDPOINTS_PASSED=false
 TEST_ENDPOINTS=(
   "/v1/docs"           # Swagger docs (should return 200 or 301/302)
   "/v1/auth/login"     # Auth endpoint (should return 400/422 for missing body, not 404)
 )
 
+MAX_ENDPOINT_RETRIES=15
+RETRY_DELAY=3
 ENDPOINT_FAILURES=0
+
 for endpoint in "${TEST_ENDPOINTS[@]}"; do
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
-  
-  if [ "$HTTP_CODE" = "000" ]; then
-    echo "   ❌ Endpoint $endpoint: Network error (cannot connect)" >&2
-    ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
-  elif [ "$HTTP_CODE" = "404" ]; then
-    echo "   ❌ Endpoint $endpoint: Not found (route not registered) (HTTP 404)" >&2
-    ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
-  elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 500 ]; then
-    # 200-499 means the route exists (even if it's a 400/422 for validation errors, that's fine)
-    echo "   ✅ Endpoint $endpoint: Route registered (HTTP $HTTP_CODE)"
-  else
-    echo "   ⚠️  Endpoint $endpoint: Unexpected response (HTTP $HTTP_CODE)" >&2
-    ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
-  fi
+  ENDPOINT_PASSED=false
+  for retry in $(seq 1 $MAX_ENDPOINT_RETRIES); do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
+    
+    if [ "$HTTP_CODE" = "000" ]; then
+      if [ $retry -lt $MAX_ENDPOINT_RETRIES ]; then
+        echo "   Endpoint $endpoint: Network error (attempt $retry/$MAX_ENDPOINT_RETRIES), retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+        continue
+      else
+        echo "   ❌ Endpoint $endpoint: Network error (cannot connect after $MAX_ENDPOINT_RETRIES attempts)" >&2
+        ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+        break
+      fi
+    elif [ "$HTTP_CODE" = "404" ]; then
+      if [ $retry -lt $MAX_ENDPOINT_RETRIES ]; then
+        echo "   Endpoint $endpoint: Route not registered yet (HTTP 404, attempt $retry/$MAX_ENDPOINT_RETRIES), retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+        continue
+      else
+        echo "   ❌ Endpoint $endpoint: Not found (route not registered) (HTTP 404 after $MAX_ENDPOINT_RETRIES attempts)" >&2
+        ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+        break
+      fi
+    elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 500 ]; then
+      # 200-499 means the route exists (even if it's a 400/422 for validation errors, that's fine)
+      echo "   ✅ Endpoint $endpoint: Route registered (HTTP $HTTP_CODE, attempt $retry)"
+      ENDPOINT_PASSED=true
+      break
+    else
+      if [ $retry -lt $MAX_ENDPOINT_RETRIES ]; then
+        echo "   Endpoint $endpoint: Unexpected response (HTTP $HTTP_CODE, attempt $retry/$MAX_ENDPOINT_RETRIES), retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+        continue
+      else
+        echo "   ⚠️  Endpoint $endpoint: Unexpected response (HTTP $HTTP_CODE after $MAX_ENDPOINT_RETRIES attempts)" >&2
+        ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+        break
+      fi
+    fi
+  done
 done
 
 if [ "$ENDPOINT_FAILURES" -eq 0 ]; then
