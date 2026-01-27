@@ -1,5 +1,4 @@
 version: 0.2
-
 # Blue-Green Deployment: Swap ALB Target Groups and Terminate Old Instance
 # This stage runs after validation passes:
 # 1. Swaps ALB target groups to point to the green instance
