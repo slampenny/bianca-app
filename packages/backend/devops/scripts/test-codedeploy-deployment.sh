@@ -31,13 +31,29 @@ echo "Profile: $PROFILE"
 echo "=========================================="
 echo ""
 
-# First, verify agent is ready
+# First, verify agent is ready (quick check)
 echo "Step 1: Verifying CodeDeploy agent readiness..."
-if ! ./packages/backend/devops/scripts/test-codedeploy-readiness.sh "$INSTANCE_ID" "$PROFILE" > /dev/null 2>&1; then
-    echo "❌ CodeDeploy agent is not ready. Run test-codedeploy-readiness.sh first."
+AGENT_ACTIVE=$(aws ssm send-command \
+    --instance-ids "$INSTANCE_ID" \
+    --document-name "AWS-RunShellScript" \
+    --parameters 'commands=["sudo systemctl is-active codedeploy-agent 2>&1 || echo inactive"]' \
+    --profile "$PROFILE" \
+    --query 'Command.CommandId' \
+    --output text)
+
+sleep 3
+AGENT_STATUS=$(aws ssm get-command-invocation \
+    --command-id "$AGENT_ACTIVE" \
+    --instance-id "$INSTANCE_ID" \
+    --profile "$PROFILE" \
+    --query 'StandardOutputContent' \
+    --output text 2>/dev/null | grep -q "active" && echo "active" || echo "inactive")
+
+if [ "$AGENT_STATUS" != "active" ]; then
+    echo "❌ CodeDeploy agent is not active. Run test-codedeploy-readiness.sh for details."
     exit 1
 fi
-echo "✅ Agent is ready"
+echo "✅ Agent is active"
 echo ""
 
 # Check if we're in the right directory
@@ -61,11 +77,25 @@ if [ ! -f "$BUNDLE_DIR/docker-compose.yml" ]; then
     echo "# Placeholder docker-compose.yml for testing" > "$BUNDLE_DIR/docker-compose.yml"
 fi
 
-# Create zip bundle
+# Create zip bundle using Python (more portable than zip command)
 BUNDLE_ZIP="/tmp/codedeploy-bundle-$(date +%s).zip"
-cd "$BUNDLE_DIR"
-zip -r "$BUNDLE_ZIP" . > /dev/null
-cd - > /dev/null
+python3 << EOF
+import os
+import zipfile
+import sys
+
+bundle_dir = "$BUNDLE_DIR"
+bundle_zip = "$BUNDLE_ZIP"
+
+with zipfile.ZipFile(bundle_zip, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for root, dirs, files in os.walk(bundle_dir):
+        for file in files:
+            file_path = os.path.join(root, file)
+            arcname = os.path.relpath(file_path, bundle_dir)
+            zipf.write(file_path, arcname)
+
+print(f"Created {bundle_zip}")
+EOF
 
 echo "✅ Bundle created: $BUNDLE_ZIP"
 echo ""
