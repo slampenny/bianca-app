@@ -92,19 +92,7 @@ echo "Step 4: Checking CodeDeploy agent status..."
 COMMAND_ID=$(aws ssm send-command \
     --instance-ids "$INSTANCE_ID" \
     --document-name "AWS-RunShellScript" \
-    --parameters 'commands=[
-        "echo 'CodeDeploy Agent Status'",
-        "sudo systemctl is-active codedeploy-agent 2>&1 || echo inactive",
-        "echo",
-        "echo 'Service Status'",
-        "sudo systemctl status codedeploy-agent --no-pager 2>&1 | head -15 || echo service not found",
-        "echo",
-        "echo 'Process Check'",
-        "pgrep -f codedeploy-agent && echo process found || echo no process",
-        "echo",
-        "echo 'Recent Logs last 30 lines'",
-        "sudo tail -30 /var/log/aws/codedeploy-agent/codedeploy-agent.log 2>&1 || echo log file not found"
-    ]' \
+    --parameters "{\"commands\":[\"echo CodeDeploy Agent Status\",\"sudo systemctl is-active codedeploy-agent 2>&1 || echo inactive\",\"echo\",\"echo Service Status\",\"sudo systemctl status codedeploy-agent --no-pager 2>&1 | head -15 || echo service not found\",\"echo\",\"echo Process Check\",\"pgrep -f codedeploy-agent && echo process found || echo no process\",\"echo\",\"echo Recent Logs last 30 lines\",\"sudo tail -30 /var/log/aws/codedeploy-agent/codedeploy-agent.log 2>&1 || echo log file not found\"]}" \
     --profile "$PROFILE" \
     --query 'Command.CommandId' \
     --output text)
