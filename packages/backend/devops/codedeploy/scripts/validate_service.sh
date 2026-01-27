@@ -246,22 +246,39 @@ if [ "$NGINX_HEALTH_PASSED" = "false" ]; then
   VALIDATION_FAILED=true
 fi
 
-# Check if public URLs are accessible through ALB (CRITICAL - this is what users actually hit)
-echo ""
-echo "   Checking public URLs through ALB..."
-PUBLIC_URLS_PASSED=true
+# Check if this is a green instance (blue-green deployment)
+# Green instances aren't registered with ALB yet, so public URL checks will fail
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
+DEPLOYMENT_TYPE=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`DeploymentType`].Value' --output text 2>/dev/null || echo "")
+IS_GREEN_INSTANCE=false
 
-if [ "$DETECTED_ENV" = "staging" ]; then
+if [ "$DEPLOYMENT_TYPE" = "green" ]; then
+  IS_GREEN_INSTANCE=true
+  echo ""
+  echo "   ℹ️  Detected green instance (DeploymentType=green)"
+  echo "   Skipping public URL checks - instance will be registered with ALB during SwapAndTerminate stage"
+  PUBLIC_URLS_PASSED=true
+  FRONTEND_URL=""
+  API_URL=""
+elif [ "$DETECTED_ENV" = "staging" ]; then
   FRONTEND_URL="https://staging.biancawellness.com"
   API_URL="https://staging-api.biancawellness.com"
 elif [ "$DETECTED_ENV" = "production" ]; then
   FRONTEND_URL="https://app.biancawellness.com"
   API_URL="https://api.biancawellness.com"
 else
+  echo ""
   echo "   ⚠️  Unknown environment, skipping public URL checks"
+  PUBLIC_URLS_PASSED=true
   FRONTEND_URL=""
   API_URL=""
 fi
+
+# Only check public URLs if this is NOT a green instance
+if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
+  echo ""
+  echo "   Checking public URLs through ALB..."
+  PUBLIC_URLS_PASSED=true
 
 if [ -n "$FRONTEND_URL" ]; then
   echo "   Testing frontend URL: $FRONTEND_URL"
@@ -342,7 +359,7 @@ if [ -n "$API_URL" ]; then
   fi
 fi
 
-if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
+if [ "$IS_GREEN_INSTANCE" = "false" ] && [ "$PUBLIC_URLS_PASSED" = "false" ]; then
   echo ""
   echo "   ⚠️  CRITICAL: Public URLs are not accessible!" >&2
   echo "   This means the deployment appears successful locally but users cannot access it." >&2
