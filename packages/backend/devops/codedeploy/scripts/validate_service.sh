@@ -204,7 +204,12 @@ ENDPOINT_FAILURES=0
 for endpoint in "${TEST_ENDPOINTS[@]}"; do
   ENDPOINT_PASSED=false
   for retry in $(seq 1 $MAX_ENDPOINT_RETRIES); do
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
+    # Use POST for /v1/auth/login (it's a POST-only endpoint)
+    if [ "$endpoint" = "/v1/auth/login" ]; then
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 -X POST -H "Content-Type: application/json" -d '{}' "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
+    else
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
+    fi
     
     if [ "$HTTP_CODE" = "000" ]; then
       if [ $retry -lt $MAX_ENDPOINT_RETRIES ]; then
