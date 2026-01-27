@@ -356,6 +356,7 @@ if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
     echo "   ⚠️  API endpoint check through public URL failed (this may indicate ALB routing issues)" >&2
     # Don't fail validation for this, but warn
   fi
+  fi
 
   if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
     echo ""
