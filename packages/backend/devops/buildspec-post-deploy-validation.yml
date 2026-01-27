@@ -120,6 +120,9 @@ phases:
             elif [ "$HTTP_CODE" = "000" ]; then
               echo "⚠️  $description connection failed (attempt $attempt/$max_retries) - may still be deploying"
               echo "   Error: ${RESPONSE_BODY:0:200}"
+              echo "   DEBUG: This usually means connection refused or timeout"
+              echo "   DEBUG: Check security groups allow access from CodeBuild IP ranges"
+              echo "   DEBUG: Or instance may not be ready yet"
             elif [ "$HTTP_CODE" = "502" ] || [ "$HTTP_CODE" = "504" ]; then
               echo "⚠️  $description returned HTTP $HTTP_CODE Bad Gateway (attempt $attempt/$max_retries)"
               echo "   This may indicate the backend is still starting up or ALB can't reach targets"
