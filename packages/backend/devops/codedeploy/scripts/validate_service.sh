@@ -280,7 +280,7 @@ if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
   echo "   Checking public URLs through ALB..."
   PUBLIC_URLS_PASSED=true
 
-if [ -n "$FRONTEND_URL" ]; then
+  if [ -n "$FRONTEND_URL" ]; then
   echo "   Testing frontend URL: $FRONTEND_URL"
   FRONTEND_PUBLIC_PASSED=false
   for i in {1..10}; do
@@ -357,9 +357,8 @@ if [ -n "$API_URL" ]; then
     echo "   ⚠️  API endpoint check through public URL failed (this may indicate ALB routing issues)" >&2
     # Don't fail validation for this, but warn
   fi
-fi
 
-if [ "$IS_GREEN_INSTANCE" = "false" ] && [ "$PUBLIC_URLS_PASSED" = "false" ]; then
+  if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
   echo ""
   echo "   ⚠️  CRITICAL: Public URLs are not accessible!" >&2
   echo "   This means the deployment appears successful locally but users cannot access it." >&2
@@ -369,7 +368,8 @@ if [ "$IS_GREEN_INSTANCE" = "false" ] && [ "$PUBLIC_URLS_PASSED" = "false" ]; th
   echo "   3. Security group rules blocking traffic" >&2
   echo "   4. DNS not pointing to ALB" >&2
   echo "   5. Maintenance mode still enabled" >&2
-  VALIDATION_FAILED=true
+    VALIDATION_FAILED=true
+  fi
 fi
 
 # Disable maintenance mode once deployment is validated
