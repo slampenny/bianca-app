@@ -131,10 +131,14 @@ phases:
         done
         
         if [ "$HEALTHY" != "true" ]; then
-          echo "⚠️  Warning: Green instance did not become healthy within timeout"
+          echo "❌ ERROR: Green instance did not become healthy within timeout"
           echo "   API Health: $API_HEALTH"
           echo "   Frontend Health: $FRONTEND_HEALTH"
-          echo "   Continuing with swap anyway (validation stage should have caught issues)"
+          echo ""
+          echo "   CRITICAL: Cannot swap traffic to unhealthy green instance!"
+          echo "   This would cause downtime. Blue instance will remain serving traffic."
+          echo "   Please investigate why green instance is not healthy."
+          exit 1
         fi
         
         # Step 3: Deregister blue instance from target groups (if it exists)
