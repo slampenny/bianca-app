@@ -305,10 +305,9 @@ if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
     echo "   This means users cannot access the site!" >&2
     PUBLIC_URLS_PASSED=false
   fi
-fi
 
-if [ -n "$API_URL" ]; then
-  echo "   Testing API URL: $API_URL/health"
+  if [ -n "$API_URL" ]; then
+    echo "   Testing API URL: $API_URL/health"
   API_PUBLIC_PASSED=false
   for i in {1..10}; do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$API_URL/health" 2>/dev/null || echo "000")
@@ -359,15 +358,15 @@ if [ -n "$API_URL" ]; then
   fi
 
   if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
-  echo ""
-  echo "   ⚠️  CRITICAL: Public URLs are not accessible!" >&2
-  echo "   This means the deployment appears successful locally but users cannot access it." >&2
-  echo "   Possible causes:" >&2
-  echo "   1. Instance not registered with ALB target groups" >&2
-  echo "   2. ALB target group health checks failing" >&2
-  echo "   3. Security group rules blocking traffic" >&2
-  echo "   4. DNS not pointing to ALB" >&2
-  echo "   5. Maintenance mode still enabled" >&2
+    echo ""
+    echo "   ⚠️  CRITICAL: Public URLs are not accessible!" >&2
+    echo "   This means the deployment appears successful locally but users cannot access it." >&2
+    echo "   Possible causes:" >&2
+    echo "   1. Instance not registered with ALB target groups" >&2
+    echo "   2. ALB target group health checks failing" >&2
+    echo "   3. Security group rules blocking traffic" >&2
+    echo "   4. DNS not pointing to ALB" >&2
+    echo "   5. Maintenance mode still enabled" >&2
     VALIDATION_FAILED=true
   fi
 fi
