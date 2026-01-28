@@ -37,12 +37,35 @@ phases:
           exit 1
         fi
         echo "Using launch template: $ACTUAL_LAUNCH_TEMPLATE_NAME, version: $LAUNCH_TEMPLATE_VERSION"
+        
+        # Cleanup: Terminate any existing green instances to prevent accumulation
+        echo "Checking for existing green instances to clean up..."
+        EXISTING_GREEN_INSTANCES=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=bianca-staging-green" \
+                    "Name=instance-state-name,Values=running,pending" \
+          --query 'Reservations[*].Instances[*].InstanceId' \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -n "$EXISTING_GREEN_INSTANCES" ] && [ "$EXISTING_GREEN_INSTANCES" != "None" ]; then
+          echo "Found existing green instances to terminate:"
+          for INSTANCE_ID in $EXISTING_GREEN_INSTANCES; do
+            echo "  - $INSTANCE_ID"
+          done
+          echo "Terminating existing green instances..."
+          aws ec2 terminate-instances --instance-ids $EXISTING_GREEN_INSTANCES --query 'TerminatingInstances[*].[InstanceId,CurrentState.Name]' --output table
+          echo "Waiting for instances to start terminating..."
+          sleep 10
+          echo "Note: Instances are terminating in background. New green instance will be created now."
+        else
+          echo "No existing green instances found - clean slate!"
+        fi
+        
         BLUE_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "")
         if [ -n "$BLUE_INSTANCE_ID" ] && [ "$BLUE_INSTANCE_ID" != "None" ]; then
           echo "Found blue instance: $BLUE_INSTANCE_ID"
           echo "BLUE_INSTANCE_ID=$BLUE_INSTANCE_ID" >> instance-info.txt
         fi
-        echo "Creating green instance..."
+        echo "Creating new green instance..."
         GREEN_INSTANCE_ID=$(aws ec2 run-instances --launch-template LaunchTemplateName=$ACTUAL_LAUNCH_TEMPLATE_NAME,Version=$LAUNCH_TEMPLATE_VERSION --subnet-id ${SUBNET_ID} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=bianca-staging-green},{Key=Environment,Value=staging},{Key=DeploymentType,Value=green}]" --query 'Instances[0].InstanceId' --output text 2>&1)
         if [ $? -ne 0 ] || [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
           echo "ERROR: Failed to create green instance"
