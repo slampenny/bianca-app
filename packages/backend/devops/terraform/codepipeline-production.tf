@@ -313,6 +313,16 @@ resource "aws_iam_role_policy" "codebuild_production_policy" {
       {
         Effect = "Allow"
         Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "ec2:RunInstances",
           "ec2:TerminateInstances",
           "ec2:DescribeInstanceStatus",
