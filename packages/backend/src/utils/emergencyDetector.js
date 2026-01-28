@@ -33,7 +33,7 @@ const EMERGENCY_PATTERNS = [
   // HIGH SEVERITY (1-5 minute response needed)
   
   // Physical Incidents - HIGH
-  { pattern: /\b(i\s+fell|fell\s+down|i\s+tripped|i\s+slipped)\b/i, phrase: 'fell down', severity: 'HIGH', category: 'Physical' },
+  { pattern: /\b(i\s+(?:'ve\s+|have\s+)?(?:fallen|fell)|i'?ve\s+(?:fallen|fell)|i\s+have\s+(?:fallen|fell)|(?:i\s+)?(?:'ve\s+|have\s+)?fallen|fell\s+down|fallen\s+down|i'?m\s+falling|i\s+am\s+falling|i'?ve\s+tripped|i\s+have\s+tripped|i\s+tripped|i'?ve\s+slipped|i\s+have\s+slipped|i\s+slipped)\b/i, phrase: 'fell down', severity: 'HIGH', category: 'Physical' },
   { pattern: /\b(can'?t\s+get\s+up|unable\s+to\s+get\s+up|cannot\s+get\s+up)\b/i, phrase: "can't get up", severity: 'HIGH', category: 'Physical' },
   { pattern: /\b(hit\s+my\s+head|bumped\s+my\s+head|head\s+injury)\b/i, phrase: 'hit my head', severity: 'HIGH', category: 'Physical' },
   { pattern: /\b(broken\s+bone|fracture|broken\s+arm|broken\s+leg)\b/i, phrase: 'broken bone', severity: 'HIGH', category: 'Physical' },

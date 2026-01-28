@@ -224,6 +224,35 @@ resource "aws_codedeploy_deployment_group" "production" {
   }
 }
 
+# Deployment group for green instances (blue-green deployment)
+resource "aws_codedeploy_deployment_group" "production_green" {
+  app_name              = aws_codedeploy_app.production.name
+  deployment_group_name  = "bianca-production-green-ec2"
+  service_role_arn       = aws_iam_role.codedeploy_production_service_role.arn
+
+  ec2_tag_filter {
+    key   = "Name"
+    type  = "KEY_AND_VALUE"
+    value = "bianca-production-green"
+  }
+
+  deployment_config_name = "CodeDeployDefault.AllAtOnce"
+
+  auto_rollback_configuration {
+    enabled = true
+    events  = ["DEPLOYMENT_FAILURE"]
+  }
+
+  alarm_configuration {
+    enabled = false
+  }
+
+  tags = {
+    Environment = "production"
+    Name        = "bianca-production-green-ec2"
+  }
+}
+
 ################################################################################
 # UPDATE PRODUCTION INSTANCE TO USE CODEDEPLOY IAM PROFILE
 ################################################################################

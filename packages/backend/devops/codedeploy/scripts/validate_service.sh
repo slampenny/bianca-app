@@ -87,8 +87,9 @@ else
   exit 1
 fi
 
-# Wait a bit for containers to fully start
-sleep 20
+# Wait a bit for containers to fully start and routes to register
+# Backend routes can take time to register after container starts
+sleep 30
 
 # Check container status with retries - if containers aren't running, try to start them
 echo "   Verifying containers are running (with retries if needed)..."
@@ -187,6 +188,78 @@ if [ "$BACKEND_HEALTH_PASSED" = "false" ]; then
   VALIDATION_FAILED=true
 fi
 
+# Check if actual API endpoints are accessible (CRITICAL - health check might pass but routes might not work)
+# Routes can take time to register after the container starts, so we retry
+echo "   Checking API endpoints are registered and accessible (with retries)..."
+API_ENDPOINTS_PASSED=false
+TEST_ENDPOINTS=(
+  "/v1/docs"           # Swagger docs (should return 200 or 301/302)
+  "/v1/auth/login"     # Auth endpoint (should return 400/422 for missing body, not 404)
+)
+
+MAX_ENDPOINT_RETRIES=15
+RETRY_DELAY=3
+ENDPOINT_FAILURES=0
+
+for endpoint in "${TEST_ENDPOINTS[@]}"; do
+  ENDPOINT_PASSED=false
+  for retry in $(seq 1 $MAX_ENDPOINT_RETRIES); do
+    # Use POST for /v1/auth/login (it's a POST-only endpoint)
+    if [ "$endpoint" = "/v1/auth/login" ]; then
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 -X POST -H "Content-Type: application/json" -d '{}' "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
+    else
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "http://localhost:3000${endpoint}" 2>/dev/null || echo "000")
+    fi
+    
+    if [ "$HTTP_CODE" = "000" ]; then
+      if [ $retry -lt $MAX_ENDPOINT_RETRIES ]; then
+        echo "   Endpoint $endpoint: Network error (attempt $retry/$MAX_ENDPOINT_RETRIES), retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+        continue
+      else
+        echo "   ❌ Endpoint $endpoint: Network error (cannot connect after $MAX_ENDPOINT_RETRIES attempts)" >&2
+        ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+        break
+      fi
+    elif [ "$HTTP_CODE" = "404" ]; then
+      if [ $retry -lt $MAX_ENDPOINT_RETRIES ]; then
+        echo "   Endpoint $endpoint: Route not registered yet (HTTP 404, attempt $retry/$MAX_ENDPOINT_RETRIES), retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+        continue
+      else
+        echo "   ❌ Endpoint $endpoint: Not found (route not registered) (HTTP 404 after $MAX_ENDPOINT_RETRIES attempts)" >&2
+        ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+        break
+      fi
+    elif [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 500 ]; then
+      # 200-499 means the route exists (even if it's a 400/422 for validation errors, that's fine)
+      echo "   ✅ Endpoint $endpoint: Route registered (HTTP $HTTP_CODE, attempt $retry)"
+      ENDPOINT_PASSED=true
+      break
+    else
+      if [ $retry -lt $MAX_ENDPOINT_RETRIES ]; then
+        echo "   Endpoint $endpoint: Unexpected response (HTTP $HTTP_CODE, attempt $retry/$MAX_ENDPOINT_RETRIES), retrying in ${RETRY_DELAY}s..."
+        sleep $RETRY_DELAY
+        continue
+      else
+        echo "   ⚠️  Endpoint $endpoint: Unexpected response (HTTP $HTTP_CODE after $MAX_ENDPOINT_RETRIES attempts)" >&2
+        ENDPOINT_FAILURES=$((ENDPOINT_FAILURES + 1))
+        break
+      fi
+    fi
+  done
+done
+
+if [ "$ENDPOINT_FAILURES" -eq 0 ]; then
+  echo "   ✅ All API endpoints are registered and accessible"
+  API_ENDPOINTS_PASSED=true
+else
+  echo "   ❌ $ENDPOINT_FAILURES endpoint(s) failed - routes may not be registered" >&2
+  echo "   Checking backend logs for route registration..." >&2
+  docker logs ${CONTAINER_PREFIX}_app --tail 100 2>&1 | grep -i "route\|listening\|started\|error" | tail -20 || true
+  VALIDATION_FAILED=true
+fi
+
 # Check if nginx is responding on port 80 (REQUIRED for public access)
 echo "   Checking nginx on port 80..."
 NGINX_HEALTH_PASSED=false
@@ -209,24 +282,41 @@ if [ "$NGINX_HEALTH_PASSED" = "false" ]; then
   VALIDATION_FAILED=true
 fi
 
-# Check if public URLs are accessible through ALB (CRITICAL - this is what users actually hit)
-echo ""
-echo "   Checking public URLs through ALB..."
-PUBLIC_URLS_PASSED=true
+# Check if this is a green instance (blue-green deployment)
+# Green instances aren't registered with ALB yet, so public URL checks will fail
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null || echo "")
+DEPLOYMENT_TYPE=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`DeploymentType`].Value' --output text 2>/dev/null || echo "")
+IS_GREEN_INSTANCE=false
 
-if [ "$DETECTED_ENV" = "staging" ]; then
+if [ "$DEPLOYMENT_TYPE" = "green" ]; then
+  IS_GREEN_INSTANCE=true
+  echo ""
+  echo "   ℹ️  Detected green instance (DeploymentType=green)"
+  echo "   Skipping public URL checks - instance will be registered with ALB during SwapAndTerminate stage"
+  PUBLIC_URLS_PASSED=true
+  FRONTEND_URL=""
+  API_URL=""
+elif [ "$DETECTED_ENV" = "staging" ]; then
   FRONTEND_URL="https://staging.biancawellness.com"
   API_URL="https://staging-api.biancawellness.com"
 elif [ "$DETECTED_ENV" = "production" ]; then
   FRONTEND_URL="https://app.biancawellness.com"
   API_URL="https://api.biancawellness.com"
 else
+  echo ""
   echo "   ⚠️  Unknown environment, skipping public URL checks"
+  PUBLIC_URLS_PASSED=true
   FRONTEND_URL=""
   API_URL=""
 fi
 
-if [ -n "$FRONTEND_URL" ]; then
+# Only check public URLs if this is NOT a green instance
+if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
+  echo ""
+  echo "   Checking public URLs through ALB..."
+  PUBLIC_URLS_PASSED=true
+
+  if [ -n "$FRONTEND_URL" ]; then
   echo "   Testing frontend URL: $FRONTEND_URL"
   FRONTEND_PUBLIC_PASSED=false
   for i in {1..10}; do
@@ -251,10 +341,10 @@ if [ -n "$FRONTEND_URL" ]; then
     echo "   This means users cannot access the site!" >&2
     PUBLIC_URLS_PASSED=false
   fi
-fi
+  fi
 
-if [ -n "$API_URL" ]; then
-  echo "   Testing API URL: $API_URL/health"
+  if [ -n "$API_URL" ]; then
+    echo "   Testing API URL: $API_URL/health"
   API_PUBLIC_PASSED=false
   for i in {1..10}; do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$API_URL/health" 2>/dev/null || echo "000")
@@ -278,19 +368,45 @@ if [ -n "$API_URL" ]; then
     echo "   This means users cannot access the API!" >&2
     PUBLIC_URLS_PASSED=false
   fi
-fi
+  
+  # Also test an actual API endpoint through the public URL (not just health)
+  echo "   Testing actual API endpoint through public URL: $API_URL/docs"
+  API_ENDPOINT_PUBLIC_PASSED=false
+  for i in {1..5}; do
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$API_URL/docs" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
+      echo "   ✅ API endpoint accessible through public URL (HTTP $HTTP_CODE, attempt $i)"
+      API_ENDPOINT_PUBLIC_PASSED=true
+      break
+    fi
+    if [ "$HTTP_CODE" = "000" ]; then
+      echo "   API endpoint check attempt $i/5 failed (network error), retrying in 3 seconds..."
+    elif [ "$HTTP_CODE" = "404" ]; then
+      echo "   ⚠️  API endpoint returned 404 (route may not be accessible through ALB)" >&2
+    else
+      echo "   API endpoint check attempt $i/5 failed (HTTP $HTTP_CODE), retrying in 3 seconds..."
+    fi
+    sleep 3
+  done
+  
+  if [ "$API_ENDPOINT_PUBLIC_PASSED" = "false" ]; then
+    echo "   ⚠️  API endpoint check through public URL failed (this may indicate ALB routing issues)" >&2
+    # Don't fail validation for this, but warn
+  fi
+  fi
 
-if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
-  echo ""
-  echo "   ⚠️  CRITICAL: Public URLs are not accessible!" >&2
-  echo "   This means the deployment appears successful locally but users cannot access it." >&2
-  echo "   Possible causes:" >&2
-  echo "   1. Instance not registered with ALB target groups" >&2
-  echo "   2. ALB target group health checks failing" >&2
-  echo "   3. Security group rules blocking traffic" >&2
-  echo "   4. DNS not pointing to ALB" >&2
-  echo "   5. Maintenance mode still enabled" >&2
-  VALIDATION_FAILED=true
+  if [ "$PUBLIC_URLS_PASSED" = "false" ]; then
+    echo ""
+    echo "   ⚠️  CRITICAL: Public URLs are not accessible!" >&2
+    echo "   This means the deployment appears successful locally but users cannot access it." >&2
+    echo "   Possible causes:" >&2
+    echo "   1. Instance not registered with ALB target groups" >&2
+    echo "   2. ALB target group health checks failing" >&2
+    echo "   3. Security group rules blocking traffic" >&2
+    echo "   4. DNS not pointing to ALB" >&2
+    echo "   5. Maintenance mode still enabled" >&2
+    VALIDATION_FAILED=true
+  fi
 fi
 
 # Disable maintenance mode once deployment is validated
@@ -309,6 +425,7 @@ if [ "$VALIDATION_FAILED" = "true" ]; then
   echo "   - Backend container must be running"
   echo "   - Nginx container must be running"
   echo "   - Backend health endpoint must respond (localhost:3000/health)"
+  echo "   - API endpoints must be registered and accessible (localhost:3000/v1/*)"
   echo "   - Nginx must respond on port 80 (localhost:80)"
   if [ -n "$FRONTEND_URL" ] || [ -n "$API_URL" ]; then
     echo "   - Public URLs must be accessible through ALB"

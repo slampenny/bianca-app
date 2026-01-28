@@ -1,0 +1,205 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Starting blue-green swap
+      - echo API Target Group ARN is ${API_TARGET_GROUP_ARN}
+      - echo Frontend Target Group ARN is ${FRONTEND_TARGET_GROUP_ARN}
+
+  build:
+    commands:
+      - |
+        # Read instance info from previous stages
+        # Try to find instance-info.txt in the artifact
+        if [ -f instance-info.txt ]; then
+          source instance-info.txt
+        elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
+          source ../CreateGreenInstance/instance-info.txt
+        else
+          echo "⚠️  Warning: instance-info.txt not found, attempting to discover instances..."
+        fi
+        
+        GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+        BLUE_TAG="${BLUE_TAG:-bianca-staging}"
+        # Find green instance if not in file
+        if [ -z "$GREEN_INSTANCE_ID" ]; then
+          echo "Finding green instance..."
+          GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+        fi
+        
+        if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
+          echo "❌ ERROR: Green instance not found!"
+          echo "   Cannot proceed with swap - green instance must exist"
+          exit 1
+        fi
+        
+        echo "Green instance: $GREEN_INSTANCE_ID"
+        
+        # Find blue instance if not in file
+        if [ -z "$BLUE_INSTANCE_ID" ]; then
+          echo "Finding blue instance..."
+          BLUE_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$BLUE_TAG" \
+                      "Name=tag:DeploymentType,Values=!green" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+        fi
+        
+        if [ -z "$BLUE_INSTANCE_ID" ] || [ "$BLUE_INSTANCE_ID" = "None" ]; then
+          echo "⚠️  No blue instance found (this might be the first deployment)"
+          BLUE_INSTANCE_ID=""
+        else
+          echo "Blue instance: $BLUE_INSTANCE_ID"
+        fi
+        
+        # Verify green instance is healthy before swapping
+        echo "Verifying green instance is healthy..."
+        GREEN_HEALTH=$(aws elbv2 describe-target-health \
+          --target-group-arn ${API_TARGET_GROUP_ARN} \
+          --targets Id=$GREEN_INSTANCE_ID \
+          --query 'TargetHealthDescriptions[0].TargetHealth.State' \
+          --output text 2>/dev/null || echo "unused")
+        
+        if [ "$GREEN_HEALTH" != "healthy" ] && [ "$GREEN_HEALTH" != "unused" ]; then
+          echo "⚠️  Warning: Green instance health check shows: $GREEN_HEALTH"
+          echo "   This might be normal if it's not yet registered with target group"
+        fi
+        
+        # Step 1: Register green instance with ALB target groups
+        echo ""
+        echo "Step 1: Registering green instance with ALB target groups..."
+        
+        # Register with API target group (port 3000)
+        echo "  Registering with API target group (port 3000)..."
+        aws elbv2 register-targets \
+          --target-group-arn ${API_TARGET_GROUP_ARN} \
+          --targets Id=$GREEN_INSTANCE_ID,Port=3000 || {
+          echo "  ⚠️  Warning: Failed to register with API target group (might already be registered)"
+        }
+        
+        # Register with Frontend target group (port 80)
+        echo "  Registering with Frontend target group (port 80)..."
+        aws elbv2 register-targets \
+          --target-group-arn ${FRONTEND_TARGET_GROUP_ARN} \
+          --targets Id=$GREEN_INSTANCE_ID,Port=80 || {
+          echo "  ⚠️  Warning: Failed to register with Frontend target group (might already be registered)"
+        }
+        
+        echo "  ✅ Green instance registered with target groups"
+        
+        # Wait for target to become healthy
+        echo ""
+        echo "Step 2: Waiting for green instance to become healthy in target groups..."
+        MAX_WAIT=300  # 5 minutes max
+        ELAPSED=0
+        HEALTHY=false
+        
+        while [ $ELAPSED -lt $MAX_WAIT ]; do
+          API_HEALTH=$(aws elbv2 describe-target-health \
+            --target-group-arn ${API_TARGET_GROUP_ARN} \
+            --targets Id=$GREEN_INSTANCE_ID \
+            --query 'TargetHealthDescriptions[0].TargetHealth.State' \
+            --output text 2>/dev/null || echo "unused")
+          
+          FRONTEND_HEALTH=$(aws elbv2 describe-target-health \
+            --target-group-arn ${FRONTEND_TARGET_GROUP_ARN} \
+            --targets Id=$GREEN_INSTANCE_ID \
+            --query 'TargetHealthDescriptions[0].TargetHealth.State' \
+            --output text 2>/dev/null || echo "unused")
+          
+          if [ "$API_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" = "healthy" ]; then
+            echo "  ✅ Green instance is healthy in both target groups!"
+            HEALTHY=true
+            break
+          fi
+          
+          echo "  API: $API_HEALTH, Frontend: $FRONTEND_HEALTH (waiting...)"
+          sleep 10
+          ELAPSED=$((ELAPSED + 10))
+        done
+        
+        if [ "$HEALTHY" != "true" ]; then
+          echo "❌ ERROR: Green instance did not become healthy within timeout"
+          echo "   API Health: $API_HEALTH"
+          echo "   Frontend Health: $FRONTEND_HEALTH"
+          echo ""
+          echo "   CRITICAL: Cannot swap traffic to unhealthy green instance!"
+          echo "   This would cause downtime. Blue instance will remain serving traffic."
+          echo "   Please investigate why green instance is not healthy."
+          exit 1
+        fi
+        
+        # Step 3: Deregister blue instance from target groups (if it exists)
+        if [ -n "$BLUE_INSTANCE_ID" ]; then
+          echo ""
+          echo "Step 3: Deregistering blue instance from target groups..."
+          
+          # Deregister from API target group
+          echo "  Deregistering from API target group..."
+          aws elbv2 deregister-targets \
+            --target-group-arn ${API_TARGET_GROUP_ARN} \
+            --targets Id=$BLUE_INSTANCE_ID,Port=3000 || {
+            echo "  ⚠️  Blue instance not registered with API target group (might have been removed)"
+          }
+          
+          # Deregister from Frontend target group
+          echo "  Deregistering from Frontend target group..."
+          aws elbv2 deregister-targets \
+            --target-group-arn ${FRONTEND_TARGET_GROUP_ARN} \
+            --targets Id=$BLUE_INSTANCE_ID,Port=80 || {
+            echo "  ⚠️  Blue instance not registered with Frontend target group (might have been removed)"
+          }
+          
+          echo "  ✅ Blue instance deregistered from target groups"
+          
+          # Wait a moment for connections to drain
+          echo "  Waiting 30 seconds for connections to drain..."
+          sleep 30
+          
+          # Step 4: Terminate blue instance
+          echo ""
+          echo "Step 4: Terminating blue instance..."
+          aws ec2 terminate-instances --instance-ids $BLUE_INSTANCE_ID
+          echo "  ✅ Blue instance termination initiated: $BLUE_INSTANCE_ID"
+          
+          # Wait for termination to complete
+          echo "  Waiting for blue instance to terminate..."
+          aws ec2 wait instance-terminated --instance-ids $BLUE_INSTANCE_ID
+          echo "  ✅ Blue instance terminated"
+        else
+          echo ""
+          echo "Step 3: No blue instance to terminate (first deployment or already terminated)"
+        fi
+        
+        # Step 5: Rename green instance to become the new "blue" for next deployment
+        echo ""
+        echo "Step 5: Renaming green instance to '$BLUE_TAG' for next deployment..."
+        aws ec2 create-tags \
+          --resources $GREEN_INSTANCE_ID \
+          --tags Key=Name,Value=$BLUE_TAG Key=DeploymentType,Value=blue || {
+          echo "  ⚠️  Warning: Failed to rename instance (non-critical)"
+        }
+        
+        # Remove green tag
+        aws ec2 delete-tags \
+          --resources $GREEN_INSTANCE_ID \
+          --tags Key=Name,Value=$GREEN_TAG || {
+          echo "  ⚠️  Warning: Failed to remove green tag (non-critical)"
+        }
+        
+        echo ""
+        echo "✅ Blue-green deployment swap completed successfully!"
+        echo "   Green instance is now serving traffic"
+        if [ -n "$BLUE_INSTANCE_ID" ]; then
+          echo "   Old blue instance has been terminated"
+        fi
+
+  post_build:
+    commands:
+      - echo "Blue-green deployment swap completed"

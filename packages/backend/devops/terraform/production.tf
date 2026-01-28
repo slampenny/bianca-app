@@ -193,6 +193,14 @@ resource "aws_iam_role_policy" "production_policy" {
           "secretsmanager:*"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:DescribeTags"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -257,6 +265,47 @@ resource "aws_launch_template" "production" {
     tags = {
       Name        = "bianca-production"
       Environment = "production"
+    }
+  }
+}
+
+# Production Launch Template for GREEN instances (blue-green deployment)
+# Same as production but no EIP - userdata falls back to instance metadata when eip_address is empty
+resource "aws_launch_template" "production_green" {
+  name_prefix   = "bianca-production-green-"
+  image_id      = data.aws_ami.amazon_linux_2.id
+  instance_type = "t3.small"
+  key_name      = var.asterisk_key_pair_name
+
+  vpc_security_group_ids = [aws_security_group.production.id]
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.production_profile.name
+  }
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      volume_size = 50
+      volume_type = "gp3"
+    }
+  }
+
+  user_data = base64encode(templatefile("${path.module}/production-userdata.sh", {
+    region         = var.aws_region
+    aws_account_id = var.aws_account_id
+    environment    = "production"
+    eip_address    = ""
+  }))
+
+  update_default_version = true
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name           = "bianca-production-green"
+      Environment    = "production"
+      DeploymentType = "green"
     }
   }
 }

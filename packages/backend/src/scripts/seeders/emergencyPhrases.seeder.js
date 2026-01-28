@@ -28,7 +28,7 @@ function getPhrasesForLanguage(language) {
       // CRITICAL - Safety
       { phrase: 'suicide', pattern: '\\b(suicide|killing\\s+myself|kill\\s+myself|want\\s+to\\s+die|end\\s+my\\s+life)\\b', severity: 'CRITICAL', category: 'Safety', description: 'Suicide threat' },
       // HIGH - Physical
-      { phrase: 'fell down', pattern: '\\b(i\\s+fell|fell\\s+down|i\\s+tripped|i\\s+slipped)\\b', severity: 'HIGH', category: 'Physical', description: 'Fall incident' },
+      { phrase: 'fell down', pattern: '\\b(i\\s+(?:\\\'ve\\s+|have\\s+)?(?:fallen|fell)|i\\\'?ve\\s+(?:fallen|fell)|i\\s+have\\s+(?:fallen|fell)|(?:i\\s+)?(?:\\\'ve\\s+|have\\s+)?fallen|fell\\s+down|fallen\\s+down|i\\\'?m\\s+falling|i\\s+am\\s+falling|i\\\'?ve\\s+tripped|i\\s+have\\s+tripped|i\\s+tripped|i\\\'?ve\\s+slipped|i\\s+have\\s+slipped|i\\s+slipped)\\b', severity: 'HIGH', category: 'Physical', description: 'Fall incident' },
       { phrase: "can't get up", pattern: '\\b(can\'?t\\s+get\\s+up|unable\\s+to\\s+get\\s+up|cannot\\s+get\\s+up)\\b', severity: 'HIGH', category: 'Physical', description: 'Unable to get up after fall' },
       // HIGH - Medical
       { phrase: 'chest pain', pattern: '\\b(chest\\s+pain|chest\\s+ache|chest\\s+pressure)\\b', severity: 'HIGH', category: 'Medical', description: 'Chest pain or pressure' },

@@ -1,0 +1,151 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting blue-green deployment - Creating green instance"
+      - |
+        echo "Configuration Launch Template ${LAUNCH_TEMPLATE_NAME} Subnet ${SUBNET_ID} Security Group ${SECURITY_GROUP_ID}"
+      - |
+        if [ -z "${LAUNCH_TEMPLATE_NAME}" ]; then
+          echo "ERROR: LAUNCH_TEMPLATE_NAME is not set"
+          exit 1
+        fi
+        if [ -z "${SUBNET_ID}" ]; then
+          echo "ERROR: SUBNET_ID is not set"
+          exit 1
+        fi
+        if [ -z "${SECURITY_GROUP_ID}" ]; then
+          echo "ERROR: SECURITY_GROUP_ID is not set"
+          exit 1
+        fi
+        echo "All required environment variables are set"
+  build:
+    commands:
+      - |
+        GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+        BLUE_TAG="${BLUE_TAG:-bianca-staging}"
+        ENVIRONMENT_TAG="${ENVIRONMENT_TAG:-staging}"
+        echo "Verifying launch template exists..."
+        ACTUAL_LAUNCH_TEMPLATE_NAME=$(aws ec2 describe-launch-templates --launch-template-names ${LAUNCH_TEMPLATE_NAME} --query 'LaunchTemplates[0].LaunchTemplateName' --output text 2>/dev/null || aws ec2 describe-launch-templates --filters "Name=launch-template-name,Values=${LAUNCH_TEMPLATE_NAME}*" --query 'LaunchTemplates[0].LaunchTemplateName' --output text)
+        if [ -z "$ACTUAL_LAUNCH_TEMPLATE_NAME" ] || [ "$ACTUAL_LAUNCH_TEMPLATE_NAME" = "None" ]; then
+          echo "ERROR: Failed to find launch template"
+          aws ec2 describe-launch-templates --query 'LaunchTemplates[*].[LaunchTemplateName,LaunchTemplateId]' --output table
+          exit 1
+        fi
+        echo "Found launch template: $ACTUAL_LAUNCH_TEMPLATE_NAME"
+        LAUNCH_TEMPLATE_VERSION=$(aws ec2 describe-launch-template-versions --launch-template-name $ACTUAL_LAUNCH_TEMPLATE_NAME --versions '$Latest' --query 'LaunchTemplateVersions[0].VersionNumber' --output text 2>&1)
+        if [ $? -ne 0 ] || [ -z "$LAUNCH_TEMPLATE_VERSION" ] || [ "$LAUNCH_TEMPLATE_VERSION" = "None" ]; then
+          echo "ERROR: Failed to get launch template version"
+          exit 1
+        fi
+        echo "Using launch template: $ACTUAL_LAUNCH_TEMPLATE_NAME, version: $LAUNCH_TEMPLATE_VERSION"
+        
+        # Cleanup: Terminate any existing green instances to prevent accumulation
+        echo "Checking for existing green instances to clean up..."
+        EXISTING_GREEN_INSTANCES=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=${GREEN_TAG:-bianca-staging-green}" \
+                    "Name=instance-state-name,Values=running,pending" \
+          --query 'Reservations[*].Instances[*].InstanceId' \
+          --output text 2>/dev/null || echo "")
+        
+        if [ -n "$EXISTING_GREEN_INSTANCES" ] && [ "$EXISTING_GREEN_INSTANCES" != "None" ]; then
+          echo "Found existing green instances to terminate:"
+          for INSTANCE_ID in $EXISTING_GREEN_INSTANCES; do
+            echo "  - $INSTANCE_ID"
+          done
+          echo "Terminating existing green instances..."
+          aws ec2 terminate-instances --instance-ids $EXISTING_GREEN_INSTANCES --query 'TerminatingInstances[*].[InstanceId,CurrentState.Name]' --output table
+          echo "Waiting for instances to start terminating..."
+          sleep 10
+          echo "Note: Instances are terminating in background. New green instance will be created now."
+        else
+          echo "No existing green instances found - clean slate!"
+        fi
+        
+        BLUE_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${BLUE_TAG:-bianca-staging}" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "")
+        if [ -n "$BLUE_INSTANCE_ID" ] && [ "$BLUE_INSTANCE_ID" != "None" ]; then
+          echo "Found blue instance: $BLUE_INSTANCE_ID"
+          echo "BLUE_INSTANCE_ID=$BLUE_INSTANCE_ID" >> instance-info.txt
+        fi
+        echo "Creating new green instance..."
+        ENV_TAG="${ENVIRONMENT_TAG:-staging}"
+        GREEN_INSTANCE_ID=$(aws ec2 run-instances --launch-template LaunchTemplateName=$ACTUAL_LAUNCH_TEMPLATE_NAME,Version=$LAUNCH_TEMPLATE_VERSION --subnet-id ${SUBNET_ID} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$GREEN_TAG},{Key=Environment,Value=$ENV_TAG},{Key=DeploymentType,Value=green}]" --query 'Instances[0].InstanceId' --output text 2>&1)
+        if [ $? -ne 0 ] || [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
+          echo "ERROR: Failed to create green instance"
+          echo "Output: $GREEN_INSTANCE_ID"
+          exit 1
+        fi
+        echo "Green instance created: $GREEN_INSTANCE_ID"
+        echo "GREEN_INSTANCE_ID=$GREEN_INSTANCE_ID" >> instance-info.txt
+        echo "Waiting for green instance to be running..."
+        if ! aws ec2 wait instance-running --instance-ids $GREEN_INSTANCE_ID; then
+          echo "ERROR: Instance failed to reach running state"
+          aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].State' --output json
+          exit 1
+        fi
+        echo "Green instance is running"
+        MAX_WAIT=300
+        ELAPSED=0
+        while [ $ELAPSED -lt $MAX_WAIT ]; do
+          STATUS=$(aws ec2 describe-instance-status --instance-ids $GREEN_INSTANCE_ID --query 'InstanceStatuses[0].InstanceStatus.Status' --output text 2>/dev/null || echo "initializing")
+          SYSTEM_STATUS=$(aws ec2 describe-instance-status --instance-ids $GREEN_INSTANCE_ID --query 'InstanceStatuses[0].SystemStatus.Status' --output text 2>/dev/null || echo "initializing")
+          if [ "$STATUS" = "ok" ] && [ "$SYSTEM_STATUS" = "ok" ]; then
+            echo "Instance status checks passed!"
+            break
+          fi
+          echo "Status: $STATUS, System: $SYSTEM_STATUS (waiting...)"
+          sleep 10
+          ELAPSED=$((ELAPSED + 10))
+        done
+        if [ $ELAPSED -ge $MAX_WAIT ]; then
+          echo "WARNING: Instance status checks did not pass within timeout, but continuing..."
+        fi
+        GREEN_INSTANCE_IP=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+        echo "Green instance IP: $GREEN_INSTANCE_IP"
+        echo "GREEN_INSTANCE_IP=$GREEN_INSTANCE_IP" >> instance-info.txt
+        
+        # Verify instance is tagged correctly for CodeDeploy
+        echo "Verifying instance tags..."
+        INSTANCE_NAME=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text)
+        if [ "$INSTANCE_NAME" != "$GREEN_TAG" ]; then
+          echo "ERROR: Instance name tag is incorrect: $INSTANCE_NAME (expected: $GREEN_TAG)"
+          exit 1
+        fi
+        echo "Instance tags verified: Name=$INSTANCE_NAME"
+        
+        # Wait for CodeDeploy agent to be ready
+        # CodeDeploy agent installation and registration can take 2-3 minutes after instance launch
+        echo "Waiting for CodeDeploy agent to be ready (this can take 2-3 minutes)..."
+        echo "The userdata script installs and starts the CodeDeploy agent, but it needs time to register with AWS."
+        sleep 120  # Wait 2 minutes for agent installation and registration
+        
+        echo "Green instance created and ready: $GREEN_INSTANCE_ID"
+        echo "Note: If CodeDeploy fails, the agent may need more time. Check instance logs if needed."
+  post_build:
+    commands:
+      - |
+        if [ -f instance-info.txt ]; then
+          cat instance-info.txt
+          echo "Instance information saved for next pipeline stages"
+        else
+          echo "WARNING: instance-info.txt not found"
+          exit 1
+        fi
+      - |
+        if [ -f instance-info.txt ]; then
+          source instance-info.txt
+          if [ -n "$GREEN_INSTANCE_ID" ]; then
+            INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo "unknown")
+            echo "Final instance state: $INSTANCE_STATE"
+            if [ "$INSTANCE_STATE" != "running" ]; then
+              echo "ERROR: Green instance is not in running state: $INSTANCE_STATE"
+              exit 1
+            fi
+            echo "Green instance verification passed"
+          fi
+        fi
+artifacts:
+  files:
+    - instance-info.txt
+  name: GreenInstanceOutput

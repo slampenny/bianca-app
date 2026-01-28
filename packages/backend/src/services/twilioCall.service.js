@@ -293,6 +293,41 @@ class TwilioCallService {
   }
 
   /**
+   * Disconnect OpenAI connection if voicemail is detected
+   * @param {string} callSid - The call SID
+   * @param {Object} call - The call record
+   */
+  async disconnectOpenAIForVoicemail(callSid, call) {
+    try {
+      const { getOpenAIServiceInstance } = require('./openai.realtime.service');
+      const openAIService = getOpenAIServiceInstance();
+      
+      // Try to find the connection by callSid (which is the primary identifier)
+      if (openAIService.connections.has(callSid)) {
+        logger.info(`[Twilio Service] Disconnecting OpenAI connection for voicemail call ${callSid}`);
+        await openAIService.disconnect(callSid);
+        return;
+      }
+      
+      // Also try to find by conversationId if callSid doesn't match
+      if (call.conversationId) {
+        for (const [connCallId, conn] of openAIService.connections.entries()) {
+          if (conn.conversationId && conn.conversationId.toString() === call.conversationId.toString()) {
+            logger.info(`[Twilio Service] Disconnecting OpenAI connection for voicemail call ${callSid} (found via conversationId: ${connCallId})`);
+            await openAIService.disconnect(connCallId);
+            return;
+          }
+        }
+      }
+      
+      logger.debug(`[Twilio Service] No OpenAI connection found to disconnect for voicemail call ${callSid}`);
+    } catch (error) {
+      logger.error(`[Twilio Service] Error disconnecting OpenAI for voicemail ${callSid}: ${error.message}`);
+      // Don't throw - continue with voicemail handling even if disconnect fails
+    }
+  }
+
+  /**
    * Handle call status updates
    * @param {Object} req - Express request object
    */
@@ -315,6 +350,9 @@ class TwilioCallService {
         case 'completed':
           // Check if this was actually a voicemail (completed but answered by machine)
           if (isVoicemail) {
+            // Disconnect OpenAI if it's still connected
+            await this.disconnectOpenAIForVoicemail(CallSid, call);
+            
             // Treat as voicemail - same logic as machine case
             call.endTime = new Date();
             call.callEndTime = new Date();
@@ -506,6 +544,9 @@ class TwilioCallService {
         
         case 'machine':
           // Answering machine detected - treat as voicemail
+          // Disconnect OpenAI if it's still connected
+          await this.disconnectOpenAIForVoicemail(CallSid, call);
+          
           call.endTime = new Date();
           call.callEndTime = new Date();
           call.status = 'failed';
@@ -577,12 +618,128 @@ class TwilioCallService {
               call.callStatus = 'initiating';
               break;
             case 'in-progress':
-              call.status = 'in-progress';
-              call.callStatus = 'connected';
+              // CRITICAL: Check for voicemail in 'in-progress' status - this catches voicemail detection
+              // that happens after the call is already connected to OpenAI
+              if (isVoicemail) {
+                logger.warn(`[Twilio Service] Voicemail detected in 'in-progress' status for ${CallSid} - disconnecting OpenAI immediately`);
+                await this.disconnectOpenAIForVoicemail(CallSid, call);
+                // Hang up the call via Twilio
+                try {
+                  await this.hangupCall(CallSid);
+                } catch (hangupError) {
+                  logger.error(`[Twilio Service] Error hanging up voicemail call ${CallSid}: ${hangupError.message}`);
+                }
+                // Handle as voicemail - update call and process retry/alert logic
+                call.endTime = new Date();
+                call.callEndTime = new Date();
+                call.status = 'failed';
+                call.callOutcome = 'voicemail';
+                call.cost = this.calculateCallCost(call.duration || 0);
+                await call.save();
+                
+                // Get patient and org for retry logic
+                const inProgressVoicemailPatient = await Patient.findById(call.patientId).populate('org');
+                const inProgressVoicemailOrg = inProgressVoicemailPatient?.org;
+                
+                // Schedule retry if org has retry settings enabled
+                if (inProgressVoicemailOrg && inProgressVoicemailOrg.callRetrySettings && inProgressVoicemailOrg.callRetrySettings.retryCount > 0) {
+                  try {
+                    await this.scheduleRetryCall(call, inProgressVoicemailOrg);
+                  } catch (retryError) {
+                    logger.error(`[Twilio Service] Failed to schedule retry: ${retryError.message}`);
+                  }
+                }
+                
+                // Create alert for voicemail call
+                const inProgressVoicemailAlertOnAllMissedCalls = inProgressVoicemailOrg?.callRetrySettings?.alertOnAllMissedCalls !== false;
+                const inProgressVoicemailCurrentRetryAttempt = call.retryAttempt || 0;
+                const inProgressVoicemailMaxRetries = inProgressVoicemailOrg?.callRetrySettings?.retryCount || 2;
+                const inProgressVoicemailShouldAlert = inProgressVoicemailAlertOnAllMissedCalls || inProgressVoicemailCurrentRetryAttempt >= inProgressVoicemailMaxRetries;
+                
+                if (inProgressVoicemailShouldAlert) {
+                  try {
+                    await alertService.createAlert({
+                      message: 'Wellness check call went to voicemail',
+                      importance: 'medium',
+                      alertType: 'patient',
+                      relatedPatient: call.patientId,
+                      relatedCall: call._id,
+                      createdBy: call.patientId,
+                      createdModel: 'Patient',
+                      visibility: 'assignedCaregivers',
+                      relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                    });
+                    logger.info(`[Twilio Service] Created alert for voicemail call ${CallSid}`);
+                  } catch (alertError) {
+                    logger.error(`[Twilio Service] Failed to create alert for voicemail ${CallSid}: ${alertError.message}`, alertError);
+                  }
+                }
+              } else {
+                call.status = 'in-progress';
+                call.callStatus = 'connected';
+              }
               break;
             case 'answered':
-              call.status = 'in-progress';
-              call.callStatus = 'answered';
+              // CRITICAL: Check for voicemail in 'answered' status - this catches voicemail detection
+              // that happens after the call is already connected to OpenAI
+              if (isVoicemail) {
+                logger.warn(`[Twilio Service] Voicemail detected in 'answered' status for ${CallSid} - disconnecting OpenAI immediately`);
+                await this.disconnectOpenAIForVoicemail(CallSid, call);
+                // Hang up the call via Twilio
+                try {
+                  await this.hangupCall(CallSid);
+                } catch (hangupError) {
+                  logger.error(`[Twilio Service] Error hanging up voicemail call ${CallSid}: ${hangupError.message}`);
+                }
+                // Handle as voicemail - update call and process retry/alert logic
+                call.endTime = new Date();
+                call.callEndTime = new Date();
+                call.status = 'failed';
+                call.callOutcome = 'voicemail';
+                call.cost = this.calculateCallCost(call.duration || 0);
+                await call.save();
+                
+                // Get patient and org for retry logic
+                const earlyVoicemailPatient = await Patient.findById(call.patientId).populate('org');
+                const earlyVoicemailOrg = earlyVoicemailPatient?.org;
+                
+                // Schedule retry if org has retry settings enabled
+                if (earlyVoicemailOrg && earlyVoicemailOrg.callRetrySettings && earlyVoicemailOrg.callRetrySettings.retryCount > 0) {
+                  try {
+                    await this.scheduleRetryCall(call, earlyVoicemailOrg);
+                  } catch (retryError) {
+                    logger.error(`[Twilio Service] Failed to schedule retry: ${retryError.message}`);
+                  }
+                }
+                
+                // Create alert for voicemail call
+                const earlyVoicemailAlertOnAllMissedCalls = earlyVoicemailOrg?.callRetrySettings?.alertOnAllMissedCalls !== false;
+                const earlyVoicemailCurrentRetryAttempt = call.retryAttempt || 0;
+                const earlyVoicemailMaxRetries = earlyVoicemailOrg?.callRetrySettings?.retryCount || 2;
+                const earlyVoicemailShouldAlert = earlyVoicemailAlertOnAllMissedCalls || earlyVoicemailCurrentRetryAttempt >= earlyVoicemailMaxRetries;
+                
+                if (earlyVoicemailShouldAlert) {
+                  try {
+                    await alertService.createAlert({
+                      message: 'Wellness check call went to voicemail',
+                      importance: 'medium',
+                      alertType: 'patient',
+                      relatedPatient: call.patientId,
+                      relatedCall: call._id,
+                      createdBy: call.patientId,
+                      createdModel: 'Patient',
+                      visibility: 'assignedCaregivers',
+                      relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                    });
+                    logger.info(`[Twilio Service] Created alert for voicemail call ${CallSid}`);
+                  } catch (alertError) {
+                    logger.error(`[Twilio Service] Failed to create alert for voicemail ${CallSid}: ${alertError.message}`, alertError);
+                  }
+                }
+              } else {
+                call.status = 'in-progress';
+                call.callStatus = 'answered';
+              }
               break;
             default:
               // For any other status, keep as initiated

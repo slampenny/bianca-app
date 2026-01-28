@@ -1,26 +1,142 @@
 version: 0.2
 
-# Post-Deployment Validation
-# Tests that the deployed site is actually accessible via public URLs
-# This catches issues like 503 errors, ALB problems, DNS issues, etc.
+# Post-Deployment Validation (Blue-Green)
+# Tests that the green instance is accessible and healthy before swapping traffic
+# For blue-green deployments, we validate the green instance directly by IP
+# before swapping ALB target groups to ensure zero-downtime
 
 phases:
   pre_build:
     commands:
-      - echo "Starting post-deployment validation..."
+      - echo "Starting post-deployment validation (blue-green mode)..."
       - |
         echo "Frontend URL: ${FRONTEND_URL}"
         echo "API URL: ${API_URL}"
         echo "Max retries: ${MAX_RETRIES:-20}"
         echo "Retry delay: ${RETRY_DELAY:-10} seconds"
+        
+        # Read green instance info from previous stage
+        if [ -f instance-info.txt ]; then
+          source instance-info.txt
+          echo "Green instance ID: ${GREEN_INSTANCE_ID:-not found}"
+          echo "Green instance IP: ${GREEN_INSTANCE_IP:-not found}"
+        elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
+          source ../CreateGreenInstance/instance-info.txt
+          echo "Green instance ID: ${GREEN_INSTANCE_ID:-not found}"
+          echo "Green instance IP: ${GREEN_INSTANCE_IP:-not found}"
+        else
+          echo "⚠️  Warning: instance-info.txt not found, attempting to discover green instance..."
+          # Try to find green instance by tags
+          GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+          GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+            GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
+              --instance-ids "$GREEN_INSTANCE_ID" \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text 2>/dev/null || echo "")
+            echo "Found green instance: $GREEN_INSTANCE_ID (IP: $GREEN_INSTANCE_IP)"
+          else
+            echo "❌ ERROR: Cannot find green instance for validation"
+            echo "   This is a blue-green deployment - green instance must exist"
+            echo "   Will NOT validate via public URLs (would test blue instance, not green)"
+            exit 1
+          fi
+        fi
 
   build:
     commands:
       - |
-        # Wait for ALB to register the instance and pass health checks
-        # Containers may be running but ALB needs time to register and health check
-        echo "Waiting 60 seconds for ALB to register instance and pass health checks..."
-        sleep 60
+        # Re-read green instance info (variables from pre_build may not persist)
+        if [ -f instance-info.txt ]; then
+          source instance-info.txt
+        elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
+          source ../CreateGreenInstance/instance-info.txt
+        else
+          # Try to find green instance by tags if not in file
+          GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+          GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" \
+                      "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+            GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
+              --instance-ids "$GREEN_INSTANCE_ID" \
+              --query 'Reservations[0].Instances[0].PublicIpAddress' \
+              --output text 2>/dev/null || echo "")
+            echo "Discovered green instance: $GREEN_INSTANCE_ID (IP: $GREEN_INSTANCE_IP)"
+          fi
+        fi
+        
+        # Determine if we're in blue-green mode (green instance exists)
+        BLUE_GREEN_MODE=false
+        if [ -n "$GREEN_INSTANCE_IP" ] && [ "$GREEN_INSTANCE_IP" != "None" ] && [ "$GREEN_INSTANCE_IP" != "" ]; then
+          BLUE_GREEN_MODE=true
+          echo "🔵 Blue-Green Mode: Validating green instance directly by IP"
+          echo "   Green instance ID: ${GREEN_INSTANCE_ID:-unknown}"
+          echo "   Green instance IP: $GREEN_INSTANCE_IP"
+        else
+          echo "❌ ERROR: Cannot find green instance for validation"
+          echo "   This is a blue-green deployment - green instance must exist"
+          echo "   Will NOT validate via public URLs (would test blue instance, not green)"
+          exit 1
+        fi
+        
+        # Wait for instance/containers to be ready
+        if [ "$BLUE_GREEN_MODE" = "true" ]; then
+          echo "Waiting for green instance containers to be ready..."
+          echo "   This can take 2-3 minutes after CodeDeploy completes..."
+          
+          # Wait up to 5 minutes for containers to be accessible
+          MAX_WAIT=300
+          ELAPSED=0
+          READY=false
+          CONSECUTIVE_SUCCESS=0
+          
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            # Test if we can connect to the instance (use same timeout as test_url)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 --connect-timeout 10 "http://${GREEN_INSTANCE_IP}:3000/health" 2>/dev/null || echo "000")
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+              CONSECUTIVE_SUCCESS=$((CONSECUTIVE_SUCCESS + 1))
+              if [ $((ELAPSED % 30)) -eq 0 ] || [ $CONSECUTIVE_SUCCESS -eq 1 ]; then
+                echo "   ✅ Green instance health check passed (HTTP $HTTP_CODE, ${CONSECUTIVE_SUCCESS} consecutive, after ${ELAPSED}s)"
+              fi
+              
+              # Require 3 consecutive successful checks to ensure stability
+              if [ $CONSECUTIVE_SUCCESS -ge 3 ]; then
+                echo "   ✅ Green instance is ready and stable (HTTP $HTTP_CODE after ${ELAPSED}s)"
+                READY=true
+                break
+              fi
+            else
+              CONSECUTIVE_SUCCESS=0
+              if [ $((ELAPSED % 30)) -eq 0 ]; then
+                echo "   Waiting... (${ELAPSED}s/${MAX_WAIT}s) - HTTP code: $HTTP_CODE"
+              fi
+            fi
+            
+            sleep 10
+            ELAPSED=$((ELAPSED + 10))
+          done
+          
+          if [ "$READY" != "true" ]; then
+            echo "   ⚠️  Warning: Green instance not fully ready after ${MAX_WAIT}s, but continuing with validation..."
+          else
+            # Add a small delay after readiness check to ensure stability
+            echo "   Waiting 10 seconds to ensure instance stability before validation..."
+            sleep 10
+          fi
+        else
+          echo "Waiting 60 seconds for ALB to register instance and pass health checks..."
+          sleep 60
+        fi
         
         # Function to test URL with retries
         test_url() {
@@ -48,6 +164,9 @@ phases:
             elif [ "$HTTP_CODE" = "000" ]; then
               echo "⚠️  $description connection failed (attempt $attempt/$max_retries) - may still be deploying"
               echo "   Error: ${RESPONSE_BODY:0:200}"
+              echo "   DEBUG: This usually means connection refused or timeout"
+              echo "   DEBUG: Check security groups allow access from CodeBuild IP ranges"
+              echo "   DEBUG: Or instance may not be ready yet"
             elif [ "$HTTP_CODE" = "502" ] || [ "$HTTP_CODE" = "504" ]; then
               echo "⚠️  $description returned HTTP $HTTP_CODE Bad Gateway (attempt $attempt/$max_retries)"
               echo "   This may indicate the backend is still starting up or ALB can't reach targets"
@@ -73,32 +192,74 @@ phases:
         # Track failures
         VALIDATION_FAILED=false
         
-        # Test frontend URL
-        if ! test_url "$FRONTEND_URL" "Frontend"; then
-          VALIDATION_FAILED=true
-        fi
-        
-        # Test API health endpoint
-        if ! test_url "$API_URL/health" "API health endpoint"; then
-          VALIDATION_FAILED=true
+        if [ "$BLUE_GREEN_MODE" = "true" ]; then
+          # Blue-Green Mode: Test green instance directly by IP
+          echo ""
+          echo "Testing green instance directly (bypassing ALB)..."
+          
+          # Test API on green instance (port 3000)
+          GREEN_API_URL="http://${GREEN_INSTANCE_IP}:3000"
+          if ! test_url "$GREEN_API_URL/health" "Green instance API health endpoint"; then
+            VALIDATION_FAILED=true
+          fi
+          
+          # Test frontend on green instance (port 80 via nginx)
+          GREEN_FRONTEND_URL="http://${GREEN_INSTANCE_IP}"
+          if ! test_url "$GREEN_FRONTEND_URL" "Green instance Frontend"; then
+            VALIDATION_FAILED=true
+          fi
+          
+          echo ""
+          echo "✅ Green instance validation complete"
+          echo "   If validation passed, pipeline will proceed to swap traffic"
+        else
+          # Standard Mode: Test via public URLs (ALB)
+          echo ""
+          echo "Testing via public URLs (ALB)..."
+          
+          # Test frontend URL
+          if ! test_url "$FRONTEND_URL" "Frontend"; then
+            VALIDATION_FAILED=true
+          fi
+          
+          # Test API health endpoint
+          if ! test_url "$API_URL/health" "API health endpoint"; then
+            VALIDATION_FAILED=true
+          fi
         fi
         
         # Final check
         if [ "$VALIDATION_FAILED" = "true" ]; then
           echo ""
           echo "❌ Post-deployment validation FAILED"
-          echo "   One or more public URLs are not accessible"
-          echo "   This means users cannot access the deployed site"
+          if [ "$BLUE_GREEN_MODE" = "true" ]; then
+            echo "   Green instance validation failed - instance is not healthy"
+            echo "   Green instance ID: ${GREEN_INSTANCE_ID:-unknown}"
+            echo "   Green instance IP: ${GREEN_INSTANCE_IP:-unknown}"
+            echo ""
+            echo "   CRITICAL: Green instance failed validation - will NOT swap traffic"
+            echo "   Blue instance will remain serving traffic to prevent downtime"
+            echo ""
+            echo "   Possible causes:"
+            echo "   1. Containers not running or unhealthy on green instance"
+            echo "   2. Backend application not responding on port 3000"
+            echo "   3. Nginx not responding on port 80"
+            echo "   4. Security group rules blocking traffic to green instance"
+            echo "   5. Application errors preventing startup"
+          else
+            echo "   One or more public URLs are not accessible"
+            echo "   This means users cannot access the deployed site"
+            echo ""
+            echo "   Possible causes:"
+            echo "   1. Instance not registered with ALB target groups"
+            echo "   2. ALB target group health checks failing"
+            echo "   3. Security group rules blocking traffic"
+            echo "   4. DNS not pointing to ALB"
+            echo "   5. Maintenance mode still enabled"
+            echo "   6. Containers not running or unhealthy"
+          fi
           echo ""
-          echo "   Possible causes:"
-          echo "   1. Instance not registered with ALB target groups"
-          echo "   2. ALB target group health checks failing"
-          echo "   3. Security group rules blocking traffic"
-          echo "   4. DNS not pointing to ALB"
-          echo "   5. Maintenance mode still enabled"
-          echo "   6. Containers not running or unhealthy"
-          echo ""
-          echo "   The deployment may have succeeded locally but is not accessible to users"
+          echo "   The deployment may have succeeded locally but validation failed"
           exit 1
         fi
         

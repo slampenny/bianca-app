@@ -6,6 +6,7 @@ import { DEFAULT_API_CONFIG } from './api/api';
 import { ssoApi } from './api/ssoApi';
 import { store } from '../store/store';
 import { logger } from '../utils/logger';
+import Config from '../config';
 
 // Complete the auth session in the browser
 WebBrowser.maybeCompleteAuthSession();
@@ -15,8 +16,26 @@ const GOOGLE_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId;
 const MICROSOFT_CLIENT_ID = Constants.expoConfig?.extra?.microsoftClientId;
 const MICROSOFT_TENANT_ID = Constants.expoConfig?.extra?.microsoftTenantId || 'common';
 
-// Redirect URI for OAuth - Use AuthSession.makeRedirectUri() for now
-const redirectUri = AuthSession.makeRedirectUri();
+// Redirect URI for OAuth
+// On web, use the current origin to ensure it matches OAuth provider configuration
+// On mobile, use the Expo auth redirect URI
+const getRedirectUri = (): string => {
+  if (Platform.OS === 'web') {
+    // For web, use the current origin (window.location.origin)
+    // This ensures it matches what's configured in Google/Microsoft OAuth
+    if (typeof window !== 'undefined' && window.location) {
+      const origin = window.location.origin;
+      logger.debug('OAuth Redirect URI (web):', origin);
+      return origin;
+    }
+    // Fallback to makeRedirectUri if window is not available
+    return AuthSession.makeRedirectUri();
+  }
+  // For mobile, use the standard Expo redirect URI
+  return AuthSession.makeRedirectUri();
+};
+
+const redirectUri = getRedirectUri();
 logger.debug('OAuth Redirect URI:', redirectUri);
 logger.debug('OAuth Client IDs:', {
   google: GOOGLE_CLIENT_ID ? 'configured' : 'missing',
@@ -230,26 +249,83 @@ class SSOService {
   // Authenticate with backend using RTK Query
   private async authenticateWithBackend(userInfo: SSOUser): Promise<SSOUser | SSOError> {
     try {
+      // Log API configuration for debugging
+      const { getDefaultApiConfig } = require('./api/api');
+      const apiConfig = getDefaultApiConfig();
+      
+      // Prepare request payload - only include picture if it's a valid non-empty string
+      const requestPayload = {
+        provider: userInfo.provider,
+        email: userInfo.email,
+        name: userInfo.name,
+        id: userInfo.id,
+        ...(userInfo.picture && userInfo.picture.trim() ? { picture: userInfo.picture } : {}),
+      };
+      
+      logger.debug('SSO backend authentication attempt:', {
+        apiUrl: apiConfig.url,
+        provider: userInfo.provider,
+        email: userInfo.email,
+        endpoint: '/sso/login',
+        hasPicture: !!requestPayload.picture
+      });
+      
       // Use RTK Query mutation for backend authentication
       const result = store.dispatch(
-        ssoApi.endpoints.ssoLogin.initiate({
-          provider: userInfo.provider,
-          email: userInfo.email,
-          name: userInfo.name,
-          id: userInfo.id,
-          picture: userInfo.picture,
-        })
+        ssoApi.endpoints.ssoLogin.initiate(requestPayload)
       );
 
       // Wait for the query to complete
       const response = await result;
       
       if ('error' in response) {
-        // RTK Query error
-        const errorData = (response.error as any)?.data;
+        // RTK Query error - extract detailed error information
+        const rtkError = response.error as any;
+        const errorData = rtkError?.data;
+        const errorStatus = rtkError?.status;
+        
+        // Log detailed error information for debugging
+        logger.error('SSO backend authentication error:', {
+          status: errorStatus,
+          statusCode: errorData?.code || errorData?.statusCode,
+          message: errorData?.message,
+          error: errorData?.error,
+          data: errorData,
+          fullError: rtkError,
+          userInfo: { email: userInfo.email, provider: userInfo.provider }
+        });
+        
+        // Extract error message from various possible locations
+        // Backend returns { code, message } format
+        let errorMessage = 'Failed to authenticate with backend';
+        
+        if (errorData) {
+          // Backend error format: { code: number, message: string }
+          errorMessage = errorData.message || 
+                        errorData.error || 
+                        errorData.description || 
+                        errorMessage;
+        }
+        
+        // Add status code information if available
+        if (errorStatus === 'FETCH_ERROR') {
+          errorMessage = `Network error: Unable to connect to the server. Please check your connection and try again.`;
+        } else if (errorStatus === 'PARSING_ERROR') {
+          errorMessage = `Server response error: ${errorMessage}. Please try again.`;
+        } else if (errorStatus && typeof errorStatus === 'number') {
+          // RTK Query HTTP status code
+          errorMessage = `Server error (${errorStatus}): ${errorMessage}`;
+        } else if (errorData?.code) {
+          // Backend error code
+          errorMessage = `Server error (${errorData.code}): ${errorMessage}`;
+        } else if (errorData?.statusCode) {
+          // Alternative status code location
+          errorMessage = `Server error (${errorData.statusCode}): ${errorMessage}`;
+        }
+        
         return {
           error: 'Backend authentication failed',
-          description: errorData?.message || 'Failed to authenticate with backend',
+          description: errorMessage,
         };
       }
 
@@ -270,7 +346,12 @@ class SSOService {
         };
       }
     } catch (error) {
-      logger.error('Backend authentication error:', error);
+      logger.error('Backend authentication error (catch block):', {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        userInfo: { email: userInfo.email, provider: userInfo.provider }
+      });
       return {
         error: 'Backend authentication failed',
         description: error instanceof Error ? error.message : 'Unknown error',

@@ -118,6 +118,9 @@ const corsOptions = {
     // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
     
+    // Normalize origin (remove trailing slash, convert to lowercase for comparison)
+    const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
+    
     const allowedOrigins = [
       // New primary domain
       'https://app.biancawellness.com',
@@ -155,26 +158,49 @@ const corsOptions = {
       'http://127.0.0.1:3000',   // Alternative localhost format
       'http://127.0.0.1:3001',
       'null'                     // Some browsers send 'null' as origin for file:// URLs
-    ].filter(Boolean); // Remove any undefined/null values
+    ]
+    .filter(Boolean) // Remove any undefined/null values
+    .map(o => o.toLowerCase().replace(/\/$/, '')); // Normalize all allowed origins
     
     // In development/test, allow all localhost origins for easier testing
     if (config.env === 'development' || config.env === 'test') {
       // Allow localhost and 127.0.0.1 with any port
-      if (origin.startsWith('http://localhost:') || 
-          origin.startsWith('http://127.0.0.1:') ||
-          origin === 'null') {
+      if (normalizedOrigin.startsWith('http://localhost:') || 
+          normalizedOrigin.startsWith('http://127.0.0.1:') ||
+          normalizedOrigin === 'null') {
         return callback(null, true);
       }
     }
     
-    // Check if it's an allowed origin
-    if (allowedOrigins.includes(origin)) {
+    // In staging, be more permissive with staging domains
+    if (config.env === 'staging') {
+      // Allow any staging subdomain
+      if (normalizedOrigin.includes('staging.biancawellness.com') ||
+          normalizedOrigin.includes('staging.myphonefriend.com')) {
+        logger.debug('CORS: Allowing staging origin', { origin, normalizedOrigin });
+        return callback(null, true);
+      }
+    }
+    
+    // Check if it's an allowed origin (case-insensitive, trailing-slash-insensitive)
+    if (allowedOrigins.includes(normalizedOrigin)) {
       return callback(null, true);
     }
     
     // Allow Vercel preview deployments (*.vercel.app)
-    if (origin.endsWith('.vercel.app')) {
+    if (normalizedOrigin.endsWith('.vercel.app')) {
       return callback(null, true);
+    }
+    
+    // Log CORS rejection for debugging (especially in staging)
+    if (config.env === 'staging' || config.env === 'development') {
+      logger.warn('CORS: Origin not allowed', {
+        origin,
+        normalizedOrigin,
+        allowedOrigins: allowedOrigins.slice(0, 10), // Log first 10 for debugging
+        frontendUrl: config.frontendUrl,
+        env: config.env
+      });
     }
     
     // Block all other origins
