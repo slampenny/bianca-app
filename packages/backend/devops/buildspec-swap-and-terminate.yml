@@ -1,18 +1,11 @@
 version: 0.2
-# Blue-Green Deployment: Swap ALB Target Groups and Terminate Old Instance
-# This stage runs after validation passes:
-# 1. Swaps ALB target groups to point to the green instance
-# 2. Terminates the old blue instance
-# This ensures zero-downtime deployment
 
 phases:
   pre_build:
     commands:
-      - echo "Starting blue-green swap: Moving traffic to green instance..."
-      - |
-        echo "Configuration:"
-        echo "  API Target Group: ${API_TARGET_GROUP_ARN}"
-        echo "  Frontend Target Group: ${FRONTEND_TARGET_GROUP_ARN}"
+      - echo Starting blue-green swap
+      - echo API Target Group: ${API_TARGET_GROUP_ARN}
+      - echo Frontend Target Group: ${FRONTEND_TARGET_GROUP_ARN}
 
   build:
     commands:
