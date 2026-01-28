@@ -4,8 +4,8 @@ phases:
   pre_build:
     commands:
       - echo Starting blue-green swap
-      - echo API Target Group: ${API_TARGET_GROUP_ARN}
-      - echo Frontend Target Group: ${FRONTEND_TARGET_GROUP_ARN}
+      - echo API Target Group ARN is ${API_TARGET_GROUP_ARN}
+      - echo Frontend Target Group ARN is ${FRONTEND_TARGET_GROUP_ARN}
 
   build:
     commands:
