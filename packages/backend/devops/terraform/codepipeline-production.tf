@@ -206,6 +206,10 @@ resource "aws_codebuild_project" "production_post_deploy_validation" {
       name  = "RETRY_DELAY"
       value = "10"
     }
+    environment_variable {
+      name  = "GREEN_TAG"
+      value = "bianca-production-green"
+    }
   }
 
   source {
@@ -305,6 +309,43 @@ resource "aws_iam_role_policy" "codebuild_production_policy" {
           "ec2:DescribeInstanceInformation"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:RunInstances",
+          "ec2:TerminateInstances",
+          "ec2:DescribeInstanceStatus",
+          "ec2:DescribeInstanceAttribute",
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+          "ec2:DescribeTags",
+          "ec2:DescribeInstances",
+          "ec2:DescribeLaunchTemplates",
+          "ec2:DescribeLaunchTemplateVersions"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "elasticloadbalancing:RegisterTargets",
+          "elasticloadbalancing:DeregisterTargets",
+          "elasticloadbalancing:DescribeTargetHealth",
+          "elasticloadbalancing:DescribeTargetGroups",
+          "elasticloadbalancing:DescribeLoadBalancers"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = aws_iam_role.production_role.arn
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "ec2.amazonaws.com"
+          }
+        }
       }
     ]
   })
@@ -366,7 +407,9 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
         Resource = [
           aws_codebuild_project.production_build.arn,
           aws_codebuild_project.production_tests.arn,
-          aws_codebuild_project.production_post_deploy_validation.arn
+          aws_codebuild_project.production_post_deploy_validation.arn,
+          aws_codebuild_project.production_create_green_instance.arn,
+          aws_codebuild_project.production_swap_and_terminate.arn
         ]
       },
       {
@@ -417,7 +460,7 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
   })
 }
 
-# NOTE: Production pipeline runs tests BEFORE deployment
+# NOTE: Production pipeline runs tests BEFORE deployment. Blue-green stages added in codepipeline-production-bluegreen.tf
 # Tests must pass before deployment proceeds to prevent deploying broken code
 
 ################################################################################
@@ -487,6 +530,24 @@ resource "aws_codepipeline" "production" {
   }
 
   stage {
+    name = "CreateGreenInstance"
+    action {
+      name             = "CreateGreenInstance"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput"]
+      output_artifacts = ["GreenInstanceOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.production_create_green_instance.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
+    }
+  }
+
+  stage {
     name = "Deploy"
     action {
       name            = "Deploy"
@@ -497,7 +558,7 @@ resource "aws_codepipeline" "production" {
       input_artifacts = ["BuildOutput"]
       configuration = {
         ApplicationName     = aws_codedeploy_app.production.name
-        DeploymentGroupName = aws_codedeploy_deployment_group.production.deployment_group_name
+        DeploymentGroupName = aws_codedeploy_deployment_group.production_green.deployment_group_name
       }
     }
   }
@@ -510,10 +571,28 @@ resource "aws_codepipeline" "production" {
       owner            = "AWS"
       provider         = "CodeBuild"
       version          = "1"
-      input_artifacts  = ["SourceOutput"]
+      input_artifacts  = ["SourceOutput", "GreenInstanceOutput"]
       output_artifacts = ["ValidationOutput"]
       configuration = {
         ProjectName   = aws_codebuild_project.production_post_deploy_validation.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
+    }
+  }
+
+  stage {
+    name = "SwapAndTerminate"
+    action {
+      name             = "SwapAndTerminate"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "GreenInstanceOutput"]
+      output_artifacts = ["SwapOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.production_swap_and_terminate.name
         PrimarySource = "SourceOutput"
       }
       run_order = 1

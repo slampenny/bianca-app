@@ -23,6 +23,9 @@ phases:
   build:
     commands:
       - |
+        GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+        BLUE_TAG="${BLUE_TAG:-bianca-staging}"
+        ENVIRONMENT_TAG="${ENVIRONMENT_TAG:-staging}"
         echo "Verifying launch template exists..."
         ACTUAL_LAUNCH_TEMPLATE_NAME=$(aws ec2 describe-launch-templates --launch-template-names ${LAUNCH_TEMPLATE_NAME} --query 'LaunchTemplates[0].LaunchTemplateName' --output text 2>/dev/null || aws ec2 describe-launch-templates --filters "Name=launch-template-name,Values=${LAUNCH_TEMPLATE_NAME}*" --query 'LaunchTemplates[0].LaunchTemplateName' --output text)
         if [ -z "$ACTUAL_LAUNCH_TEMPLATE_NAME" ] || [ "$ACTUAL_LAUNCH_TEMPLATE_NAME" = "None" ]; then
@@ -41,7 +44,7 @@ phases:
         # Cleanup: Terminate any existing green instances to prevent accumulation
         echo "Checking for existing green instances to clean up..."
         EXISTING_GREEN_INSTANCES=$(aws ec2 describe-instances \
-          --filters "Name=tag:Name,Values=bianca-staging-green" \
+          --filters "Name=tag:Name,Values=${GREEN_TAG:-bianca-staging-green}" \
                     "Name=instance-state-name,Values=running,pending" \
           --query 'Reservations[*].Instances[*].InstanceId' \
           --output text 2>/dev/null || echo "")
@@ -60,13 +63,14 @@ phases:
           echo "No existing green instances found - clean slate!"
         fi
         
-        BLUE_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "")
+        BLUE_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${BLUE_TAG:-bianca-staging}" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "")
         if [ -n "$BLUE_INSTANCE_ID" ] && [ "$BLUE_INSTANCE_ID" != "None" ]; then
           echo "Found blue instance: $BLUE_INSTANCE_ID"
           echo "BLUE_INSTANCE_ID=$BLUE_INSTANCE_ID" >> instance-info.txt
         fi
         echo "Creating new green instance..."
-        GREEN_INSTANCE_ID=$(aws ec2 run-instances --launch-template LaunchTemplateName=$ACTUAL_LAUNCH_TEMPLATE_NAME,Version=$LAUNCH_TEMPLATE_VERSION --subnet-id ${SUBNET_ID} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=bianca-staging-green},{Key=Environment,Value=staging},{Key=DeploymentType,Value=green}]" --query 'Instances[0].InstanceId' --output text 2>&1)
+        ENV_TAG="${ENVIRONMENT_TAG:-staging}"
+        GREEN_INSTANCE_ID=$(aws ec2 run-instances --launch-template LaunchTemplateName=$ACTUAL_LAUNCH_TEMPLATE_NAME,Version=$LAUNCH_TEMPLATE_VERSION --subnet-id ${SUBNET_ID} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$GREEN_TAG},{Key=Environment,Value=$ENV_TAG},{Key=DeploymentType,Value=green}]" --query 'Instances[0].InstanceId' --output text 2>&1)
         if [ $? -ne 0 ] || [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
           echo "ERROR: Failed to create green instance"
           echo "Output: $GREEN_INSTANCE_ID"
@@ -104,8 +108,8 @@ phases:
         # Verify instance is tagged correctly for CodeDeploy
         echo "Verifying instance tags..."
         INSTANCE_NAME=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text)
-        if [ "$INSTANCE_NAME" != "bianca-staging-green" ]; then
-          echo "ERROR: Instance name tag is incorrect: $INSTANCE_NAME (expected: bianca-staging-green)"
+        if [ "$INSTANCE_NAME" != "$GREEN_TAG" ]; then
+          echo "ERROR: Instance name tag is incorrect: $INSTANCE_NAME (expected: $GREEN_TAG)"
           exit 1
         fi
         echo "Instance tags verified: Name=$INSTANCE_NAME"

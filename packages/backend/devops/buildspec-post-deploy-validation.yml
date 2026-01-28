@@ -27,8 +27,9 @@ phases:
         else
           echo "⚠️  Warning: instance-info.txt not found, attempting to discover green instance..."
           # Try to find green instance by tags
+          GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=bianca-staging-green" \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")
@@ -57,8 +58,9 @@ phases:
           source ../CreateGreenInstance/instance-info.txt
         else
           # Try to find green instance by tags if not in file
+          GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=bianca-staging-green" \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")

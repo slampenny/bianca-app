@@ -20,11 +20,13 @@ phases:
           echo "⚠️  Warning: instance-info.txt not found, attempting to discover instances..."
         fi
         
+        GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+        BLUE_TAG="${BLUE_TAG:-bianca-staging}"
         # Find green instance if not in file
         if [ -z "$GREEN_INSTANCE_ID" ]; then
           echo "Finding green instance..."
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=bianca-staging-green" \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")
@@ -42,7 +44,7 @@ phases:
         if [ -z "$BLUE_INSTANCE_ID" ]; then
           echo "Finding blue instance..."
           BLUE_INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=bianca-staging" \
+            --filters "Name=tag:Name,Values=$BLUE_TAG" \
                       "Name=tag:DeploymentType,Values=!green" \
                       "Name=instance-state-name,Values=running" \
             --query 'Reservations[0].Instances[0].InstanceId' \
@@ -177,17 +179,17 @@ phases:
         
         # Step 5: Rename green instance to become the new "blue" for next deployment
         echo ""
-        echo "Step 5: Renaming green instance to 'bianca-staging' for next deployment..."
+        echo "Step 5: Renaming green instance to '$BLUE_TAG' for next deployment..."
         aws ec2 create-tags \
           --resources $GREEN_INSTANCE_ID \
-          --tags Key=Name,Value=bianca-staging Key=DeploymentType,Value=blue || {
+          --tags Key=Name,Value=$BLUE_TAG Key=DeploymentType,Value=blue || {
           echo "  ⚠️  Warning: Failed to rename instance (non-critical)"
         }
         
         # Remove green tag
         aws ec2 delete-tags \
           --resources $GREEN_INSTANCE_ID \
-          --tags Key=Name,Value=bianca-staging-green || {
+          --tags Key=Name,Value=$GREEN_TAG || {
           echo "  ⚠️  Warning: Failed to remove green tag (non-critical)"
         }
         
