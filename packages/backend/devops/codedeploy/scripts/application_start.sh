@@ -266,13 +266,25 @@ fi
 sleep 3  # Give containers a moment to start
 APP_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
 NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
+ASTERISK_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_asterisk" --format "{{.Names}}" | wc -l)
 
 if [ "$APP_RUNNING" -eq 0 ] || [ "$NGINX_RUNNING" -eq 0 ]; then
   echo "❌ ERROR: Required containers are not running!" >&2
   echo "   App container running: $APP_RUNNING" >&2
   echo "   Nginx container running: $NGINX_RUNNING" >&2
   EXIT_CODE=1  # Mark as failed
-  
+fi
+
+# Asterisk is required for calls; if compose defines it but it's not running, fail deployment
+if [ -f "$DEPLOY_DIR/docker-compose.yml" ] && grep -q "asterisk:" "$DEPLOY_DIR/docker-compose.yml" && [ "$ASTERISK_RUNNING" -eq 0 ]; then
+  echo "❌ ERROR: Asterisk container is not running (required for phone calls)!" >&2
+  echo "   Asterisk container running: $ASTERISK_RUNNING" >&2
+  echo "   This can cause calls to hang up or fail after blue/green deployment." >&2
+  docker logs ${CONTAINER_PREFIX}_asterisk --tail 50 2>/dev/null || echo "   (Asterisk container not found or not started)" >&2
+  EXIT_CODE=1
+fi
+
+if [ "$EXIT_CODE" -ne 0 ]; then
   # Check for stopped containers
   echo "   Checking for stopped containers..." >&2
   docker ps -a --filter "name=${CONTAINER_PREFIX}_" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" >&2 || true

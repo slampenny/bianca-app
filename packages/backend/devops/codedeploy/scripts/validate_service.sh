@@ -28,6 +28,8 @@ if [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-production" ]; then
   DETECTED_ENV="production"
 elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-staging" ]; then
   DETECTED_ENV="staging"
+elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-demo" ]; then
+  DETECTED_ENV="demo"
 fi
 
 # Method 4: Fallback to instance tags (if not already set)
@@ -48,6 +50,8 @@ if [ -z "$DETECTED_ENV" ]; then
     DETECTED_ENV="production"
   elif [ "$ENVIRONMENT_TAG" = "staging" ] || echo "$INSTANCE_NAME" | grep -qi "staging"; then
     DETECTED_ENV="staging"
+  elif [ "$ENVIRONMENT_TAG" = "demo" ] || echo "$INSTANCE_NAME" | grep -qi "demo"; then
+    DETECTED_ENV="demo"
   fi
 fi
 
@@ -58,6 +62,9 @@ if [ "$DETECTED_ENV" = "production" ]; then
 elif [ "$DETECTED_ENV" = "staging" ]; then
   DEPLOY_DIR="/opt/bianca-staging"
   CONTAINER_PREFIX="staging"
+elif [ "$DETECTED_ENV" = "demo" ]; then
+  DEPLOY_DIR="/opt/bianca-demo"
+  CONTAINER_PREFIX="demo"
 else
   echo "❌ ERROR: Cannot determine environment"
   echo "   Checked /etc/environment, environment variables, deployment directories, and instance tags"
@@ -98,22 +105,34 @@ RETRY_DELAY=5
 RETRY_COUNT=0
 ALL_CONTAINERS_RUNNING=false
 
+# Asterisk is required for phone calls when present in compose
+REQUIRE_ASTERISK=false
+if [ -f "$DEPLOY_DIR/docker-compose.yml" ] && grep -q "asterisk:" "$DEPLOY_DIR/docker-compose.yml"; then
+  REQUIRE_ASTERISK=true
+fi
+
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
   # Check if containers are running
   NGINX_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_nginx" --format "{{.Names}}" | wc -l)
   FRONTEND_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_frontend" --format "{{.Names}}" | wc -l)
   APP_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_app" --format "{{.Names}}" | wc -l)
+  ASTERISK_RUNNING=$(docker ps --filter "name=${CONTAINER_PREFIX}_asterisk" --format "{{.Names}}" | wc -l)
   
-  echo "   Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Nginx=$NGINX_RUNNING, Frontend=$FRONTEND_RUNNING, App=$APP_RUNNING"
+  echo "   Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES: Nginx=$NGINX_RUNNING, Frontend=$FRONTEND_RUNNING, App=$APP_RUNNING, Asterisk=$ASTERISK_RUNNING"
   
-  if [ "$NGINX_RUNNING" -gt 0 ] && [ "$FRONTEND_RUNNING" -gt 0 ] && [ "$APP_RUNNING" -gt 0 ]; then
+  ASTERISK_OK=true
+  if [ "$REQUIRE_ASTERISK" = "true" ] && [ "$ASTERISK_RUNNING" -eq 0 ]; then
+    ASTERISK_OK=false
+  fi
+  
+  if [ "$NGINX_RUNNING" -gt 0 ] && [ "$FRONTEND_RUNNING" -gt 0 ] && [ "$APP_RUNNING" -gt 0 ] && [ "$ASTERISK_OK" = "true" ]; then
     ALL_CONTAINERS_RUNNING=true
     echo "   ✅ All required containers are running"
     break
   fi
   
   # If containers aren't running, try to start them
-  if [ "$NGINX_RUNNING" -eq 0 ] || [ "$FRONTEND_RUNNING" -eq 0 ] || [ "$APP_RUNNING" -eq 0 ]; then
+  if [ "$NGINX_RUNNING" -eq 0 ] || [ "$FRONTEND_RUNNING" -eq 0 ] || [ "$APP_RUNNING" -eq 0 ] || { [ "$REQUIRE_ASTERISK" = "true" ] && [ "$ASTERISK_RUNNING" -eq 0 ]; }; then
     echo "   ⚠️  Some containers not running, attempting to start..."
     
     # Try to start containers
@@ -154,6 +173,10 @@ if [ "$ALL_CONTAINERS_RUNNING" = "false" ]; then
     echo "   App logs:" >&2
     docker logs ${CONTAINER_PREFIX}_app --tail 20 2>&1 || echo "   App container not found" >&2
   fi
+  if [ "$REQUIRE_ASTERISK" = "true" ] && [ "$ASTERISK_RUNNING" -eq 0 ]; then
+    echo "   Asterisk logs (required for phone calls):" >&2
+    docker logs ${CONTAINER_PREFIX}_asterisk --tail 30 2>&1 || echo "   Asterisk container not found" >&2
+  fi
 else
   # Display container status
   echo ""
@@ -164,6 +187,9 @@ else
   echo "✅ Backend container is running"
   echo "✅ Nginx container is running"
   echo "✅ Frontend container is running"
+  if [ "$REQUIRE_ASTERISK" = "true" ] && [ "$ASTERISK_RUNNING" -gt 0 ]; then
+    echo "✅ Asterisk container is running (phone calls)"
+  fi
 fi
 
 # Check if backend is responding to health checks (REQUIRED)
@@ -302,6 +328,9 @@ elif [ "$DETECTED_ENV" = "staging" ]; then
 elif [ "$DETECTED_ENV" = "production" ]; then
   FRONTEND_URL="https://app.biancawellness.com"
   API_URL="https://api.biancawellness.com"
+elif [ "$DETECTED_ENV" = "demo" ]; then
+  FRONTEND_URL="https://demo.biancawellness.com"
+  API_URL="https://demo.biancawellness.com/v1"
 else
   echo ""
   echo "   ⚠️  Unknown environment, skipping public URL checks"

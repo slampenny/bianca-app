@@ -513,6 +513,7 @@ services:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - /opt/maintenance-mode.flag:/opt/maintenance-mode.flag:ro
       - /opt/maintenance.html:/opt/maintenance.html:ro
+      $DEMO_502_VOLUME
     depends_on:
       - app
       - frontend
@@ -527,6 +528,33 @@ networks:
     driver: bridge
 EOF
 
+# Demo: create helpful 502 page and set nginx/docker vars (frontend container may be down)
+NGINX_502_BLOCK=""
+DEMO_502_VOLUME=""
+if [ "$ENVIRONMENT" = "demo" ]; then
+  echo "   Creating demo 502 error page..."
+  mkdir -p /opt
+  cat > /opt/demo-502.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>502 - Demo Starting</title></head><body style="font-family:sans-serif;max-width:32em;margin:2em auto;">
+<h1>502 Bad Gateway</h1>
+<p>The demo app is starting up or a container may be down.</p>
+<p>Try again in a minute, or run <code>yarn demo:update</code> from your machine to restart the demo containers.</p>
+</body></html>
+HTMLEOF
+  NGINX_502_BLOCK="
+    error_page 502 /demo-502.html;
+    location = /demo-502.html {
+        root /opt;
+        internal;
+        add_header Content-Type text/html;
+    }
+"
+  DEMO_502_VOLUME="- /opt/demo-502.html:/opt/demo-502.html:ro"
+else
+  DEMO_502_VOLUME="# (no demo 502 volume - not demo env)"
+fi
+
 # Create nginx config with maintenance mode support
 echo "   Creating nginx.conf..."
 cat > nginx.conf <<EOF
@@ -534,6 +562,7 @@ cat > nginx.conf <<EOF
 server {
     listen 80;
     server_name $SERVER_NAME_FRONTEND;
+    $NGINX_502_BLOCK
     
     # Serve maintenance page
     location = /maintenance.html {

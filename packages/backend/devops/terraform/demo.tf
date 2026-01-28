@@ -479,10 +479,10 @@ resource "aws_route53_record" "demo_frontend_primary" {
 }
 
 # Host-based routing rule for demo frontend (demo.biancawellness.com)
-# Priority 20 (after API rule at 11) - only matches paths that don't start with /v1
+# Priority 21 (after API rule at 11; 20 is used by WordPress)
 resource "aws_lb_listener_rule" "demo_frontend" {
   listener_arn = aws_lb_listener.shared_https.arn
-  priority     = 20
+  priority     = 21
 
   action {
     type             = "forward"
