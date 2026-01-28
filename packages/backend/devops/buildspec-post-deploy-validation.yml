@@ -91,23 +91,33 @@ phases:
           echo "Waiting for green instance containers to be ready..."
           echo "   This can take 2-3 minutes after CodeDeploy completes..."
           
-          # Wait up to 3 minutes for containers to be accessible
-          MAX_WAIT=180
+          # Wait up to 5 minutes for containers to be accessible
+          MAX_WAIT=300
           ELAPSED=0
           READY=false
+          CONSECUTIVE_SUCCESS=0
           
           while [ $ELAPSED -lt $MAX_WAIT ]; do
-            # Test if we can connect to the instance
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 --connect-timeout 3 "http://${GREEN_INSTANCE_IP}:3000/health" 2>/dev/null || echo "000")
+            # Test if we can connect to the instance (use same timeout as test_url)
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 --connect-timeout 10 "http://${GREEN_INSTANCE_IP}:3000/health" 2>/dev/null || echo "000")
             
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "   ✅ Green instance is ready (HTTP $HTTP_CODE after ${ELAPSED}s)"
-              READY=true
-              break
-            fi
-            
-            if [ $((ELAPSED % 30)) -eq 0 ]; then
-              echo "   Waiting... (${ELAPSED}s/${MAX_WAIT}s) - HTTP code: $HTTP_CODE"
+              CONSECUTIVE_SUCCESS=$((CONSECUTIVE_SUCCESS + 1))
+              if [ $((ELAPSED % 30)) -eq 0 ] || [ $CONSECUTIVE_SUCCESS -eq 1 ]; then
+                echo "   ✅ Green instance health check passed (HTTP $HTTP_CODE, ${CONSECUTIVE_SUCCESS} consecutive, after ${ELAPSED}s)"
+              fi
+              
+              # Require 3 consecutive successful checks to ensure stability
+              if [ $CONSECUTIVE_SUCCESS -ge 3 ]; then
+                echo "   ✅ Green instance is ready and stable (HTTP $HTTP_CODE after ${ELAPSED}s)"
+                READY=true
+                break
+              fi
+            else
+              CONSECUTIVE_SUCCESS=0
+              if [ $((ELAPSED % 30)) -eq 0 ]; then
+                echo "   Waiting... (${ELAPSED}s/${MAX_WAIT}s) - HTTP code: $HTTP_CODE"
+              fi
             fi
             
             sleep 10
@@ -116,6 +126,10 @@ phases:
           
           if [ "$READY" != "true" ]; then
             echo "   ⚠️  Warning: Green instance not fully ready after ${MAX_WAIT}s, but continuing with validation..."
+          else
+            # Add a small delay after readiness check to ensure stability
+            echo "   Waiting 10 seconds to ensure instance stability before validation..."
+            sleep 10
           fi
         else
           echo "Waiting 60 seconds for ALB to register instance and pass health checks..."
