@@ -136,6 +136,16 @@ RUN rm -rf /usr/share/nginx/html/*
 # Copy built frontend from builder stage
 COPY --from=builder /app/dist/ /usr/share/nginx/html
 
+# Verify the JS file referenced by index.html exists (prevents "Unexpected token '<'" when file is missing)
+RUN SCRIPT_SRC=$(grep -oE 'src="[^"]+\.js"' /usr/share/nginx/html/index.html | head -1 | sed 's/src="//;s/"$//') && \
+    FILE_PATH="${SCRIPT_SRC#/}" && \
+    if [ ! -f "/usr/share/nginx/html/$FILE_PATH" ]; then \
+      echo "ERROR: index.html references $SCRIPT_SRC but file is missing at /usr/share/nginx/html/$FILE_PATH"; \
+      echo "This causes 'Unexpected token <' in browser (nginx serves HTML 404 for missing .js)"; \
+      exit 1; \
+    fi && \
+    echo "Verified JS asset exists: $FILE_PATH"
+
 # Custom nginx config for SPA routing
 COPY devops/nginx.conf /etc/nginx/nginx.conf
 

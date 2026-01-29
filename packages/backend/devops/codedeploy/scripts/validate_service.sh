@@ -370,6 +370,35 @@ if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
     echo "   This means users cannot access the site!" >&2
     PUBLIC_URLS_PASSED=false
   fi
+
+  # CRITICAL: Verify frontend serves real JS assets (not HTML) - prevents "Unexpected token '<'" in browser
+  if [ -n "$FRONTEND_URL" ] && [ "$FRONTEND_PUBLIC_PASSED" = "true" ]; then
+    echo "   Verifying frontend JS asset is served (not HTML)..."
+    FRONTEND_HTML=$(curl -s -L --max-time 10 "$FRONTEND_URL" 2>/dev/null || echo "")
+    SCRIPT_SRC=$(echo "$FRONTEND_HTML" | grep -oE 'src="[^"]+\.js"' | head -1 | sed 's/^src="//;s/"$//')
+    if [ -z "$SCRIPT_SRC" ]; then
+      echo "   ❌ Frontend HTML has no script src - cannot verify JS asset" >&2
+      PUBLIC_URLS_PASSED=false
+    else
+      ORIGIN=$(echo "$FRONTEND_URL" | sed -n 's|^\(https\?://[^/]*\).*|\1|p')
+      case "$SCRIPT_SRC" in
+        /*) JS_URL="${ORIGIN}${SCRIPT_SRC}" ;;
+        *)  JS_URL="${ORIGIN}/${SCRIPT_SRC}" ;;
+      esac
+      JS_RESPONSE=$(curl -s -w "\n%{http_code}" --max-time 10 "$JS_URL" 2>/dev/null || echo -e "\n000")
+      JS_HTTP=$(echo "$JS_RESPONSE" | tail -n1)
+      JS_BODY=$(echo "$JS_RESPONSE" | head -n -1)
+      if [ "$JS_HTTP" != "200" ]; then
+        echo "   ❌ Frontend JS asset returned HTTP $JS_HTTP (expected 200) - causes 'Unexpected token <' in browser" >&2
+        PUBLIC_URLS_PASSED=false
+      elif [ -n "$JS_BODY" ] && [[ "$JS_BODY" == \<* ]]; then
+        echo "   ❌ Frontend JS asset returned HTML instead of JavaScript - causes 'Unexpected token <' in browser" >&2
+        PUBLIC_URLS_PASSED=false
+      else
+        echo "   ✅ Frontend JS asset check passed (HTTP 200, content is JavaScript)"
+      fi
+    fi
+  fi
   fi
 
   if [ -n "$API_URL" ]; then
@@ -431,9 +460,10 @@ if [ "$IS_GREEN_INSTANCE" = "false" ] && [ -n "$FRONTEND_URL" ]; then
     echo "   Possible causes:" >&2
     echo "   1. Instance not registered with ALB target groups" >&2
     echo "   2. ALB target group health checks failing" >&2
-    echo "   3. Security group rules blocking traffic" >&2
-    echo "   4. DNS not pointing to ALB" >&2
-    echo "   5. Maintenance mode still enabled" >&2
+    echo "   3. Frontend JS bundle missing or returning HTML (causes 'Unexpected token <' in browser)" >&2
+    echo "   4. Security group rules blocking traffic" >&2
+    echo "   5. DNS not pointing to ALB" >&2
+    echo "   6. Maintenance mode still enabled" >&2
     VALIDATION_FAILED=true
   fi
 fi
