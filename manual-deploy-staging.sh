@@ -3,11 +3,24 @@
 
 set -e
 
-INSTANCE_ID="i-07d3946107e994de6"
 REGION="us-east-2"
 PROFILE="jordan"
 ECR_REGISTRY="730335291008.dkr.ecr.us-east-2.amazonaws.com"
 DEPLOY_DIR="/opt/bianca-staging"
+
+# Discover current staging instance by tag (blue/green: Name=bianca-staging is the one serving traffic)
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text \
+  --profile "$PROFILE" \
+  --region "$REGION" 2>/dev/null || true)
+
+if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+  echo "❌ No running staging instance found with Name=bianca-staging in $REGION."
+  echo "   Check AWS console or run: aws ec2 describe-instances --filters Name=instance-state-name,Values=running --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==\`Name\`].Value|[0]]' --output table --profile $PROFILE --region $REGION"
+  exit 1
+fi
 
 echo "🚀 Manually deploying latest build to staging EC2 instance..."
 echo "   Instance: $INSTANCE_ID"
@@ -81,7 +94,7 @@ EOF
   --region "$REGION" \
   --output json > /tmp/ssm-command.json
 
-COMMAND_ID=$(jq -r '.Command.CommandId' /tmp/ssm-command.json)
+COMMAND_ID=$(grep -o '"CommandId": "[^"]*"' /tmp/ssm-command.json | head -1 | sed 's/.*: "\([^"]*\)".*/\1/')
 echo "   Command ID: $COMMAND_ID"
 echo ""
 
@@ -112,7 +125,7 @@ aws ssm get-command-invocation \
   --profile "$PROFILE" \
   --region "$REGION" \
   --query '[Status, StandardOutputContent, StandardErrorContent]' \
-  --output json | jq -r '.[]'
+  --output text
 
 echo ""
 echo "✅ Manual deployment complete!"

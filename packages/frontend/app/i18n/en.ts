@@ -861,6 +861,8 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     lastCallAnalysis: "Last Call Analysis",
     noRecentCall: "No Recent Call",
     noRecentCallMessage: "The most recent conversation doesn't have sentiment analysis available yet.",
+    noRecentCallButHaveCalls: "Recent calls, no sentiment yet",
+    noRecentCallButHaveCallsMessage: "You have recent calls in the last 30 days, but none have sentiment analysis yet. New calls will be analyzed automatically after they end. Older calls may need to be re-processed.",
     duration: "Duration",
     analysisDate: "Analysis Date",
     conversationId: "Conversation ID",

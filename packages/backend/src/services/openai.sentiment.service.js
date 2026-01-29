@@ -30,7 +30,8 @@ class OpenAISentimentService {
         throw new Error('Conversation text is required for sentiment analysis');
       }
 
-      const model = options.model || config.openai.model || 'gpt-4o';
+      // Use sentiment-specific model or fallback to gpt-4o (chat completions); config.openai.model may be a realtime model
+      const model = options.model || config.openai.sentimentModel || config.openai.model || 'gpt-4o';
       const detailed = options.detailed !== false; // Default to true
 
       logger.info(`[OpenAI Sentiment] Starting sentiment analysis using model: ${model}`);
@@ -139,7 +140,7 @@ Please provide your analysis in the following JSON format:`;
       const parsed = JSON.parse(jsonMatch[0]);
       
       // Validate required fields
-      if (!parsed.overallSentiment || !parsed.sentimentScore === undefined || !parsed.confidence === undefined) {
+      if (!parsed.overallSentiment || parsed.sentimentScore === undefined || parsed.confidence === undefined) {
         throw new Error('Missing required sentiment fields');
       }
 

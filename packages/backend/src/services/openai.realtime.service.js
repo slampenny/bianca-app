@@ -3699,8 +3699,24 @@ class OpenAIRealtimeService {
 
       // Get connection data before cleanup
       const conn = this.connections.get(callId);
-      const conversationId = conn?.conversationId;
+      let conversationId = conn?.conversationId;
       const callType = conn?.callType || 'unknown';
+
+      // If connection had no conversationId (e.g. race or init path), resolve from Call so we still finalize + sentiment
+      if (!conversationId && callId) {
+        try {
+          const { Call } = require('../models');
+          const call = await Call.findOne({
+            $or: [{ callSid: callId }, { asteriskChannelId: callId }],
+          }).select('conversationId');
+          if (call?.conversationId) {
+            conversationId = call.conversationId.toString();
+            logger.info(`[OpenAI Call End] Resolved conversationId ${conversationId} from Call for ${callId}`);
+          }
+        } catch (resolveErr) {
+          logger.warn(`[OpenAI Call End] Could not resolve conversationId for ${callId}: ${resolveErr.message}`);
+        }
+      }
 
       // SAVE ANY PENDING MESSAGES BEFORE CLEANUP
       if (conn) {

@@ -39,6 +39,7 @@ const buildOpenAIConfig = (envVars) => {
       realtimeSessionConfig,
       idleTimeout: envVars.OPENAI_IDLE_TIMEOUT || 300000,
       model: envVars.OPENAI_MODEL || 'gpt-4o-2025-01-12',
+      sentimentModel: envVars.OPENAI_SENTIMENT_MODEL || 'gpt-4o', // Chat completions model for sentiment; OPENAI_MODEL may be realtime-only
       useGA,
       realtimeTranscriptionModel: envVars.OPENAI_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
       debugAudio: true,
@@ -54,6 +55,7 @@ const validateOpenAIEnvVars = (envVars) => {
     OPENAI_REALTIME_SESSION_CONFIG: Joi.string().optional(),
     OPENAI_IDLE_TIMEOUT: Joi.number().optional(),
     OPENAI_MODEL: Joi.string().optional(),
+    OPENAI_SENTIMENT_MODEL: Joi.string().optional(),
     OPENAI_REALTIME_USE_GA: Joi.boolean().optional(),
     OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().optional(),
   });

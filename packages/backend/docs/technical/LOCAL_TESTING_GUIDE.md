@@ -172,7 +172,31 @@ OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe  # or gpt-4o-transcri
 #   - GA: gpt-realtime
 # You can override via OPENAI_REALTIME_MODEL if needed
 OPENAI_REALTIME_VOICE=alloy
+
+# Optional - Sentiment analysis uses a chat-completions model (default: gpt-4o)
+# Set if OPENAI_MODEL is a realtime-only model and sentiment fails with 404
+OPENAI_SENTIMENT_MODEL=gpt-4o
 ```
+
+### Testing sentiment analysis locally
+
+Sentiment analysis runs when a call is finalized and can be tested without a real call:
+
+```bash
+# From repo root
+yarn workspace @bianca-app/backend test:sentiment:local
+
+# Or from packages/backend (with .env present)
+node scripts/test-sentiment-local.js
+```
+
+Requires `OPENAI_API_KEY` in `.env`. The script analyzes sample conversation text by default. To test with a real conversation ID (MongoDB must be running):
+
+```bash
+MONGODB_URL=mongodb://localhost:27017/bianca-app node scripts/test-sentiment-local.js <conversationId>
+```
+
+If sentiment fails in staging with a 404 model error, set `OPENAI_SENTIMENT_MODEL=gpt-4o` in Secrets Manager (or env) so sentiment uses a valid chat-completions model.
 
 ## Troubleshooting
 

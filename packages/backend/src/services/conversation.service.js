@@ -390,64 +390,53 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     let conversationText;
 
     if (useRealtimeMessages) {
-      // Get messages from Message collection (realtime calls)
+      // Get messages from Message collection (realtime calls) - same conversationId the UI uses
       messages = await Message.find({ conversationId })
         .sort({ createdAt: 1 })
         .select('role content timestamp')
         .lean();
 
+      // Fallback: if Message.find returned nothing but conversation has messages (split/call vs conversation),
+      // use conversation.messages (same source as live call UI) so sentiment always sees what the UI sees
       if (!messages || messages.length === 0) {
-        await Conversation.findByIdAndUpdate(conversationId, {
-          history: 'No conversation content recorded', // Use existing history field
-        });
-        // Update the associated Call's endTime
-        const { Call } = require('../models');
-        const convWithCall = await Conversation.findById(conversationId).populate('callId');
-        if (convWithCall?.callId) {
-          await Call.findByIdAndUpdate(convWithCall.callId, {
-            endTime: new Date(),
-            status: 'completed',
-            callStatus: 'ended'
-          });
+        const convWithMessages = await Conversation.findById(conversationId).populate('messages').lean();
+        const refs = convWithMessages?.messages || [];
+        if (refs.length > 0) {
+          messages = refs
+            .filter(m => m && m.content != null)
+            .sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+          logger.info(`[Finalize] Using conversation.messages (${messages.length}) for conversation ${conversationId} (Message.find had 0)`);
         }
-        return;
       }
 
-      conversationText = messages
-        .map(msg => {
-          const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
-          return `${speaker}: ${msg.content}`;
-        })
-        .join('\n');
-
+      if (!messages || messages.length === 0) {
+        // No messages: still run summary + sentiment on fallback so every call has sentiment
+        messages = [];
+        conversationText = 'No conversation content recorded.';
+      } else {
+        conversationText = messages
+          .map(msg => {
+            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+            return `${speaker}: ${msg.content}`;
+          })
+          .join('\n');
+      }
     } else {
       // Use existing conversation.messages array
       const populatedConversation = await Conversation.findById(conversationId).populate('messages');
       messages = populatedConversation.messages || [];
-      
-      if (messages.length === 0) {
-        await Conversation.findByIdAndUpdate(conversationId, {
-          history: 'No conversation content recorded', // Use existing history field
-        });
-        // Update the associated Call's endTime
-        const { Call } = require('../models');
-        const convWithCall = await Conversation.findById(conversationId).populate('callId');
-        if (convWithCall?.callId) {
-          await Call.findByIdAndUpdate(convWithCall.callId, {
-            endTime: new Date(),
-            status: 'completed',
-            callStatus: 'ended'
-          });
-        }
-        return;
-      }
 
-      conversationText = messages
-        .map(msg => {
-          const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
-          return `${speaker}: ${msg.content}`;
-        })
-        .join('\n');
+      if (messages.length === 0) {
+        // No messages: still run summary + sentiment on fallback so every call has sentiment
+        conversationText = 'No conversation content recorded.';
+      } else {
+        conversationText = messages
+          .map(msg => {
+            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+            return `${speaker}: ${msg.content}`;
+          })
+          .join('\n');
+      }
     }
 
     // Determine user domain

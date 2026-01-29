@@ -105,10 +105,21 @@ export function SentimentDashboard({
             />
           ) : !isLoading && (
             <View style={styles.noDataContainer}>
-              <Text style={styles.noDataTitle}>{translate("sentimentAnalysis.noRecentCall")}</Text>
-              <Text style={styles.noDataText}>
-                {translate("sentimentAnalysis.noRecentCallMessage")}
-              </Text>
+              {summary && summary.totalConversations > 0 && summary.analyzedConversations === 0 ? (
+                <>
+                  <Text style={styles.noDataTitle}>{translate("sentimentAnalysis.noRecentCallButHaveCalls")}</Text>
+                  <Text style={styles.noDataText}>
+                    {translate("sentimentAnalysis.noRecentCallButHaveCallsMessage")}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.noDataTitle}>{translate("sentimentAnalysis.noRecentCall")}</Text>
+                  <Text style={styles.noDataText}>
+                    {translate("sentimentAnalysis.noRecentCallMessage")}
+                  </Text>
+                </>
+              )}
             </View>
           )}
         </>
