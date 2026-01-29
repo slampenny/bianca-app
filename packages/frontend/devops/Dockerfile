@@ -144,7 +144,11 @@ RUN SCRIPT_SRC=$(grep -oE 'src="[^"]+\.js"' /usr/share/nginx/html/index.html | h
       echo "This causes 'Unexpected token <' in browser (nginx serves HTML 404 for missing .js)"; \
       exit 1; \
     fi && \
-    echo "Verified JS asset exists: $FILE_PATH"
+    echo "Verified JS asset exists: $FILE_PATH" && \
+    DIR="/usr/share/nginx/html/$(dirname "$FILE_PATH")" && \
+    BASE="$(basename "$FILE_PATH")" && \
+    ln -sf "$BASE" "$DIR/index-current.js" && \
+    echo "Created index-current.js -> $BASE (fallback for cached index.html with old hash)"
 
 # Custom nginx config for SPA routing
 COPY devops/nginx.conf /etc/nginx/nginx.conf

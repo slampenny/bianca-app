@@ -93,6 +93,21 @@ phases:
         
         echo "  ✅ Green instance registered with target groups"
         
+        # Step 1.5: Deregister any other targets (orphans) so only green remains
+        echo ""
+        echo "Step 1.5: Ensuring only green instance is in target groups (deregister orphans)..."
+        for TG_ARN in ${API_TARGET_GROUP_ARN} ${FRONTEND_TARGET_GROUP_ARN}; do
+          aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+            --query "TargetHealthDescriptions[?TargetHealth.State!='draining'].[Target.Id,Target.Port]" --output text 2>/dev/null | while read TID TPORT; do
+            [ -z "$TID" ] && continue
+            if [ "$TID" != "$GREEN_INSTANCE_ID" ]; then
+              echo "  Deregistering orphan $TID (port $TPORT) from target group..."
+              aws elbv2 deregister-targets --target-group-arn "$TG_ARN" --targets Id=$TID,Port=$TPORT 2>/dev/null || true
+            fi
+          done
+        done
+        echo "  ✅ Orphan targets deregistered (only green remains)"
+        
         # Wait for target to become healthy
         echo ""
         echo "Step 2: Waiting for green instance to become healthy in target groups..."

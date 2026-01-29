@@ -580,6 +580,23 @@ server {
         proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
     }
     
+    # Static assets: on 502/503 from frontend, return non-HTML body so browser does not
+    # parse HTML error page as JS and throw "Unexpected token '<'".
+    location ~* \.(js|css|woff2?|ttf|eot|ico|png|jpg|jpeg|gif|webp|svg)$ {
+        proxy_pass http://frontend:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
+        proxy_intercept_errors on;
+        error_page 502 503 = @asset_error;
+    }
+    location @asset_error {
+        add_header Content-Type application/octet-stream;
+        return 502 "";
+    }
+    
     location / {
         # Check if maintenance flag exists and return 503 with maintenance page
         if (-f /opt/maintenance-mode.flag) {
