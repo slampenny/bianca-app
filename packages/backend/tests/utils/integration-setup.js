@@ -76,6 +76,20 @@ jest.mock('../../src/services/openai.sentiment.service', () => ({
       sentiment: 'positive',
       confidence: 0.8,
       reasoning: 'Mocked sentiment analysis'
+    }),
+    analyzeSentiment: jest.fn().mockResolvedValue({
+      success: true,
+      data: {
+        overallSentiment: 'positive',
+        sentimentScore: 0.8,
+        confidence: 0.8,
+        patientMood: 'Mocked',
+        keyEmotions: [],
+        concernLevel: 'low',
+        satisfactionIndicators: { positive: [], negative: [] },
+        summary: 'Mocked sentiment analysis',
+        recommendations: ''
+      }
     })
   })
 }));
@@ -127,7 +141,7 @@ jest.mock('@langchain/openai', () => ({
   }))
 }));
 
-// Mock OpenAI sentiment service
+// Mock OpenAI sentiment service (analyzeSentiment used by finalizeConversation)
 jest.mock('../../src/services/openai.sentiment.service', () => ({
   getOpenAISentimentServiceInstance: jest.fn().mockReturnValue({
     analyzeConversationSentiment: jest.fn().mockResolvedValue({
@@ -145,6 +159,20 @@ jest.mock('../../src/services/openai.sentiment.service', () => ({
         },
         summary: 'Patient shows negative sentiment with moderate confidence',
         recommendations: 'Consider additional support'
+      }
+    }),
+    analyzeSentiment: jest.fn().mockResolvedValue({
+      success: true,
+      data: {
+        overallSentiment: 'neutral',
+        sentimentScore: 0,
+        confidence: 0.8,
+        patientMood: 'Mocked',
+        keyEmotions: [],
+        concernLevel: 'low',
+        satisfactionIndicators: { positive: [], negative: [] },
+        summary: 'Mocked sentiment for finalizeConversation',
+        recommendations: ''
       }
     }),
     validateSentimentData: jest.fn().mockImplementation((data) => {

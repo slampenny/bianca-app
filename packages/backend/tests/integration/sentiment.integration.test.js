@@ -166,18 +166,18 @@ describe('Sentiment Analysis Integration', () => {
     });
 
     it('should handle sentiment analysis failure gracefully', async () => {
-      // Mock OpenAI error
-      const OpenAI = require('openai').OpenAI;
-      const mockOpenAI = new OpenAI();
-      mockOpenAI.chat.completions.create.mockRejectedValue(new Error('OpenAI API error'));
+      // Override integration-setup mock so analyzeSentiment fails (finalizeConversation calls analyzeSentiment)
+      const openaiSentiment = require('../../src/services/openai.sentiment.service');
+      openaiSentiment.getOpenAISentimentServiceInstance.mockReturnValueOnce({
+        analyzeSentiment: jest.fn().mockResolvedValue({ success: false, error: 'OpenAI API error' }),
+        analyzeConversationSentiment: jest.fn().mockResolvedValue({ success: true, data: {} })
+      });
 
-      // Finalize the conversation
       const result = await conversationService.finalizeConversation(conversation._id, false);
 
       expect(result).toHaveProperty('summary');
       expect(result.sentimentAnalysis).toBeNull();
 
-      // Verify conversation was still finalized - check the result
       expect(result).toHaveProperty('summary');
       expect(result.sentimentAnalysis).toBeNull();
     });

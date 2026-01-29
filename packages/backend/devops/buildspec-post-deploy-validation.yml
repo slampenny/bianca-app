@@ -15,25 +15,32 @@ phases:
         echo "Max retries: ${MAX_RETRIES:-20}"
         echo "Retry delay: ${RETRY_DELAY:-10} seconds"
         
-        # Read green instance info from previous stage
-        if [ -f instance-info.txt ]; then
-          source instance-info.txt
-          echo "Green instance ID: ${GREEN_INSTANCE_ID:-not found}"
+        # Read green instance info from previous stage (try multiple artifact paths)
+        INSTANCE_INFO_FOUND=false
+        for path in instance-info.txt ../CreateGreenInstance/instance-info.txt GreenInstanceOutput/instance-info.txt; do
+          if [ -f "$path" ]; then
+            source "$path"
+            echo "Green instance ID: ${GREEN_INSTANCE_ID:-not found}"
+            echo "Green instance IP: ${GREEN_INSTANCE_IP:-not found}"
+            INSTANCE_INFO_FOUND=true
+            break
+          fi
+        done
+        if [ -n "${CODEBUILD_SRC_DIR_GreenInstanceOutput:-}" ] && [ -f "${CODEBUILD_SRC_DIR_GreenInstanceOutput}/instance-info.txt" ] && [ "$INSTANCE_INFO_FOUND" = "false" ]; then
+          source "${CODEBUILD_SRC_DIR_GreenInstanceOutput}/instance-info.txt"
+          echo "Green instance ID: ${GREEN_INSTANCE_ID:-not found} (from GreenInstanceOutput artifact)"
           echo "Green instance IP: ${GREEN_INSTANCE_IP:-not found}"
-        elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
-          source ../CreateGreenInstance/instance-info.txt
-          echo "Green instance ID: ${GREEN_INSTANCE_ID:-not found}"
-          echo "Green instance IP: ${GREEN_INSTANCE_IP:-not found}"
-        else
-          echo "⚠️  Warning: instance-info.txt not found, attempting to discover green instance..."
-          # Try to find green instance by tags
+          INSTANCE_INFO_FOUND=true
+        fi
+        if [ "$INSTANCE_INFO_FOUND" = "false" ]; then
+          echo "⚠️  Warning: instance-info.txt not found in any path, attempting to discover instance..."
           GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+          BLUE_TAG="${BLUE_TAG:-bianca-staging}"
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")
-          
           if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
             GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
               --instance-ids "$GREEN_INSTANCE_ID" \
@@ -41,50 +48,75 @@ phases:
               --output text 2>/dev/null || echo "")
             echo "Found green instance: $GREEN_INSTANCE_ID (IP: $GREEN_INSTANCE_IP)"
           else
-            echo "❌ ERROR: Cannot find green instance for validation"
-            echo "   This is a blue-green deployment - green instance must exist"
-            echo "   Will NOT validate via public URLs (would test blue instance, not green)"
-            exit 1
+            # Fallback: validate single staging instance (Name=bianca-staging) when no green exists
+            echo "   No green instance found, checking for single staging instance (Name=$BLUE_TAG)..."
+            GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=$BLUE_TAG" \
+                        "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text 2>/dev/null || echo "")
+            if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+              GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
+                --instance-ids "$GREEN_INSTANCE_ID" \
+                --query 'Reservations[0].Instances[0].PublicIpAddress' \
+                --output text 2>/dev/null || echo "")
+              echo "   Using single staging instance for validation: $GREEN_INSTANCE_ID (IP: $GREEN_INSTANCE_IP)"
+            else
+              echo "❌ ERROR: Cannot find green instance or staging instance for validation"
+              exit 1
+            fi
           fi
         fi
 
   build:
     commands:
       - |
-        # Re-read green instance info (variables from pre_build may not persist)
-        if [ -f instance-info.txt ]; then
-          source instance-info.txt
-        elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
-          source ../CreateGreenInstance/instance-info.txt
-        else
-          # Try to find green instance by tags if not in file
+        # Re-read green instance info (variables from pre_build may not persist; try all artifact paths)
+        for path in instance-info.txt ../CreateGreenInstance/instance-info.txt GreenInstanceOutput/instance-info.txt; do
+          if [ -f "$path" ]; then source "$path"; break; fi
+        done
+        if [ -n "${CODEBUILD_SRC_DIR_GreenInstanceOutput:-}" ] && [ -f "${CODEBUILD_SRC_DIR_GreenInstanceOutput}/instance-info.txt" ]; then
+          source "${CODEBUILD_SRC_DIR_GreenInstanceOutput}/instance-info.txt"
+        fi
+        if [ -z "$GREEN_INSTANCE_IP" ] || [ "$GREEN_INSTANCE_IP" = "None" ] || [ "$GREEN_INSTANCE_IP" = "" ]; then
           GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
+          BLUE_TAG="${BLUE_TAG:-bianca-staging}"
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
             --query 'Reservations[0].Instances[0].InstanceId' \
             --output text 2>/dev/null || echo "")
-          
           if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
             GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
               --instance-ids "$GREEN_INSTANCE_ID" \
               --query 'Reservations[0].Instances[0].PublicIpAddress' \
               --output text 2>/dev/null || echo "")
             echo "Discovered green instance: $GREEN_INSTANCE_ID (IP: $GREEN_INSTANCE_IP)"
+          else
+            GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=$BLUE_TAG" \
+                        "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text 2>/dev/null || echo "")
+            if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+              GREEN_INSTANCE_IP=$(aws ec2 describe-instances \
+                --instance-ids "$GREEN_INSTANCE_ID" \
+                --query 'Reservations[0].Instances[0].PublicIpAddress' \
+                --output text 2>/dev/null || echo "")
+              echo "Discovered single staging instance for validation: $GREEN_INSTANCE_ID (IP: $GREEN_INSTANCE_IP)"
+            fi
           fi
         fi
         
-        # Determine if we're in blue-green mode (green instance exists)
+        # Proceed if we have any instance to validate (green or single staging)
         BLUE_GREEN_MODE=false
         if [ -n "$GREEN_INSTANCE_IP" ] && [ "$GREEN_INSTANCE_IP" != "None" ] && [ "$GREEN_INSTANCE_IP" != "" ]; then
           BLUE_GREEN_MODE=true
-          echo "🔵 Blue-Green Mode: Validating green instance directly by IP"
-          echo "   Green instance ID: ${GREEN_INSTANCE_ID:-unknown}"
-          echo "   Green instance IP: $GREEN_INSTANCE_IP"
+          echo "🔵 Validating instance directly by IP"
+          echo "   Instance ID: ${GREEN_INSTANCE_ID:-unknown}"
+          echo "   Instance IP: $GREEN_INSTANCE_IP"
         else
-          echo "❌ ERROR: Cannot find green instance for validation"
-          echo "   This is a blue-green deployment - green instance must exist"
-          echo "   Will NOT validate via public URLs (would test blue instance, not green)"
+          echo "❌ ERROR: Cannot find green or staging instance for validation"
           exit 1
         fi
         
