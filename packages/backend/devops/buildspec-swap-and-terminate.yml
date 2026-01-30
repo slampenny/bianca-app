@@ -10,12 +10,11 @@ phases:
   build:
     commands:
       - |
-        # Read instance info from previous stages
-        # Try to find instance-info.txt in the artifact
+        # Read instance info from previous stages (use . for POSIX sh)
         if [ -f instance-info.txt ]; then
-          source instance-info.txt
+          . instance-info.txt
         elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
-          source ../CreateGreenInstance/instance-info.txt
+          . ../CreateGreenInstance/instance-info.txt
         else
           echo "⚠️  Warning: instance-info.txt not found, attempting to discover instances..."
         fi
@@ -207,6 +206,44 @@ phases:
           --tags Key=Name,Value=$GREEN_TAG || {
           echo "  ⚠️  Warning: Failed to remove green tag (non-critical)"
         }
+        
+        # Step 6: Associate staging EIP with new blue instance (so staging-sip.* and Asterisk SIP keep working)
+        if [ -n "${STAGING_EIP_ALLOCATION_ID:-}" ]; then
+          echo ""
+          echo "Step 6: Associating staging EIP with new blue instance (for SIP / Asterisk)..."
+          if aws ec2 associate-address \
+            --instance-id "$GREEN_INSTANCE_ID" \
+            --allocation-id "$STAGING_EIP_ALLOCATION_ID" \
+            --allow-reassociation 2>/dev/null; then
+            echo "  ✅ EIP associated with new blue instance - staging-sip.* now points to this instance"
+            echo "  Waiting 15s for EIP to propagate, then restarting Asterisk so it uses new EXTERNAL_ADDRESS..."
+            sleep 15
+            # Restart Asterisk so it picks up new public IP (EIP) in EXTERNAL_ADDRESS
+            # Use single-quoted JSON so $(curl...) runs on the instance, not in CodeBuild
+            if command_id=$(aws ssm send-command \
+              --instance-ids "$GREEN_INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters '{"commands":["export PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && cd /opt/bianca-staging && docker compose up -d asterisk"]}' \
+              --timeout-seconds 60 \
+              --query 'Command.CommandId' \
+              --output text 2>/dev/null); then
+              echo "  SSM restart Asterisk sent (CommandId: $command_id), waiting for completion..."
+              for i in 1 2 3 4 5 6; do
+                status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$GREEN_INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "Pending")
+                [ "$status" = "Success" ] && echo "  ✅ Asterisk restarted with new EXTERNAL_ADDRESS" && break
+                [ "$status" = "Failed" ] && echo "  ⚠️  SSM restart failed (Asterisk may still work; check instance if SIP fails)" && break
+                sleep 10
+              done
+            else
+              echo "  ⚠️  Could not send SSM command to restart Asterisk (instance may need SSM agent). SIP may work after manual Asterisk restart."
+            fi
+          else
+            echo "  ⚠️  EIP association failed (may already be associated or allocation missing). Check staging-sip DNS and Asterisk."
+          fi
+        else
+          echo ""
+          echo "Step 6: No STAGING_EIP_ALLOCATION_ID set - skipping EIP association (non-staging or not configured)"
+        fi
         
         echo ""
         echo "✅ Blue-green deployment swap completed successfully!"

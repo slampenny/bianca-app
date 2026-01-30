@@ -523,24 +523,6 @@ resource "aws_codepipeline" "production" {
   }
 
   stage {
-    name = "RunTests"
-    action {
-      name             = "RunTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput", "BuildOutput"]
-      output_artifacts = ["TestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.production_tests.name
-        PrimarySource = "SourceOutput"
-      }
-      run_order = 1
-    }
-  }
-
-  stage {
     name = "CreateGreenInstance"
     action {
       name             = "CreateGreenInstance"
@@ -558,6 +540,7 @@ resource "aws_codepipeline" "production" {
     }
   }
 
+  # Deploy and RunTests run in parallel; PostDeployValidation waits for both to pass
   stage {
     name = "Deploy"
     action {
@@ -571,6 +554,21 @@ resource "aws_codepipeline" "production" {
         ApplicationName     = aws_codedeploy_app.production.name
         DeploymentGroupName = aws_codedeploy_deployment_group.production_green.deployment_group_name
       }
+      run_order = 1
+    }
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.production_tests.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
     }
   }
 

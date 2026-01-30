@@ -2154,13 +2154,26 @@ async handleStasisStartForPlayback(channel, channelName, event) {
     }
 
     async createConversationRecord(twilioCallSid, asteriskChannelId, patientId, callType = 'inbound') {
-        if (!patientId || !twilioCallSid) {
-            throw new Error('PatientID and twilioCallSid are required for conversation record');
+        if (!twilioCallSid) {
+            throw new Error('twilioCallSid is required for conversation record');
         }
 
         try {
-            const patientDoc = await Patient.findById(patientId).select('_id name').lean();
-            
+            // Resolve patient: prefer SIP URI patientId, fallback to Call record (outbound calls create Call at initiate with correct patientId)
+            let patientDoc = await Patient.findById(patientId).select('_id name').lean();
+            if (!patientDoc?._id && patientId) {
+                logger.warn(`[ARI Pipeline] Patient not found for SIP patientId ${patientId}, trying Call record by callSid`);
+            }
+            if (!patientDoc?._id) {
+                const existingCall = await Call.findOne({ callSid: twilioCallSid }).select('patientId').lean();
+                if (existingCall?.patientId) {
+                    const resolvedId = existingCall.patientId?.toString?.() || existingCall.patientId;
+                    patientDoc = await Patient.findById(resolvedId).select('_id name').lean();
+                    if (patientDoc?._id) {
+                        logger.info(`[ARI Pipeline] Resolved patient from Call record: ${patientDoc._id} (SIP patientId was: ${patientId || 'missing'})`);
+                    }
+                }
+            }
             if (!patientDoc?._id) {
                 throw new Error(`Patient with ID ${patientId} not found`);
             }

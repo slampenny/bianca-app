@@ -541,6 +541,12 @@ resource "aws_codebuild_project" "staging_swap_and_terminate" {
       name  = "FRONTEND_TARGET_GROUP_ARN"
       value = aws_lb_target_group.staging_frontend.arn
     }
+    # EIP allocation ID for staging SIP (staging-sip.*). After swap we associate this
+    # with the new blue instance so Twilio/Asterisk SIP keeps working.
+    environment_variable {
+      name  = "STAGING_EIP_ALLOCATION_ID"
+      value = aws_eip.staging.id
+    }
   }
 
   source {
@@ -751,6 +757,8 @@ resource "aws_codepipeline" "staging" {
     }
   }
 
+  # Deploy stage: CodeDeploy only. PostDeployValidation runs as soon as Deploy completes
+  # (RunTests runs in a later stage so it does not block validate/swap)
   stage {
     name = "Deploy"
     action {
@@ -765,22 +773,6 @@ resource "aws_codepipeline" "staging" {
         DeploymentGroupName = aws_codedeploy_deployment_group.staging_green.deployment_group_name
       }
       run_order = 1
-    }
-    # Tests run in parallel with Deploy (same run_order) - doesn't block deployment
-    # Tests use Docker containers from build stage for faster, more accurate testing
-    action {
-      name             = "RunTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput", "BuildOutput"]
-      output_artifacts = ["TestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.staging_tests.name
-        PrimarySource = "SourceOutput"
-      }
-      run_order = 1  # Same as Deploy - runs in parallel, doesn't block deployment
     }
   }
 
@@ -814,6 +806,26 @@ resource "aws_codepipeline" "staging" {
       output_artifacts = ["SwapOutput"]
       configuration = {
         ProjectName   = aws_codebuild_project.staging_swap_and_terminate.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
+    }
+  }
+
+  # Staging: RunTests runs after swap; does not block deploy/validate/swap.
+  # Staging is updated ASAP; tests run and finish whenever (pass/fail does not block).
+  stage {
+    name = "RunTests"
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_tests.name
         PrimarySource = "SourceOutput"
       }
       run_order = 1
