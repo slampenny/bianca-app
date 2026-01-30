@@ -8,6 +8,7 @@ const config = require('../config/config');
 const { caregiverService, conversationService, patientService, scheduleService } = require('../services');
 
 const { ConversationDTO, PatientDTO } = require('../dtos');
+const { toOrgIdString } = require('../dtos/caregiver.dto');
 
 const createPatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
@@ -214,8 +215,10 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
       }
     }
   } else if (caregiver.role === 'orgAdmin') {
-    // OrgAdmin can access conversations in their org
-    if (patient.org && patient.org.toString() !== caregiver.org?.toString()) {
+    // OrgAdmin can access conversations in their org (use DTO-style normalization for org IDs)
+    const patientOrgId = toOrgIdString(patient.org);
+    const caregiverOrgId = toOrgIdString(caregiver.org);
+    if (patientOrgId && caregiverOrgId && patientOrgId !== caregiverOrgId) {
       throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient\'s conversations');
     }
   }

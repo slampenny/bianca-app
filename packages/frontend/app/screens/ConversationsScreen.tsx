@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react"
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { View, StyleSheet, ActivityIndicator, FlatList, RefreshControl } from "react-native"
 import { Text } from "../components"
 import { useSelector, useDispatch } from "react-redux"
@@ -163,6 +163,7 @@ export function ConversationsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
+  const loadMoreThrottleRef = useRef(0)
   const { colors, isLoading: themeLoading } = useTheme()
 
   const {
@@ -184,7 +185,7 @@ export function ConversationsScreen() {
     },
   )
 
-  // Handle pagination state
+  // Handle pagination state (success)
   useEffect(() => {
     if (conversationsData) {
       logger.debug(`[ConversationsScreen] Received conversations data:`, {
@@ -198,6 +199,14 @@ export function ConversationsScreen() {
       setHasMore(conversationsData.page < conversationsData.totalPages)
     }
   }, [conversationsData])
+
+  // Stop pagination on error (e.g. 403) so we don't cycle through pages
+  useEffect(() => {
+    if (error) {
+      logger.warn('[ConversationsScreen] Conversations request failed, stopping pagination', { error: (error as any)?.status })
+      setHasMore(false)
+    }
+  }, [error])
 
   useEffect(() => {
     if (patient?.id) {
@@ -223,23 +232,15 @@ export function ConversationsScreen() {
   }, [conversations, currentConversation]);
 
   const loadMoreConversations = useCallback(() => {
-    logger.debug(`[ConversationsScreen] loadMoreConversations called:`, {
-      hasMore,
-      isLoading,
-      currentPage: page,
-      currentConversationsCount: conversations.length
-    });
-    
-    if (hasMore && !isLoading) {
-      logger.debug(`[ConversationsScreen] Loading page ${page + 1}`);
-      setPage(prev => prev + 1)
-    } else {
-      logger.debug(`[ConversationsScreen] Cannot load more:`, {
-        hasMore,
-        isLoading
-      });
-    }
-  }, [hasMore, isLoading, page, conversations.length])
+    if (error) return
+    if (!hasMore || isLoading) return
+    // Throttle: avoid rapid fire when onEndReached triggers repeatedly (e.g. short/empty list)
+    const now = Date.now()
+    if (now - loadMoreThrottleRef.current < 800) return
+    loadMoreThrottleRef.current = now
+    logger.debug(`[ConversationsScreen] Loading page ${page + 1}`);
+    setPage(prev => prev + 1)
+  }, [hasMore, isLoading, page, error])
 
   const onRefresh = async () => {
     setRefreshing(true)
