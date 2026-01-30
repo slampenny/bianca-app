@@ -13,7 +13,7 @@ const CaregiverDTO = (caregiver) => {
     return null;
   }
   
-  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, patients } = caregiverObj;
+  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, patients, ssoProvider, ssoProviderId } = caregiverObj;
   
   const id = _id;
 
@@ -36,6 +36,8 @@ const CaregiverDTO = (caregiver) => {
     isPhoneVerified: isPhoneVerified === true,
     org: orgId,
     patients: patientIds,
+    ssoProvider: ssoProvider || undefined,
+    ssoProviderId: ssoProviderId || undefined,
   };
 };
 

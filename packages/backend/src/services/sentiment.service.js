@@ -280,11 +280,11 @@ const getSentimentSummary = async (patientId) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Get recent conversations using Call's endTime
+    // Get recent conversations using Call's endTime (date/duration live on Call, not Conversation)
     let recentConversations = await Conversation.find({
       patientId
     })
-      .populate('callId', 'endTime startTime duration status')
+      .populate('callId', 'endTime startTime duration callDuration status')
       .select('_id analyzedData callId')
       .lean();
     

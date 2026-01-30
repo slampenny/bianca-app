@@ -31,25 +31,17 @@ const SentimentAnalysisDTO = (sentimentData) => {
 };
 
 const SentimentTrendPointDTO = (conversation) => {
-  const {
-    _id,
-    startTime,
-    endTime,
-    duration,
-    analyzedData
-  } = conversation;
-
-  console.log(`[SentimentTrendPointDTO] Processing conversation:`, {
-    _id,
-    analyzedData,
-    hasSentiment: !!analyzedData?.sentiment,
-    sentimentValue: analyzedData?.sentiment
-  });
+  const { _id, analyzedData } = conversation;
+  // Date and duration live on the Call, not Conversation (callId is populated with endTime, startTime, duration)
+  const call = conversation.callId;
+  const endTime = call?.endTime;
+  const startTime = call?.startTime;
+  const duration = call?.duration ?? call?.callDuration ?? 0;
 
   return {
     conversationId: _id,
     date: endTime || startTime,
-    duration,
+    duration: typeof duration === 'number' ? duration : 0,
     sentiment: analyzedData?.sentiment ? SentimentAnalysisDTO(analyzedData.sentiment) : null,
     sentimentAnalyzedAt: analyzedData?.sentimentAnalyzedAt
   };

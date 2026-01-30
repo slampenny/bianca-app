@@ -23,8 +23,8 @@ import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { logger } from "../utils/logger"
 import { TIMEOUTS } from "../constants"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
-import { getCaregiver } from "../store/caregiverSlice"
-import { getInviteToken } from "../store/authSlice"
+import { getCaregiver, setCaregiver } from "../store/caregiverSlice"
+import { getCurrentUser, getInviteToken } from "../store/authSlice"
 import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
 import { useResendVerificationEmailMutation } from "../services/api/authApi"
 import { useGetMFAStatusQuery } from "../services/api/mfaApi"
@@ -45,8 +45,10 @@ function ProfileScreen() {
   // Use language hook to trigger re-renders on language change
   useLanguage()
 
-  // Get the current user (who is a caregiver)
-  const currentUser = useSelector(getCaregiver)
+  // Use caregiver from slice; fall back to auth currentUser so profile is filled after SSO even if caregiver slice lags
+  const caregiverFromSlice = useSelector(getCaregiver)
+  const currentUserFromAuth = useSelector(getCurrentUser)
+  const currentUser = caregiverFromSlice ?? currentUserFromAuth
   const inviteToken = useSelector(getInviteToken)
   
   const isSsoUser = Boolean(currentUser?.ssoProvider)
@@ -84,16 +86,24 @@ function ProfileScreen() {
   // Timeout ref for navigation delay
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // When setting the avatar state in ProfileScreen
+  // Sync form from current user (caregiver or auth fallback) so SSO users see name/email/avatar pre-filled
   useEffect(() => {
     if (currentUser) {
-      logger.debug("Current user avatar:", currentUser.avatar)
-      setName(currentUser.name || "")
-      setAvatar(currentUser.avatar || "")
-      setEmail(currentUser.email || "")
-      setPhone(currentUser.phone || "")
+      logger.debug("ProfileScreen syncing form from user:", currentUser.id, currentUser.name, currentUser.avatar)
+      setName(currentUser.name ?? "")
+      setAvatar(currentUser.avatar ?? "")
+      setEmail(currentUser.email ?? "")
+      setPhone(currentUser.phone ?? "")
     }
   }, [currentUser])
+
+  // Keep caregiver slice in sync when auth has user but caregiver slice doesn't (e.g. after SSO)
+  useEffect(() => {
+    if (currentUserFromAuth && !caregiverFromSlice) {
+      logger.debug("ProfileScreen: syncing caregiver slice from auth currentUser")
+      dispatch(setCaregiver(currentUserFromAuth))
+    }
+  }, [currentUserFromAuth, caregiverFromSlice, dispatch])
 
   // Handle invited users who got stuck on profile screen
   useEffect(() => {

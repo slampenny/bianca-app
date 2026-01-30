@@ -40,6 +40,7 @@ export interface Caregiver {
   isEmailVerified?: boolean
   isPhoneVerified?: boolean
   ssoProvider?: "google" | "microsoft" | null
+  ssoProviderId?: string | null
 }
 
 export interface AlertPages {

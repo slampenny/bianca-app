@@ -38,27 +38,29 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
     <View style={[styles.container, style]}>
       <Text style={styles.title}>{translate("sentimentAnalysis.lastCallAnalysis")}</Text>
       
-      {/* Call Overview */}
+      {/* Call Overview - date/duration come from Call (conversation.callId) on backend */}
       <View style={styles.callOverview}>
         <View style={styles.callHeader}>
           <View style={styles.callDateContainer}>
             <Icon icon="calendar" size={16} color={colors.textDim || colors.palette.neutral600} />
             <Text style={styles.callDate}>
-              {new Date(lastCall.date).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {(() => {
+                const d = lastCall.date ? new Date(lastCall.date) : null
+                return d && !Number.isNaN(d.getTime())
+                  ? d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                  : 'N/A'
+              })()}
             </Text>
           </View>
           <View style={styles.callTimeContainer}>
             <Icon icon="clock" size={16} color={colors.textDim || colors.palette.neutral600} />
             <Text style={styles.callTime}>
-              {new Date(lastCall.date).toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit'
-              })}
+              {(() => {
+                const d = lastCall.date ? new Date(lastCall.date) : null
+                return d && !Number.isNaN(d.getTime())
+                  ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                  : 'N/A'
+              })()}
             </Text>
           </View>
         </View>
@@ -66,15 +68,19 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
         <View style={styles.callStats}>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>{translate("sentimentAnalysis.duration")}</Text>
-            <Text style={styles.statValue}>{Math.round(lastCall.duration / 60)} minutes</Text>
+            <Text style={styles.statValue}>
+              {typeof lastCall.duration === 'number' && !Number.isNaN(lastCall.duration)
+                ? `${Math.round(lastCall.duration / 60)} minutes`
+                : 'N/A'}
+            </Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>{translate("sentimentAnalysis.analysisDate")}</Text>
             <Text style={styles.statValue}>
-              {lastCall.sentimentAnalyzedAt 
-                ? new Date(lastCall.sentimentAnalyzedAt).toLocaleDateString()
-                : 'N/A'
-              }
+              {(() => {
+                const d = lastCall.sentimentAnalyzedAt ? new Date(lastCall.sentimentAnalyzedAt) : null
+                return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString() : 'N/A'
+              })()}
             </Text>
           </View>
           <View style={styles.statItem}>
