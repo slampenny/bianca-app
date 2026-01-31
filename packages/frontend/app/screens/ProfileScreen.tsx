@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import {
   ScrollView,
   Pressable,
@@ -24,8 +24,9 @@ import { logger } from "../utils/logger"
 import { TIMEOUTS } from "../constants"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver, setCaregiver } from "../store/caregiverSlice"
-import { getCurrentUser, getInviteToken } from "../store/authSlice"
-import { useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
+import { getCurrentUser, getInviteToken, getAuthTokens, setCurrentUser } from "../store/authSlice"
+import type { RootState } from "../store/store"
+import { useUpdateCaregiverMutation, useUploadAvatarMutation, useGetCaregiverQuery } from "../services/api/caregiverApi"
 import { useResendVerificationEmailMutation } from "../services/api/authApi"
 import { useGetMFAStatusQuery } from "../services/api/mfaApi"
 import { LoadingScreen } from "./LoadingScreen"
@@ -34,6 +35,7 @@ import { navigationRef } from "app/navigators/navigationUtilities"
 import { Button } from "app/components"
 import { useFontScale } from "app/hooks/useFontScale"
 import { testingProps } from "../utils/testingProps"
+import { jwtDecode } from "jwt-decode"
 
 function ProfileScreen() {
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
@@ -48,8 +50,48 @@ function ProfileScreen() {
   // Use caregiver from slice; fall back to auth currentUser so profile is filled after SSO even if caregiver slice lags
   const caregiverFromSlice = useSelector(getCaregiver)
   const currentUserFromAuth = useSelector(getCurrentUser)
-  const currentUser = caregiverFromSlice ?? currentUserFromAuth
+  const tokens = useSelector(getAuthTokens)
   const inviteToken = useSelector(getInviteToken)
+  const currentUser = caregiverFromSlice ?? currentUserFromAuth
+
+  // When we have tokens but no user (e.g. after deploy/reload or race), fetch current user from token sub
+  const caregiverIdFromToken = useMemo(() => {
+    if (!tokens?.access?.token || currentUser) return null
+    try {
+      const decoded = jwtDecode<{ sub?: string }>(tokens.access.token)
+      return decoded?.sub ?? null
+    } catch {
+      return null
+    }
+  }, [tokens?.access?.token, currentUser])
+  const { data: fetchedCaregiver, isLoading: isLoadingCaregiver } = useGetCaregiverQuery(
+    { id: caregiverIdFromToken! },
+    { skip: !caregiverIdFromToken }
+  )
+  useEffect(() => {
+    if (fetchedCaregiver && !currentUser) {
+      dispatch(setCurrentUser(fetchedCaregiver))
+      dispatch(setCaregiver(fetchedCaregiver))
+    }
+  }, [fetchedCaregiver, currentUser, dispatch])
+
+  // Fallback: if we have tokens but no user, try to restore from latest SSO login result in API cache (handles race after modal close)
+  const ssoLoginUserFromCache = useSelector((state: RootState) => {
+    const api = state.ssoApi as { mutations?: Record<string, { status: string; data?: { user?: unknown } }> } | undefined
+    if (!api?.mutations) return null
+    const entry = Object.entries(api.mutations).find(
+      ([k, v]) => k.startsWith("ssoLogin") && v?.status === "fulfilled" && v?.data?.user
+    )
+    return entry?.[1]?.data?.user ?? null
+  })
+  useEffect(() => {
+    if (!tokens?.access?.token || currentUser || !ssoLoginUserFromCache) return
+    dispatch(setCurrentUser(ssoLoginUserFromCache as Parameters<typeof setCurrentUser>[0]))
+    dispatch(setCaregiver(ssoLoginUserFromCache as Parameters<typeof setCaregiver>[0]))
+  }, [tokens?.access?.token, currentUser, ssoLoginUserFromCache, dispatch])
+
+  // Show loading when we have tokens but no user and we're fetching by id (avoids flashing empty profile after SSO)
+  const isRestoringUser = Boolean(tokens?.access?.token && !currentUser && caregiverIdFromToken && isLoadingCaregiver)
   
   const isSsoUser = Boolean(currentUser?.ssoProvider)
   const isEmailVerified = Boolean(currentUser?.isEmailVerified || isSsoUser)
@@ -250,7 +292,7 @@ function ProfileScreen() {
     }
   }
 
-  if (isUpdating || isUploading) {
+  if (isUpdating || isUploading || isRestoringUser) {
     return <LoadingScreen />
   }
 

@@ -1,9 +1,9 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { authApi } from "../services/api/authApi"
 import { caregiverApi } from "../services/api/caregiverApi"
+import { ssoApi } from "../services/api/ssoApi"
 import { AuthTokens, Caregiver } from "../services/api/api.types"
 import { RootState } from "./store"
-import { logger } from "../utils/logger"
 
 interface AuthState {
   tokens: AuthTokens | null // This is the JWT token
@@ -94,6 +94,14 @@ export const authSlice = createSlice({
         }
       },
     )
+    // SSO login: update store when API succeeds so we don't rely only on component callback (avoids empty profile after redirect/reload)
+    builder.addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
+      if (payload?.success && payload?.tokens && payload?.user) {
+        state.tokens = payload.tokens
+        state.currentUser = payload.user as Caregiver
+        if (payload.user?.email) state.authEmail = payload.user.email
+      }
+    })
   },
 })
 

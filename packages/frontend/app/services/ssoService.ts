@@ -25,7 +25,6 @@ const getRedirectUri = (): string => {
     // This ensures it matches what's configured in Google/Microsoft OAuth
     if (typeof window !== 'undefined' && window.location) {
       const origin = window.location.origin;
-      logger.debug('OAuth Redirect URI (web):', origin);
       return origin;
     }
     // Fallback to makeRedirectUri if window is not available
@@ -36,12 +35,7 @@ const getRedirectUri = (): string => {
 };
 
 const redirectUri = getRedirectUri();
-logger.debug('OAuth Redirect URI:', redirectUri);
-logger.debug('OAuth Client IDs:', {
-  google: GOOGLE_CLIENT_ID ? 'configured' : 'missing',
-  microsoft: MICROSOFT_CLIENT_ID ? 'configured' : 'missing',
-  tenant: MICROSOFT_TENANT_ID
-});
+// Intentionally no debug logging here to reduce console noise in web dev builds
 
 export interface SSOUser {
   id: string;
@@ -262,28 +256,41 @@ class SSOService {
         ...(userInfo.picture && userInfo.picture.trim() ? { picture: userInfo.picture } : {}),
       };
       
-      logger.debug('SSO backend authentication attempt:', {
-        apiUrl: apiConfig.url,
-        provider: userInfo.provider,
-        email: userInfo.email,
-        endpoint: '/sso/login',
-        hasPicture: !!requestPayload.picture
-      });
+      // Intentionally no debug logging here to reduce console noise in web dev builds
       
       // Use RTK Query mutation for backend authentication
       const result = store.dispatch(
         ssoApi.endpoints.ssoLogin.initiate(requestPayload)
       );
 
-      // Wait for the query to complete
-      const response = await result;
-      
-      if ('error' in response) {
-        // RTK Query error - extract detailed error information
-        const rtkError = response.error as any;
+      try {
+        // Unwrap throws on RTK Query errors, returns payload on success
+        const data = await result.unwrap();
+
+        if (data?.success) {
+          // Return the user info with tokens, org, patients, and alerts for the frontend to handle
+          return {
+            ...userInfo,
+            tokens: data.tokens,
+            backendUser: data.user,
+            backendOrg: data.org,
+            backendPatients: data.patients,
+            backendAlerts: data.alerts,
+          } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] };
+        }
+
+        return {
+          error: 'Backend authentication failed',
+          description: data?.message || 'Unknown backend error',
+        };
+      } catch (rtkError: any) {
         const errorData = rtkError?.data;
         const errorStatus = rtkError?.status;
-        
+        const fallbackMessage =
+          rtkError?.error ||
+          rtkError?.message ||
+          'Failed to authenticate with backend';
+
         // Log detailed error information for debugging
         logger.error('SSO backend authentication error:', {
           status: errorStatus,
@@ -292,21 +299,25 @@ class SSOService {
           error: errorData?.error,
           data: errorData,
           fullError: rtkError,
+          apiUrl: apiConfig.url,
+          endpoint: '/sso/login',
           userInfo: { email: userInfo.email, provider: userInfo.provider }
         });
-        
+
         // Extract error message from various possible locations
         // Backend returns { code, message } format
         let errorMessage = 'Failed to authenticate with backend';
-        
+
         if (errorData) {
           // Backend error format: { code: number, message: string }
-          errorMessage = errorData.message || 
-                        errorData.error || 
-                        errorData.description || 
+          errorMessage = errorData.message ||
+                        errorData.error ||
+                        errorData.description ||
                         errorMessage;
+        } else {
+          errorMessage = fallbackMessage;
         }
-        
+
         // Add status code information if available
         if (errorStatus === 'FETCH_ERROR') {
           errorMessage = `Network error: Unable to connect to the server. Please check your connection and try again.`;
@@ -322,28 +333,15 @@ class SSOService {
           // Alternative status code location
           errorMessage = `Server error (${errorData.statusCode}): ${errorMessage}`;
         }
-        
+
         return {
           error: 'Backend authentication failed',
           description: errorMessage,
         };
-      }
-
-      if (response.data.success) {
-        // Return the user info with tokens, org, patients, and alerts for the frontend to handle
-        return {
-          ...userInfo,
-          tokens: response.data.tokens,
-          backendUser: response.data.user,
-          backendOrg: response.data.org,
-          backendPatients: response.data.patients,
-          backendAlerts: response.data.alerts,
-        } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] };
-      } else {
-        return {
-          error: 'Backend authentication failed',
-          description: response.data.message || 'Unknown backend error',
-        };
+      } finally {
+        if (typeof (result as any)?.unsubscribe === 'function') {
+          result.unsubscribe();
+        }
       }
     } catch (error) {
       logger.error('Backend authentication error (catch block):', {

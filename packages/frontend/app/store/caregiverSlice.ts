@@ -5,7 +5,7 @@ import { Caregiver } from "../services/api/api.types"
 import { authApi } from "../services/api/authApi"
 import { caregiverApi } from "../services/api/caregiverApi"
 import { orgApi } from "../services/api/orgApi"
-import { logger } from "../utils/logger"
+import { ssoApi } from "../services/api/ssoApi"
 
 interface CaregiverState {
   caregiver: Caregiver | null
@@ -125,6 +125,12 @@ export const caregiverSlice = createSlice({
         state.caregivers = payload.results
       },
     )
+    // SSO login: set caregiver when API succeeds so profile is filled even if component callback lags
+    builder.addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
+      if (payload?.success && payload?.user) {
+        state.caregiver = payload.user as Caregiver
+      }
+    })
   },
 })
 

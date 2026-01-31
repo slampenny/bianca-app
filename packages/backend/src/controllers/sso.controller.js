@@ -241,16 +241,7 @@ const login = catchAsync(async (req, res) => {
       );
     }
 
-    logger.info('SSO login successful', {
-      provider,
-      email,
-      caregiverId: caregiver._id,
-      orgId: orgForDTO?._id,
-      patientCount: patientDTOs.length,
-      alertCount: alertDTOs.length
-    });
-
-    res.json({
+    const responsePayload = {
       success: true,
       message: 'SSO login successful',
       tokens: {
@@ -267,7 +258,9 @@ const login = catchAsync(async (req, res) => {
       org: orgDTO,
       patients: patientDTOs,
       alerts: alertDTOs
-    });
+    };
+
+    res.json(responsePayload);
 
   } catch (error) {
     // If it's already an ApiError, re-throw it

@@ -114,10 +114,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
   const isDarkMode = themeInfo.darkMode;
   const styles = createStyles(colors, isDarkMode);
   
-  // Debug: Log to verify dark mode detection (remove after testing)
-  if (__DEV__) {
-    console.log('[SSO Buttons] Dark mode:', isDarkMode, 'Background color:', isDarkMode ? '#A3A3A3' : '#FFFFFF');
-  }
+  // No debug logging here to reduce console noise in web dev builds
 
   const handleGoogleSignIn = async () => {
     if (disabled || isGoogleLoading) return;

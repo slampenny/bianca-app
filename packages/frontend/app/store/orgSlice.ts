@@ -3,6 +3,7 @@ import { RootState } from "./store"
 import { Org, Caregiver } from "../services/api/api.types"
 // Import API directly to break circular dependency with app/services/api/index.ts
 import { authApi } from "../services/api/authApi"
+import { ssoApi } from "../services/api/ssoApi"
 
 interface OrgState {
   org: Org | null
@@ -40,6 +41,11 @@ export const orgSlice = createSlice({
       })
       .addMatcher(authApi.endpoints.logout.matchRejected, (state) => {
         state.org = null
+      })
+      .addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
+        if (payload?.success && payload?.org) {
+          state.org = payload.org as Org
+        }
       })
       // Listen for any action that ends with '/updateOrg/fulfilled'
       .addMatcher(
