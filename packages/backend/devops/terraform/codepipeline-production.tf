@@ -540,7 +540,6 @@ resource "aws_codepipeline" "production" {
     }
   }
 
-  # Deploy and RunTests run in parallel; PostDeployValidation waits for both to pass
   stage {
     name = "Deploy"
     action {
@@ -556,6 +555,12 @@ resource "aws_codepipeline" "production" {
       }
       run_order = 1
     }
+  }
+
+  # RunTests stage runs AFTER Deploy completes, BEFORE SwapAndTerminate
+  # This ensures tests validate the green instance before it goes live
+  stage {
+    name = "RunTests"
     action {
       name             = "RunTests"
       category         = "Build"
