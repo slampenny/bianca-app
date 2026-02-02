@@ -83,7 +83,10 @@ class TwilioCallService {
         statusCallbackMethod: 'POST',
         // answerOnBridge: true, // REMOVED: This was causing Twilio to skip the initial TwiML "Connecting you to Bianca" message
         machineDetection: 'DetectMessageEnd', // Detect answering machines
-        machineDetectionTimeout: 10, // Wait 10 seconds for detection
+        machineDetectionTimeout: 5000, // Wait up to 5s (milliseconds) for detection
+        asyncAmd: true, // Continue AMD in background; don't delay handoff
+        asyncAmdStatusCallback: statusCallbackUrl,
+        asyncAmdStatusCallbackMethod: 'POST',
         timeout: 30 // Ring for 30 seconds before giving up
       };
       
