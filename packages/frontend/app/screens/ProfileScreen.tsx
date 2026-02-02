@@ -59,35 +59,63 @@ function ProfileScreen() {
     if (!tokens?.access?.token || currentUser) return null
     try {
       const decoded = jwtDecode<{ sub?: string }>(tokens.access.token)
+      logger.debug("ProfileScreen: decoded token sub:", decoded?.sub)
       return decoded?.sub ?? null
-    } catch {
+    } catch (error) {
+      logger.error("ProfileScreen: failed to decode JWT:", error)
       return null
     }
   }, [tokens?.access?.token, currentUser])
-  const { data: fetchedCaregiver, isLoading: isLoadingCaregiver } = useGetCaregiverQuery(
+  
+  const { data: fetchedCaregiver, isLoading: isLoadingCaregiver, error: fetchError } = useGetCaregiverQuery(
     { id: caregiverIdFromToken! },
     { skip: !caregiverIdFromToken }
   )
+  
   useEffect(() => {
     if (fetchedCaregiver && !currentUser) {
+      logger.debug("ProfileScreen: restoring user from API fetch:", fetchedCaregiver.id, fetchedCaregiver.email)
       dispatch(setCurrentUser(fetchedCaregiver))
       dispatch(setCaregiver(fetchedCaregiver))
     }
-  }, [fetchedCaregiver, currentUser, dispatch])
+    if (fetchError) {
+      logger.error("ProfileScreen: failed to fetch caregiver from token:", fetchError)
+    }
+  }, [fetchedCaregiver, currentUser, fetchError, dispatch])
 
   // Fallback: if we have tokens but no user, try to restore from latest SSO login result in API cache (handles race after modal close)
   const ssoLoginUserFromCache = useSelector((state: RootState) => {
-    const api = state.ssoApi as { mutations?: Record<string, { status: string; data?: { user?: unknown } }> } | undefined
-    if (!api?.mutations) return null
+    const api = state.ssoApi as { mutations?: Record<string, { status: string; data?: { caregiver?: unknown } }> } | undefined
+    if (!api?.mutations) {
+      logger.debug("ProfileScreen: no SSO API mutations in cache")
+      return null
+    }
     const entry = Object.entries(api.mutations).find(
-      ([k, v]) => k.startsWith("ssoLogin") && v?.status === "fulfilled" && v?.data?.user
+      ([k, v]) => k.startsWith("ssoLogin") && v?.status === "fulfilled" && v?.data?.caregiver
     )
-    return entry?.[1]?.data?.user ?? null
+    if (entry) {
+      logger.debug("ProfileScreen: found SSO caregiver in cache from key:", entry[0])
+    } else {
+      logger.debug("ProfileScreen: no fulfilled SSO login found in cache")
+    }
+    return entry?.[1]?.data?.caregiver ?? null
   })
+  
   useEffect(() => {
     if (!tokens?.access?.token || currentUser || !ssoLoginUserFromCache) return
-    dispatch(setCurrentUser(ssoLoginUserFromCache as Parameters<typeof setCurrentUser>[0]))
-    dispatch(setCaregiver(ssoLoginUserFromCache as Parameters<typeof setCaregiver>[0]))
+    const caregiver = ssoLoginUserFromCache as Parameters<typeof setCurrentUser>[0]
+    // Validate caregiver has required fields before using cache
+    if (caregiver?.id && caregiver?.email && caregiver?.name) {
+      logger.debug("ProfileScreen: restoring caregiver from SSO cache:", caregiver.id, caregiver.email)
+      dispatch(setCurrentUser(caregiver))
+      dispatch(setCaregiver(caregiver))
+    } else {
+      logger.warn("ProfileScreen: SSO cache caregiver incomplete, skipping:", {
+        hasId: !!caregiver?.id,
+        hasEmail: !!caregiver?.email,
+        hasName: !!caregiver?.name
+      })
+    }
   }, [tokens?.access?.token, currentUser, ssoLoginUserFromCache, dispatch])
 
   // Show loading when we have tokens but no user and we're fetching by id (avoids flashing empty profile after SSO)

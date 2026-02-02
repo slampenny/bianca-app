@@ -55,17 +55,20 @@ const login = catchAsync(async (req, res) => {
             role: 'orgAdmin', // First caregiver in org should be orgAdmin
           });
           
-          // Add caregiver to org
+          // Add caregiver to org and save - do this before populate to ensure data is persisted
           existingOrg.caregivers.push(caregiver._id);
           if (!existingOrg.privacyOfficerId) {
             existingOrg.privacyOfficerId = caregiver._id;
           }
           await existingOrg.save();
           
-          // Populate org for DTO
-          orgForDTO = existingOrg;
+          // Populate org for DTO - use fresh query to ensure data is fully persisted
+          orgForDTO = await Org.findById(existingOrg._id);
           
-          // Populate caregiver with org and patients
+          // Wait a tick to ensure MongoDB write is committed before populate
+          await new Promise(resolve => setImmediate(resolve));
+          
+          // Populate caregiver with org and patients - use fresh query with populated org
           caregiver = await Caregiver.findById(caregiver._id)
             .populate('org')
             .populate({
@@ -75,6 +78,11 @@ const login = catchAsync(async (req, res) => {
                 model: 'Schedule',
               },
             });
+          
+          // Ensure org was populated - if not, set it manually
+          if (!caregiver.org && orgForDTO) {
+            caregiver.org = orgForDTO;
+          }
           
           logger.info('SSO login successfully created caregiver for existing org', { 
             orgId: existingOrg._id, 
@@ -117,12 +125,37 @@ const login = catchAsync(async (req, res) => {
           }
           );
 
-          caregiver = org.caregivers[0];
-          // Use the org we just created
-          orgForDTO = org;
+          // Wait a tick to ensure MongoDB write is committed
+          await new Promise(resolve => setImmediate(resolve));
+
+          // Fetch the caregiver with full population to ensure we have complete data
+          const caregiverId = org.caregivers && org.caregivers.length > 0 ? org.caregivers[0] : null;
+          if (!caregiverId) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve caregiver after org creation');
+          }
+
+          caregiver = await Caregiver.findById(caregiverId)
+            .populate('org')
+            .populate({
+              path: 'patients',
+              populate: {
+                path: 'schedules',
+                model: 'Schedule',
+              },
+            });
+
+          if (!caregiver) {
+            throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to find caregiver after creation');
+          }
+
+          // Fetch org separately to ensure it's fully populated
+          orgForDTO = await Org.findById(org._id);
+          
           logger.info('SSO login successfully created new org and caregiver', { 
             orgId: org._id, 
-            caregiverId: caregiver._id 
+            caregiverId: caregiver._id,
+            hasOrg: !!caregiver.org,
+            orgPopulated: !!(caregiver.org && caregiver.org.name)
           });
         } catch (createError) {
           logger.error('SSO login failed to create org and caregiver', {
@@ -224,10 +257,28 @@ const login = catchAsync(async (req, res) => {
     const patientDTOs = patients.map((patient) => PatientDTO(patient));
 
     // Generate DTOs
-    let userDTO, orgDTO;
+    let caregiverDTO, orgDTO;
     try {
-      userDTO = CaregiverDTO(caregiver);
+      caregiverDTO = CaregiverDTO(caregiver);
       orgDTO = orgForDTO ? OrgDTO(orgForDTO) : null;
+      
+      // Validate caregiverDTO has required fields to prevent empty profile screen
+      if (!caregiverDTO || !caregiverDTO.id || !caregiverDTO.email || !caregiverDTO.name) {
+        logger.error('SSO login generated incomplete caregiverDTO', {
+          caregiverDTO,
+          caregiverId: caregiver._id,
+          caregiverData: {
+            id: caregiver._id,
+            email: caregiver.email,
+            name: caregiver.name,
+            hasOrg: !!caregiver.org
+          }
+        });
+        throw new ApiError(
+          httpStatus.INTERNAL_SERVER_ERROR,
+          'Failed to generate complete user data. Please try again.'
+        );
+      }
     } catch (dtoError) {
       logger.error('SSO login failed to generate DTOs', {
         error: dtoError.message,
@@ -254,7 +305,7 @@ const login = catchAsync(async (req, res) => {
           expires: refreshExpires,
         },
       },
-      user: userDTO,
+      caregiver: caregiverDTO,
       org: orgDTO,
       patients: patientDTOs,
       alerts: alertDTOs

@@ -237,6 +237,16 @@ jest.mock('../../src/config/stripe', () => ({
   }
 }));
 
+// Mock stripeUsageService to prevent Stripe API calls
+jest.mock('../../src/services/stripeUsage.service', () => ({
+  getUsageSummary: jest.fn().mockResolvedValue({
+    subscriptionId: 'sub_test123',
+    totalUsage: 0,
+    items: []
+  }),
+  reportCallUsage: jest.fn().mockResolvedValue({ success: true })
+}));
+
 // Don't mock paymentMethod.service - we want to test our own business logic
 
 // Mock cache service to prevent initialization issues

@@ -15,8 +15,46 @@ const { snsService } = require('../../src/services/sns.service');
 describe('Phone Verification Integration Tests', () => {
   beforeAll(async () => {
     await setupMongoMemoryServer();
-    // Mock SNS service methods by directly assigning mock functions
-    // This works even if methods don't exist yet
+    
+    // Mock Twilio SMS Service that smsVerificationService actually uses
+    const { twilioSmsService } = require('../../src/services/twilioSms.service');
+    
+    // Mock the isInitialized getter
+    Object.defineProperty(twilioSmsService, 'isInitialized', {
+      get: jest.fn(() => true),
+      configurable: true
+    });
+    
+    // Mock the sendSMS method that smsVerificationService calls
+    twilioSmsService.sendSMS = jest.fn().mockResolvedValue({
+      sid: 'test-sms-sid-123',
+      status: 'queued'
+    });
+    
+    // Mock the formatPhoneNumber method
+    twilioSmsService.formatPhoneNumber = jest.fn().mockImplementation((phone) => {
+      if (!phone) return null;
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      }
+      return phone.startsWith('+') ? phone : `+${phone}`;
+    });
+    
+    // Mock the maskPhoneNumber method
+    twilioSmsService.maskPhoneNumber = jest.fn().mockImplementation((phone) => {
+      if (!phone) return '';
+      const formatted = twilioSmsService.formatPhoneNumber(phone);
+      if (!formatted) return phone;
+      // Mask middle digits: +1234567890 -> +1***-***-7890
+      const cleaned = formatted.replace(/\D/g, '');
+      if (cleaned.length >= 10) {
+        return `+${cleaned[0]}***-***-${cleaned.slice(-4)}`;
+      }
+      return phone;
+    });
+    
+    // Also mock SNS service methods for compatibility
     snsService.sendToPhone = jest.fn().mockResolvedValue({
       MessageId: 'test-message-id-123'
     });

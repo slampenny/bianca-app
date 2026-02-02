@@ -127,8 +127,30 @@ export const caregiverSlice = createSlice({
     )
     // SSO login: set caregiver when API succeeds so profile is filled even if component callback lags
     builder.addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
-      if (payload?.success && payload?.user) {
-        state.caregiver = payload.user as Caregiver
+      // Validate that we have complete caregiver data before updating state
+      if (payload?.success && payload?.caregiver) {
+        const caregiver = payload.caregiver;
+        // Additional validation: ensure caregiver has required fields
+        if (caregiver.id && caregiver.email && caregiver.name) {
+          logger.debug('[caregiverSlice] SSO login fulfilled, setting caregiver:', {
+            caregiverId: caregiver.id,
+            email: caregiver.email,
+            hasOrg: !!caregiver.org
+          });
+          state.caregiver = caregiver;
+        } else {
+          logger.error('[caregiverSlice] SSO login fulfilled but caregiver data incomplete:', {
+            hasId: !!caregiver.id,
+            hasEmail: !!caregiver.email,
+            hasName: !!caregiver.name,
+            caregiver: caregiver
+          });
+        }
+      } else {
+        logger.warn('[caregiverSlice] SSO login fulfilled but payload incomplete:', {
+          hasSuccess: !!payload?.success,
+          hasCaregiver: !!payload?.caregiver
+        });
       }
     })
   },

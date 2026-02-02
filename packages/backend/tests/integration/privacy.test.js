@@ -40,7 +40,7 @@ describe('Privacy API routes', () => {
     // Create org and caregiver
     const [org] = await insertOrgs([orgOne]);
     const orgDoc = await Org.findById(org.id); // Get the actual Mongoose document
-    const { caregiver, token } = await insertCaregivertoOrgAndReturnToken(orgDoc, caregiverOneWithPassword);
+    const { caregiver, accessToken: token } = await insertCaregivertoOrgAndReturnToken(orgDoc, caregiverOneWithPassword);
     accessToken = token;
     // caregiver should be a full Mongoose document now, so it should have both _id and id
     caregiverId = caregiver._id ? caregiver._id.toString() : (caregiver.id ? caregiver.id.toString() : caregiver.id);
@@ -83,20 +83,20 @@ describe('Privacy API routes', () => {
         })
         .expect(httpStatus.CREATED);
 
-      expect(res.body).toHaveProperty('_id');
+      expect(res.body).toHaveProperty('id');
       expect(res.body.requestType).toBe('access');
       expect(res.body.status).toBe('pending'); // Initially pending, then auto-processed
 
       // Verify request was created in database
-      const privacyRequest = await PrivacyRequest.findById(res.body._id);
+      const privacyRequest = await PrivacyRequest.findById(res.body.id);
       expect(privacyRequest).toBeDefined();
       expect(privacyRequest.requestorId.toString()).toBe(caregiverId.toString());
 
       // Wait for async processing and email sending
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Increased from 2000ms
 
       // Check if request was processed (status should be completed after auto-processing)
-      const updatedRequest = await PrivacyRequest.findById(res.body._id);
+      const updatedRequest = await PrivacyRequest.findById(res.body.id);
       expect(updatedRequest).toBeDefined();
       expect(updatedRequest.status).toBe('completed');
       expect(updatedRequest.informationProvided).toBeDefined();
@@ -132,7 +132,7 @@ describe('Privacy API routes', () => {
         // (email might be delayed or Ethereal might be unavailable)
         console.warn('Could not retrieve email from Ethereal:', emailError.message);
       }
-    });
+    }, 15000); // Increase timeout to 15 seconds for email processing
 
     it('should require authentication', async () => {
       await request(app)
@@ -160,7 +160,7 @@ describe('Privacy API routes', () => {
         })
         .expect(httpStatus.CREATED);
 
-      expect(res.body).toHaveProperty('_id');
+      expect(res.body).toHaveProperty('id');
       expect(res.body.requestType).toBe('correction');
       expect(res.body.correctionDetails).toBeDefined();
       expect(res.body.correctionDetails.field).toBe('email');
@@ -235,7 +235,7 @@ describe('Privacy API routes', () => {
 
   describe('GET /v1/privacy/requests/:requestId', () => {
     it('should return a specific request', async () => {
-      const request = await PrivacyRequest.create({
+      const privacyRequest = await PrivacyRequest.create({
         requestType: 'access',
         requestorType: 'caregiver',
         requestorId: caregiverId,
@@ -244,11 +244,11 @@ describe('Privacy API routes', () => {
       });
 
       const res = await request(app)
-        .get(`/v1/privacy/requests/${request._id}`)
+        .get(`/v1/privacy/requests/${privacyRequest._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.OK);
 
-      expect(res.body._id).toBe(request._id.toString());
+      expect(res.body.id).toBe(privacyRequest._id.toString());
       expect(res.body.requestType).toBe('access');
     });
 
@@ -265,7 +265,7 @@ describe('Privacy API routes', () => {
         org: existingCaregiver.org,
       });
 
-      const request = await PrivacyRequest.create({
+      const privacyRequest = await PrivacyRequest.create({
         requestType: 'access',
         requestorType: 'caregiver',
         requestorId: otherCaregiver._id,
@@ -274,7 +274,7 @@ describe('Privacy API routes', () => {
       });
 
       await request(app)
-        .get(`/v1/privacy/requests/${request._id}`)
+        .get(`/v1/privacy/requests/${privacyRequest._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.FORBIDDEN);
     });
@@ -301,12 +301,12 @@ describe('Privacy API routes', () => {
         })
         .expect(httpStatus.CREATED);
 
-      expect(res.body).toHaveProperty('_id');
+      expect(res.body).toHaveProperty('id');
       expect(res.body.consentType).toBe('collection');
       expect(res.body.granted).toBe(true);
 
       // Verify in database
-      const consent = await ConsentRecord.findById(res.body._id);
+      const consent = await ConsentRecord.findById(res.body.id);
       expect(consent).toBeDefined();
       expect(consent.userId.toString()).toBe(caregiverId.toString());
     });
@@ -395,6 +395,7 @@ describe('Privacy API routes', () => {
   describe('POST /v1/privacy/consent/:consentId/withdraw', () => {
     it('should withdraw consent and lock account', async () => {
       const consent = await ConsentRecord.create({
+        userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
         consentType: 'collection',
@@ -576,6 +577,7 @@ describe('Privacy API routes', () => {
         });
 
         await ConsentRecord.create({
+          userType: 'caregiver',
           userId: caregiverId,
           userModel: 'Caregiver',
           consentType: 'collection',

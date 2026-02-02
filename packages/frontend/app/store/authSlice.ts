@@ -96,10 +96,33 @@ export const authSlice = createSlice({
     )
     // SSO login: update store when API succeeds so we don't rely only on component callback (avoids empty profile after redirect/reload)
     builder.addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
-      if (payload?.success && payload?.tokens && payload?.user) {
-        state.tokens = payload.tokens
-        state.currentUser = payload.user as Caregiver
-        if (payload.user?.email) state.authEmail = payload.user.email
+      // Validate that we have complete caregiver data before updating state
+      if (payload?.success && payload?.tokens && payload?.caregiver) {
+        // Additional validation: ensure caregiver has required fields
+        const caregiver = payload.caregiver;
+        if (caregiver.id && caregiver.email && caregiver.name) {
+          logger.debug('[authSlice] SSO login fulfilled, setting tokens and caregiver:', { 
+            caregiverId: caregiver.id, 
+            email: caregiver.email,
+            hasOrg: !!caregiver.org 
+          });
+          state.tokens = payload.tokens;
+          state.currentUser = caregiver;
+          if (caregiver.email) state.authEmail = caregiver.email;
+        } else {
+          logger.error('[authSlice] SSO login fulfilled but caregiver data incomplete:', {
+            hasId: !!caregiver.id,
+            hasEmail: !!caregiver.email,
+            hasName: !!caregiver.name,
+            caregiver: caregiver
+          });
+        }
+      } else {
+        logger.warn('[authSlice] SSO login fulfilled but payload incomplete:', {
+          hasSuccess: !!payload?.success,
+          hasTokens: !!payload?.tokens,
+          hasCaregiver: !!payload?.caregiver
+        });
       }
     })
   },

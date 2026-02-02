@@ -270,8 +270,31 @@ export const LoginForm: FC<LoginFormProps> = ({
   const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] }) => {
     setIsLoading(true)
     try {
+      logger.debug('LoginForm: SSO success handler called with user:', {
+        hasTokens: !!user.tokens,
+        hasBackendUser: !!user.backendUser,
+        userId: user.backendUser?.id,
+        userEmail: user.backendUser?.email,
+        userName: user.backendUser?.name,
+        hasOrg: !!user.backendOrg,
+        hasPatients: !!user.backendPatients
+      });
+      
       if (user.tokens && user.backendUser) {
+        // Validate user data is complete before setting state
+        if (!user.backendUser.id || !user.backendUser.email || !user.backendUser.name) {
+          logger.error('LoginForm: SSO returned incomplete user data:', {
+            hasId: !!user.backendUser.id,
+            hasEmail: !!user.backendUser.email,
+            hasName: !!user.backendUser.name,
+            user: user.backendUser
+          });
+          setErrorMessage("SSO login returned incomplete data. Please try again.");
+          return;
+        }
+        
         // SSO login successful - set tokens and user data
+        logger.debug('LoginForm: dispatching SSO auth data to Redux');
         dispatch(setAuthTokens(user.tokens));
         dispatch(setAuthEmail(user.email));
         dispatch(setCurrentUser(user.backendUser));
@@ -279,11 +302,13 @@ export const LoginForm: FC<LoginFormProps> = ({
         
         // Set org if included in response
         if (user.backendOrg) {
+          logger.debug('LoginForm: dispatching org to Redux');
           dispatch(setOrg(user.backendOrg));
         }
         
         // Set patients if included in response
         if (user.backendPatients && user.backendUser?.id) {
+          logger.debug('LoginForm: dispatching patients to Redux, count:', user.backendPatients.length);
           dispatch(setPatientsForCaregiver({ 
             caregiverId: user.backendUser.id, 
             patients: user.backendPatients 
@@ -295,18 +320,23 @@ export const LoginForm: FC<LoginFormProps> = ({
         // Explicitly close auth modal after successful SSO login
         // This ensures the modal closes even if the AuthModalContext effect doesn't trigger
         if (hideAuthModal) {
+          logger.debug('LoginForm: hiding auth modal');
           hideAuthModal();
         }
         
         if (onLoginSuccess) {
+          logger.debug('LoginForm: calling onLoginSuccess callback');
           onLoginSuccess()
         }
+        
+        logger.debug('LoginForm: SSO login complete');
       } else {
+        logger.warn('LoginForm: SSO success but missing tokens or backendUser');
         dispatch(setAuthEmail(user.email));
         setErrorMessage("SSO login successful but backend integration incomplete. Please use email/password login.");
       }
     } catch (error) {
-      console.error('SSO login error:', error);
+      logger.error('LoginForm: SSO login error in handler:', error);
       setErrorMessage("SSO login failed. Please try again or use email/password login.");
     } finally {
       setIsLoading(false)

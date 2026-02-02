@@ -83,6 +83,14 @@ const callSchema = mongoose.Schema(
       ref: 'LineItem',
       default: null, // Indicates that the call has not been billed yet
     },
+    // Temporary field used for atomic billing operations to prevent race conditions
+    // When a billing process claims calls, it sets this to a unique session ID
+    // After billing completes, this field is removed
+    billingSessionId: {
+      type: mongoose.SchemaTypes.ObjectId,
+      default: null,
+      // Index defined separately below
+    },
     // Retry fields for missed call retry functionality
     retryAttempt: {
       type: Number,
@@ -132,6 +140,8 @@ callSchema.index({ patientId: 1 });
 callSchema.index({ callSid: 1 });
 callSchema.index({ lineItemId: 1 });
 callSchema.index({ patientId: 1, lineItemId: 1 }); // Critical for billing queries
+callSchema.index({ patientId: 1, lineItemId: 1, billingSessionId: 1 }); // For atomic billing operations
+callSchema.index({ billingSessionId: 1 }); // For fetching claimed calls during billing
 callSchema.index({ patientId: 1, startTime: -1 }); // For patient call history
 callSchema.index({ status: 1, startTime: -1 }); // For status-based queries
 callSchema.index({ originalCallId: 1 }); // For retry queries

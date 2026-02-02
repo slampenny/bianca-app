@@ -4,10 +4,18 @@ const { SentimentAnalysisDTO } = require('./sentiment.dto');
 const logger = require('../config/logger');
 
 const ConversationDTO = (conversation) => {
-  // Convert Mongoose document to plain object if needed
+  // First check if conversation has runtime-set properties (like status from call data)
+  // These are set by controllers but not persisted, so toObject() would lose them
+  const hasRuntimeProperties = conversation && (
+    conversation.status !== undefined || 
+    conversation.callStatus !== undefined ||
+    conversation.callNotes !== undefined
+  );
+  
+  // Convert Mongoose document to plain object if needed, but preserve runtime properties
   // This ensures we can safely access all fields without triggering toJSON transformation
   // which could convert _id to id and delete _id before we can access it
-  const conversationObj = conversation && typeof conversation.toObject === 'function' 
+  const conversationObj = conversation && typeof conversation.toObject === 'function' && !hasRuntimeProperties
     ? conversation.toObject({ virtuals: false, getters: false }) 
     : conversation;
   

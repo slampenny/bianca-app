@@ -301,19 +301,41 @@ async function processOrgBilling(org) {
   yesterday.setDate(yesterday.getDate() - 1);
   
   const { Call } = require('../models');
-  const unbilledCalls = await Call.find({
-    patientId: { $in: patients.map(p => p._id) },
-    lineItemId: null, // Not yet billed
-    endTime: { $gte: yesterday }, // From last 24 hours
-    cost: { $gt: 0 } // Has a cost
-  }).populate('patientId');
+  const mongoose = require('mongoose');
   
-  if (unbilledCalls.length === 0) {
+  // Use a temporary marker to claim these calls atomically
+  // This prevents race conditions when multiple billing processes run concurrently
+  const billingSessionId = new mongoose.Types.ObjectId();
+  
+  // Atomically claim unbilled calls by setting a temporary marker
+  // Only calls with lineItemId: null will be updated, ensuring no duplicates
+  const updateResult = await Call.updateMany(
+    {
+      patientId: { $in: patients.map(p => p._id) },
+      lineItemId: null, // Not yet billed
+      endTime: { $gte: yesterday }, // From last 24 hours
+      cost: { $gt: 0 }, // Has a cost
+      $or: [
+        { billingSessionId: null }, // Not already claimed
+        { billingSessionId: { $exists: false } } // Field doesn't exist (older records)
+      ]
+    },
+    {
+      $set: { billingSessionId: billingSessionId }
+    }
+  );
+  
+  if (updateResult.modifiedCount === 0) {
     logger.info(`[Daily Billing] No unbilled calls found for org ${org.name}`);
     return;
   }
   
-  logger.info(`[Daily Billing] Found ${unbilledCalls.length} unbilled calls for org ${org.name}`);
+  logger.info(`[Daily Billing] Claimed ${updateResult.modifiedCount} unbilled calls for org ${org.name}`);
+  
+  // Now fetch the calls we just claimed
+  const unbilledCalls = await Call.find({
+    billingSessionId: billingSessionId
+  }).populate('patientId');
   
   // Group calls by patient for itemized billing
   const patientBilling = {};
@@ -336,61 +358,69 @@ async function processOrgBilling(org) {
   
   if (totalCost === 0) {
     logger.info(`[Daily Billing] Total cost is $0 for org ${org.name}, skipping invoice creation`);
+    // Clear the session markers since we're not billing
+    await Call.updateMany(
+      { billingSessionId: billingSessionId },
+      { $unset: { billingSessionId: 1 } }
+    );
     return;
   }
   
-  // Double-check that calls are still unbilled (race condition protection)
-  const stillUnbilledCalls = await Call.find({
-    _id: { $in: unbilledCalls.map(c => c._id) },
-    lineItemId: null
-  });
-  
-  if (stillUnbilledCalls.length !== unbilledCalls.length) {
-    logger.warn(`[Daily Billing] Some calls were already billed for org ${org.name}, skipping`);
-    return;
-  }
-  
-  // Create invoice for the organization
-  const invoice = await createOrgInvoice(org, patientBilling, totalCost);
-  
-  // Update calls with their respective line item references
-  const callIds = stillUnbilledCalls.map(c => c._id);
-  
-  // Create a mapping of patientId to lineItemId
-  const patientToLineItem = {};
-  for (const lineItem of invoice.lineItems) {
-    patientToLineItem[lineItem.patientId.toString()] = lineItem._id;
-  }
-  
-  // Update each call with its patient's line item ID
-  for (const call of stillUnbilledCalls) {
-    const patientId = call.patientId.toString();
-    const lineItemId = patientToLineItem[patientId];
+  try {
+    // Create invoice for the organization
+    const invoice = await createOrgInvoice(org, patientBilling, totalCost);
     
-    if (lineItemId) {
-      await Call.updateOne(
-        { _id: call._id },
-        { $set: { lineItemId: lineItemId } }
-      );
+    // Create a mapping of patientId to lineItemId
+    const patientToLineItem = {};
+    for (const lineItem of invoice.lineItems) {
+      patientToLineItem[lineItem.patientId.toString()] = lineItem._id;
     }
-  }
-  
-  logger.info(`[Daily Billing] Successfully marked ${callIds.length} calls as billed for org ${org.name}`);
-  
-  if (invoice) {
-    logger.info(`[Daily Billing] Created invoice ${invoice.invoiceNumber} for org ${org.name} with total cost $${totalCost.toFixed(2)}`);
-  }
-  
-  // Attempt to charge the payment method
-  if (org.paymentMethod) {
-    try {
-      await chargePaymentMethod(org, invoice);
-    } catch (error) {
-      logger.error(`[Daily Billing] Failed to charge payment method for org ${org.name}: ${error.message}`);
-      // Create alert for failed payment
+    
+    // Update each call with its patient's line item ID and clear session marker
+    for (const call of unbilledCalls) {
+      const patientId = call.patientId._id.toString();
+      const lineItemId = patientToLineItem[patientId];
+      
+      if (lineItemId) {
+        await Call.updateOne(
+          { _id: call._id },
+          { 
+            $set: { lineItemId: lineItemId },
+            $unset: { billingSessionId: 1 }
+          }
+        );
+      }
+    }
+    
+    logger.info(`[Daily Billing] Successfully marked ${unbilledCalls.length} calls as billed for org ${org.name}`);
+    
+    if (invoice) {
+      logger.info(`[Daily Billing] Created invoice ${invoice.invoiceNumber} for org ${org.name} with total cost $${totalCost.toFixed(2)}`);
+    }
+    
+    // Attempt to charge the payment method
+    if (org.paymentMethod) {
+      try {
+        await chargePaymentMethod(org, invoice);
+      } catch (error) {
+        logger.error(`[Daily Billing] Failed to charge payment method for org ${org.name}: ${error.message}`);
+        // Create alert for failed payment
+        await alertService.createAlert({
+          message: `Failed to charge payment method for daily billing. Invoice ${invoice.invoiceNumber} created but not paid.`,
+          importance: 'high',
+          alertType: 'system',
+          createdBy: org._id,
+          createdModel: 'Org',
+          visibility: 'orgAdmin',
+          relevanceUntil: moment().add(7, 'days').toISOString(),
+        });
+      }
+    } else {
+      logger.warn(`[Daily Billing] No payment method found for org ${org.name}, invoice created but not charged`);
+      // Create alert for missing payment method
       await alertService.createAlert({
-        message: `Failed to charge payment method for daily billing. Invoice ${invoice.invoiceNumber} created but not paid.`,
-        importance: 'high',
+        message: `No payment method configured for daily billing. Invoice ${invoice.invoiceNumber} created but not charged.`,
+        importance: 'medium',
         alertType: 'system',
         createdBy: org._id,
         createdModel: 'Org',
@@ -398,18 +428,14 @@ async function processOrgBilling(org) {
         relevanceUntil: moment().add(7, 'days').toISOString(),
       });
     }
-  } else {
-    logger.warn(`[Daily Billing] No payment method found for org ${org.name}, invoice created but not charged`);
-    // Create alert for missing payment method
-    await alertService.createAlert({
-      message: `No payment method configured for daily billing. Invoice ${invoice.invoiceNumber} created but not charged.`,
-      importance: 'medium',
-      alertType: 'system',
-      createdBy: org._id,
-      createdModel: 'Org',
-      visibility: 'orgAdmin',
-      relevanceUntil: moment().add(7, 'days').toISOString(),
-    });
+  } catch (error) {
+    // If invoice creation or updates fail, clear the session markers so calls can be retried
+    logger.error(`[Daily Billing] Error processing billing for org ${org.name}: ${error.message}`);
+    await Call.updateMany(
+      { billingSessionId: billingSessionId },
+      { $unset: { billingSessionId: 1 } }
+    );
+    throw error;
   }
 }
 
@@ -449,15 +475,18 @@ async function createOrgInvoice(org, patientBilling, totalCost) {
       description: `Daily billing - ${billing.calls.length} call(s)`,
       periodStart: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
       periodEnd: new Date(), // Now
-      quantity: billing.conversations.length,
-      unitPrice: billing.totalCost / billing.conversations.length
+      quantity: billing.calls.length,
+      unitPrice: billing.totalCost / billing.calls.length
     });
   }
   
   const lineItems = await require('../models').LineItem.create(lineItemData);
   
-  // Populate line items and return
-  return await require('../models').Invoice.findById(invoice._id).populate('lineItems');
+  // Add lineItems to invoice object for caller to use
+  invoice.lineItems = lineItems;
+  
+  // Return invoice with lineItems attached
+  return invoice;
 }
 
 async function chargePaymentMethod(org, invoice) {

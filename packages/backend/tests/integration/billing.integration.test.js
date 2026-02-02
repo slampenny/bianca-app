@@ -30,7 +30,8 @@ describe('Billing System Integration Tests', () => {
       name: 'Integration Test Healthcare Org',
       email: 'integration@healthcare.com',
       phone: '+12345678901',
-      country: 'US'
+      country: 'US',
+      stripeSubscriptionId: 'sub_test123' // Add Stripe subscription for billing tests
     });
 
     // Create test caregiver
@@ -71,6 +72,8 @@ describe('Billing System Integration Tests', () => {
 
   beforeEach(async () => {
     // Clean up before each test
+    // Clear any stuck billing session IDs first (in case previous tests left them)
+    await Call.updateMany({ billingSessionId: { $ne: null } }, { $unset: { billingSessionId: 1 } });
     await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Invoice.deleteMany({});
@@ -80,14 +83,18 @@ describe('Billing System Integration Tests', () => {
   describe('End-to-End Billing Flow', () => {
     it('should complete full billing cycle from conversation to invoice', async () => {
       // Step 1: Create Call records first (required for conversations)
+      // Set endTime to yesterday so they're eligible for billing (billing process looks for calls from last 24h)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
       const call1 = await Call.create({
         callSid: 'CA11111111111111111111111111111111',
         patientId: patient1._id,
         duration: 120, // 2 minutes
         cost: 0.20,
         status: 'completed',
-        startTime: new Date(),
-        endTime: new Date(),
+        startTime: yesterday,
+        endTime: yesterday, // Set to yesterday for billing eligibility
         lineItemId: null // Unbilled
       });
 
@@ -97,8 +104,8 @@ describe('Billing System Integration Tests', () => {
         duration: 180, // 3 minutes
         cost: 0.30,
         status: 'completed',
-        startTime: new Date(),
-        endTime: new Date(),
+        startTime: yesterday,
+        endTime: yesterday, // Set to yesterday for billing eligibility
         lineItemId: null // Unbilled
       });
 
@@ -108,8 +115,8 @@ describe('Billing System Integration Tests', () => {
         duration: 90, // 1.5 minutes
         cost: 0.15,
         status: 'completed',
-        startTime: new Date(),
-        endTime: new Date(),
+        startTime: yesterday,
+        endTime: yesterday, // Set to yesterday for billing eligibility
         lineItemId: null // Unbilled
       });
 
@@ -192,6 +199,9 @@ describe('Billing System Integration Tests', () => {
 
     it('should handle multiple billing cycles without double billing', async () => {
       // Create initial Call records (payment service uses Call records for billing)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
       await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
@@ -199,8 +209,8 @@ describe('Billing System Integration Tests', () => {
           duration: 120,
           cost: 0.20,
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday for billing eligibility
           lineItemId: null
         },
         {
@@ -209,8 +219,8 @@ describe('Billing System Integration Tests', () => {
           duration: 90,
           cost: 0.15,
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday for billing eligibility
           lineItemId: null
         }
       ]);
@@ -223,6 +233,7 @@ describe('Billing System Integration Tests', () => {
       expect(invoices[0].totalAmount).toBe(0.35);
 
       // Create new Call records for second billing cycle
+      // Reuse yesterday for this cycle
       await Call.create([
         {
           callSid: 'CA33333333333333333333333333333333',
@@ -230,8 +241,8 @@ describe('Billing System Integration Tests', () => {
           duration: 180,
           cost: 0.30,
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday for billing eligibility
           lineItemId: null
         }
       ]);
@@ -252,14 +263,17 @@ describe('Billing System Integration Tests', () => {
 
     it('should handle mixed billed and unbilled conversations correctly', async () => {
       // Create Call records (payment service uses Call records for billing)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
       const call1 = await Call.create({
         callSid: 'CA11111111111111111111111111111111',
         patientId: patient1._id,
         duration: 120,
         cost: 0.20,
         status: 'completed',
-        startTime: new Date(),
-        endTime: new Date(),
+        startTime: yesterday,
+        endTime: yesterday, // Set to yesterday for billing eligibility
         lineItemId: null
       });
 
@@ -269,8 +283,8 @@ describe('Billing System Integration Tests', () => {
         duration: 180,
         cost: 0.30,
         status: 'completed',
-        startTime: new Date(),
-        endTime: new Date(),
+        startTime: yesterday,
+        endTime: yesterday, // Set to yesterday for billing eligibility
         lineItemId: null
       });
 
@@ -315,6 +329,9 @@ describe('Billing System Integration Tests', () => {
 
     it('should handle zero-cost conversations correctly', async () => {
       // Create Call records with different costs (payment service uses Call records)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
       await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
@@ -322,8 +339,8 @@ describe('Billing System Integration Tests', () => {
           duration: 120,
           cost: 0.20,
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday for billing eligibility
           lineItemId: null
         },
         {
@@ -332,8 +349,8 @@ describe('Billing System Integration Tests', () => {
           duration: 0,
           cost: 0, // Zero cost conversation
           status: 'failed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday (but won't be billed due to zero cost)
           lineItemId: null
         },
         {
@@ -342,8 +359,8 @@ describe('Billing System Integration Tests', () => {
           duration: 90,
           cost: 0.15,
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday for billing eligibility
           lineItemId: null
         }
       ]);
@@ -363,14 +380,17 @@ describe('Billing System Integration Tests', () => {
 
     it('should handle API endpoints with proper authentication and authorization', async () => {
       // Create test Call record (payment service uses Call records for billing)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
       await Call.create({
         callSid: 'CA11111111111111111111111111111111',
         patientId: patient1._id,
         duration: 120,
         cost: 0.20,
         status: 'completed',
-        startTime: new Date(),
-        endTime: new Date(),
+        startTime: yesterday,
+        endTime: yesterday, // Set to yesterday for billing eligibility
         lineItemId: null
       });
 
@@ -428,6 +448,9 @@ describe('Billing System Integration Tests', () => {
 
     it('should handle concurrent billing processes', async () => {
       // Create Call records (payment service uses Call records for billing)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
       await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
@@ -435,8 +458,8 @@ describe('Billing System Integration Tests', () => {
           duration: 120,
           cost: 0.20,
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday for billing eligibility
           lineItemId: null
         },
         {
@@ -445,8 +468,8 @@ describe('Billing System Integration Tests', () => {
           duration: 90,
           cost: 0.15,
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
+          startTime: yesterday,
+          endTime: yesterday, // Set to yesterday for billing eligibility
           lineItemId: null
         }
       ]);
@@ -468,6 +491,9 @@ describe('Billing System Integration Tests', () => {
 
     it('should handle large numbers of conversations efficiently', async () => {
       // Create many Call records (payment service uses Call records for billing)
+      // Use a timestamp from a few hours ago to ensure it's within the 24-hour window
+      const callEndTime = new Date(Date.now() - 2 * 60 * 60 * 1000); // 2 hours ago
+      
       const calls = [];
       for (let i = 0; i < 50; i++) {
         calls.push({
@@ -476,9 +502,10 @@ describe('Billing System Integration Tests', () => {
           duration: 60 + (i * 2), // Varying durations
           cost: 0.10 + (i * 0.01), // Varying costs
           status: 'completed',
-          startTime: new Date(),
-          endTime: new Date(),
-          lineItemId: null
+          startTime: new Date(callEndTime.getTime() - 60000), // 1 minute before end
+          endTime: callEndTime,
+          lineItemId: null,
+          billingSessionId: null // Explicitly set to null for billing query
         });
       }
       await Call.insertMany(calls);

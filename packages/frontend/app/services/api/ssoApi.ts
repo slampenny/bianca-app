@@ -14,7 +14,7 @@ export interface SSOLoginResponse {
   success: boolean
   message: string
   tokens: AuthTokens
-  user: Caregiver
+  caregiver: Caregiver
   org?: Org
   patients?: Patient[]
   alerts?: Alert[]

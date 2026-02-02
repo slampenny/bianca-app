@@ -272,7 +272,7 @@ class SSOService {
           return {
             ...userInfo,
             tokens: data.tokens,
-            backendUser: data.user,
+            backendUser: data.caregiver,
             backendOrg: data.org,
             backendPatients: data.patients,
             backendAlerts: data.alerts,
