@@ -269,7 +269,6 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
         ]
         Resource = [
           aws_codebuild_project.staging_build.arn,
-          aws_codebuild_project.staging_smoke_tests.arn,
           aws_codebuild_project.staging_tests.arn,
           aws_codebuild_project.staging_post_deploy_validation.arn,
           aws_codebuild_project.staging_create_green_instance.arn,
@@ -320,64 +319,6 @@ resource "aws_iam_role_policy" "codepipeline_staging_policy" {
       }
     ]
   })
-}
-
-################################################################################
-# CODEBUILD PROJECT FOR SMOKE TESTS (STAGING)
-################################################################################
-# Quick verification that frontend builds and loads correctly
-# Runs between Build and Deploy to catch frontend issues before deployment
-
-resource "aws_codebuild_project" "staging_smoke_tests" {
-  name         = "bianca-staging-smoke-tests"
-  description  = "Runs frontend smoke tests to verify frontend works before deployment"
-  service_role = aws_iam_role.codebuild_staging_role.arn
-
-  artifacts {
-    type = "CODEPIPELINE"
-  }
-
-  environment {
-    compute_type                = "BUILD_GENERAL1_SMALL"
-    image                       = "aws/codebuild/standard:7.0"
-    type                        = "LINUX_CONTAINER"
-    privileged_mode             = true
-    image_pull_credentials_type = "CODEBUILD"
-
-    environment_variable {
-      name  = "AWS_DEFAULT_REGION"
-      value = var.aws_region
-    }
-    environment_variable {
-      name  = "NODE_ENV"
-      value = "test"
-    }
-    environment_variable {
-      name  = "BUILD_ENV"
-      value = "staging"
-    }
-    environment_variable {
-      name  = "FRONTEND_PORT"
-      value = "8082"
-    }
-  }
-
-  source {
-    type      = "CODEPIPELINE"
-    buildspec = "packages/frontend/devops/buildspec-smoke-tests.yml"
-  }
-
-  logs_config {
-    cloudwatch_logs {
-      status     = "ENABLED"
-      group_name = "/aws/codebuild/bianca-staging-smoke-tests"
-    }
-  }
-
-  tags = {
-    Name        = "bianca-staging-smoke-tests"
-    Environment = "staging"
-  }
 }
 
 ################################################################################
@@ -722,24 +663,6 @@ resource "aws_codepipeline" "staging" {
   }
 
   stage {
-    name = "SmokeTests"
-    action {
-      name             = "SmokeTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput", "BuildOutput"]
-      output_artifacts = ["SmokeTestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.staging_smoke_tests.name
-        PrimarySource = "SourceOutput"
-      }
-      run_order = 1
-    }
-  }
-
-  stage {
     name = "CreateGreenInstance"
     action {
       name             = "CreateGreenInstance"
@@ -757,8 +680,7 @@ resource "aws_codepipeline" "staging" {
     }
   }
 
-  # Deploy stage: CodeDeploy only. PostDeployValidation runs as soon as Deploy completes
-  # (RunTests runs in a later stage so it does not block validate/swap)
+  # Deploy stage: Deploy to green instance
   stage {
     name = "Deploy"
     action {
@@ -794,6 +716,8 @@ resource "aws_codepipeline" "staging" {
     }
   }
 
+  # Swap proceeds as soon as Deploy and PostDeployValidation pass
+  # This keeps staging deployments fast for rapid iteration
   stage {
     name = "SwapAndTerminate"
     action {
@@ -812,8 +736,9 @@ resource "aws_codepipeline" "staging" {
     }
   }
 
-  # Staging: RunTests runs after swap; does not block deploy/validate/swap.
-  # Staging is updated ASAP; tests run and finish whenever (pass/fail does not block).
+  # Staging: RunTests runs after swap for monitoring/feedback, but does NOT block deployment.
+  # This allows fast iterations in staging while still getting test feedback.
+  # Production pipeline runs tests BEFORE swap to ensure safety.
   stage {
     name = "RunTests"
     action {

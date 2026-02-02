@@ -207,23 +207,27 @@ phases:
           echo "  ⚠️  Warning: Failed to remove green tag (non-critical)"
         }
         
-        # Step 6: Associate staging EIP with new blue instance (so staging-sip.* and Asterisk SIP keep working)
-        if [ -n "${STAGING_EIP_ALLOCATION_ID:-}" ]; then
+        # Step 6: Associate EIP with new blue instance (for SIP / Asterisk to keep working)
+        # Supports both STAGING_EIP_ALLOCATION_ID and PRODUCTION_EIP_ALLOCATION_ID
+        EIP_ALLOCATION_ID="${STAGING_EIP_ALLOCATION_ID:-${PRODUCTION_EIP_ALLOCATION_ID:-}}"
+        if [ -n "$EIP_ALLOCATION_ID" ]; then
           echo ""
-          echo "Step 6: Associating staging EIP with new blue instance (for SIP / Asterisk)..."
+          echo "Step 6: Associating EIP with new blue instance (for SIP / Asterisk)..."
           if aws ec2 associate-address \
             --instance-id "$GREEN_INSTANCE_ID" \
-            --allocation-id "$STAGING_EIP_ALLOCATION_ID" \
+            --allocation-id "$EIP_ALLOCATION_ID" \
             --allow-reassociation 2>/dev/null; then
-            echo "  ✅ EIP associated with new blue instance - staging-sip.* now points to this instance"
+            echo "  ✅ EIP associated with new blue instance - SIP domain now points to this instance"
             echo "  Waiting 15s for EIP to propagate, then restarting Asterisk so it uses new EXTERNAL_ADDRESS..."
             sleep 15
             # Restart Asterisk so it picks up new public IP (EIP) in EXTERNAL_ADDRESS
             # Use single-quoted JSON so $(curl...) runs on the instance, not in CodeBuild
+            # Determine the docker compose directory based on environment
+            DOCKER_DIR="/opt/bianca-${BLUE_TAG#bianca-}"
             if command_id=$(aws ssm send-command \
               --instance-ids "$GREEN_INSTANCE_ID" \
               --document-name "AWS-RunShellScript" \
-              --parameters '{"commands":["export PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && cd /opt/bianca-staging && docker compose up -d asterisk"]}' \
+              --parameters "{\"commands\":[\"export PUBLIC_IP=\$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && cd $DOCKER_DIR && docker compose up -d asterisk\"]}" \
               --timeout-seconds 60 \
               --query 'Command.CommandId' \
               --output text 2>/dev/null); then
@@ -238,11 +242,11 @@ phases:
               echo "  ⚠️  Could not send SSM command to restart Asterisk (instance may need SSM agent). SIP may work after manual Asterisk restart."
             fi
           else
-            echo "  ⚠️  EIP association failed (may already be associated or allocation missing). Check staging-sip DNS and Asterisk."
+            echo "  ⚠️  EIP association failed (may already be associated or allocation missing). Check SIP DNS and Asterisk."
           fi
         else
           echo ""
-          echo "Step 6: No STAGING_EIP_ALLOCATION_ID set - skipping EIP association (non-staging or not configured)"
+          echo "Step 6: No EIP_ALLOCATION_ID set - skipping EIP association (environment may not use dedicated EIP for SIP)"
         fi
         
         echo ""

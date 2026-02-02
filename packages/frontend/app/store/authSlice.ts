@@ -4,6 +4,7 @@ import { caregiverApi } from "../services/api/caregiverApi"
 import { ssoApi } from "../services/api/ssoApi"
 import { AuthTokens, Caregiver } from "../services/api/api.types"
 import { RootState } from "./store"
+import { logger } from "../utils/logger"
 
 interface AuthState {
   tokens: AuthTokens | null // This is the JWT token

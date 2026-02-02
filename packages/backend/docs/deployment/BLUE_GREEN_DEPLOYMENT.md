@@ -14,19 +14,27 @@ This document describes the budget blue-green deployment strategy implemented fo
 
 ### Pipeline Stages
 
+**Staging Pipeline** (Fast iteration - tests don't block):
 1. **Source**: Pulls code from GitHub `staging` branch
 2. **Build**: Builds Docker images and pushes to ECR
-3. **SmokeTests**: Quick frontend validation
-4. **CreateGreenInstance**: Creates a new EC2 instance tagged as `bianca-staging-green`
-5. **Deploy**: Deploys code to the green instance using CodeDeploy
-6. **RunTests**: Runs unit and E2E tests (parallel with Deploy)
-7. **PostDeployValidation**: Validates the green instance is healthy and accessible
-8. **SwapAndTerminate**: 
+3. **CreateGreenInstance**: Creates a new EC2 instance tagged as `bianca-staging-green`
+4. **Deploy**: Deploys code to the green instance using CodeDeploy
+5. **PostDeployValidation**: Validates the green instance is healthy and accessible
+6. **SwapAndTerminate**: 
    - Registers green instance with ALB target groups
    - Waits for health checks to pass
    - Deregisters blue instance from target groups
    - Terminates the old blue instance
    - Renames green instance to `bianca-staging` for next deployment
+7. **RunTests**: Runs unit and E2E tests (runs AFTER swap, non-blocking - for monitoring/feedback)
+
+**Production Pipeline** (Safe - tests MUST pass before swap):
+1. **Source**: Pulls code from GitHub `main` branch
+2. **Build**: Builds Docker images and pushes to ECR
+3. **CreateGreenInstance**: Creates a new green instance
+4. **Deploy + RunTests**: Run in PARALLEL on green instance (both must pass to proceed)
+5. **PostDeployValidation**: Validates green instance health
+6. **SwapAndTerminate**: Only proceeds if Deploy, RunTests, AND PostDeployValidation all pass
 
 ### Cost Optimization
 

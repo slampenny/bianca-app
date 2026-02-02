@@ -115,6 +115,12 @@ resource "aws_codebuild_project" "production_swap_and_terminate" {
       name  = "BLUE_TAG"
       value = "bianca-production"
     }
+    # EIP allocation ID for production SIP (sip.myphonefriend.com). After swap we associate this
+    # with the new blue instance so Twilio/Asterisk SIP keeps working.
+    environment_variable {
+      name  = "PRODUCTION_EIP_ALLOCATION_ID"
+      value = aws_eip.production.id
+    }
   }
 
   source {
