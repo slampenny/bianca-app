@@ -58,10 +58,10 @@ class SSOService {
       clientId: GOOGLE_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
-      responseType: AuthSession.ResponseType.Token, // Use implicit flow for web
+      responseType: AuthSession.ResponseType.Code, // Use code flow with PKCE (more secure, better COOP compatibility)
       extraParams: {},
       prompt: AuthSession.Prompt.SelectAccount,
-      usePKCE: false, // Disable PKCE for implicit flow
+      usePKCE: true, // Enable PKCE for code flow
     });
   }
 
@@ -71,12 +71,12 @@ class SSOService {
       clientId: MICROSOFT_CLIENT_ID,
       scopes: ['openid', 'profile', 'email'],
       redirectUri,
-      responseType: AuthSession.ResponseType.Token, // Use implicit flow for web
+      responseType: AuthSession.ResponseType.Code, // Use code flow with PKCE (more secure, better COOP compatibility)
       extraParams: {
         tenant: MICROSOFT_TENANT_ID,
       },
       prompt: AuthSession.Prompt.SelectAccount,
-      usePKCE: false, // Disable PKCE for implicit flow
+      usePKCE: true, // Enable PKCE for code flow
     });
   }
 
@@ -115,13 +115,35 @@ class SSOService {
       const result = await request.promptAsync(endpoints);
       
       if (result.type === 'success') {
-        // With implicit flow, we get the access token directly
-        const accessToken = result.params.access_token;
+        // With code flow + PKCE, we get an authorization code
+        const code = result.params.code;
+        
+        if (!code) {
+          return {
+            error: 'Authentication failed',
+            description: 'No authorization code received from Google',
+          };
+        }
+
+        // Exchange code for access token
+        const tokenResult = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: GOOGLE_CLIENT_ID,
+            code,
+            redirectUri,
+            extraParams: {
+              code_verifier: request.codeVerifier || '',
+            },
+          },
+          endpoints
+        );
+
+        const accessToken = tokenResult.accessToken;
         
         if (!accessToken) {
           return {
             error: 'Authentication failed',
-            description: 'No access token received from Google',
+            description: 'Failed to exchange code for access token',
           };
         }
 
@@ -132,6 +154,7 @@ class SSOService {
         const backendResponse = await this.authenticateWithBackend(userInfo);
         return backendResponse;
       } else {
+        logger.warn('Google OAuth result:', { type: result.type, params: result.params });
         return {
           error: 'Authentication cancelled',
           description: result.type === 'cancel' ? 'User cancelled the authentication' : 'Authentication failed',
@@ -163,13 +186,35 @@ class SSOService {
       const result = await request.promptAsync(endpoints);
       
       if (result.type === 'success') {
-        // With implicit flow, we get the access token directly
-        const accessToken = result.params.access_token;
+        // With code flow + PKCE, we get an authorization code
+        const code = result.params.code;
+        
+        if (!code) {
+          return {
+            error: 'Authentication failed',
+            description: 'No authorization code received from Microsoft',
+          };
+        }
+
+        // Exchange code for access token
+        const tokenResult = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: MICROSOFT_CLIENT_ID,
+            code,
+            redirectUri,
+            extraParams: {
+              code_verifier: request.codeVerifier || '',
+            },
+          },
+          endpoints
+        );
+
+        const accessToken = tokenResult.accessToken;
         
         if (!accessToken) {
           return {
             error: 'Authentication failed',
-            description: 'No access token received from Microsoft',
+            description: 'Failed to exchange code for access token',
           };
         }
 
@@ -180,6 +225,7 @@ class SSOService {
         const backendResponse = await this.authenticateWithBackend(userInfo);
         return backendResponse;
       } else {
+        logger.warn('Microsoft OAuth result:', { type: result.type, params: result.params });
         return {
           error: 'Authentication cancelled',
           description: result.type === 'cancel' ? 'User cancelled the authentication' : 'Authentication failed',
