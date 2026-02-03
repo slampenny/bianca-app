@@ -100,10 +100,11 @@ resource "aws_codebuild_project" "production_tests" {
       name  = "API_BASE_URL"
       value = "http://localhost:3000/v1"
     }
-    # Production secrets - inject directly from AWS Secrets Manager
+    # CRITICAL: Use STAGING secrets for tests to avoid hitting production APIs
+    # Tests should NEVER use production Stripe, OpenAI, Twilio, etc.
     environment_variable {
       name  = "AWS_SECRET_ID"
-      value = "MySecretsManagerSecret"
+      value = "StagingSecretsManagerSecret"
     }
     environment_variable {
       name  = "AWS_REGION"
@@ -113,21 +114,21 @@ resource "aws_codebuild_project" "production_tests" {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     }
-    # Inject secrets from Secrets Manager (CodeBuild handles permissions automatically)
+    # Inject STAGING secrets from Secrets Manager (CodeBuild handles permissions automatically)
     environment_variable {
       name  = "JWT_SECRET"
       type  = "SECRETS_MANAGER"
-      value = "MySecretsManagerSecret:JWT_SECRET::"
+      value = "StagingSecretsManagerSecret:JWT_SECRET::"
     }
     environment_variable {
       name  = "STRIPE_SECRET_KEY"
       type  = "SECRETS_MANAGER"
-      value = "MySecretsManagerSecret:STRIPE_SECRET_KEY::"
+      value = "StagingSecretsManagerSecret:STRIPE_SECRET_KEY::"
     }
     environment_variable {
       name  = "STRIPE_PUBLISHABLE_KEY"
       type  = "SECRETS_MANAGER"
-      value = "MySecretsManagerSecret:STRIPE_PUBLISHABLE_KEY::"
+      value = "StagingSecretsManagerSecret:STRIPE_PUBLISHABLE_KEY::"
     }
     # Use test key for tests - prevents hitting real OpenAI API during test runs
     # Tests mock OpenAI services, but setting a test key provides extra safety
@@ -138,12 +139,12 @@ resource "aws_codebuild_project" "production_tests" {
     environment_variable {
       name  = "MFA_ENCRYPTION_KEY"
       type  = "SECRETS_MANAGER"
-      value = "MySecretsManagerSecret:MFA_ENCRYPTION_KEY::"
+      value = "StagingSecretsManagerSecret:MFA_ENCRYPTION_KEY::"
     }
     environment_variable {
       name  = "TWILIO_AUTHTOKEN"
       type  = "SECRETS_MANAGER"
-      value = "MySecretsManagerSecret:TWILIO_AUTHTOKEN::"
+      value = "StagingSecretsManagerSecret:TWILIO_AUTHTOKEN::"
     }
   }
 
