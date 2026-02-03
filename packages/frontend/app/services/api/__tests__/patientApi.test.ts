@@ -41,7 +41,22 @@ describe("patientApi", () => {
   })
 
   afterEach(async () => {
-    await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+    // Clean up org - wrap in try-catch to prevent test failures if cleanup fails
+    try {
+      const result = await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+      // Unwrap to ensure promise completes
+      if ('data' in result) {
+        // Success - cleanup complete
+      }
+    } catch (error) {
+      // Cleanup failed but don't fail the test
+      console.warn('Cleanup failed:', error)
+    }
+    
+    // Reset RTK Query state to cancel any pending queries
+    store.dispatch(patientApi.util.resetApiState())
+    store.dispatch(orgApi.util.resetApiState())
+    
     jest.clearAllMocks()
   })
 
@@ -251,6 +266,10 @@ describe("patientApi", () => {
   })
 
   afterEach(() => {
+    // Reset RTK Query state to cancel any pending queries
+    store.dispatch(patientApi.util.resetApiState())
+    store.dispatch(orgApi.util.resetApiState())
+    
     jest.clearAllMocks()
   })
 })
