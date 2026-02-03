@@ -15,9 +15,25 @@ const ConversationDTO = (conversation) => {
   // Convert Mongoose document to plain object if needed, but preserve runtime properties
   // This ensures we can safely access all fields without triggering toJSON transformation
   // which could convert _id to id and delete _id before we can access it
+  // 
+  // CRITICAL: Use depopulate to convert populated refs (like callId) back to IDs
+  // This prevents issues where callId population can cause patientId to become undefined
+  // BUT we need to preserve populated messages since those should remain as objects
+  const preserveMessages = conversation && conversation.messages && 
+    Array.isArray(conversation.messages) && 
+    conversation.messages.length > 0 && 
+    conversation.messages[0] && 
+    typeof conversation.messages[0] === 'object' && 
+    conversation.messages[0].content !== undefined;
+    
   const conversationObj = conversation && typeof conversation.toObject === 'function' && !hasRuntimeProperties
-    ? conversation.toObject({ virtuals: false, getters: false, depopulate: true }) // Add depopulate to convert refs back to IDs
+    ? conversation.toObject({ virtuals: false, getters: false, depopulate: true })
     : conversation;
+    
+  // Restore populated messages if they were depopulated
+  if (preserveMessages && conversationObj) {
+    conversationObj.messages = conversation.messages;
+  }
   
   if (!conversationObj) {
     throw new Error('ConversationDTO received null or undefined conversation');
