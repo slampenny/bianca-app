@@ -319,7 +319,10 @@ resource "aws_iam_role_policy" "codebuild_production_policy" {
         ]
         Resource = [
           "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
-          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret"
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret",
+          # Production tests use staging secrets to avoid hitting production APIs
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:StagingSecretsManagerSecret-*",
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:StagingSecretsManagerSecret"
         ]
       },
       {
