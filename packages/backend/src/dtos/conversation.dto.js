@@ -16,15 +16,35 @@ const ConversationDTO = (conversation) => {
   // This ensures we can safely access all fields without triggering toJSON transformation
   // which could convert _id to id and delete _id before we can access it
   const conversationObj = conversation && typeof conversation.toObject === 'function' && !hasRuntimeProperties
-    ? conversation.toObject({ virtuals: false, getters: false }) 
+    ? conversation.toObject({ virtuals: false, getters: false, depopulate: true }) // Add depopulate to convert refs back to IDs
     : conversation;
   
   if (!conversationObj) {
     throw new Error('ConversationDTO received null or undefined conversation');
   }
   
-  const { _id, callSid, patientId, lineItemId, messages, history, analyzedData, metadata, startTime, endTime, duration, callStatus, callStartTime, callEndTime, callDuration, callOutcome, callNotes, agentId, status } =
-    conversationObj;
+  // CRITICAL: When callId is populated, Mongoose replaces it with the Call object
+  // This can cause issues with destructuring. Use explicit access for patientId
+  // to ensure we get the value even when other fields are populated
+  const _id = conversationObj._id || conversation._id;
+  const callSid = conversationObj.callSid || conversation.callSid;
+  const patientId = conversationObj.patientId || conversation.patientId;
+  const lineItemId = conversationObj.lineItemId || conversation.lineItemId;
+  const messages = conversationObj.messages || conversation.messages;
+  const history = conversationObj.history || conversation.history;
+  const analyzedData = conversationObj.analyzedData || conversation.analyzedData;
+  const metadata = conversationObj.metadata || conversation.metadata;
+  const startTime = conversationObj.startTime || conversation.startTime;
+  const endTime = conversationObj.endTime || conversation.endTime;
+  const duration = conversationObj.duration || conversation.duration;
+  const callStatus = conversationObj.callStatus || conversation.callStatus;
+  const callStartTime = conversationObj.callStartTime || conversation.callStartTime;
+  const callEndTime = conversationObj.callEndTime || conversation.callEndTime;
+  const callDuration = conversationObj.callDuration || conversation.callDuration;
+  const callOutcome = conversationObj.callOutcome || conversation.callOutcome;
+  const callNotes = conversationObj.callNotes || conversation.callNotes;
+  const agentId = conversationObj.agentId || conversation.agentId;
+  const status = conversationObj.status || conversation.status;
 
   // Convert _id (ObjectId) to string, or use id if already converted by toJSON plugin
   // Priority: conversation.id (if already transformed) > _id.toString() > _id (if already string)
