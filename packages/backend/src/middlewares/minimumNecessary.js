@@ -35,7 +35,9 @@ const FIELD_ACCESS_RULES = {
     
     conversation: [
       '_id',
+      'id', // DTO transforms _id to id
       'patient', // ID only
+      'patientId', // DTO uses patientId field
       'status',
       'duration',
       'startTime',
@@ -86,7 +88,9 @@ const FIELD_ACCESS_RULES = {
     
     conversation: [
       '_id',
+      'id', // DTO transforms _id to id
       'patient',
+      'patientId', // DTO uses patientId field
       'status',
       'duration',
       'startTime',
@@ -189,6 +193,13 @@ const minimumNecessaryMiddleware = (resourceType) => {
       // Filter the data
       let filteredData = data;
       
+      // Debug: Log before filtering
+      const beforeSample = data && data.results && data.results[0] ? {
+        hasPatientId: 'patientId' in data.results[0],
+        patientIdValue: data.results[0].patientId,
+        keys: Object.keys(data.results[0])
+      } : null;
+      
       if (data && typeof data === 'object') {
         // Handle different response structures
         if (data.results && Array.isArray(data.results)) {
@@ -197,6 +208,21 @@ const minimumNecessaryMiddleware = (resourceType) => {
             ...data,
             results: filterFields(data.results, allowedFields)
           };
+          
+          // Debug: Log after filtering
+          const afterSample = filteredData.results && filteredData.results[0] ? {
+            hasPatientId: 'patientId' in filteredData.results[0],
+            patientIdValue: filteredData.results[0].patientId,
+            keys: Object.keys(filteredData.results[0])
+          } : null;
+          
+          logger.debug('[MINIMUM_NECESSARY] Before/After filtering', {
+            resourceType,
+            role: userRole,
+            allowedFields,
+            before: beforeSample,
+            after: afterSample,
+          });
         } else if (Array.isArray(data)) {
           // Array response
           filteredData = filterFields(data, allowedFields);

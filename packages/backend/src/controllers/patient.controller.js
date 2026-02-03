@@ -264,6 +264,22 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
     totalResults: transformedResults.length, // Update count to reflect filtered results
   };
   
+  // Debug: Log what we're actually sending to frontend for pagination queries
+  if (transformedResults.length > 0) {
+    logger.info('[PatientController] Sending paginated conversations', {
+      count: transformedResults.length,
+      firstConvId: transformedResults[0].id,
+      firstConvPatientId: transformedResults[0].patientId,
+      sampleConv: {
+        id: transformedResults[0].id,
+        patientId: transformedResults[0].patientId,
+        status: transformedResults[0].status,
+        hasMessages: !!transformedResults[0].messages,
+        messageCount: transformedResults[0].messages?.length || 0,
+      }
+    });
+  }
+  
   res.status(httpStatus.OK).send(transformedResult);
 });
 
