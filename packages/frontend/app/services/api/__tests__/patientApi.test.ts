@@ -245,7 +245,12 @@ describe("patientApi", () => {
         `Get conversations by patient failed with error: ${JSON.stringify(result.error)}`,
       )
     } else {
-      expect(result.data).toBeInstanceOf(Array)
+      // API now returns paginated response (ConversationPages)
+      expect(result.data).toHaveProperty("results")
+      expect(result.data.results).toBeInstanceOf(Array)
+      expect(result.data).toHaveProperty("totalResults")
+      expect(result.data).toHaveProperty("page")
+      expect(result.data).toHaveProperty("limit")
     }
   })
 

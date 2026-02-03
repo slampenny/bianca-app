@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import { Patient, PatientPages, Caregiver, Conversation } from "./api.types"
+import { Patient, PatientPages, Caregiver, Conversation, ConversationPages } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 // Lazy import to break circular dependency with patientSlice
@@ -152,11 +152,21 @@ export const patientApi = createApi({
         method: "DELETE",
       }),
     }),
-    getConversationsByPatient: builder.query<Conversation[], { patientId: string }>({
-      query: ({ patientId }) => ({
-        url: `/patients/${patientId}/conversations`,
-        method: "GET",
-      }),
+    getConversationsByPatient: builder.query<
+      ConversationPages,
+      { patientId: string; page?: number; limit?: number; sortBy?: string }
+    >({
+      query: ({ patientId, page, limit, sortBy }) => {
+        const params = new URLSearchParams()
+        if (page) params.append("page", page.toString())
+        if (limit) params.append("limit", limit.toString())
+        if (sortBy) params.append("sortBy", sortBy)
+        const queryString = params.toString()
+        return {
+          url: `/patients/${patientId}/conversations${queryString ? `?${queryString}` : ""}`,
+          method: "GET",
+        }
+      },
     }),
     getCaregivers: builder.query<Caregiver[], { patientId: string }>({
       query: ({ patientId }) => ({
