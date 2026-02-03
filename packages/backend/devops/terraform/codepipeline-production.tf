@@ -104,7 +104,7 @@ resource "aws_codebuild_project" "production_tests" {
     # Tests should NEVER use production Stripe, OpenAI, Twilio, etc.
     environment_variable {
       name  = "AWS_SECRET_ID"
-      value = "StagingSecretsManagerSecret"
+      value = "MySecretsManagerSecret-Staging"
     }
     environment_variable {
       name  = "AWS_REGION"
@@ -118,17 +118,17 @@ resource "aws_codebuild_project" "production_tests" {
     environment_variable {
       name  = "JWT_SECRET"
       type  = "SECRETS_MANAGER"
-      value = "StagingSecretsManagerSecret:JWT_SECRET::"
+      value = "MySecretsManagerSecret-Staging:JWT_SECRET::"
     }
     environment_variable {
       name  = "STRIPE_SECRET_KEY"
       type  = "SECRETS_MANAGER"
-      value = "StagingSecretsManagerSecret:STRIPE_SECRET_KEY::"
+      value = "MySecretsManagerSecret-Staging:STRIPE_SECRET_KEY::"
     }
     environment_variable {
       name  = "STRIPE_PUBLISHABLE_KEY"
       type  = "SECRETS_MANAGER"
-      value = "StagingSecretsManagerSecret:STRIPE_PUBLISHABLE_KEY::"
+      value = "MySecretsManagerSecret-Staging:STRIPE_PUBLISHABLE_KEY::"
     }
     # Use test key for tests - prevents hitting real OpenAI API during test runs
     # Tests mock OpenAI services, but setting a test key provides extra safety
@@ -139,12 +139,12 @@ resource "aws_codebuild_project" "production_tests" {
     environment_variable {
       name  = "MFA_ENCRYPTION_KEY"
       type  = "SECRETS_MANAGER"
-      value = "StagingSecretsManagerSecret:MFA_ENCRYPTION_KEY::"
+      value = "MySecretsManagerSecret-Staging:MFA_ENCRYPTION_KEY::"
     }
     environment_variable {
       name  = "TWILIO_AUTHTOKEN"
       type  = "SECRETS_MANAGER"
-      value = "StagingSecretsManagerSecret:TWILIO_AUTHTOKEN::"
+      value = "MySecretsManagerSecret-Staging:TWILIO_AUTHTOKEN::"
     }
   }
 
@@ -321,8 +321,8 @@ resource "aws_iam_role_policy" "codebuild_production_policy" {
           "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
           "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret",
           # Production tests use staging secrets to avoid hitting production APIs
-          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:StagingSecretsManagerSecret-*",
-          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:StagingSecretsManagerSecret"
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-Staging-*",
+          "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-Staging"
         ]
       },
       {
