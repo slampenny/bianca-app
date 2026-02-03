@@ -19,12 +19,26 @@ const ConversationDTO = (conversation) => {
   // CRITICAL: Use depopulate to convert populated refs (like callId) back to IDs
   // This prevents issues where callId population can cause patientId to become undefined
   // BUT we need to preserve populated messages since those should remain as objects
+  // AND we need to preserve patientId before depopulation in case it gets lost
   const preserveMessages = conversation && conversation.messages && 
     Array.isArray(conversation.messages) && 
     conversation.messages.length > 0 && 
     conversation.messages[0] && 
     typeof conversation.messages[0] === 'object' && 
     conversation.messages[0].content !== undefined;
+  
+  // Preserve patientId BEFORE toObject/depopulate in case it gets lost
+  const originalPatientId = conversation?.patientId;
+  
+  // Debug logging to understand patientId loss
+  if (conversation && !originalPatientId) {
+    logger.warn('[ConversationDTO] WARN: conversation has no patientId before toObject', {
+      conversationId: conversation._id || conversation.id,
+      hasCallId: !!conversation.callId,
+      callIdType: typeof conversation.callId,
+      keys: Object.keys(conversation),
+    });
+  }
     
   const conversationObj = conversation && typeof conversation.toObject === 'function' && !hasRuntimeProperties
     ? conversation.toObject({ virtuals: false, getters: false, depopulate: true })
@@ -33,6 +47,26 @@ const ConversationDTO = (conversation) => {
   // Restore populated messages if they were depopulated
   if (preserveMessages && conversationObj) {
     conversationObj.messages = conversation.messages;
+  }
+  
+  // Restore patientId if it was lost during toObject/depopulate
+  if (originalPatientId && conversationObj && !conversationObj.patientId) {
+    logger.info('[ConversationDTO] Restoring patientId that was lost during toObject', {
+      conversationId: conversationObj._id || conversationObj.id,
+      originalPatientId: originalPatientId.toString ? originalPatientId.toString() : originalPatientId,
+    });
+    // Convert to string if it's an ObjectId
+    conversationObj.patientId = originalPatientId.toString ? originalPatientId.toString() : originalPatientId;
+  }
+  
+  // Debug: Check if patientId is still missing after restore
+  if (conversationObj && !conversationObj.patientId && !originalPatientId) {
+    logger.error('[ConversationDTO] CRITICAL: patientId is missing and cannot be restored', {
+      conversationId: conversationObj._id || conversationObj.id,
+      hasCallId: !!conversationObj.callId,
+      callIdType: typeof conversationObj.callId,
+      keys: Object.keys(conversationObj),
+    });
   }
   
   if (!conversationObj) {
@@ -106,6 +140,17 @@ const ConversationDTO = (conversation) => {
   const patientIdStr = patientId ? (patientId instanceof ObjectId ? patientId.toString() : (patientId.toString ? patientId.toString() : patientId)) : null;
   const agentIdStr = agentId ? (agentId instanceof ObjectId ? agentId.toString() : (agentId.toString ? agentId.toString() : agentId)) : null;
   const lineItemIdStr = lineItemId ? (lineItemId instanceof ObjectId ? lineItemId.toString() : (lineItemId.toString ? lineItemId.toString() : lineItemId)) : null;
+
+  // Debug: Log if patientId conversion resulted in null/undefined
+  if (!patientIdStr) {
+    logger.warn('[ConversationDTO] patientId converted to null/undefined', {
+      conversationId: id,
+      patientId_value: patientId,
+      patientId_type: typeof patientId,
+      patientId_isObjectId: patientId instanceof ObjectId,
+      patientId_hasToString: patientId && typeof patientId.toString === 'function',
+    });
+  }
 
   return {
     id,
