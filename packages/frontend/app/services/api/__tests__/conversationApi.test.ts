@@ -45,11 +45,23 @@ describe("conversationApi", () => {
   })
 
   afterEach(async () => {
+    // Clean up org - wrap in try-catch to prevent test failures if cleanup fails
     try {
-      await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+      const result = await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+      // Unwrap to ensure promise completes
+      if ('data' in result) {
+        // Success - cleanup complete
+      }
     } catch (error) {
-      // Ignore cleanup errors
+      // Cleanup failed but don't fail the test
+      console.warn('Cleanup failed:', error)
     }
+
+    // Reset RTK Query state to cancel any pending queries
+    store.dispatch(conversationApi.util.resetApiState())
+    store.dispatch(orgApi.util.resetApiState())
+    store.dispatch(patientApi.util.resetApiState())
+
     jest.clearAllMocks()
   })
 
