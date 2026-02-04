@@ -106,6 +106,9 @@ const envVarsSchema = Joi.object({
     then: Joi.string().optional(), // Allow missing in staging/production as it will be loaded from secrets
     otherwise: Joi.string().optional() // Optional in dev/test environments
   }),
+  // Google OAuth credentials
+  GOOGLE_CLIENT_ID: Joi.string().optional(),
+  GOOGLE_CLIENT_SECRET: Joi.string().optional(),
   // **NEW:** Realtime API specific variables
   // Note: Model is auto-selected based on OPENAI_REALTIME_USE_GA:
   // - GA: 'gpt-realtime' (default when useGA=true)
