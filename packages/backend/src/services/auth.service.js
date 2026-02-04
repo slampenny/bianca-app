@@ -42,7 +42,10 @@ const loginCaregiverWithEmailAndPassword = async (email, password) => {
 const logout = async (refreshToken) => {
   const refreshTokenDoc = await Token.findOne({ token: refreshToken, type: tokenTypes.REFRESH, blacklisted: false });
   if (!refreshTokenDoc) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Not found');
+    // Token not found in database - this is OK for SSO users (JWT-only tokens)
+    // or if token was already deleted. Just return success.
+    logger.debug('Logout: refresh token not found in database (likely SSO user or already logged out)');
+    return;
   }
   await refreshTokenDoc.deleteOne();
 };
