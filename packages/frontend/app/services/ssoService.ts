@@ -69,7 +69,7 @@ class SSOService {
   private getMicrosoftAuthRequest() {
     return new AuthSession.AuthRequest({
       clientId: MICROSOFT_CLIENT_ID,
-      scopes: ['openid', 'profile', 'email'],
+      scopes: ['openid', 'profile', 'email', 'User.Read'], // Add User.Read for Microsoft Graph API access
       redirectUri,
       responseType: AuthSession.ResponseType.Code, // Use code flow with PKCE (more secure, better COOP compatibility)
       extraParams: {
@@ -316,10 +316,22 @@ class SSOService {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch Microsoft user info');
+      const errorText = await response.text();
+      logger.error('Failed to fetch Microsoft user info', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorText,
+      });
+      throw new Error(`Failed to fetch Microsoft user info: ${response.status} ${response.statusText}`);
     }
 
     const userInfo = await response.json();
+    
+    logger.info('Microsoft user info fetched successfully', {
+      id: userInfo.id,
+      email: userInfo.mail || userInfo.userPrincipalName,
+      displayName: userInfo.displayName,
+    });
     
     return {
       id: userInfo.id,
