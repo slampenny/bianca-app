@@ -464,27 +464,30 @@ const exchangeCode = catchAsync(async (req, res) => {
       tokenResponse = responseData;
     } else if (provider === 'microsoft') {
       // Exchange code for token with Microsoft
-      const { clientId, clientSecret, tenantId, tokenUri } = config.microsoftOAuth;
+      // NOTE: Microsoft enforces strict PKCE - if app is configured as "public client"
+      // (Allow public client flows = Yes), we CANNOT send client_secret
+      // We use PKCE (code_verifier) instead
+      const { clientId, tenantId, tokenUri } = config.microsoftOAuth;
       
-      if (!clientId || !clientSecret) {
-        logger.error('Microsoft OAuth not configured', { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+      if (!clientId) {
+        logger.error('Microsoft OAuth not configured', { hasClientId: !!clientId });
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Microsoft OAuth not configured on server');
       }
 
       const params = new URLSearchParams({
         client_id: clientId,
-        client_secret: clientSecret,
         code,
         redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       });
 
-      // Add code_verifier for PKCE if provided
+      // CRITICAL: For PKCE flow, we MUST send code_verifier but NOT client_secret
+      // Microsoft rejects requests with both: "Public clients can't send a client secret"
       if (codeVerifier) {
         params.append('code_verifier', codeVerifier);
       }
 
-      logger.info('Exchanging code with Microsoft', { tokenUri, redirectUri, tenantId });
+      logger.info('Exchanging code with Microsoft (PKCE, no client_secret)', { tokenUri, redirectUri, tenantId });
 
       const response = await fetch(tokenUri, {
         method: 'POST',
