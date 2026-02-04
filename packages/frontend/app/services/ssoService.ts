@@ -218,34 +218,56 @@ class SSOService {
           };
         }
 
-        // Exchange code for access token
-        const tokenResult = await AuthSession.exchangeCodeAsync(
-          {
-            clientId: MICROSOFT_CLIENT_ID,
-            code,
-            redirectUri,
-            extraParams: {
-              code_verifier: request.codeVerifier || '',
-            },
-          },
-          endpoints
-        );
-
-        const accessToken = tokenResult.accessToken;
+        // Exchange code for access token via BACKEND (which has the client_secret)
+        const { getDefaultApiConfig } = require('./api/api');
+        const apiConfig = getDefaultApiConfig();
         
-        if (!accessToken) {
+        try {
+          const exchangeResponse = await fetch(`${apiConfig.url}/sso/exchange-code`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              provider: 'microsoft',
+              code,
+              redirectUri,
+              codeVerifier: request.codeVerifier || '',
+            }),
+          });
+
+          const exchangeData = await exchangeResponse.json();
+
+          if (!exchangeResponse.ok || !exchangeData.success) {
+            logger.error('Backend code exchange failed:', exchangeData);
+            return {
+              error: 'Authentication failed',
+              description: exchangeData.message || 'Failed to exchange authorization code',
+            };
+          }
+
+          const accessToken = exchangeData.accessToken;
+          
+          if (!accessToken) {
+            return {
+              error: 'Authentication failed',
+              description: 'Failed to get access token from backend',
+            };
+          }
+
+          // Get user info from Microsoft
+          const userInfo = await this.fetchMicrosoftUserInfo(accessToken);
+          
+          // Send to backend for authentication
+          const backendResponse = await this.authenticateWithBackend(userInfo);
+          return backendResponse;
+        } catch (exchangeError) {
+          logger.error('Code exchange error:', exchangeError);
           return {
             error: 'Authentication failed',
-            description: 'Failed to exchange code for access token',
+            description: exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token',
           };
         }
-
-        // Get user info from Microsoft
-        const userInfo = await this.fetchMicrosoftUserInfo(accessToken);
-        
-        // Send to backend for authentication
-        const backendResponse = await this.authenticateWithBackend(userInfo);
-        return backendResponse;
       } else {
         logger.warn('Microsoft OAuth result:', { type: result.type, params: result.params });
         return {

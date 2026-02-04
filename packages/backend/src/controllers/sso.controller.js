@@ -463,8 +463,52 @@ const exchangeCode = catchAsync(async (req, res) => {
 
       tokenResponse = responseData;
     } else if (provider === 'microsoft') {
-      // TODO: Implement Microsoft token exchange when Microsoft OAuth secrets are added
-      throw new ApiError(httpStatus.NOT_IMPLEMENTED, 'Microsoft OAuth token exchange not yet implemented');
+      // Exchange code for token with Microsoft
+      const { clientId, clientSecret, tenantId, tokenUri } = config.microsoftOAuth;
+      
+      if (!clientId || !clientSecret) {
+        logger.error('Microsoft OAuth not configured', { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Microsoft OAuth not configured on server');
+      }
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      });
+
+      // Add code_verifier for PKCE if provided
+      if (codeVerifier) {
+        params.append('code_verifier', codeVerifier);
+      }
+
+      logger.info('Exchanging code with Microsoft', { tokenUri, redirectUri, tenantId });
+
+      const response = await fetch(tokenUri, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        logger.error('Microsoft token exchange failed', {
+          status: response.status,
+          error: responseData.error,
+          errorDescription: responseData.error_description,
+        });
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Token exchange failed: ${responseData.error_description || responseData.error || 'Unknown error'}`
+        );
+      }
+
+      tokenResponse = responseData;
     } else {
       throw new ApiError(httpStatus.BAD_REQUEST, `Unsupported provider: ${provider}`);
     }

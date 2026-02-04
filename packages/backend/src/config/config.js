@@ -109,6 +109,10 @@ const envVarsSchema = Joi.object({
   // Google OAuth credentials
   GOOGLE_CLIENT_ID: Joi.string().optional(),
   GOOGLE_CLIENT_SECRET: Joi.string().optional(),
+  // Microsoft OAuth credentials
+  MICROSOFT_CLIENT_ID: Joi.string().optional(),
+  MICROSOFT_CLIENT_SECRET: Joi.string().optional(),
+  MICROSOFT_TENANT_ID: Joi.string().optional(),
   // **NEW:** Realtime API specific variables
   // Note: Model is auto-selected based on OPENAI_REALTIME_USE_GA:
   // - GA: 'gpt-realtime' (default when useGA=true)
@@ -225,6 +229,13 @@ const baselineConfig = {
     clientId: envVars.GOOGLE_CLIENT_ID || null,
     clientSecret: envVars.GOOGLE_CLIENT_SECRET || null,
     tokenUri: 'https://oauth2.googleapis.com/token',
+  },
+  // Microsoft OAuth Configuration (loaded from AWS Secrets Manager)
+  microsoftOAuth: {
+    clientId: envVars.MICROSOFT_CLIENT_ID || null,
+    clientSecret: envVars.MICROSOFT_CLIENT_SECRET || null,
+    tenantId: envVars.MICROSOFT_TENANT_ID || 'common',
+    tokenUri: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
   },
   // Merge domain-specific configurations
   ...buildAllConfigs(envVars),
@@ -383,6 +394,29 @@ baselineConfig.loadSecrets = async () => {
       }
     } catch (googleErr) {
       logger.warn(`Could not load Google OAuth secrets from ${googleSecretId}: ${googleErr.message}`);
+      // Not fatal - SSO just won't work if secrets aren't available
+    }
+    
+    // Microsoft OAuth Secrets (load from environment-specific secrets)
+    const microsoftSecretId = `bianca/${baselineConfig.env}/microsoft-oauth`;
+    try {
+      logger.info(`Loading Microsoft OAuth secrets from ${microsoftSecretId}`);
+      const microsoftCommand = new GetSecretValueCommand({ SecretId: microsoftSecretId });
+      const microsoftData = await client.send(microsoftCommand);
+      
+      if (microsoftData.SecretString) {
+        const microsoftSecrets = JSON.parse(microsoftData.SecretString);
+        baselineConfig.microsoftOAuth.clientId = microsoftSecrets.client_id;
+        baselineConfig.microsoftOAuth.clientSecret = microsoftSecrets.client_secret;
+        baselineConfig.microsoftOAuth.tenantId = microsoftSecrets.tenant_id || 'common';
+        // Update tokenUri with actual tenant if not 'common'
+        if (microsoftSecrets.tenant_id && microsoftSecrets.tenant_id !== 'common') {
+          baselineConfig.microsoftOAuth.tokenUri = `https://login.microsoftonline.com/${microsoftSecrets.tenant_id}/oauth2/v2.0/token`;
+        }
+        logger.info('Successfully loaded Microsoft OAuth secrets');
+      }
+    } catch (microsoftErr) {
+      logger.warn(`Could not load Microsoft OAuth secrets from ${microsoftSecretId}: ${microsoftErr.message}`);
       // Not fatal - SSO just won't work if secrets aren't available
     }
     
