@@ -155,14 +155,25 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
     }
   }
 
-  const getStatusMessage = (status: string) => {
+  const getStatusMessage = (status: string, callOutcome?: string) => {
+    // Show specific messages based on call outcome
+    if (callOutcome === 'voicemail') {
+      return 'Answering machine detected'
+    }
+    if (callOutcome === 'no_answer') {
+      return 'No answer'
+    }
+    if (callOutcome === 'busy') {
+      return 'Line busy'
+    }
+    
     switch (status) {
       case 'initiated':
         return 'Setting up call...'
       case 'in-progress':
         return `Connected with ${patientName}`
       case 'completed':
-        return 'Call ended'
+        return callOutcome === 'answered' ? 'Call completed' : 'Call ended'
       case 'failed':
         return 'Call failed'
       default:
@@ -267,8 +278,25 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
           
           <View style={styles.statusInfo}>
             <Text style={styles.statusMessage}>
-              {getStatusMessage(status)}
+              {getStatusMessage(status, callStatusData?.data?.callOutcome)}
             </Text>
+            
+            {/* Show outcome badge for voicemail, no_answer, and busy */}
+            {callStatusData?.data?.callOutcome === 'voicemail' && (
+              <View style={styles.outcomeBadge}>
+                <Text style={styles.outcomeBadgeText}>📱 Voicemail</Text>
+              </View>
+            )}
+            {callStatusData?.data?.callOutcome === 'no_answer' && (
+              <View style={styles.outcomeBadge}>
+                <Text style={styles.outcomeBadgeText}>📞 No Answer</Text>
+              </View>
+            )}
+            {callStatusData?.data?.callOutcome === 'busy' && (
+              <View style={styles.outcomeBadge}>
+                <Text style={styles.outcomeBadgeText}>🚫 Busy</Text>
+              </View>
+            )}
             
             {showDuration && (
               <Text style={styles.durationText}>
@@ -337,6 +365,21 @@ const styles = StyleSheet.create({
   durationText: {
     fontSize: 14,
     color: colors.palette.neutral600,
+  },
+  outcomeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.palette.warning100 || '#fef3c7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  outcomeBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.palette.warning800 || '#92400e',
   },
   endCallButton: {
     backgroundColor: colors.error || colors.palette.error500,

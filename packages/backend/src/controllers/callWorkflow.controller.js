@@ -215,6 +215,7 @@ const getCallStatus = catchAsync(async (req, res) => {
     callId: call._id,
     status: call.status,
     callStatus: call.callStatus,
+    callOutcome: call.callOutcome, // Include outcome for voicemail detection
     startTime: call.startTime,
     endTime: call.endTime,
     duration: call.duration,
