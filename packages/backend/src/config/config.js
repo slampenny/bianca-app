@@ -217,6 +217,12 @@ const baselineConfig = {
     name: 'App Review Tester',
     phone: '+16045624263',
   },
+  // Google OAuth Configuration (loaded from AWS Secrets Manager)
+  googleOAuth: {
+    clientId: envVars.GOOGLE_CLIENT_ID || null,
+    clientSecret: envVars.GOOGLE_CLIENT_SECRET || null,
+    tokenUri: 'https://oauth2.googleapis.com/token',
+  },
   // Merge domain-specific configurations
   ...buildAllConfigs(envVars),
 };
@@ -358,6 +364,25 @@ baselineConfig.loadSecrets = async () => {
     if (secrets.APP_STORE_REVIEW_PASSWORD) {
       baselineConfig.appStoreReview.password = secrets.APP_STORE_REVIEW_PASSWORD;
     }
+    
+    // Google OAuth Secrets (load from environment-specific secrets)
+    const googleSecretId = `bianca/${baselineConfig.env}/google-oauth`;
+    try {
+      logger.info(`Loading Google OAuth secrets from ${googleSecretId}`);
+      const googleCommand = new GetSecretValueCommand({ SecretId: googleSecretId });
+      const googleData = await client.send(googleCommand);
+      
+      if (googleData.SecretString) {
+        const googleSecrets = JSON.parse(googleData.SecretString);
+        baselineConfig.googleOAuth.clientId = googleSecrets.client_id;
+        baselineConfig.googleOAuth.clientSecret = googleSecrets.client_secret;
+        logger.info('Successfully loaded Google OAuth secrets');
+      }
+    } catch (googleErr) {
+      logger.warn(`Could not load Google OAuth secrets from ${googleSecretId}: ${googleErr.message}`);
+      // Not fatal - SSO just won't work if secrets aren't available
+    }
+    
     // Mongoose URL
     // if (secrets.MONGODB_URL) {
     //     baselineConfig.mongoose.url = secrets.MONGODB_URL + (baselineConfig.env === 'test' ? '-test' : '');

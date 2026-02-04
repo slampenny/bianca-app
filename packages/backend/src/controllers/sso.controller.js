@@ -403,7 +403,100 @@ const verify = catchAsync(async (req, res) => {
   }
 });
 
+const exchangeCode = catchAsync(async (req, res) => {
+  try {
+    const { provider, code, redirectUri, codeVerifier } = req.body;
+
+    logger.info('SSO code exchange attempt', { provider, redirectUri });
+
+    if (!provider || !code || !redirectUri) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Missing required fields: provider, code, and redirectUri are required');
+    }
+
+    let tokenResponse;
+
+    if (provider === 'google') {
+      // Exchange code for token with Google
+      const { clientId, clientSecret, tokenUri } = config.googleOAuth;
+      
+      if (!clientId || !clientSecret) {
+        logger.error('Google OAuth not configured', { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+        throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Google OAuth not configured on server');
+      }
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      });
+
+      // Add code_verifier for PKCE if provided
+      if (codeVerifier) {
+        params.append('code_verifier', codeVerifier);
+      }
+
+      logger.info('Exchanging code with Google', { tokenUri, redirectUri });
+
+      const response = await fetch(tokenUri, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        logger.error('Google token exchange failed', {
+          status: response.status,
+          error: responseData.error,
+          errorDescription: responseData.error_description,
+        });
+        throw new ApiError(
+          httpStatus.BAD_REQUEST,
+          `Token exchange failed: ${responseData.error_description || responseData.error || 'Unknown error'}`
+        );
+      }
+
+      tokenResponse = responseData;
+    } else if (provider === 'microsoft') {
+      // TODO: Implement Microsoft token exchange when Microsoft OAuth secrets are added
+      throw new ApiError(httpStatus.NOT_IMPLEMENTED, 'Microsoft OAuth token exchange not yet implemented');
+    } else {
+      throw new ApiError(httpStatus.BAD_REQUEST, `Unsupported provider: ${provider}`);
+    }
+
+    logger.info('SSO code exchange successful', { provider });
+
+    res.json({
+      success: true,
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token,
+      expiresIn: tokenResponse.expires_in,
+      tokenType: tokenResponse.token_type,
+    });
+
+  } catch (error) {
+    logger.error('SSO code exchange error', {
+      error: error.message,
+      stack: error.stack,
+      provider: req.body?.provider
+    });
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      `SSO code exchange failed: ${error.message || 'Unknown error'}`
+    );
+  }
+});
+
 module.exports = {
   login,
   verify,
+  exchangeCode,
 };

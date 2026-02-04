@@ -17,7 +17,17 @@ const verify = {
   }),
 };
 
+const exchangeCode = {
+  body: Joi.object().keys({
+    provider: Joi.string().valid('google', 'microsoft').required(),
+    code: Joi.string().required(),
+    redirectUri: Joi.string().uri().required(),
+    codeVerifier: Joi.string().optional(),
+  }),
+};
+
 module.exports = {
   login,
   verify,
+  exchangeCode,
 };
