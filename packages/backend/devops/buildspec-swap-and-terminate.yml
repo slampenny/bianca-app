@@ -42,12 +42,22 @@ phases:
         # Find blue instance if not in file
         if [ -z "$BLUE_INSTANCE_ID" ]; then
           echo "Finding blue instance..."
+          # Get all running instances with BLUE_TAG name, then filter out the green instance
           BLUE_INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$BLUE_TAG" \
-                      "Name=tag:DeploymentType,Values=!green" \
                       "Name=instance-state-name,Values=running" \
-            --query 'Reservations[0].Instances[0].InstanceId' \
+            --query "Reservations[*].Instances[?Tags[?Key=='DeploymentType' && Value=='blue']] | [0][0].InstanceId" \
             --output text 2>/dev/null || echo "")
+          
+          # If no instance with DeploymentType=blue, check if there's any instance (legacy without tag)
+          if [ -z "$BLUE_INSTANCE_ID" ] || [ "$BLUE_INSTANCE_ID" = "None" ]; then
+            # Exclude the green instance we just created
+            BLUE_INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=$BLUE_TAG" \
+                        "Name=instance-state-name,Values=running" \
+              --query "Reservations[*].Instances[?InstanceId!='$GREEN_INSTANCE_ID'] | [0][0].InstanceId" \
+              --output text 2>/dev/null || echo "")
+          fi
         fi
         
         if [ -z "$BLUE_INSTANCE_ID" ] || [ "$BLUE_INSTANCE_ID" = "None" ]; then
