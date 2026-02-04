@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { View, ScrollView, StyleSheet, Platform, TouchableOpacity } from "react-native"
 import { useSelector, useDispatch } from "react-redux"
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from "@react-navigation/native"
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native"
 import type { HomeStackParamList } from "../navigators/navigationTypes"
 import { Picker } from "@react-native-picker/picker"
 import ScheduleComponent from "../components/Schedule"
@@ -10,8 +10,6 @@ import {
   useUpdateScheduleMutation,
   useDeleteScheduleMutation,
 } from "../services/api/scheduleApi"
-import { useCreateAlertMutation } from "../services/api/alertApi"
-import { getAlerts } from "../store/alertSlice"
 import { getSchedules, setSchedule, getSchedule, setSchedules } from "../store/scheduleSlice"
 import { getPatient, setPatient } from "../store/patientSlice"
 import { getCurrentUser } from "../store/authSlice"
@@ -35,23 +33,13 @@ export const SchedulesScreen = () => {
   const selectedSchedule = useSelector(getSchedule)
   const schedules = useSelector(getSchedules)
   const currentUser = useSelector(getCurrentUser)
-  const existingAlerts = useSelector(getAlerts)
-  const isNewPatient = route.params?.isNewPatient ?? false
   const [updateSchedule, { isLoading: isUpdating, isError: isUpdatingError }] =
     useUpdateScheduleMutation()
   const [createNewSchedule, { isLoading: isCreating, isError: isCreatingError }] =
     useCreateScheduleMutation()
   const [deleteSchedule, { isLoading: isDeleting, isError: isDeletingError }] =
     useDeleteScheduleMutation()
-  const [createAlert] = useCreateAlertMutation()
   const { colors, isLoading: themeLoading, currentTheme, fontScale } = useTheme()
-  
-  // Track if we've already checked for missing schedule to avoid duplicate alerts
-  // Store the patient ID we've checked to prevent duplicates even if component re-renders
-  const alertCheckRef = useRef<{ patientId: string | null; hasChecked: boolean }>({
-    patientId: null,
-    hasChecked: false,
-  })
   
   // Track if schedule has been modified to enable/disable save button
   const [hasChanges, setHasChanges] = useState(false)
@@ -112,105 +100,6 @@ export const SchedulesScreen = () => {
   const isValidSchedule = (schedule: Schedule | null | undefined): boolean => {
     return validateSchedule(schedule) === null
   }
-  
-  // Check if user exits without creating a schedule and create alert if needed
-  // Only for new patient creations, not updates
-  // useFocusEffect works for both stack navigation and tab navigation
-  useFocusEffect(
-    React.useCallback(() => {
-      // Reset check flag when screen gains focus (but keep patient ID to prevent duplicates)
-      const currentPatientId = selectedPatient?.id || null
-      if (alertCheckRef.current.patientId !== currentPatientId) {
-        alertCheckRef.current = { patientId: currentPatientId, hasChecked: false }
-      }
-      
-      // Return cleanup function that runs when screen loses focus
-      return () => {
-        // Only check if this is a new patient creation and we haven't checked yet for this patient
-        if (!isNewPatient || alertCheckRef.current.hasChecked) {
-          return
-        }
-
-        // Only check if we have a patient and user
-        if (!selectedPatient?.id || !currentUser?.id) {
-          logger.debug('SchedulesScreen blur: Missing patient or user, skipping alert check', {
-            hasPatient: !!selectedPatient?.id,
-            hasUser: !!currentUser?.id
-          })
-          return
-        }
-
-        // Mark as checked for this patient to prevent duplicate alerts
-        alertCheckRef.current = {
-          patientId: selectedPatient.id,
-          hasChecked: true,
-        }
-
-        // Check if any schedules exist for this patient
-        // Use patient.schedules if available (from API), otherwise fall back to Redux schedules
-        const patientSchedules = selectedPatient.schedules || schedules
-        const hasSchedules = Array.isArray(patientSchedules) && patientSchedules.length > 0
-        
-        logger.debug('SchedulesScreen blur: Checking for missing schedule', {
-          patientId: selectedPatient.id,
-          patientName: selectedPatient.name,
-          hasSchedules,
-          scheduleCount: patientSchedules.length,
-          schedulesSource: selectedPatient.schedules ? 'patient.schedules' : 'Redux'
-        })
-        
-        // If no schedules exist, check if alert already exists before creating a new one
-        if (!hasSchedules) {
-          // Check if an alert with the same message and patient already exists
-          const alertMessage = `Patient ${selectedPatient.name} has no schedule configured`
-          const existingAlert = existingAlerts.find(
-            (alert) =>
-              alert.message === alertMessage &&
-              alert.relatedPatient === selectedPatient.id &&
-              alert.alertType === 'patient'
-          )
-
-          if (existingAlert) {
-            logger.debug(`Alert already exists for patient ${selectedPatient.name} with no schedule, skipping creation`)
-            return
-          }
-
-          logger.info(`Creating alert for patient ${selectedPatient.name} with no schedule`)
-          // Use setTimeout to ensure this runs after navigation completes
-          // and doesn't block the navigation
-          setTimeout(async () => {
-            try {
-              // Set relevanceUntil to 30 days from now so the alert doesn't expire immediately
-              const relevanceUntil = new Date()
-              relevanceUntil.setDate(relevanceUntil.getDate() + 30)
-              
-              // Use assignedCaregivers visibility with patient as creator so all caregivers
-              // assigned to this patient see the alert (one alert visible to all assigned caregivers)
-              const result = await createAlert({
-                message: alertMessage,
-                importance: 'medium',
-                alertType: 'patient',
-                relatedPatient: selectedPatient.id,
-                createdBy: selectedPatient.id, // Patient ID so all assigned caregivers can see it
-                createdModel: 'Patient',
-                visibility: 'assignedCaregivers', // Only show to caregivers assigned to this patient
-                relevanceUntil: relevanceUntil.toISOString() as any, // API accepts ISO string, type definition expects Date
-              }).unwrap()
-              logger.info(`Alert created successfully for patient ${selectedPatient.name} with no schedule`, result)
-            } catch (error) {
-              logger.error('Failed to create alert for patient without schedule:', error)
-              // Log the full error for debugging
-              if (error && typeof error === 'object') {
-                logger.error('Alert creation error details:', JSON.stringify(error, null, 2))
-              }
-            }
-          }, 100)
-        } else {
-          logger.debug(`Patient ${selectedPatient.name} has ${patientSchedules.length} schedule(s), no alert needed`)
-        }
-      }
-    }, [isNewPatient, selectedPatient, currentUser, schedules, createAlert, existingAlerts])
-  )
 
   // Inject CSS for web Picker dropdown theming
   useEffect(() => {

@@ -36,6 +36,11 @@ agenda.on('ready', () => {
   agenda.every('0 2 * * *', 'processDataDeletion');
   logger.info('[Agenda] Daily data deletion scheduled for 2:00 AM daily');
 
+  // Schedule patient schedule check job (runs every 30 minutes)
+  // Checks for patients created more than 30 minutes ago without schedules
+  agenda.every('30 minutes', 'checkPatientsWithoutSchedules');
+  logger.info('[Agenda] Patient schedule check scheduled to run every 30 minutes');
+
   // Start processing jobs only after the connection is ready
   agenda.start();
 });
@@ -73,6 +78,18 @@ agenda.define('processDataDeletion', { concurrency: 1, lockLifetime: 3600000 }, 
     done();
   } catch (error) {
     logger.error(`Error in processDataDeletion job: ${error}`);
+    done(error);
+  }
+});
+
+// Patient schedule check job definition
+// Checks for patients created more than 30 minutes ago without schedules
+agenda.define('checkPatientsWithoutSchedules', { concurrency: 1, lockLifetime: 600000 }, async (job, done) => {
+  try {
+    await checkPatientsWithoutSchedules();
+    done();
+  } catch (error) {
+    logger.error(`Error in checkPatientsWithoutSchedules job: ${error}`);
     done(error);
   }
 });
@@ -502,6 +519,66 @@ async function chargePaymentMethod(org, invoice) {
   //   invoice.paidAt = new Date();
   //   await invoice.save();
   // }
+}
+
+async function checkPatientsWithoutSchedules() {
+  logger.info('[Patient Schedule Check] Starting patient schedule check...');
+  
+  try {
+    // Check patients created in a specific time window: between 30-60 minutes ago
+    // This ensures we only check each patient once, not repeatedly on every job run
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000);
+    
+    // Find patients created in this window who don't have schedules yet
+    const patients = await Patient.find({
+      createdAt: { 
+        $gte: sixtyMinutesAgo,  // Created after 60 minutes ago
+        $lte: thirtyMinutesAgo   // Created before 30 minutes ago
+      }
+    }).populate('org');
+    
+    logger.info(`[Patient Schedule Check] Found ${patients.length} patients created 30-60 minutes ago`);
+    
+    let patientsChecked = 0;
+    let alertsCreated = 0;
+    let patientsWithSchedules = 0;
+    
+    for (const patient of patients) {
+      patientsChecked++;
+      
+      // Check if patient has any schedules
+      const scheduleCount = await Schedule.countDocuments({ patient: patient._id });
+      
+      if (scheduleCount === 0) {
+        // Create alert for patient without schedule
+        logger.info(`[Patient Schedule Check] Creating alert for patient ${patient.name} (${patient._id}) with no schedule`);
+        
+        const alertMessage = `Patient ${patient.name} has no schedule configured`;
+        const relevanceUntil = moment().add(30, 'days').toISOString();
+        
+        await alertService.createAlert({
+          message: alertMessage,
+          importance: 'medium',
+          alertType: 'patient',
+          relatedPatient: patient._id,
+          createdBy: patient._id,
+          createdModel: 'Patient',
+          visibility: 'assignedCaregivers',
+          relevanceUntil
+        });
+        
+        alertsCreated++;
+      } else {
+        patientsWithSchedules++;
+      }
+    }
+    
+    logger.info(`[Patient Schedule Check] Completed. Patients checked: ${patientsChecked}, Alerts created: ${alertsCreated}, Patients with schedules: ${patientsWithSchedules}`);
+  } catch (error) {
+    logger.error(`[Patient Schedule Check] Error: ${error.message}`);
+    throw error;
+  }
 }
 
 module.exports = {
