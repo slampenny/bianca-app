@@ -296,9 +296,16 @@ EOF
 echo "Logging into ECR..."
 aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
 
-# Create MongoDB data directory
+# Create data directories for persistent storage
 mkdir -p /opt/mongodb-data
 chown 999:999 /opt/mongodb-data
+
+mkdir -p /opt/redis-data
+chown 999:999 /opt/redis-data
+
+# Create asterisk recordings directory
+mkdir -p /opt/asterisk-recordings
+chown 1000:1000 /opt/asterisk-recordings
 
 # Pull and start containers
 echo "Starting containers..."

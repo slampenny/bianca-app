@@ -82,8 +82,10 @@ fi
 echo "   ✅ Detected deployment directory: $DEPLOY_DIR"
 
 # Clean up Docker to free up space before pulling new images
-echo "   Cleaning up Docker (removing unused images, containers, volumes)..."
-docker system prune -af --volumes || {
+# IMPORTANT: Do NOT use --volumes flag - it can delete MongoDB data volumes!
+# Only clean up unused images and containers, not volumes (data must persist)
+echo "   Cleaning up Docker (removing unused images and containers, preserving volumes)..."
+docker system prune -af || {
   echo "⚠️  Docker cleanup had some issues, but continuing..."
 }
 

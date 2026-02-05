@@ -49,8 +49,8 @@ services:
       - BIANCA_PASSWORD=${BIANCA_PASSWORD:-}
       - EXTERNAL_ADDRESS=${EXTERNAL_ADDRESS:-3.21.74.167}
     volumes:
-      # Mount recordings for production debugging
-      - ./devops/asterisk/recordings:/var/spool/asterisk/recording
+      # Mount recordings for production debugging (use absolute path to EBS volume)
+      - /opt/asterisk-recordings:/var/spool/asterisk/recording
 
   redis:
     image: redis:7-alpine
@@ -59,7 +59,7 @@ services:
     ports:
       - '6379:6379'
     volumes:
-      - redis-data:/data
+      - /opt/redis-data:/data  # Mount EBS volume for data persistence (matches staging)
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -75,5 +75,5 @@ networks:
   node-network:
     driver: bridge
 
-volumes:
-  redis-data:
+# Note: No named volumes in production - all data stored on EBS volumes via bind mounts
+# This protects data from being deleted by docker system prune commands
