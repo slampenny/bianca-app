@@ -36,3 +36,26 @@ Feature: Alert Management
     When I mark all alerts as read
     Then all alerts should be marked as read
 
+  Scenario: Toggle individual alert checkbox
+    Given I am on the alerts screen
+    And I have an unread alert
+    When I click the checkbox on the alert
+    Then the alert should be marked as read
+    And the checkbox should be checked
+    When I click the checkbox on the alert again
+    Then the alert should be marked as unread
+    And the checkbox should be unchecked
+
+  Scenario: Alert visibility in tabs based on read status
+    Given I am on the alerts screen
+    And I have an unread alert
+    When I view the "Unread" tab
+    Then the alert should be visible
+    When I click the checkbox on the alert
+    Then the alert should disappear from the "Unread" tab
+    When I switch to the "All Alerts" tab
+    Then the alert should be visible
+    When I click the checkbox on the alert again
+    And I switch to the "Unread" tab
+    Then the alert should be visible again
+

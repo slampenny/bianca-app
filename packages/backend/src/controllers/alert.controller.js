@@ -39,6 +39,12 @@ const markAlertAsRead = catchAsync(async (req, res) => {
   res.send(alert);
 });
 
+const markAlertAsUnread = catchAsync(async (req, res) => {
+  const { alertId } = req.params; // ID of the alert to retrieve
+  const alert = await alertService.markAlertAsUnread(alertId, req.caregiver.id);
+  res.send(alert);
+});
+
 const markAllAsRead = catchAsync(async (req, res) => {
   const { alertIds } = req.body; // Step 1: Extract alertIds from the request body
   const successfullyMarkedAlerts = []; // To store successfully marked alerts
@@ -70,6 +76,7 @@ module.exports = {
   getAlerts,
   updateAlert,
   markAlertAsRead,
+  markAlertAsUnread,
   markAllAsRead,
   deleteAlert,
 };

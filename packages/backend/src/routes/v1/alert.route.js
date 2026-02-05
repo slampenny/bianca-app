@@ -22,6 +22,10 @@ router
   .post(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.markAlertAsRead), alertController.markAlertAsRead);
 
 router
+  .route('/markAsUnread/:alertId')
+  .post(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.markAlertAsUnread), alertController.markAlertAsUnread);
+
+router
   .route('/markAsRead')
   .post(auth('readOwn:alert', 'readAny:alert'), validate(alertValidation.markAllAsRead), alertController.markAllAsRead);
 

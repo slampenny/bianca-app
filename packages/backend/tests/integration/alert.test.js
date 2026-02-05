@@ -216,4 +216,52 @@ describe('Alert routes', () => {
       expect(alert.readBy.length).toEqual(0);
     });
   });
+
+  it('should mark an alert as read', async () => {
+    const res = await request(app)
+      .post(`/v1/alerts/markAsRead/${alertId}`)
+      .set('Authorization', `Bearer ${caregiverToken}`);
+
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    expect(res.body.readBy).toEqual(expect.arrayContaining([caregiver.id.toString()]));
+  });
+
+  it('should mark an alert as unread', async () => {
+    // First mark as read
+    await request(app)
+      .post(`/v1/alerts/markAsRead/${alertId}`)
+      .set('Authorization', `Bearer ${caregiverToken}`);
+
+    // Then mark as unread
+    const res = await request(app)
+      .post(`/v1/alerts/markAsUnread/${alertId}`)
+      .set('Authorization', `Bearer ${caregiverToken}`);
+
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    expect(res.body.readBy).not.toContain(caregiver.id.toString());
+    expect(res.body.readBy.length).toEqual(0);
+  });
+
+  it('should toggle alert between read and unread', async () => {
+    // Mark as read
+    let res = await request(app)
+      .post(`/v1/alerts/markAsRead/${alertId}`)
+      .set('Authorization', `Bearer ${caregiverToken}`);
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    expect(res.body.readBy).toContain(caregiver.id.toString());
+
+    // Mark as unread
+    res = await request(app)
+      .post(`/v1/alerts/markAsUnread/${alertId}`)
+      .set('Authorization', `Bearer ${caregiverToken}`);
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    expect(res.body.readBy).not.toContain(caregiver.id.toString());
+
+    // Mark as read again
+    res = await request(app)
+      .post(`/v1/alerts/markAsRead/${alertId}`)
+      .set('Authorization', `Bearer ${caregiverToken}`);
+    expect(res.statusCode).toEqual(httpStatus.OK);
+    expect(res.body.readBy).toContain(caregiver.id.toString());
+  });
 });

@@ -6,6 +6,7 @@ import { Toggle, Button, ListItem, Text } from "../components"
 import {
   useMarkAllAsReadMutation,
   useMarkAlertAsReadMutation,
+  useMarkAlertAsUnreadMutation,
   useGetAllAlertsQuery,
   useGetAllPatientsQuery,
 } from "../services/api"
@@ -62,6 +63,7 @@ export function AlertScreen() {
 
   const [markAllAsRead] = useMarkAllAsReadMutation()
   const [markAlertAsRead] = useMarkAlertAsReadMutation()
+  const [markAlertAsUnread] = useMarkAlertAsUnreadMutation()
   
   // Use a ref to track current alerts for merging without causing dependency issues
   const alertsRef = React.useRef(alerts)
@@ -162,17 +164,28 @@ export function AlertScreen() {
   const handleAlertPress = async (alert: Alert) => {
     if (alert.id) {
       try {
-        logger.debug('[AlertScreen] Marking alert as read:', alert.id)
-        logger.debug('[AlertScreen] Current alerts in state before marking:', alerts.length)
-        logger.debug('[AlertScreen] Current alerts breakdown:', {
-          total: alerts.length,
-          read: currentUser ? alerts.filter(a => a.readBy?.includes(currentUser.id!)).length : 0,
-          unread: currentUser ? alerts.filter(a => !a.readBy?.includes(currentUser.id!)).length : 0
-        })
+        const isRead = alert.readBy?.includes(currentUser?.id || "")
         
-        const updatedAlert = await markAlertAsRead({ alertId: alert.id }).unwrap()
-        logger.debug('[AlertScreen] Alert marked as read, updated alert:', updatedAlert)
-        logger.debug('[AlertScreen] Updated alert readBy:', updatedAlert.readBy)
+        if (isRead) {
+          // Mark as unread
+          logger.debug('[AlertScreen] Marking alert as unread:', alert.id)
+          const updatedAlert = await markAlertAsUnread({ alertId: alert.id }).unwrap()
+          logger.debug('[AlertScreen] Alert marked as unread, updated alert:', updatedAlert)
+          logger.debug('[AlertScreen] Updated alert readBy:', updatedAlert.readBy)
+        } else {
+          // Mark as read
+          logger.debug('[AlertScreen] Marking alert as read:', alert.id)
+          logger.debug('[AlertScreen] Current alerts in state before marking:', alerts.length)
+          logger.debug('[AlertScreen] Current alerts breakdown:', {
+            total: alerts.length,
+            read: currentUser ? alerts.filter(a => a.readBy?.includes(currentUser.id!)).length : 0,
+            unread: currentUser ? alerts.filter(a => !a.readBy?.includes(currentUser.id!)).length : 0
+          })
+          
+          const updatedAlert = await markAlertAsRead({ alertId: alert.id }).unwrap()
+          logger.debug('[AlertScreen] Alert marked as read, updated alert:', updatedAlert)
+          logger.debug('[AlertScreen] Updated alert readBy:', updatedAlert.readBy)
+        }
         
         // Note: The alertSlice extraReducer automatically updates the alert in Redux state
         // No need to manually update here - that could cause duplicates
@@ -195,7 +208,7 @@ export function AlertScreen() {
           logger.debug('[AlertScreen] Refetch returned no data')
         }
       } catch (error) {
-        logger.error("Failed to mark alert as read:", error)
+        logger.error("Failed to toggle alert read status:", error)
       }
     }
   }

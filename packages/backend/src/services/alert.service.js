@@ -141,6 +141,18 @@ const markAlertAsRead = async (alertId, caregiverId) => {
   return alert;
 };
 
+const markAlertAsUnread = async (alertId, caregiverId) => {
+  const alert = await Alert.findById(alertId);
+  if (!alert) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Alert not found');
+  }
+  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId); // Convert to ObjectId
+  // Remove the caregiver ID from the readBy array
+  alert.readBy = alert.readBy.filter((id) => !id.equals(objectCaregiverId));
+  await alert.save();
+  return alert;
+};
+
 const deleteAlertById = async (alertId) => {
   const alert = await Alert.findByIdAndDelete(alertId);
   return alert;
@@ -151,6 +163,7 @@ module.exports = {
   getAlertById,
   getAlerts,
   markAlertAsRead,
+  markAlertAsUnread,
   updateAlertById,
   deleteAlertById,
 };

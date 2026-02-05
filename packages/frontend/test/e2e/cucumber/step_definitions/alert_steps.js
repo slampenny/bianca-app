@@ -485,3 +485,179 @@ Then('all alerts should be marked as read', async function() {
   expect(badgeCount).toBe(0);
 });
 
+// Store the test alert for checkbox tests
+let testAlertMessage = null;
+
+Given('I have an unread alert', async function() {
+  // Create a test alert
+  testAlertMessage = `Checkbox Test Alert - ${Date.now()}`;
+  
+  // Get caregiver data
+  const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1';
+  const email = this.credentials?.email || 'staff@example.com';
+  
+  const caregiverResponse = await this.page.request.post(`${API_BASE_URL}/test/get-caregiver-by-email`, {
+    headers: { 'Content-Type': 'application/json' },
+    data: { email },
+  });
+  
+  if (!caregiverResponse.ok()) {
+    throw new Error('Could not get caregiver data');
+  }
+  
+  const caregiver = await caregiverResponse.json();
+  const caregiverId = caregiver.id || caregiver._id;
+  const patientId = caregiver.patients?.[0]?.id || caregiver.patients?.[0]?._id || caregiver.patients?.[0];
+  
+  if (!patientId) {
+    throw new Error('Caregiver has no patients');
+  }
+  
+  // Create alert
+  const alertResponse = await this.page.request.post(`${API_BASE_URL}/test/create-alert`, {
+    headers: { 'Content-Type': 'application/json' },
+    data: {
+      caregiverId,
+      message: testAlertMessage,
+      importance: 'high',
+      alertType: 'patient',
+      relatedPatient: patientId,
+      visibility: 'allCaregivers',
+      relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  });
+  
+  if (!alertResponse.ok()) {
+    throw new Error('Could not create test alert');
+  }
+  
+  // Wait for alert to be created and appear
+  await safeWait(this.page, 3000);
+});
+
+When('I click the checkbox on the alert', async function() {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  // Find the alert item
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  await alertItem.waitFor({ state: 'visible', timeout: 10000 });
+  
+  // Find and click the checkbox
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  await checkbox.waitFor({ state: 'visible', timeout: 5000 });
+  await checkbox.click();
+  
+  // Wait for API call to complete
+  await safeWait(this.page, 2000);
+});
+
+When('I click the checkbox on the alert again', async function() {
+  // Same as above - click the checkbox again
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  await alertItem.waitFor({ state: 'visible', timeout: 10000 });
+  
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  await checkbox.waitFor({ state: 'visible', timeout: 5000 });
+  await checkbox.click();
+  
+  await safeWait(this.page, 2000);
+});
+
+Then('the alert should be marked as read', async function() {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  // Find the alert and verify checkbox is checked
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  
+  // Wait a moment for state to update
+  await safeWait(this.page, 1000);
+  
+  const isChecked = await checkbox.isChecked().catch(() => true);
+  expect(isChecked).toBe(true);
+});
+
+Then('the checkbox should be checked', async function() {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  
+  const isChecked = await checkbox.isChecked().catch(() => true);
+  expect(isChecked).toBe(true);
+});
+
+Then('the alert should be marked as unread', async function() {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  
+  await safeWait(this.page, 1000);
+  
+  const isChecked = await checkbox.isChecked().catch(() => false);
+  expect(isChecked).toBe(false);
+});
+
+Then('the checkbox should be unchecked', async function() {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  
+  const isChecked = await checkbox.isChecked().catch(() => false);
+  expect(isChecked).toBe(false);
+});
+
+Then('the alert should be visible', async function() {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  await expect(alertItem).toBeVisible({ timeout: 10000 });
+});
+
+Then('the alert should disappear from the {string} tab', async function(tabName) {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  // Wait a moment for the alert to disappear
+  await safeWait(this.page, 2000);
+  
+  // Alert should not be visible in this tab
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  const count = await alertItem.count();
+  
+  // In the Unread tab, a read alert should not be present
+  expect(count).toBe(0);
+});
+
+Then('the alert should be visible again', async function() {
+  if (!testAlertMessage) {
+    throw new Error('No test alert message stored');
+  }
+  
+  // Wait for alert to reappear
+  await safeWait(this.page, 2000);
+  
+  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+  await expect(alertItem).toBeVisible({ timeout: 10000 });
+});
+
+

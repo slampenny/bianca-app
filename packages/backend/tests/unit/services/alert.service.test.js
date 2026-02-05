@@ -68,9 +68,40 @@ describe('alertService', () => {
   });
 
   it('should mark an alert as read', async () => {
-    const updatedAlert = await alertService.markAlertAsRead(alert1.id);
+    const updatedAlert = await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
     expect(updatedAlert.readBy).toEqual(expect.any(Array));
-    expect(updatedAlert.readBy).not.toContain(expect.arrayContaining([undefined]));
+    expect(updatedAlert.readBy.length).toBeGreaterThan(0);
+    expect(updatedAlert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+  });
+
+  it('should mark an alert as unread', async () => {
+    // First mark as read
+    await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
+    const readAlert = await Alert.findById(alert1.id);
+    expect(readAlert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+    
+    // Then mark as unread
+    const updatedAlert = await alertService.markAlertAsUnread(alert1.id, adminCargiver.id);
+    expect(updatedAlert.readBy).toEqual(expect.any(Array));
+    expect(updatedAlert.readBy.some(id => id.equals(adminCargiver._id))).toBe(false);
+  });
+
+  it('should toggle alert between read and unread multiple times', async () => {
+    // Mark as read
+    let alert = await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
+    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+    
+    // Mark as unread
+    alert = await alertService.markAlertAsUnread(alert1.id, adminCargiver.id);
+    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(false);
+    
+    // Mark as read again
+    alert = await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
+    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+    
+    // Mark as unread again
+    alert = await alertService.markAlertAsUnread(alert1.id, adminCargiver.id);
+    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(false);
   });
 
   it('should delete an alert by id', async () => {

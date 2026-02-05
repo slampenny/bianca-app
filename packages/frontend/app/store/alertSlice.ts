@@ -87,6 +87,25 @@ export const alertSlice = createSlice({
       }
       // DO NOT filter or remove alerts - keep ALL alerts in the array
     })
+
+    builder.addMatcher(alertApi.endpoints.markAlertAsUnread.matchFulfilled, (state, { payload }) => {
+      // Find the index of the alert in state.alerts that matches the current alert's ID
+      const index = state.alerts.findIndex((alertInState) => alertInState.id === payload.id)
+      // CRITICAL: Replace the alert in-place to preserve it in the array
+      if (index !== -1) {
+        logger.debug('[AlertSlice] Updating alert in state (marking as unread):', { 
+          alertId: payload.id, 
+          oldReadBy: state.alerts[index].readBy,
+          newReadBy: payload.readBy 
+        })
+        state.alerts[index] = payload
+      } else {
+        // If alert not found, add it to preserve all alerts
+        logger.warn('[AlertSlice] Alert not found in state array, adding it:', payload.id)
+        state.alerts.push(payload)
+      }
+      // DO NOT filter or remove alerts - keep ALL alerts in the array
+    })
   },
 })
 

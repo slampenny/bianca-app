@@ -119,4 +119,64 @@ describe("alertApi", () => {
       })
     }
   })
+
+  it("should mark an alert as unread", async () => {
+    // First mark as read
+    await alertApi.endpoints.markAlertAsRead.initiate({ alertId })(
+      store.dispatch,
+      store.getState,
+      {},
+    )
+    
+    // Then mark as unread
+    const result = await alertApi.endpoints.markAlertAsUnread.initiate({ alertId })(
+      store.dispatch,
+      store.getState,
+      {},
+    )
+    if ("error" in result) {
+      throw new Error(`Mark alert as unread failed with error: ${JSON.stringify(result.error)}`)
+    } else {
+      expect(result.data).toMatchObject({
+        id: alertId,
+      })
+      // The readBy array should not contain the current caregiver
+      expect(result.data.readBy).toBeDefined()
+      expect(Array.isArray(result.data.readBy)).toBe(true)
+    }
+  })
+
+  it("should toggle alert between read and unread", async () => {
+    // Mark as read
+    let result = await alertApi.endpoints.markAlertAsRead.initiate({ alertId })(
+      store.dispatch,
+      store.getState,
+      {},
+    )
+    if ("error" in result) {
+      throw new Error(`Mark alert as read failed: ${JSON.stringify(result.error)}`)
+    }
+    expect(result.data.readBy?.length).toBeGreaterThan(0)
+    
+    // Mark as unread
+    result = await alertApi.endpoints.markAlertAsUnread.initiate({ alertId })(
+      store.dispatch,
+      store.getState,
+      {},
+    )
+    if ("error" in result) {
+      throw new Error(`Mark alert as unread failed: ${JSON.stringify(result.error)}`)
+    }
+    
+    // Mark as read again
+    result = await alertApi.endpoints.markAlertAsRead.initiate({ alertId })(
+      store.dispatch,
+      store.getState,
+      {},
+    )
+    if ("error" in result) {
+      throw new Error(`Mark alert as read again failed: ${JSON.stringify(result.error)}`)
+    }
+    expect(result.data.readBy?.length).toBeGreaterThan(0)
+  })
 })

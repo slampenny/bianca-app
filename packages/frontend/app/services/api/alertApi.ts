@@ -48,6 +48,13 @@ export const alertApi = createApi({
       }),
       invalidatesTags: ["Alert"], // CRITICAL: Invalidate cache so refetch gets updated alerts
     }),
+    markAlertAsUnread: builder.mutation<Alert, { alertId: string }>({
+      query: ({ alertId }) => ({
+        url: `/alerts/markAsUnread/${alertId}`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Alert"], // CRITICAL: Invalidate cache so refetch gets updated alerts
+    }),
     markAllAsRead: builder.mutation<Alert[], { alerts: Alert[] }>({
       query: ({ alerts }) => ({
         url: `/alerts/markAsRead`,
@@ -66,5 +73,6 @@ export const {
   useUpdateAlertMutation,
   useDeleteAlertMutation,
   useMarkAlertAsReadMutation,
+  useMarkAlertAsUnreadMutation,
   useMarkAllAsReadMutation,
 } = alertApi

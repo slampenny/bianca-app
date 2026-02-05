@@ -47,6 +47,12 @@ const markAlertAsRead = {
   }),
 };
 
+const markAlertAsUnread = {
+  params: Joi.object().keys({
+    alertId: Joi.string().custom(objectId).required(),
+  }),
+};
+
 const markAllAsRead = {
   body: Joi.object().keys({
     alertIds: Joi.array().items(Joi.string().custom(objectId)).required(),
@@ -65,6 +71,7 @@ module.exports = {
   getAlertById,
   updateAlert,
   markAlertAsRead,
+  markAlertAsUnread,
   markAllAsRead,
   deleteAlert,
 };
