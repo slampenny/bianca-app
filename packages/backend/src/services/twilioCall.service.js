@@ -181,7 +181,7 @@ class TwilioCallService {
     
     try {
       // Customize greeting based on answering machine detection
-      if (AnsweredBy === 'machine_start' || AnsweredBy === 'machine_end') {
+      if (AnsweredBy === 'machine_start' || AnsweredBy === 'machine_end' || AnsweredBy === 'machine_end_beep' || AnsweredBy === 'machine_end_silence') {
         // Leave a message on answering machine
         twiml.say({
           voice: 'alice',
@@ -192,7 +192,7 @@ class TwilioCallService {
            "Thank you and have a good day.");
         
         twiml.hangup();
-        logger.info(`[Twilio Service] Generated answering machine message for ${CallSid}`);
+        logger.info(`[Twilio Service] Generated answering machine message for ${CallSid} (${AnsweredBy})`);
         
         // Update call record
         this.updateCallStatus(CallSid, 'machine');
@@ -352,8 +352,22 @@ class TwilioCallService {
         return;
       }
       
+      // CRITICAL: Handle async AMD callback (no CallStatus, only AnsweredBy)
+      // This comes as a separate callback with machine_end_beep or machine_end_silence
+      if (!CallStatus && AnsweredBy && (AnsweredBy === 'machine_end_beep' || AnsweredBy === 'machine_end_silence' || AnsweredBy === 'machine_start')) {
+        logger.warn(`[Twilio Service] Async AMD detected voicemail for ${CallSid}: ${AnsweredBy}`);
+        
+        // Mark the call as voicemail but don't end it yet - let the completed callback handle that
+        // Just store the AnsweredBy value so we know it when the call completes
+        call.callOutcome = 'voicemail';
+        await call.save();
+        
+        logger.info(`[Twilio Service] Marked call ${CallSid} as voicemail (will process on completion)`);
+        return;
+      }
+      
       // Check if this is a voicemail/answering machine (can come as completed status with AnsweredBy)
-      const isVoicemail = AnsweredBy === 'machine_start' || AnsweredBy === 'machine_end' || CallStatus === 'machine';
+      const isVoicemail = AnsweredBy === 'machine_start' || AnsweredBy === 'machine_end' || AnsweredBy === 'machine_end_beep' || AnsweredBy === 'machine_end_silence' || CallStatus === 'machine' || call.callOutcome === 'voicemail';
       
       switch (CallStatus) {
         case 'completed':
