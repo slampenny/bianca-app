@@ -172,7 +172,10 @@ class TwilioCallService {
     const { CallSid, AnsweredBy } = req.body;
     const { patientId } = req.params;
     
-    logger.info(`[Twilio Service] Generating Asterisk SIP TwiML for CallSid: ${CallSid}, AnsweredBy: ${AnsweredBy || 'unknown'}, PatientId: ${patientId}`);
+    logger.info(`[Twilio Service] Generating Asterisk SIP TwiML for CallSid: ${CallSid}, AnsweredBy: ${AnsweredBy || 'null'}, PatientId: ${patientId}`);
+    
+    // DEBUG: Log full request body to see all Twilio parameters
+    logger.info(`[Twilio Service] Full TwiML request body:`, JSON.stringify(req.body, null, 2));
     
     const twiml = new VoiceResponse();
     
@@ -336,7 +339,10 @@ class TwilioCallService {
    */
   async handleCallStatus(req) {
     const { CallSid, CallStatus, CallDuration, AnsweredBy } = req.body;
-    logger.info(`[Twilio Service] Call status update for ${CallSid}: ${CallStatus} (${AnsweredBy || 'unknown'})`);
+    logger.info(`[Twilio Service] Call status update for ${CallSid}: ${CallStatus} (AnsweredBy: ${AnsweredBy || 'null'})`);
+    
+    // DEBUG: Log the entire request body to see all Twilio parameters
+    logger.info(`[Twilio Service] Full status callback body:`, JSON.stringify(req.body, null, 2));
     
     try {
       // Find the call record
