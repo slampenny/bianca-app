@@ -252,8 +252,8 @@ Then('I should see at least {int} alerts', async function(minCount) {
 });
 
 Given('I am on the alerts screen', async function() {
-  // Ensure we're on the home/main screen first
-  await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+  // Ensure we're on the home/main screen first, with test mode enabled for faster polling
+  await this.page.goto(`${this.baseURL}/?playwright_test=1`, { waitUntil: 'networkidle' });
   await safeWait(this.page, 2000);
   
   // Check if we're logged in - if login screen is visible, we need to login
@@ -489,8 +489,11 @@ Then('all alerts should be marked as read', async function() {
 let testAlertMessage = null;
 
 Given('I have an unread alert', async function() {
-  // Create a test alert
+  // Create alert while already on the alerts screen
+  // This allows the RTK Query polling to naturally pick it up
+  
   testAlertMessage = `Checkbox Test Alert - ${Date.now()}`;
+  console.log('[DEBUG] Creating test alert:', testAlertMessage);
   
   // Get caregiver data
   const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1';
@@ -532,8 +535,22 @@ Given('I have an unread alert', async function() {
     throw new Error('Could not create test alert');
   }
   
-  // Wait for alert to be created and appear
-  await safeWait(this.page, 3000);
+  console.log('[DEBUG] Alert created, waiting for polling to fetch it...');
+  
+  // Wait for alert to appear (polling is 3s in test mode, wait for several cycles)
+  // Sometimes it takes longer due to network or backend processing
+  await safeWait(this.page, 15000);
+  
+  // Click "All Alerts" tab to ensure we see it
+  const allAlertsTab = this.page.locator('text="All Alerts"').or(this.page.getByText(/all.*alerts/i));
+  const allAlertsCount = await allAlertsTab.count();
+  if (allAlertsCount > 0) {
+    await allAlertsTab.first().click();
+    console.log('[DEBUG] Clicked "All Alerts" tab');
+    await safeWait(this.page, 3000);
+  }
+  
+  console.log('[DEBUG] Alert should now be visible on page');
 });
 
 When('I click the checkbox on the alert', async function() {
@@ -541,11 +558,11 @@ When('I click the checkbox on the alert', async function() {
     throw new Error('No test alert message stored');
   }
   
-  // Find the alert item
+  // Find the alert item using filter (like the working Playwright test)
   const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
   await alertItem.waitFor({ state: 'visible', timeout: 10000 });
   
-  // Find and click the checkbox
+  // Find and click the checkbox within this specific alert
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
   await checkbox.waitFor({ state: 'visible', timeout: 5000 });
   await checkbox.click();
@@ -555,18 +572,20 @@ When('I click the checkbox on the alert', async function() {
 });
 
 When('I click the checkbox on the alert again', async function() {
-  // Same as above - click the checkbox again
   if (!testAlertMessage) {
     throw new Error('No test alert message stored');
   }
   
+  // Find the alert item using filter (like the working Playwright test)
   const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
   await alertItem.waitFor({ state: 'visible', timeout: 10000 });
   
+  // Find and click the checkbox within this specific alert
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
   await checkbox.waitFor({ state: 'visible', timeout: 5000 });
   await checkbox.click();
   
+  // Wait for API call to complete
   await safeWait(this.page, 2000);
 });
 
