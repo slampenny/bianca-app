@@ -50,6 +50,7 @@ Given('the backend is running on {string}', async function(apiURL) {
 // Common login step - reusable across all test suites
 Given('I am logged in as {string}', async function(username) {
   const credentials = this.getCredentials(username);
+  this.credentials = credentials; // Store credentials for later use in test steps
   
   // Navigate to login page with retries in case frontend is still starting
   let navigationSuccess = false;
