@@ -336,6 +336,19 @@ Given('I am on the alerts screen', async function() {
   await alertTab.click({ force: true });
   await safeWait(this.page, 2000);
   
+  // CRITICAL: Switch to "All Alerts" tab so read/unread toggles don't hide alerts
+  // The screen defaults to "Unread" tab which filters out read alerts
+  try {
+    const allAlertsTab = this.page.getByText('All Alerts', { exact: true });
+    const allAlertsCount = await allAlertsTab.count();
+    if (allAlertsCount > 0) {
+      await allAlertsTab.first().click();
+      await safeWait(this.page, 1000);
+    }
+  } catch (e) {
+    // All Alerts tab might not be available, continue anyway
+  }
+  
   // Wait for alert screen (from old Playwright test)
   const alertScreen = this.page.locator('[data-testid="alert-screen"], [aria-label*="alert" i]').first();
   await alertScreen.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
@@ -495,14 +508,11 @@ Given('I have an unread alert', async function() {
   // Wait for the alert screen to be fully loaded and polling to have started
   const alertScreen = this.page.locator('[data-testid="alert-screen"]').or(this.page.getByLabel('alert-screen'));
   await alertScreen.waitFor({ state: 'visible', timeout: 15000 });
-  console.log('[DEBUG] Alert screen is visible');
   
   // Wait an additional 3+ seconds to ensure at least one polling cycle has completed
   await safeWait(this.page, 4000);
-  console.log('[DEBUG] Waited for initial polling cycle');
   
   testAlertMessage = `Checkbox Test Alert - ${Date.now()}`;
-  console.log('[DEBUG] Creating test alert:', testAlertMessage);
   
   // Get caregiver data
   const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1';
@@ -544,42 +554,26 @@ Given('I have an unread alert', async function() {
     throw new Error('Could not create test alert');
   }
   
-  console.log('[DEBUG] Alert created successfully');
-  
-  // Debug: Check if playwright_test param is set
-  const url = this.page.url();
-  console.log('[DEBUG] Current URL:', url);
-  console.log('[DEBUG] Has playwright_test param:', url.includes('playwright_test=1'));
-  
   // Wait for polling to pick up the new alert
   // NOTE: If playwright_test localStorage isn't set early enough, polling interval is 30s
   // Wait for at least one full poll cycle (35s to be safe)
-  console.log('[DEBUG] Waiting for polling cycle to fetch alert (may take up to 30s)...');
   await safeWait(this.page, 35000);
   
-  console.log('[DEBUG] Alert should now be visible on page');
+  // Scroll to bottom of alerts list to ensure FlatList renders all items (virtualization)
+  const alertList = this.page.locator('[data-testid="alert-list"]');
+  const listCount = await alertList.count();
+  if (listCount > 0) {
+    await alertList.first().evaluate((element) => {
+      // Scroll to the bottom to trigger FlatList virtualization
+      element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
+    });
+    await safeWait(this.page, 2000);
+  }
 });
 
 When('I click the checkbox on the alert', async function() {
   if (!testAlertMessage) {
     throw new Error('No test alert message stored');
-  }
-  
-  // Debug: Check how many alerts are on the page
-  const allAlertItems = this.page.locator('[data-testid="alert-item"]');
-  const alertCount = await allAlertItems.count();
-  console.log(`[DEBUG] Total alert items visible: ${alertCount}`);
-  console.log(`[DEBUG] Looking for alert: ${testAlertMessage}`);
-  
-  // Debug: Get ALL alert texts to see if our alert is there
-  for (let i = 0; i < alertCount; i++) {
-    const text = await allAlertItems.nth(i).textContent();
-    const shortText = text?.substring(0, 60);
-    if (text?.includes(testAlertMessage)) {
-      console.log(`[DEBUG] ✓ FOUND at position ${i}: ${shortText}`);
-    } else if (i < 3 || i >= alertCount - 3) {
-      console.log(`[DEBUG] Alert ${i}: ${shortText}`);
-    }
   }
   
   // Find the alert item using filter (like the working Playwright test)
