@@ -494,7 +494,8 @@ Given('I have an unread alert', async function() {
   
   // Get caregiver data
   const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1';
-  const email = this.credentials?.email || 'staff@example.com';
+  const credentials = this.getCredentials('caregiver');
+  const email = credentials.email;
   
   const caregiverResponse = await this.page.request.post(`${API_BASE_URL}/test/get-caregiver-by-email`, {
     headers: { 'Content-Type': 'application/json' },
