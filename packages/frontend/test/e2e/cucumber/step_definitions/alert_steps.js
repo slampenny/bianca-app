@@ -489,8 +489,17 @@ Then('all alerts should be marked as read', async function() {
 let testAlertMessage = null;
 
 Given('I have an unread alert', async function() {
-  // Create alert while already on the alerts screen
-  // This allows the RTK Query polling to naturally pick it up
+  // IMPORTANT: Create alert AFTER ensuring we're on the alerts screen
+  // This ensures RTK Query polling has started before we create the alert
+  
+  // Wait for the alert screen to be fully loaded and polling to have started
+  const alertScreen = this.page.locator('[data-testid="alert-screen"]').or(this.page.getByLabel('alert-screen'));
+  await alertScreen.waitFor({ state: 'visible', timeout: 15000 });
+  console.log('[DEBUG] Alert screen is visible');
+  
+  // Wait an additional 3+ seconds to ensure at least one polling cycle has completed
+  await safeWait(this.page, 4000);
+  console.log('[DEBUG] Waited for initial polling cycle');
   
   testAlertMessage = `Checkbox Test Alert - ${Date.now()}`;
   console.log('[DEBUG] Creating test alert:', testAlertMessage);
@@ -535,11 +544,21 @@ Given('I have an unread alert', async function() {
     throw new Error('Could not create test alert');
   }
   
-  console.log('[DEBUG] Alert created, waiting for polling to fetch it...');
+  console.log('[DEBUG] Alert created, waiting for next polling cycle to fetch it...');
   
-  // Wait for alert to appear (polling is 3s in test mode, wait for several cycles)
-  // Sometimes it takes longer due to network or backend processing
-  await safeWait(this.page, 15000);
+  // RTK Query caching means the polling might not refetch immediately
+  // Reload the page to force a fresh fetch of all alerts
+  console.log('[DEBUG] Reloading page to fetch newly created alert...');
+  await this.page.reload({ waitUntil: 'networkidle' });
+  await safeWait(this.page, 2000);
+  
+  // After reload, navigate back to alerts screen
+  const alertTab = this.page.getByTestId('tab-alert').first();
+  const tabCount = await alertTab.count();
+  if (tabCount > 0) {
+    await alertTab.click();
+    await safeWait(this.page, 2000);
+  }
   
   // Click "All Alerts" tab to ensure we see it
   const allAlertsTab = this.page.locator('text="All Alerts"').or(this.page.getByText(/all.*alerts/i));
@@ -547,7 +566,7 @@ Given('I have an unread alert', async function() {
   if (allAlertsCount > 0) {
     await allAlertsTab.first().click();
     console.log('[DEBUG] Clicked "All Alerts" tab');
-    await safeWait(this.page, 3000);
+    await safeWait(this.page, 2000);
   }
   
   console.log('[DEBUG] Alert should now be visible on page');
@@ -556,6 +575,23 @@ Given('I have an unread alert', async function() {
 When('I click the checkbox on the alert', async function() {
   if (!testAlertMessage) {
     throw new Error('No test alert message stored');
+  }
+  
+  // Debug: Check how many alerts are on the page
+  const allAlertItems = this.page.locator('[data-testid="alert-item"]');
+  const alertCount = await allAlertItems.count();
+  console.log(`[DEBUG] Total alert items visible: ${alertCount}`);
+  console.log(`[DEBUG] Looking for alert: ${testAlertMessage}`);
+  
+  // Debug: Get ALL alert texts to see if our alert is there
+  for (let i = 0; i < alertCount; i++) {
+    const text = await allAlertItems.nth(i).textContent();
+    const shortText = text?.substring(0, 60);
+    if (text?.includes(testAlertMessage)) {
+      console.log(`[DEBUG] ✓ FOUND at position ${i}: ${shortText}`);
+    } else if (i < 3 || i >= alertCount - 3) {
+      console.log(`[DEBUG] Alert ${i}: ${shortText}`);
+    }
   }
   
   // Find the alert item using filter (like the working Playwright test)
