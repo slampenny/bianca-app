@@ -64,33 +64,13 @@ PUBLIC_IP="${eip_address}"
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 %{ endif ~}
 
-# Fix for NVMe EBS volumes (newer instance types use /dev/nvme* instead of /dev/sd*)
-# Format and mount EBS volume for MongoDB data
-echo "Setting up EBS volume for MongoDB..."
-# Check for NVMe device first (newer instances)
-if [ -b /dev/nvme1n1 ]; then
-    EBS_DEVICE="/dev/nvme1n1"
-elif [ -b /dev/sdf ]; then
-    EBS_DEVICE="/dev/sdf"
-else
-    EBS_DEVICE=""
-fi
-
-if [ -n "$EBS_DEVICE" ]; then
-    if ! blkid $EBS_DEVICE >/dev/null 2>&1; then
-        echo "Formatting EBS volume $EBS_DEVICE..."
-        mkfs.ext4 $EBS_DEVICE
-    fi
-    
-    mkdir -p /opt/mongodb-data
-    mount $EBS_DEVICE /opt/mongodb-data
-    chown 999:999 /opt/mongodb-data
-    chmod 755 /opt/mongodb-data
-    echo "$EBS_DEVICE /opt/mongodb-data ext4 defaults,nofail 0 2" >> /etc/fstab
-    echo "EBS volume mounted successfully"
-else
-    echo "Warning: EBS volume not found (checked /dev/nvme1n1 and /dev/sdf)"
-fi
+# Demo uses ephemeral storage - data is wiped on instance restart for easy reset between demos
+# Create MongoDB data directory on root volume (will be ephemeral)
+echo "Setting up ephemeral MongoDB data directory..."
+mkdir -p /opt/mongodb-data
+chown 999:999 /opt/mongodb-data
+chmod 755 /opt/mongodb-data
+echo "Demo uses ephemeral storage - data will be reset on instance restart"
 
 echo "Instance: $${INSTANCE_ID}"
 echo "Private IP: $${PRIVATE_IP}"

@@ -346,28 +346,8 @@ resource "aws_eip_association" "demo" {
   allocation_id = aws_eip.demo.id
 }
 
-# EBS Volume for MongoDB data persistence
-resource "aws_ebs_volume" "demo_mongodb" {
-  availability_zone = aws_subnet.demo_public.availability_zone
-  size              = 20
-  type              = "gp3"
-
-  tags = {
-    Name        = "bianca-demo-mongodb-data"
-    Environment = "demo"
-    Purpose     = "MongoDB data persistence"
-  }
-}
-
-# Try to find an unassociated EIP to reuse
-# If none available, will need to request EIP limit increase or release unused EIPs
-
-# Attach EBS volume to demo instance
-resource "aws_volume_attachment" "demo_mongodb" {
-  device_name = "/dev/sdf"
-  volume_id   = aws_ebs_volume.demo_mongodb.id
-  instance_id = aws_instance.demo.id
-}
+# Demo does NOT use EBS volumes - data should be ephemeral for easy reset between demos
+# MongoDB data will be stored on the instance root volume and wiped on instance recreation
 
 # Demo now uses shared ALB (consolidated with WordPress to reduce costs)
 # The shared ALB is defined in main.tf
