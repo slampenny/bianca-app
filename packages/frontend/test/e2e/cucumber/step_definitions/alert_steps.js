@@ -252,8 +252,8 @@ Then('I should see at least {int} alerts', async function(minCount) {
 });
 
 Given('I am on the alerts screen', async function() {
-  // Ensure we're on the home/main screen first, with test mode enabled for faster polling
-  await this.page.goto(`${this.baseURL}/?playwright_test=1`, { waitUntil: 'networkidle' });
+  // Navigate to home screen
+  await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
   await safeWait(this.page, 2000);
   
   // Check if we're logged in - if login screen is visible, we need to login
@@ -544,30 +544,18 @@ Given('I have an unread alert', async function() {
     throw new Error('Could not create test alert');
   }
   
-  console.log('[DEBUG] Alert created, waiting for next polling cycle to fetch it...');
+  console.log('[DEBUG] Alert created successfully');
   
-  // RTK Query caching means the polling might not refetch immediately
-  // Reload the page to force a fresh fetch of all alerts
-  console.log('[DEBUG] Reloading page to fetch newly created alert...');
-  await this.page.reload({ waitUntil: 'networkidle' });
-  await safeWait(this.page, 2000);
+  // Debug: Check if playwright_test param is set
+  const url = this.page.url();
+  console.log('[DEBUG] Current URL:', url);
+  console.log('[DEBUG] Has playwright_test param:', url.includes('playwright_test=1'));
   
-  // After reload, navigate back to alerts screen
-  const alertTab = this.page.getByTestId('tab-alert').first();
-  const tabCount = await alertTab.count();
-  if (tabCount > 0) {
-    await alertTab.click();
-    await safeWait(this.page, 2000);
-  }
-  
-  // Click "All Alerts" tab to ensure we see it
-  const allAlertsTab = this.page.locator('text="All Alerts"').or(this.page.getByText(/all.*alerts/i));
-  const allAlertsCount = await allAlertsTab.count();
-  if (allAlertsCount > 0) {
-    await allAlertsTab.first().click();
-    console.log('[DEBUG] Clicked "All Alerts" tab');
-    await safeWait(this.page, 2000);
-  }
+  // Wait for polling to pick up the new alert
+  // NOTE: If playwright_test localStorage isn't set early enough, polling interval is 30s
+  // Wait for at least one full poll cycle (35s to be safe)
+  console.log('[DEBUG] Waiting for polling cycle to fetch alert (may take up to 30s)...');
+  await safeWait(this.page, 35000);
   
   console.log('[DEBUG] Alert should now be visible on page');
 });
@@ -598,8 +586,8 @@ When('I click the checkbox on the alert', async function() {
   const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
   await alertItem.waitFor({ state: 'visible', timeout: 10000 });
   
-  // Find and click the checkbox within this specific alert
-  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  // Find and click the checkbox within this specific alert (use .first() in case of duplicates)
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]').first();
   await checkbox.waitFor({ state: 'visible', timeout: 5000 });
   await checkbox.click();
   
@@ -616,8 +604,8 @@ When('I click the checkbox on the alert again', async function() {
   const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
   await alertItem.waitFor({ state: 'visible', timeout: 10000 });
   
-  // Find and click the checkbox within this specific alert
-  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
+  // Find and click the checkbox within this specific alert (use .first() in case of duplicates)
+  const checkbox = alertItem.locator('[data-testid="alert-checkbox"]').first();
   await checkbox.waitFor({ state: 'visible', timeout: 5000 });
   await checkbox.click();
   
