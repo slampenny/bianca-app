@@ -466,16 +466,42 @@ class TwilioCallService {
               }
             }
             
-            // Summarize the conversation if it exists and has messages
+            // Persist call updates (endTime, status, etc.)
+            await call.save();
+
+            // Finalize conversation: summary, sentiment analysis, and post-call medical/fraud analysis.
+            // This ensures sentiment and medical analysis run when call end is signaled by Twilio (e.g. staging
+            // or when realtime WebSocket cleanup doesn't run in the same process).
             if (call.conversationId) {
-              const conversation = await Conversation.findById(call.conversationId);
-              if (conversation && conversation.messages && conversation.messages.length > 0) {
+              try {
+                const conversation = await Conversation.findById(call.conversationId).select('analyzedData').lean();
+                const sentimentAt = conversation?.analyzedData?.sentimentAnalyzedAt;
+                const alreadyFinalized =
+                  sentimentAt && Date.now() - new Date(sentimentAt).getTime() < 5 * 60 * 1000;
+                if (alreadyFinalized) {
+                  logger.info(`[Twilio Service] Conversation ${call.conversationId} already finalized recently, skipping duplicate finalization for call ${CallSid}`);
+                } else {
+                  const conversationService = require('./conversation.service');
+                  const conversationId = call.conversationId.toString();
+                  const result = await conversationService.finalizeConversation(conversationId, true);
+                  if (result?.summary) {
+                    logger.info(`[Twilio Service] Finalized conversation ${conversationId} for call ${CallSid} (summary + sentiment + post-call analysis)`);
+                  } else {
+                    logger.warn(`[Twilio Service] Finalization completed for ${conversationId} but no summary returned`);
+                  }
+                }
+              } catch (finalizeError) {
+                logger.error(`[Twilio Service] Failed to finalize conversation for call ${CallSid}: ${finalizeError.message}`, finalizeError);
+                // Fallback: try legacy summarize so at least summary exists (conversation.messages path)
                 try {
-                  conversation.summary = await chatService.summarize(conversation);
-                  await conversation.save();
-                  logger.info(`[Twilio Service] Created summary for call ${CallSid}`);
+                  const conversation = await Conversation.findById(call.conversationId);
+                  if (conversation?.messages?.length > 0) {
+                    conversation.history = await chatService.summarize(conversation);
+                    await conversation.save();
+                    logger.info(`[Twilio Service] Fallback summary saved for call ${CallSid}`);
+                  }
                 } catch (summaryError) {
-                  logger.error(`[Twilio Service] Failed to summarize: ${summaryError.message}`);
+                  logger.error(`[Twilio Service] Fallback summarize failed: ${summaryError.message}`);
                 }
               }
             }
