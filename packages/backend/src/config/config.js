@@ -265,12 +265,20 @@ if (envVars.NODE_ENV === 'production') {
   baselineConfig.twilio.websocketUrl = envVars.WEBSOCKET_URL || `wss://${apiBaseUrl.replace('https://', '')}`;
 
   // Ensure baseUrl is also correct for production if used elsewhere
-  // Ensure Asterisk ARI URL points to the internal service discovery name in production
   baselineConfig.asterisk.enabled = true; // Always enable Asterisk
-  baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.${internalDomain}.internal`;
-  baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
-  baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || `bianca-app.${internalDomain}.internal`;
-  baselineConfig.asterisk.rtpAsteriskHost = envVars.RTP_ASTERISK_HOST || `asterisk.${internalDomain}.internal`;
+  // EC2/Docker Compose: ASTERISK_URL is http://asterisk:8088 — use it and Docker service names for RTP
+  // ECS/other: use env or internal domain fallbacks
+  if (envVars.ASTERISK_URL && envVars.ASTERISK_URL.includes('://asterisk:')) {
+    baselineConfig.asterisk.url = envVars.ASTERISK_URL;
+    baselineConfig.asterisk.host = 'asterisk';
+    baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || 'app';
+    baselineConfig.asterisk.rtpAsteriskHost = envVars.RTP_ASTERISK_HOST || 'asterisk';
+  } else {
+    baselineConfig.asterisk.host = envVars.ASTERISK_HOST || `asterisk.${internalDomain}.internal`;
+    baselineConfig.asterisk.url = envVars.ASTERISK_URL || `http://${baselineConfig.asterisk.host}:8088`;
+    baselineConfig.asterisk.rtpBiancaHost = envVars.RTP_BIANCA_HOST || `bianca-app.${internalDomain}.internal`;
+    baselineConfig.asterisk.rtpAsteriskHost = envVars.RTP_ASTERISK_HOST || `asterisk.${internalDomain}.internal`;
+  }
 }
 
 // Set staging-specific overrides
