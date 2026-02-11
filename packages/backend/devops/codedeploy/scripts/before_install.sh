@@ -457,6 +457,8 @@ services:
       - WEBSOCKET_URL=$WEBSOCKET_URL
       - FRONTEND_URL=$FRONTEND_URL
       - ASTERISK_URL=http://asterisk:8088
+      - ASTERISK_HOST=asterisk
+      - DEPLOYMENT_TYPE=docker-compose
       - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=$PUBLIC_IP
       - AWS_SES_REGION=$AWS_REGION
