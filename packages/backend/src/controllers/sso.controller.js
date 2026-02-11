@@ -1,5 +1,4 @@
 const httpStatus = require('http-status');
-const jwt = require('jsonwebtoken');
 const Caregiver = require('../models/caregiver.model');
 const Org = require('../models/org.model');
 const ApiError = require('../utils/ApiError');
@@ -7,7 +6,6 @@ const config = require('../config/config');
 const logger = require('../config/logger');
 const catchAsync = require('../utils/catchAsync');
 const { tokenService, orgService, emailService, alertService } = require('../services');
-const { tokenTypes } = require('../config/tokens');
 const { CaregiverDTO, OrgDTO, PatientDTO, AlertDTO } = require('../dtos');
 
 const login = catchAsync(async (req, res) => {
@@ -209,43 +207,21 @@ const login = catchAsync(async (req, res) => {
       }
     }
 
-    // Generate JWT tokens with correct structure
-    let accessToken, refreshToken;
+    // Use same token generation as email/password login so tokens work for all protected routes
+    let tokens;
     try {
-      accessToken = jwt.sign(
-        {
-          type: tokenTypes.ACCESS,
-          sub: caregiver._id,
-          iat: Math.floor(Date.now() / 1000)
-        },
-        config.jwt.secret,
-        { expiresIn: '1h' }
-      );
-
-      refreshToken = jwt.sign(
-        {
-          type: tokenTypes.REFRESH,
-          sub: caregiver._id,
-          iat: Math.floor(Date.now() / 1000)
-        },
-        config.jwt.secret,
-        { expiresIn: '7d' }
-      );
-    } catch (jwtError) {
-      logger.error('SSO login failed to generate JWT tokens', {
-        error: jwtError.message,
-        stack: jwtError.stack,
+      tokens = await tokenService.generateAuthTokens(caregiver);
+    } catch (tokenError) {
+      logger.error('SSO login failed to generate auth tokens', {
+        error: tokenError.message,
+        stack: tokenError.stack,
         caregiverId: caregiver._id
       });
       throw new ApiError(
         httpStatus.INTERNAL_SERVER_ERROR,
-        `Failed to generate authentication tokens: ${jwtError.message}`
+        `Failed to generate authentication tokens: ${tokenError.message}`
       );
     }
-
-    // Calculate expiration dates
-    const accessExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
-    const refreshExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
     // Get alerts and patients for the caregiver
     const caregiverId = caregiver._id || caregiver.id;
@@ -295,16 +271,7 @@ const login = catchAsync(async (req, res) => {
     const responsePayload = {
       success: true,
       message: 'SSO login successful',
-      tokens: {
-        access: {
-          token: accessToken,
-          expires: accessExpires,
-        },
-        refresh: {
-          token: refreshToken,
-          expires: refreshExpires,
-        },
-      },
+      tokens,
       caregiver: caregiverDTO,
       org: orgDTO,
       patients: patientDTOs,
