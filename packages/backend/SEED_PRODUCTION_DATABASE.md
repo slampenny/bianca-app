@@ -4,6 +4,23 @@
 
 After deploying to production, you need to seed the database with all required data. This includes:
 
+### Minimal: migrations only (emergency phrases)
+
+If the DB is empty (e.g. after a volume wipe) and you only need **default data like emergency phrases** (for emergency detection), run **migrations** on the instance. The migration `20260205-135748-seed-emergency-phrases.js` seeds all emergency phrases.
+
+**On the production server (via SSH):**
+```bash
+ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@<PRODUCTION_IP>
+cd /opt/bianca-production
+docker compose run --rm -e NODE_ENV=production -e MONGODB_URL=mongodb://mongodb:27017/bianca-service app yarn migrate:up
+# or if only docker-compose is installed:
+docker-compose run --rm -e NODE_ENV=production -e MONGODB_URL=mongodb://mongodb:27017/bianca-service app yarn migrate:up
+```
+
+**Staging:** same with `cd /opt/bianca-staging` and `NODE_ENV=staging`.
+
+No full seed required unless you want demo/org/caregiver data.
+
 - Emergency phrases (all languages)
 - Organizations
 - Caregivers
