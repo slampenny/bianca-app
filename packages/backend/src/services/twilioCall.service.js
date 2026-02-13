@@ -466,16 +466,31 @@ class TwilioCallService {
               }
             }
             
-            // Summarize the conversation if it exists and has messages
+            // Finalize conversation: summary, sentiment, and post-call medical + fraud/abuse analysis
             if (call.conversationId) {
-              const conversation = await Conversation.findById(call.conversationId);
-              if (conversation && conversation.messages && conversation.messages.length > 0) {
+              const conversation = await Conversation.findById(call.conversationId).lean();
+              const alreadyAnalyzed =
+                conversation?.analyzedData?.sentimentAnalyzedAt &&
+                Date.now() - new Date(conversation.analyzedData.sentimentAnalyzedAt).getTime() < 5 * 60 * 1000;
+              if (alreadyAnalyzed) {
+                logger.info(`[Twilio Service] Conversation ${call.conversationId} already finalized recently, skipping`);
+              } else {
                 try {
-                  conversation.summary = await chatService.summarize(conversation);
-                  await conversation.save();
-                  logger.info(`[Twilio Service] Created summary for call ${CallSid}`);
-                } catch (summaryError) {
-                  logger.error(`[Twilio Service] Failed to summarize: ${summaryError.message}`);
+                  const conversationService = require('./conversation.service');
+                  await conversationService.finalizeConversation(call.conversationId.toString(), false);
+                  logger.info(`[Twilio Service] Finalized conversation ${call.conversationId} (summary, sentiment, medical & fraud/abuse analysis)`);
+                } catch (finalizeError) {
+                  logger.error(`[Twilio Service] Finalize failed for ${call.conversationId}: ${finalizeError.message}`);
+                  try {
+                    const conv = await Conversation.findById(call.conversationId);
+                    if (conv && conv.messages && conv.messages.length > 0) {
+                      conv.summary = await chatService.summarize(conv);
+                      await conv.save();
+                      logger.info(`[Twilio Service] Fallback: created summary only for call ${CallSid}`);
+                    }
+                  } catch (summaryError) {
+                    logger.error(`[Twilio Service] Fallback summarize failed: ${summaryError.message}`);
+                  }
                 }
               }
             }

@@ -21,6 +21,9 @@ phases:
         
         GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
         BLUE_TAG="${BLUE_TAG:-bianca-staging}"
+        # Deploy directory (staging: /opt/bianca-staging, production: /opt/bianca-production)
+        DEPLOY_DIR="/opt/${BLUE_TAG}"
+        echo "Deploy directory: $DEPLOY_DIR"
         # Find green instance if not in file
         if [ -z "$GREEN_INSTANCE_ID" ]; then
           echo "Finding green instance..."
@@ -65,6 +68,72 @@ phases:
           BLUE_INSTANCE_ID=""
         else
           echo "Blue instance: $BLUE_INSTANCE_ID"
+        fi
+        
+        # Step 0: Migrate MongoDB EBS volume from blue to green (so patient data persists)
+        # Green is launched from a template with only root volume; the data volume is attached
+        # by Terraform only to the (current) blue instance. We must detach it from blue and
+        # attach to green before swapping traffic, or green would run with an empty DB.
+        if [ -n "$BLUE_INSTANCE_ID" ] && [ -n "$GREEN_INSTANCE_ID" ]; then
+          echo ""
+          echo "Step 0: Migrating MongoDB data volume from blue to green..."
+          VOLUME_ID=$(aws ec2 describe-volumes \
+            --filters "Name=attachment.instance-id,Values=$BLUE_INSTANCE_ID" "Name=attachment.device,Values=/dev/sdf" \
+            --query 'Volumes[0].VolumeId' \
+            --output text 2>/dev/null || echo "")
+          if [ -n "$VOLUME_ID" ] && [ "$VOLUME_ID" != "None" ]; then
+            echo "  Found MongoDB volume on blue: $VOLUME_ID"
+            echo "  Stopping app and MongoDB on blue, then unmounting volume..."
+            BLUE_CMD_ID=$(aws ssm send-command \
+              --instance-ids "$BLUE_INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters "{\"commands\":[\"cd $DEPLOY_DIR && docker compose stop 2>/dev/null || true\",\"sleep 3\",\"sudo umount /opt/mongodb-data 2>/dev/null || true\"]}" \
+              --timeout-seconds 120 \
+              --query 'Command.CommandId' \
+              --output text 2>/dev/null || echo "")
+            if [ -n "$BLUE_CMD_ID" ]; then
+              for i in 1 2 3 4 5 6; do
+                ST=$(aws ssm get-command-invocation --command-id "$BLUE_CMD_ID" --instance-id "$BLUE_INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "Pending")
+                [ "$ST" = "Success" ] && break
+                [ "$ST" = "Failed" ] && echo "  ⚠️  Blue stop/unmount command failed (continuing anyway)" && break
+                sleep 10
+              done
+            fi
+            echo "  Detaching volume from blue..."
+            aws ec2 detach-volume --volume-id "$VOLUME_ID" --instance-id "$BLUE_INSTANCE_ID" --device /dev/sdf 2>/dev/null || true
+            echo "  Waiting for volume to detach..."
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              ATTACH_STATE=$(aws ec2 describe-volumes --volume-ids "$VOLUME_ID" --query 'Volumes[0].Attachments[0].State' --output text 2>/dev/null || echo "detaching")
+              [ "$ATTACH_STATE" = "detached" ] && break
+              sleep 5
+            done
+            echo "  Attaching volume to green at /dev/sdf..."
+            aws ec2 attach-volume --volume-id "$VOLUME_ID" --instance-id "$GREEN_INSTANCE_ID" --device /dev/sdf
+            echo "  Waiting for volume to attach to green..."
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              ATTACH_STATE=$(aws ec2 describe-volumes --volume-ids "$VOLUME_ID" --query 'Volumes[0].Attachments[0].State' --output text 2>/dev/null || echo "attaching")
+              [ "$ATTACH_STATE" = "attached" ] && break
+              sleep 5
+            done
+            echo "  Mounting volume on green and restarting MongoDB..."
+            GREEN_CMD_ID=$(aws ssm send-command \
+              --instance-ids "$GREEN_INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters "{\"commands\":[\"sleep 3\",\"sudo mount /opt/mongodb-data 2>/dev/null || sudo mount /dev/sdf /opt/mongodb-data\",\"sudo chown -R 999:999 /opt/mongodb-data 2>/dev/null || true\",\"cd $DEPLOY_DIR && docker compose up -d mongodb\",\"sleep 5\",\"cd $DEPLOY_DIR && docker compose up -d\"]}" \
+              --timeout-seconds 120 \
+              --query 'Command.CommandId' \
+              --output text 2>/dev/null || echo "")
+            if [ -n "$GREEN_CMD_ID" ]; then
+              for i in 1 2 3 4 5 6 7 8 9; do
+                ST=$(aws ssm get-command-invocation --command-id "$GREEN_CMD_ID" --instance-id "$GREEN_INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "Pending")
+                [ "$ST" = "Success" ] && echo "  ✅ MongoDB volume mounted and services restarted on green" && break
+                [ "$ST" = "Failed" ] && echo "  ⚠️  Green mount/restart failed - check instance logs" && break
+                sleep 10
+              done
+            fi
+          else
+            echo "  ⚠️  No /dev/sdf volume found on blue (first deploy or volume not attached); green will use empty DB"
+          fi
         fi
         
         # Verify green instance is healthy before swapping
@@ -228,16 +297,17 @@ phases:
             --allocation-id "$EIP_ALLOCATION_ID" \
             --allow-reassociation 2>/dev/null; then
             echo "  ✅ EIP associated with new blue instance - SIP domain now points to this instance"
-            echo "  Waiting 15s for EIP to propagate, then restarting Asterisk so it uses new EXTERNAL_ADDRESS..."
+            echo "  Waiting 15s for EIP to propagate, then updating EXTERNAL_ADDRESS and restarting Asterisk..."
             sleep 15
-            # Restart Asterisk so it picks up new public IP (EIP) in EXTERNAL_ADDRESS
-            # Use single-quoted JSON so $(curl...) runs on the instance, not in CodeBuild
-            # Determine the docker compose directory based on environment
+            # docker-compose was written at deploy time with the instance's pre-EIP IP. Update it to
+            # the current public IP (now the EIP) so Asterisk SIP and the app use the correct address.
+            # Use docker-compose (standalone) or docker compose (plugin) so this works on both staging and production.
             DOCKER_DIR="/opt/bianca-${BLUE_TAG#bianca-}"
+            CMD="cd $DOCKER_DIR && PUBLIC_IP=\$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && sed -i.bak -e 's|EXTERNAL_ADDRESS=[^[:space:]]*|EXTERNAL_ADDRESS='\$PUBLIC_IP'|' -e 's|ASTERISK_PUBLIC_IP=[^[:space:]]*|ASTERISK_PUBLIC_IP='\$PUBLIC_IP'|' docker-compose.yml && (docker compose up -d asterisk app 2>/dev/null || docker-compose up -d asterisk app)"
             if command_id=$(aws ssm send-command \
               --instance-ids "$GREEN_INSTANCE_ID" \
               --document-name "AWS-RunShellScript" \
-              --parameters "{\"commands\":[\"export PUBLIC_IP=\$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && cd $DOCKER_DIR && docker compose up -d asterisk\"]}" \
+              --parameters "{\"commands\":[\"$CMD\"]}" \
               --timeout-seconds 60 \
               --query 'Command.CommandId' \
               --output text 2>/dev/null); then
@@ -257,6 +327,44 @@ phases:
         else
           echo ""
           echo "Step 6: No EIP_ALLOCATION_ID set - skipping EIP association (environment may not use dedicated EIP for SIP)"
+        fi
+        
+        # Step 7: Update Terraform state so it points at the new blue instance (avoids drift on next terraform apply)
+        echo ""
+        echo "Step 7: Updating Terraform state to point at new blue instance..."
+        if [ "$BLUE_TAG" = "bianca-staging" ]; then
+          TF_INSTANCE_RESOURCE="aws_instance.staging"
+        elif [ "$BLUE_TAG" = "bianca-production" ]; then
+          TF_INSTANCE_RESOURCE="aws_instance.production"
+        else
+          echo "  ⚠️  Unknown BLUE_TAG ($BLUE_TAG), skipping Terraform state update"
+          TF_INSTANCE_RESOURCE=""
+        fi
+        if [ -n "$TF_INSTANCE_RESOURCE" ]; then
+          for _srcdir in "${CODEBUILD_SRC_DIR}" "${CODEBUILD_SRC_DIR_SourceOutput:-}"; do
+            [ -z "$_srcdir" ] && continue
+            _tfdir="${_srcdir}/packages/backend/devops/terraform"
+            if [ -d "$_tfdir" ] && [ -f "$_tfdir/backend.tf" ]; then TF_DIR="$_tfdir"; break; fi
+          done
+          if [ -n "${TF_DIR:-}" ] && [ -f "$TF_DIR/backend.tf" ]; then
+            echo "  Installing Terraform..."
+            TF_VER="1.5.7"
+            curl -fsSL "https://releases.hashicorp.com/terraform/${TF_VER}/terraform_${TF_VER}_linux_amd64.zip" -o /tmp/terraform.zip
+            unzip -o -q /tmp/terraform.zip -d /tmp && chmod +x /tmp/terraform && mv /tmp/terraform /usr/local/bin/
+            terraform -version
+            echo "  Initializing Terraform (S3 backend)..."
+            cd "$TF_DIR"
+            terraform init -input=false -reconfigure
+            echo "  Removing old instance from state and importing new blue..."
+            terraform state rm "$TF_INSTANCE_RESOURCE" 2>/dev/null || true
+            if terraform import -input=false "$TF_INSTANCE_RESOURCE" "$GREEN_INSTANCE_ID"; then
+              echo "  ✅ Terraform state updated: $TF_INSTANCE_RESOURCE = $GREEN_INSTANCE_ID"
+            else
+              echo "  ⚠️  Terraform import failed (non-fatal). Next terraform apply may recreate the instance."
+            fi
+          else
+            echo "  ⚠️  Terraform dir not found (check artifact paths), skipping state update"
+          fi
         fi
         
         echo ""
