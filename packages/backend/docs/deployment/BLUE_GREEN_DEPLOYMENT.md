@@ -21,6 +21,7 @@ This document describes the budget blue-green deployment strategy implemented fo
 4. **Deploy**: Deploys code to the green instance using CodeDeploy
 5. **PostDeployValidation**: Validates the green instance is healthy and accessible
 6. **SwapAndTerminate**: 
+   - **Migrates MongoDB EBS volume** from blue to green (so patient/data persists; green is launched without a data volume)
    - Registers green instance with ALB target groups
    - Waits for health checks to pass
    - Deregisters blue instance from target groups
@@ -34,7 +35,7 @@ This document describes the budget blue-green deployment strategy implemented fo
 3. **CreateGreenInstance**: Creates a new green instance
 4. **Deploy + RunTests**: Run in PARALLEL on green instance (both must pass to proceed)
 5. **PostDeployValidation**: Validates green instance health
-6. **SwapAndTerminate**: Only proceeds if Deploy, RunTests, AND PostDeployValidation all pass
+6. **SwapAndTerminate**: Same as staging (MongoDB volume migration, then register green, deregister blue, terminate blue, rename green). Only proceeds if Deploy, RunTests, AND PostDeployValidation all pass
 
 ### Cost Optimization
 
@@ -53,10 +54,12 @@ This document describes the budget blue-green deployment strategy implemented fo
    - Outputs instance ID and IP for subsequent stages
 
 2. **`bianca-staging-swap-and-terminate`**: Handles the traffic swap
+   - **Step 0 (volume migration)**: Stops app/MongoDB on blue, detaches the MongoDB EBS volume from blue, attaches it to green, mounts on green and restarts MongoDB (so the new instance uses the same data)
    - Registers green instance with ALB target groups
    - Waits for health checks
    - Deregisters and terminates blue instance
    - Renames green to become the new blue
+   - **Step 7 (Terraform state)**: Updates Terraform state so the instance resource points at the new blue (avoids drift on the next `terraform apply`). Same step runs for production.
 
 #### CodeDeploy Deployment Groups
 
@@ -96,11 +99,10 @@ The SIP subdomain (`staging-sip.biancawellness.com`) points to an Elastic IP (EI
 
 ### EBS Volume for MongoDB
 
-The staging MongoDB uses an EBS volume attached to the instance. The current implementation:
+Staging and production both use an EBS volume for MongoDB attached to the blue instance. The **SwapAndTerminate** stage migrates this volume so data persists:
 
-- Green instance starts with a fresh MongoDB (empty database)
-- For staging, this is typically acceptable as data can be reset
-- For production blue-green, volume migration would be needed
+- Before swapping traffic: the buildspec detaches the MongoDB volume from blue and attaches it to green, then mounts and restarts MongoDB on green.
+- The deploy directory is derived from `BLUE_TAG` (`/opt/bianca-staging` or `/opt/bianca-production`), so the same buildspec works for both environments.
 
 ## Monitoring
 
@@ -150,6 +152,42 @@ Monitor the pipeline in AWS CodePipeline console:
 - Verify green instance is registered with target groups
 - Check security group rules allow ALB to reach instance
 - Review CloudWatch logs for swap-and-terminate project
+
+### Data wiped after deploy (MongoDB empty)
+
+If the app shows no data after a blue-green deploy, the MongoDB EBS volume may not have been mounted or restarted on the new instance (e.g. Step 0’s `docker compose` command failed on instances that only have `docker-compose`). The **data may still exist** on an EBS volume.
+
+**Immediate recovery (production or staging):**
+
+1. **Find the MongoDB volume** (attached to current instance or available):
+   ```bash
+   # Current instance ID (the one serving traffic)
+   INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-production" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text --region us-east-2 --profile jordan)
+   # Volumes attached to this instance
+   aws ec2 describe-volumes --filters "Name=attachment.instance-id,Values=$INSTANCE_ID" --query 'Volumes[*].[VolumeId,Attachments[0].Device,Size]' --output table --region us-east-2 --profile jordan
+   # Or find unattached volumes by name (staging/production MongoDB data)
+   aws ec2 describe-volumes --filters "Name=tag:Name,Values=bianca-production-mongodb-data" "Name=status,Values=available" --query 'Volumes[*].VolumeId' --output text --region us-east-2 --profile jordan
+   ```
+
+2. **If volume is attached at `/dev/sdf` but app still has no data:** SSH to the instance and ensure it’s mounted and MongoDB is using it:
+   ```bash
+   ssh -i ~/.ssh/bianca-key-pair.pem ec2-user@<PRODUCTION_IP>
+   sudo mount | grep mongodb   # should show /dev/sdf on /opt/mongodb-data
+   # If not mounted:
+   sudo mount /dev/sdf /opt/mongodb-data
+   sudo chown -R 999:999 /opt/mongodb-data
+   cd /opt/bianca-production && (docker compose restart mongodb 2>/dev/null || docker-compose restart mongodb)
+   ```
+
+3. **If volume is available (detached):** Attach it to the current instance, then do step 2:
+   ```bash
+   aws ec2 attach-volume --volume-id vol-xxxxx --instance-id $INSTANCE_ID --device /dev/sdf --region us-east-2 --profile jordan
+   # Wait ~30s then SSH and mount/restart as in step 2
+   ```
+
+4. **If the volume was attached to the terminated (old blue) instance when it was terminated**, the volume may still exist but data can be lost depending on EBS behavior. Prefer avoiding this by ensuring Step 0 always succeeds (pipeline now fails the stage if green mount/restart fails).
+
+**Pipeline fix (already in buildspec):** Step 0 now uses `(docker compose ... || docker-compose ...)` so it works on instances with either the plugin or standalone binary, and **the pipeline exits with an error** if the green mount/restart step fails, so we do not swap traffic to an instance with an empty DB.
 
 ## Future Enhancements
 

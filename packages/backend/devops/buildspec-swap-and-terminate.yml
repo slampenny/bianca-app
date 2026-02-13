@@ -87,7 +87,7 @@ phases:
             BLUE_CMD_ID=$(aws ssm send-command \
               --instance-ids "$BLUE_INSTANCE_ID" \
               --document-name "AWS-RunShellScript" \
-              --parameters "{\"commands\":[\"cd $DEPLOY_DIR && docker compose stop 2>/dev/null || true\",\"sleep 3\",\"sudo umount /opt/mongodb-data 2>/dev/null || true\"]}" \
+              --parameters "{\"commands\":[\"cd $DEPLOY_DIR && (docker compose stop 2>/dev/null || docker-compose stop 2>/dev/null || true)\",\"sleep 3\",\"sudo umount /opt/mongodb-data 2>/dev/null || true\"]}" \
               --timeout-seconds 120 \
               --query 'Command.CommandId' \
               --output text 2>/dev/null || echo "")
@@ -119,17 +119,23 @@ phases:
             GREEN_CMD_ID=$(aws ssm send-command \
               --instance-ids "$GREEN_INSTANCE_ID" \
               --document-name "AWS-RunShellScript" \
-              --parameters "{\"commands\":[\"sleep 3\",\"sudo mount /opt/mongodb-data 2>/dev/null || sudo mount /dev/sdf /opt/mongodb-data\",\"sudo chown -R 999:999 /opt/mongodb-data 2>/dev/null || true\",\"cd $DEPLOY_DIR && docker compose up -d mongodb\",\"sleep 5\",\"cd $DEPLOY_DIR && docker compose up -d\"]}" \
+              --parameters "{\"commands\":[\"sleep 3\",\"sudo mount /opt/mongodb-data 2>/dev/null || sudo mount /dev/sdf /opt/mongodb-data\",\"sudo chown -R 999:999 /opt/mongodb-data 2>/dev/null || true\",\"cd $DEPLOY_DIR && (docker compose up -d mongodb 2>/dev/null || docker-compose up -d mongodb)\",\"sleep 5\",\"cd $DEPLOY_DIR && (docker compose up -d 2>/dev/null || docker-compose up -d)\"]}" \
               --timeout-seconds 120 \
               --query 'Command.CommandId' \
               --output text 2>/dev/null || echo "")
+            GREEN_STEP0_OK=false
             if [ -n "$GREEN_CMD_ID" ]; then
               for i in 1 2 3 4 5 6 7 8 9; do
                 ST=$(aws ssm get-command-invocation --command-id "$GREEN_CMD_ID" --instance-id "$GREEN_INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "Pending")
-                [ "$ST" = "Success" ] && echo "  ✅ MongoDB volume mounted and services restarted on green" && break
-                [ "$ST" = "Failed" ] && echo "  ⚠️  Green mount/restart failed - check instance logs" && break
+                [ "$ST" = "Success" ] && echo "  ✅ MongoDB volume mounted and services restarted on green" && GREEN_STEP0_OK=true && break
+                [ "$ST" = "Failed" ] && echo "  ❌ Green mount/restart FAILED - refusing to swap (would lose data)" && break
                 sleep 10
               done
+            fi
+            if [ "$GREEN_STEP0_OK" != "true" ]; then
+              echo "  ❌ CRITICAL: Step 0 (volume migration) did not succeed on green. Aborting to prevent data loss."
+              echo "     Fix the green instance (SSM/SSH: mount volume, restart mongodb) or re-run pipeline after fixing."
+              exit 1
             fi
           else
             echo "  ⚠️  No /dev/sdf volume found on blue (first deploy or volume not attached); green will use empty DB"
