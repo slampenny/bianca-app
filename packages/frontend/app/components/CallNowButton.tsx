@@ -5,6 +5,7 @@ import { Text } from "app/components/Text"
 import { useNavigation } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
+import { isAuthCancelledError, AUTH_CANCELLED_MESSAGE } from "../services/api/baseQueryWithAuth"
 import { colors } from "app/theme/colors"
 import { useAppDispatch } from "../store/store"
 import { setActiveCall, setCallStatus } from "../store/callSlice"
@@ -71,7 +72,11 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       ;(navigation as any).navigate("Call")
       
     } catch (err: any) {
-      const errorMessage = err?.data?.message || err?.message || 'Failed to initiate call'
+      if (isAuthCancelledError(err)) {
+        setError(AUTH_CANCELLED_MESSAGE)
+        return
+      }
+      const errorMessage = err?.data?.message || err?.error?.error || err?.message || 'Failed to initiate call'
       setError(errorMessage)
       logger.error('Call initiation error:', err)
     } finally {

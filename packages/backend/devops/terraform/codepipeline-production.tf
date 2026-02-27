@@ -341,6 +341,16 @@ resource "aws_iam_role_policy" "codebuild_production_policy" {
         ]
         Resource = "*"
       },
+      # Volume migration in SwapAndTerminate (detach from blue, attach to green)
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DetachVolume",
+          "ec2:AttachVolume",
+          "ec2:DescribeVolumes"
+        ]
+        Resource = "*"
+      },
       {
         Effect = "Allow"
         Action = [
@@ -351,6 +361,20 @@ resource "aws_iam_role_policy" "codebuild_production_policy" {
           "elasticloadbalancing:DescribeLoadBalancers"
         ]
         Resource = "*"
+      },
+      # Terraform state (SwapAndTerminate updates state after blue-green so next apply doesn't recreate instance)
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.terraform_state.arn,
+          "${aws_s3_bucket.terraform_state.arn}/*"
+        ]
       },
       {
         Effect   = "Allow"

@@ -9,6 +9,7 @@ import { setSchedules, clearSchedules } from "../store/scheduleSlice"
 import { setPendingCallData, clearCallData } from "../store/callSlice"
 import { clearConversation } from "../store/conversationSlice"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
+import { isAuthCancelledError } from "../services/api/baseQueryWithAuth"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { Caregiver, Patient } from "../services/api/api.types"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
@@ -130,17 +131,16 @@ export function HomeScreen() {
       // Navigate to dedicated call screen
       navigation.navigate("Call")
     } catch (error: unknown) {
-      console.error('Failed to initiate call:', error)
-      
-      // Handle different types of errors
-      if (error.response?.status === 401) {
-        console.error('Authentication failed - user may need to login again')
-        // You might want to redirect to login or show an auth error
-      } else if (error.response?.status >= 400) {
-        console.error('API error:', error.response?.data?.message || 'Unknown error')
+      if (isAuthCancelledError(error)) {
+        // User closed the auth modal without signing in; no need to log or show a generic error
+        return
       }
-      
-      // You might want to show an error message to the user here
+      console.error('Failed to initiate call:', error)
+      if ((error as any)?.response?.status === 401) {
+        logger.debug('Authentication failed - user may need to login again')
+      } else if ((error as any)?.response?.status >= 400) {
+        console.error('API error:', (error as any)?.response?.data?.message || 'Unknown error')
+      }
     }
   }
 

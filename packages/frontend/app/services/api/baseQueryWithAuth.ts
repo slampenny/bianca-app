@@ -21,12 +21,25 @@ let pendingRequests: PendingRequest[] = []
 let isAuthModalShowing = false
 let initialErrorMessage: string | null = null
 
+// Cooldown so we don't show the auth modal repeatedly (e.g. when many requests 401 in quick succession)
+const AUTH_MODAL_COOLDOWN_MS = 60_000 // 1 minute
+let lastAuthModalShownAt = 0
+
 export function setShowAuthModalCallback(callback: ((initialErrorMessage?: string) => void) | null) {
   showAuthModalCallback = callback
 }
 
 export function getInitialErrorMessage(): string | null {
   return initialErrorMessage
+}
+
+/** Error shown when user closes the auth modal without logging in. Use this to show a friendly message instead of the raw error. */
+export const AUTH_CANCELLED_MESSAGE = 'Please sign in to continue.'
+
+/** Returns true if the error is from the user closing the auth modal without logging in. */
+export function isAuthCancelledError(error: unknown): boolean {
+  const e = error as { error?: { status?: string; error?: string } }
+  return e?.error?.status === 'CUSTOM_ERROR' && e?.error?.error === 'Authentication cancelled'
 }
 
 export function clearInitialErrorMessage() {
@@ -38,6 +51,7 @@ export function notifyAuthSuccess() {
   const requests = [...pendingRequests]
   pendingRequests = []
   isAuthModalShowing = false
+  lastAuthModalShownAt = 0
   clearInitialErrorMessage()
   
   // Use setTimeout to ensure this happens after auth state is updated
@@ -120,9 +134,12 @@ function baseQueryWithReauth(
           ? result.error.data
           : 'Your session has expired. Please sign in again.'
       
-      // Only show modal if callback is set (modal is ready)
-      if (showAuthModalCallback && !isAuthModalShowing) {
+      // Only show modal if callback is set (modal is ready), not already showing, and not in cooldown
+      const now = Date.now()
+      const inCooldown = now - lastAuthModalShownAt < AUTH_MODAL_COOLDOWN_MS
+      if (showAuthModalCallback && !isAuthModalShowing && !inCooldown) {
         isAuthModalShowing = true
+        lastAuthModalShownAt = now
         // Store the initial error message
         initialErrorMessage = errorMessage
         // Show the modal immediately with the error message

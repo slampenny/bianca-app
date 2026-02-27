@@ -47,7 +47,37 @@ If Asterisk logs show `Request 'REGISTER' from '<sip:543@...>' failed ... Failed
 - **Likely cause:** External SIP probing. Public SIP ports (5060/5061) are often scanned; bots try common extensions (100, 101, 543, etc.) and weak passwords. **"Failed to authenticate" is correct** – do not add auth for random usernames.
 - **IP 69.74.119.166** is not in Twilio’s documented SIP IP ranges; treat it as untrusted. No change needed – rejecting it is the right behavior.
 
-## 5. Common causes
+## 5. EXTERNAL_ADDRESS wrong after blue-green (EIP swap)
+
+After a blue-green deploy, the EIP is associated with the new instance in **Step 6**, but `docker-compose.yml` was written at **deploy time** with the instance’s **pre-EIP** public IP. So Asterisk keeps using the wrong IP for SIP (e.g. Twilio can’t reach it, or SIP fails).
+
+**One-time fix on the current production instance** (SSH or SSM):
+
+```bash
+cd /opt/bianca-production
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+sed -i.bak -e "s|EXTERNAL_ADDRESS=[^[:space:]]*|EXTERNAL_ADDRESS=$PUBLIC_IP|" \
+           -e "s|ASTERISK_PUBLIC_IP=[^[:space:]]*|ASTERISK_PUBLIC_IP=$PUBLIC_IP|" docker-compose.yml
+docker compose up -d asterisk app
+```
+
+Then check: `docker logs production_asterisk --tail 20` (should show correct external address).
+
+**Pipeline fix**: Step 6 in `buildspec-swap-and-terminate.yml` now updates `EXTERNAL_ADDRESS` and `ASTERISK_PUBLIC_IP` in `docker-compose.yml` to the current public IP (EIP) and restarts Asterisk + app after associating the EIP. Step 6 uses `(docker compose ... || docker-compose ...)` so it works on both staging (standalone binary) and production (plugin). Future deploys will keep SIP correct.
+
+**Staging one-time fix** (if Asterisk stopped working after a blue-green deploy): SSH to the staging instance (or use SSM), then:
+
+```bash
+cd /opt/bianca-staging
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+sudo sed -i.bak -e "s|EXTERNAL_ADDRESS=[^[:space:]]*|EXTERNAL_ADDRESS=$PUBLIC_IP|" \
+           -e "s|ASTERISK_PUBLIC_IP=[^[:space:]]*|ASTERISK_PUBLIC_IP=$PUBLIC_IP|" docker-compose.yml
+docker-compose up -d asterisk app
+# or: docker compose up -d asterisk app
+docker logs staging_asterisk --tail 20
+```
+
+## 6. Common causes
 
 | Symptom | Likely cause | Fix |
 |--------|----------------|-----|
@@ -56,7 +86,7 @@ If Asterisk logs show `Request 'REGISTER' from '<sip:543@...>' failed ... Failed
 | App logs "authentication" / 401 to ARI | ARI_PASSWORD mismatch (app vs Asterisk) | App and Asterisk must use the same ARI_PASSWORD (from same Secrets Manager secret). |
 | Twilio can’t reach SIP | Wrong instance has traffic, or SIP (5061) not open | Ensure only the EIP instance is in the ALB (no orphans). Production SG allows 5060/5061 from internet (see production.tf). |
 
-## 6. Security groups
+## 7. Security groups
 
 Production SG (`production.tf`) already allows:
 
@@ -65,7 +95,7 @@ Production SG (`production.tf`) already allows:
 
 So Asterisk connectivity from the internet is not blocked by the SG if the correct instance (with EIP) is the one receiving traffic.
 
-## 7. After fixing
+## 8. After fixing
 
 - Restart containers: `cd /opt/bianca-production && docker-compose up -d` (or `docker-compose` if that’s what the instance uses).
 - Or trigger a new CodeDeploy to production so the single instance gets a full deploy with Asterisk started and validated (validate_service.sh checks Asterisk when present in compose).
