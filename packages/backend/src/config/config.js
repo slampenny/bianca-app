@@ -10,16 +10,20 @@ const logger = require('./logger'); // Assuming logger is available for loadSecr
 const { AwsContext } = require('twilio/lib/rest/accounts/v1/credential/aws');
 const { buildAllConfigs, applyAllSecrets } = require('./domains');
 
-// Load .env file (if present)
-// CRITICAL: Use override: false to ensure container environment variables take precedence
-// This prevents .env file from overriding NODE_ENV set by Docker/CodeBuild
-// Store the NODE_ENV value BEFORE dotenv loads (in case .env file tries to set it)
-const nodeEnvBeforeDotenv = process.env.NODE_ENV;
-dotenv.config({ path: path.join(__dirname, '../../.env'), override: false });
-// CRITICAL: Restore NODE_ENV if dotenv tried to override it (shouldn't happen with override: false, but be safe)
-if (nodeEnvBeforeDotenv && process.env.NODE_ENV !== nodeEnvBeforeDotenv) {
-  logger.warn(`[Config] dotenv tried to override NODE_ENV from "${nodeEnvBeforeDotenv}" to "${process.env.NODE_ENV}". Restoring original value.`);
-  process.env.NODE_ENV = nodeEnvBeforeDotenv;
+// Load .env file only in development and test. In staging/production we use process.env (CodeBuild/Docker) + AWS Secrets only.
+const nodeEnv = process.env.NODE_ENV;
+if (nodeEnv === 'development' || nodeEnv === 'test' || !nodeEnv) {
+  const nodeEnvBeforeDotenv = process.env.NODE_ENV;
+  dotenv.config({ path: path.join(__dirname, '../../.env'), override: false });
+  if (nodeEnvBeforeDotenv && process.env.NODE_ENV !== nodeEnvBeforeDotenv) {
+    logger.warn(`[Config] dotenv tried to override NODE_ENV from "${nodeEnvBeforeDotenv}" to "${process.env.NODE_ENV}". Restoring original value.`);
+    process.env.NODE_ENV = nodeEnvBeforeDotenv;
+  }
+} else {
+  // staging / production: do not load .env; use only process.env and AWS Secrets Manager
+  if (nodeEnv === 'staging' || nodeEnv === 'production') {
+    logger.info(`[Config] NODE_ENV=${nodeEnv}: skipping .env file; using process.env and AWS Secrets only.`);
+  }
 }
 
 // Define the environment variable schema, including new variables

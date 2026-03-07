@@ -7,6 +7,7 @@ const { getConversationContextWindow } = require('../utils/conversationContextWi
 const { config } = require('../config/emergency.config');
 const { snsService } = require('./sns.service');
 const alertService = require('./alert.service');
+const mongoose = require('mongoose');
 const { Patient, Caregiver } = require('../models');
 const logger = require('../config/logger');
 
@@ -45,44 +46,44 @@ class EmergencyProcessor {
 
   /**
    * Process a patient utterance for emergency detection
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {string} text - Patient utterance text
    * @param {number} timestamp - Timestamp of utterance (defaults to now)
    * @returns {Promise<Object>} - Processing result
    */
-  async processUtterance(patientId, text, timestamp = Date.now()) {
+  async processUtterance(clientId, text, timestamp = Date.now()) {
     try {
       // Validate inputs
-      if (!patientId || !text) {
-        return this.createErrorResponse('Invalid input: patientId and text are required');
+      if (!clientId || !text) {
+        return this.createErrorResponse('Invalid input: clientId and text are required');
       }
 
       if (typeof text !== 'string' || text.trim().length === 0) {
         return this.createErrorResponse('Invalid input: text must be a non-empty string');
       }
 
-      // Get patient information to determine language
-      let patientLanguage = 'en'; // Default to English
+      // Get client information to determine language
+      let clientLanguage = 'en'; // Default to English
       try {
-        const patient = await Patient.findById(patientId).select('preferredLanguage');
-        if (patient && patient.preferredLanguage) {
-          patientLanguage = patient.preferredLanguage;
+        const client = await Patient.findById(clientId).select('preferredLanguage');
+        if (client && client.preferredLanguage) {
+          clientLanguage = client.preferredLanguage;
         }
       } catch (error) {
-        logger.warn(`Could not fetch patient language for ${patientId}, using default: ${error.message}`);
+        logger.warn(`Could not fetch client language for ${clientId}, using default: ${error.message}`);
       }
 
       // Step 0: Add utterance to context window for context-aware processing
       const contextWindow = getConversationContextWindow();
-      contextWindow.addUtterance(patientId, text, 'user', timestamp);
+      contextWindow.addUtterance(clientId, text, 'user', timestamp);
 
       // Step 1: Detect emergency patterns using localized detector
-      let emergencyResult = await localizedEmergencyDetector.detectEmergency(text, patientLanguage);
+      let emergencyResult = await localizedEmergencyDetector.detectEmergency(text, clientLanguage);
       
       // CRITICAL FIX: Fallback to basic detector if localized detector has no phrases
       // This ensures emergencies are detected even if database phrases aren't loaded
       if (!emergencyResult.isEmergency && !emergencyResult.error && emergencyResult.fallbackNeeded) {
-        logger.warn(`[Emergency Detection] No phrases found for language ${patientLanguage}, falling back to basic detector`);
+        logger.warn(`[Emergency Detection] No phrases found for language ${clientLanguage}, falling back to basic detector`);
         // Fallback to basic emergency detector
         const basicDetector = require('../utils/emergencyDetector');
         const basicResult = basicDetector.detectEmergency(text);
@@ -95,7 +96,7 @@ class EmergencyProcessor {
             matchedPhrase: basicResult.matchedPhrase,
             phrase: basicResult.matchedPhrase,
             category: basicResult.category,
-            language: patientLanguage
+            language: clientLanguage
           };
         } else {
           logger.debug(`[Emergency Detection] Basic detector also found no emergency for: "${text.substring(0, 50)}"`);
@@ -104,9 +105,9 @@ class EmergencyProcessor {
       
       if (config.logging.logAllDetections) {
         logger.info(`[Emergency Detection] Processing utterance for emergency detection`, {
-          patientId,
+          clientId,
           text: text.substring(0, 100),
-          language: patientLanguage,
+          language: clientLanguage,
           result: emergencyResult
         });
       }
@@ -120,7 +121,7 @@ class EmergencyProcessor {
         // If not a basic false positive, check context window for narrative vs present-tense
         // NOTE: We err on the side of sending alerts - only filter if VERY confident it's narrative
         if (!falsePositiveResult.isFalsePositive && config.enableContextAwareFiltering !== false) {
-          const narrativeClassification = contextWindow.classifyNarrativeVsPresent(patientId, text);
+          const narrativeClassification = contextWindow.classifyNarrativeVsPresent(clientId, text);
           
           // Only filter if VERY high confidence (>0.85) that it's narrative (past story)
           // This ensures we send alerts even for ambiguous cases
@@ -131,15 +132,15 @@ class EmergencyProcessor {
             };
             
             if (config.logging.logFalsePositives) {
-              logger.info(`Context-aware false positive for patient ${patientId}: ${falsePositiveResult.reason}`);
+              logger.info(`Context-aware false positive for client ${clientId}: ${falsePositiveResult.reason}`);
             }
           } else if (config.logging.logAllDetections) {
-            logger.debug(`Context classification for patient ${patientId}: ${narrativeClassification.reason} (confidence: ${narrativeClassification.confidence.toFixed(2)})`);
+            logger.debug(`Context classification for client ${clientId}: ${narrativeClassification.reason} (confidence: ${narrativeClassification.confidence.toFixed(2)})`);
           }
         }
         
         if (config.logging.logFalsePositives && falsePositiveResult.isFalsePositive) {
-          logger.info(`False positive detected for patient ${patientId}: ${falsePositiveResult.reason}`);
+          logger.info(`False positive detected for client ${clientId}: ${falsePositiveResult.reason}`);
         }
       }
 
@@ -147,13 +148,13 @@ class EmergencyProcessor {
       let deduplicationResult = { shouldAlert: true, reason: 'No deduplication check performed' };
       if (emergencyResult.isEmergency && !falsePositiveResult.isFalsePositive) {
         deduplicationResult = getAlertDeduplicator().shouldAlert(
-          patientId, 
+          clientId, 
           emergencyResult.category, 
           text, 
           timestamp,
           {
             severity: emergencyResult.severity,
-            contextWindow: contextWindow.getRecentContext(patientId, 5) // Last 5 minutes
+            contextWindow: contextWindow.getRecentContext(clientId, 5) // Last 5 minutes
           }
         );
       }
@@ -179,7 +180,7 @@ class EmergencyProcessor {
 
         // Record the alert in deduplicator with severity
         const deduplicator = getAlertDeduplicator();
-        const alertRecord = deduplicator.recordAlert(patientId, emergencyResult.category, timestamp, text);
+        const alertRecord = deduplicator.recordAlert(clientId, emergencyResult.category, timestamp, text);
         if (alertRecord) {
           alertRecord.severity = emergencyResult.severity;
         }
@@ -201,7 +202,7 @@ class EmergencyProcessor {
       // Step 8: Log alert decision
       if (config.logging.logAlertDecisions || shouldAlert) {
         logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${shouldAlert}`, {
-          patientId,
+          clientId,
           shouldAlert,
           reason: response.reason,
           severity: alertData?.severity,
@@ -219,29 +220,33 @@ class EmergencyProcessor {
 
   /**
    * Create an alert in the system
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {Object} alertData - Alert data from processUtterance
-   * @param {string} originalText - Original patient utterance
+   * @param {string} originalText - Original client utterance
    * @returns {Promise<Object>} - Alert creation result
    */
-  async createAlert(patientId, alertData, originalText) {
+  async createAlert(clientId, alertData, originalText) {
     try {
-      // Get patient information
-      const patient = await Patient.findById(patientId);
-      if (!patient) {
+      // Validate client ID to avoid CastError and noisy logs in tests
+      if (!clientId || !mongoose.Types.ObjectId.isValid(clientId)) {
+        return { success: false, error: 'Invalid client ID' };
+      }
+      // Get client information
+      const client = await Patient.findById(clientId);
+      if (!client) {
         return { success: false, error: 'Client not found' };
       }
 
       // Create alert message (stored in English, will be translated when fetched)
-      const alertMessage = this.createAlertMessage(patient, alertData, originalText);
+      const alertMessage = this.createAlertMessage(client, alertData, originalText);
 
       // Create alert in database
       const alertRecord = {
         message: alertMessage,
         importance: this.mapSeverityToImportance(alertData.severity),
         alertType: 'client',
-        relatedClient: patientId,
-        createdBy: patientId,
+        relatedClient: clientId,
+        createdBy: clientId,
         createdModel: 'Client',
         visibility: 'assignedCaregivers',
         relevanceUntil: new Date(Date.now() + (alertData.responseTimeSeconds * 1000))
@@ -254,17 +259,17 @@ class EmergencyProcessor {
       logger.info(`[Emergency Processor] Checking SMS notifications - enableSNSPushNotifications: ${config.enableSNSPushNotifications}`);
       
       if (config.enableSNSPushNotifications) {
-        const caregivers = await this.getPatientCaregivers(patientId);
-        logger.info(`[Emergency Processor] Found ${caregivers.length} caregiver(s) with phone numbers for patient ${patientId}`);
+        const caregivers = await this.getClientCaregivers(clientId);
+        logger.info(`[Emergency Processor] Found ${caregivers.length} caregiver(s) with phone numbers for client ${clientId}`);
         
         if (caregivers.length === 0) {
-          logger.warn(`[Emergency Processor] No caregivers with phone numbers found for patient ${patientId} - SMS will not be sent`);
+          logger.warn(`[Emergency Processor] No caregivers with phone numbers found for client ${clientId} - SMS will not be sent`);
         } else {
           logger.info(`[Emergency Processor] Sending emergency SMS alerts to ${caregivers.length} caregiver(s)`);
           notificationResult = await snsService.sendEmergencyAlert(
             {
-              patientId,
-              patientName: patient.name || patient.preferredName || 'Unknown Patient',
+              clientId,
+              clientName: client.name || client.preferredName || 'Unknown Client',
               severity: alertData.severity,
               category: alertData.category,
               phrase: alertData.phrase
@@ -283,9 +288,9 @@ class EmergencyProcessor {
         alert,
         notificationResult,
         client: {
-          id: patientId,
-          name: patient.name,
-          preferredName: patient.preferredName
+          id: clientId,
+          name: client.name,
+          preferredName: client.preferredName
         }
       };
     } catch (error) {
@@ -295,19 +300,19 @@ class EmergencyProcessor {
   }
 
   /**
-   * Get caregivers assigned to a patient
+   * Get caregivers assigned to a client
    * @private
    */
-  async getPatientCaregivers(patientId) {
+  async getClientCaregivers(clientId) {
     try {
-      const patient = await Patient.findById(patientId).populate('caregivers');
-      if (!patient || !patient.caregivers) {
+      const client = await Patient.findById(clientId).populate('caregivers');
+      if (!client || !client.caregivers) {
         return [];
       }
 
-      return patient.caregivers.filter(caregiver => caregiver && caregiver.phone);
+      return client.caregivers.filter(caregiver => caregiver && caregiver.phone);
     } catch (error) {
-      logger.error('Error getting patient caregivers:', error);
+      logger.error('Error getting client caregivers:', error);
       return [];
     }
   }
@@ -343,11 +348,11 @@ class EmergencyProcessor {
    * Create alert message text
    * @private
    */
-  createAlertMessage(patient, alertData, originalText) {
-    const patientName = patient.preferredName || patient.name || 'Patient';
+  createAlertMessage(client, alertData, originalText) {
+    const clientName = client.preferredName || client.name || 'Client';
     const urgency = this.getUrgencyText(alertData.severity);
     
-    return `${urgency} ${alertData.category} Emergency: ${patientName} reported "${alertData.phrase}". ` +
+    return `${urgency} ${alertData.category} Emergency: ${clientName} reported "${alertData.phrase}". ` +
            `Original message: "${originalText.substring(0, 100)}${originalText.length > 100 ? '...' : ''}"`;
   }
 

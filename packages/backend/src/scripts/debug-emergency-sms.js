@@ -4,7 +4,7 @@
  * Emergency SMS Debugging Script
  * Helps diagnose why emergency SMS alerts aren't being sent
  * 
- * Usage: node src/scripts/debug-emergency-sms.js <patientId>
+ * Usage: node src/scripts/debug-emergency-sms.js <clientId>
  */
 
 const mongoose = require('mongoose');
@@ -15,31 +15,31 @@ const { twilioSmsService } = require('../services/twilioSms.service');
 const { Patient, Caregiver } = require('../models');
 const logger = require('../config/logger');
 
-async function debugEmergencySMS(patientId) {
+async function debugEmergencySMS(clientId) {
   console.log('\n=== Emergency SMS Debugging ===\n');
   
   try {
-    // 1. Check patient exists
-    console.log('1. Checking patient...');
-    const patient = await Patient.findById(patientId).populate('caregivers');
-    if (!patient) {
-      console.log('❌ Patient not found:', patientId);
+    // 1. Check client exists
+    console.log('1. Checking client...');
+    const client = await Patient.findById(clientId).populate('caregivers');
+    if (!client) {
+      console.log('❌ Client not found:', clientId);
       return;
     }
-    console.log('✅ Patient found:', patient.name || patient.preferredName || patient.email);
-    console.log(`   - ID: ${patient._id}`);
-    console.log(`   - Email: ${patient.email}`);
-    console.log(`   - Phone: ${patient.phone || 'N/A'}`);
+    console.log('✅ Client found:', client.name || client.preferredName || client.email);
+    console.log(`   - ID: ${client._id}`);
+    console.log(`   - Email: ${client.email}`);
+    console.log(`   - Phone: ${client.phone || 'N/A'}`);
     
     // 2. Check caregivers
     console.log('\n2. Checking caregivers...');
-    const caregivers = await emergencyProcessor.getPatientCaregivers(patientId);
+    const caregivers = await emergencyProcessor.getClientCaregivers(clientId);
     console.log(`   Found ${caregivers.length} caregiver(s) with phone numbers`);
     
     if (caregivers.length === 0) {
       console.log('❌ No caregivers with phone numbers found!');
       console.log('\n   Checking all assigned caregivers...');
-      const allCaregivers = patient.caregivers || [];
+      const allCaregivers = client.caregivers || [];
       console.log(`   Total assigned caregivers: ${allCaregivers.length}`);
       
       for (const caregiver of allCaregivers) {
@@ -62,7 +62,7 @@ async function debugEmergencySMS(patientId) {
     console.log('\n3. Testing emergency detection...');
     const testPhrase = "I'm having a heart attack";
     console.log(`   Testing phrase: "${testPhrase}"`);
-    const detectionResult = await emergencyProcessor.processUtterance(patientId, testPhrase);
+    const detectionResult = await emergencyProcessor.processUtterance(clientId, testPhrase);
     console.log('   Detection result:', JSON.stringify(detectionResult, null, 2));
     
     if (!detectionResult.shouldAlert) {
@@ -152,10 +152,10 @@ async function debugEmergencySMS(patientId) {
     }
     
     // 9. Check recent alerts
-    console.log('\n9. Checking recent alerts for this patient...');
+    console.log('\n9. Checking recent alerts for this client...');
     const { Alert } = require('../models');
     const recentAlerts = await Alert.find({
-      relatedClient: patientId,
+      relatedClient: clientId,
       createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
     }).sort({ createdAt: -1 }).limit(5);
     
@@ -177,10 +177,10 @@ async function debugEmergencySMS(patientId) {
 }
 
 // Main execution
-const patientId = process.argv[2];
+const clientId = process.argv[2];
 
-if (!patientId) {
-  console.error('Usage: node src/scripts/debug-emergency-sms.js <patientId>');
+if (!clientId) {
+  console.error('Usage: node src/scripts/debug-emergency-sms.js <clientId>');
   process.exit(1);
 }
 
@@ -188,7 +188,7 @@ if (!patientId) {
 mongoose.connect(config.mongoose.url, config.mongoose.options)
   .then(() => {
     console.log('Connected to MongoDB');
-    return debugEmergencySMS(patientId);
+    return debugEmergencySMS(clientId);
   })
   .catch((error) => {
     console.error('Failed to connect to MongoDB:', error);

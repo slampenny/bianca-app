@@ -230,7 +230,7 @@ describe('Emergency Processor', () => {
       const result = await processor.createAlert('nonexistent', alertData, "I'm having a heart attack");
       
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Cast to ObjectId failed');
+      expect(result.error).toBe('Invalid client ID');
     });
 
     test('should create proper alert message', async () => {
@@ -258,11 +258,11 @@ describe('Emergency Processor', () => {
         responseTimeSeconds: 60
       };
 
-      // Test with invalid patient ID to trigger error handling
+      // Test with invalid client ID to trigger error handling
       const result = await processor.createAlert('invalid-id', alertData, "I'm having a heart attack");
       
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Cast to ObjectId failed');
+      expect(result.error).toBe('Invalid client ID');
     });
   });
 

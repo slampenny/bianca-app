@@ -114,23 +114,23 @@ class MedicalAnalysisScheduler {
     logger.info('Starting monthly medical analysis job', { jobId: job.attrs._id });
 
     try {
-      // Get all active patients
-      const patients = await patientService.getActivePatients();
-      logger.info(`Found ${patients.length} active patients for analysis`);
+      // Get all active clients
+      const clients = await patientService.getActivePatients();
+      logger.info(`Found ${clients.length} active clients for analysis`);
 
-      if (patients.length === 0) {
-        logger.info('No active patients found, skipping monthly analysis');
+      if (clients.length === 0) {
+        logger.info('No active clients found, skipping monthly analysis');
         return;
       }
 
-      // Process patients in batches
-      const batches = this.createBatches(patients, this.config.batchSize);
+      // Process clients in batches
+      const batches = this.createBatches(clients, this.config.batchSize);
       let totalProcessed = 0;
       let totalErrors = 0;
 
       for (const batch of batches) {
-        const batchPromises = batch.map(patient => 
-          this.schedulePatientAnalysis(patient._id.toString(), {
+        const batchPromises = batch.map(client => 
+          this.schedulePatientAnalysis(client._id.toString(), {
             trigger: 'monthly',
             batchId: job.attrs._id.toString()
           })
@@ -154,7 +154,7 @@ class MedicalAnalysisScheduler {
       const duration = Date.now() - startTime;
       logger.info('Monthly medical analysis job completed', {
         jobId: job.attrs._id,
-        totalPatients: patients.length,
+        totalClients: clients.length,
         processed: totalProcessed,
         errors: totalErrors,
         duration: `${duration}ms`
@@ -163,7 +163,7 @@ class MedicalAnalysisScheduler {
       // Store job results
       await this.storeJobResults(job.attrs._id.toString(), {
         type: 'monthly',
-        totalPatients: patients.length,
+        totalClients: clients.length,
         processed: totalProcessed,
         errors: totalErrors,
         duration,
@@ -188,31 +188,33 @@ class MedicalAnalysisScheduler {
    * @param {Object} job - Agenda job object
    */
   async handlePatientAnalysis(job) {
-    const { patientId, trigger, batchId } = job.attrs.data;
-    logger.info('Starting patient medical analysis', { 
+    const data = job.attrs.data || {};
+    const clientId = data.clientId || data.patientId; // support legacy job data
+    const { trigger, batchId } = data;
+    logger.info('Starting client medical analysis', { 
       jobId: job.attrs._id, 
-      patientId, 
+      clientId, 
       trigger, 
       batchId 
     });
 
     try {
-      // Get patient conversations from the last month
+      // Get client conversations from the last month
       const endDate = new Date();
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - 1);
 
       const conversations = await conversationService.getConversationsByClientAndDateRange(
-        patientId,
+        clientId,
         startDate,
         endDate
       );
 
       if (conversations.length === 0) {
-        logger.info(`No conversations found for patient ${patientId} in the last month`);
+        logger.info(`No conversations found for client ${clientId} in the last month`);
         
         // Store empty analysis result
-        await this.storeAnalysisResult(patientId, {
+        await this.storeAnalysisResult(clientId, {
           cognitiveMetrics: this.medicalAnalyzer.getDefaultMetrics(),
           psychiatricMetrics: this.medicalAnalyzer.getDefaultMetrics(),
           warnings: ['No conversations found for analysis period'],
@@ -229,34 +231,34 @@ class MedicalAnalysisScheduler {
       }
 
       // Get baseline analysis (previous month's result)
-      const baseline = await this.getBaselineAnalysis(patientId);
+      const baseline = await this.getBaselineAnalysis(clientId);
 
       // Perform medical pattern analysis
       const analysisResult = await this.medicalAnalyzer.analyzeMonth(conversations, baseline);
 
       // Store analysis result
-      await this.storeAnalysisResult(patientId, {
+      await this.storeAnalysisResult(clientId, {
         ...analysisResult,
         trigger,
         batchId
       });
 
-      logger.info('Patient medical analysis completed', {
+      logger.info('Client medical analysis completed', {
         jobId: job.attrs._id,
-        patientId,
+        clientId,
         conversationCount: conversations.length,
         confidence: analysisResult.confidence,
         warnings: analysisResult.warnings.length
       });
 
     } catch (error) {
-      logger.error('Error in patient medical analysis:', error, {
+      logger.error('Error in client medical analysis:', error, {
         jobId: job.attrs._id,
-        patientId
+        clientId
       });
       
       // Store error result
-      await this.storeAnalysisResult(patientId, {
+      await this.storeAnalysisResult(clientId, {
         error: error.message,
         status: 'failed',
         analysisDate: new Date(),
@@ -294,48 +296,48 @@ class MedicalAnalysisScheduler {
   }
 
   /**
-   * Schedule analysis for a specific patient
-   * @param {string} patientId - Patient ID
+   * Schedule analysis for a specific client
+   * @param {string} clientId - Client ID
    * @param {Object} options - Scheduling options
    * @returns {Promise} Job promise
    */
-  async schedulePatientAnalysis(patientId, options = {}) {
+  async schedulePatientAnalysis(clientId, options = {}) {
     try {
       const job = await this.agenda.now('patient-medical-analysis', {
-        patientId,
+        clientId,
         trigger: options.trigger || 'manual',
         batchId: options.batchId || null
       });
 
-      logger.info('Scheduled patient medical analysis', { 
+      logger.info('Scheduled client medical analysis', { 
         jobId: job.attrs._id, 
-        patientId,
+        clientId,
         trigger: options.trigger 
       });
 
       return job;
     } catch (error) {
-      logger.error('Error scheduling patient analysis:', error);
+      logger.error('Error scheduling client analysis:', error);
       throw error;
     }
   }
 
   /**
-   * Schedule analysis for multiple patients
-   * @param {Array} patientIds - Array of patient IDs
+   * Schedule analysis for multiple clients
+   * @param {Array} clientIds - Array of client IDs
    * @param {Object} options - Scheduling options
    * @returns {Promise} Array of job promises
    */
-  async scheduleBatchAnalysis(patientIds, options = {}) {
+  async scheduleBatchAnalysis(clientIds, options = {}) {
     const jobs = [];
     
-    for (const patientId of patientIds) {
+    for (const clientId of clientIds) {
       try {
-        const job = await this.schedulePatientAnalysis(patientId, options);
+        const job = await this.schedulePatientAnalysis(clientId, options);
         jobs.push(job);
       } catch (error) {
-        logger.error(`Error scheduling analysis for patient ${patientId}:`, error);
-        jobs.push({ error: error.message, patientId, clientId: patientId });
+        logger.error(`Error scheduling analysis for client ${clientId}:`, error);
+        jobs.push({ error: error.message, clientId });
       }
     }
 
@@ -343,28 +345,28 @@ class MedicalAnalysisScheduler {
   }
 
   /**
-   * Get analysis results for a patient
-   * @param {string} patientId - Patient ID
+   * Get analysis results for a client
+   * @param {string} clientId - Client ID
    * @param {number} limit - Maximum number of results to return
    * @returns {Promise} Analysis results
    */
-  async getPatientAnalysisResults(patientId, limit = 10) {
+  async getPatientAnalysisResults(clientId, limit = 10) {
     try {
-      return await conversationService.getMedicalAnalysisResults(patientId, limit);
+      return await conversationService.getMedicalAnalysisResults(clientId, limit);
     } catch (error) {
-      logger.error('Error getting patient analysis results:', error);
+      logger.error('Error getting client analysis results:', error);
       throw error;
     }
   }
 
   /**
    * Get baseline analysis for comparison
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @returns {Promise} Baseline analysis or null
    */
-  async getBaselineAnalysis(patientId) {
+  async getBaselineAnalysis(clientId) {
     try {
-      const results = await conversationService.getMedicalAnalysisResults(patientId, 1);
+      const results = await conversationService.getMedicalAnalysisResults(clientId, 1);
       return results.length > 0 ? results[0] : null;
     } catch (error) {
       logger.error('Error getting baseline analysis:', error);

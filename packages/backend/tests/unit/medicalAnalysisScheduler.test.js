@@ -3,6 +3,15 @@
 // Only mock external dependencies
 jest.mock('agenda');
 
+// Mock logger so intentional error-path tests don't log to console and confuse CI
+jest.mock('../../src/config/logger', () => ({
+  log: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+}));
+
 const mongoose = require('mongoose');
 const Agenda = require('agenda');
 const MedicalPatternAnalyzer = require('../../src/services/ai/medicalPatternAnalyzer.service');
@@ -178,7 +187,7 @@ describe('Medical Analysis Scheduler', () => {
         attrs: {
           _id: 'test-job-2',
           data: {
-            patientId: validClientId.toString(),
+            clientId: validClientId.toString(),
             trigger: 'monthly',
             batchId: 'batch-1'
           }
@@ -227,7 +236,7 @@ describe('Medical Analysis Scheduler', () => {
         attrs: {
           _id: 'test-job-3',
           data: {
-            patientId: validClientId.toString(),
+            clientId: validClientId.toString(),
             trigger: 'monthly',
             batchId: 'batch-1'
           }
@@ -266,7 +275,7 @@ describe('Medical Analysis Scheduler', () => {
         attrs: {
           _id: 'test-job-4',
           data: {
-            patientId: validClientId.toString(),
+            clientId: validClientId.toString(),
             trigger: 'monthly',
             batchId: 'batch-1'
           }

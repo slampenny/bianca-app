@@ -1941,7 +1941,7 @@ class OpenAIRealtimeService {
           });
 
           if (emergencyResult.shouldAlert && !emergencyResult.processing.falsePositive) {
-            logger.warn(`[Emergency Detection] 🚨 EMERGENCY DETECTED for patient ${conn.clientId}: ${emergencyResult.reason}`);
+            logger.warn(`[Emergency Detection] 🚨 EMERGENCY DETECTED for client ${conn.clientId}: ${emergencyResult.reason}`);
             
             const alertResult = await emergencyProcessor.createAlert(
               conn.clientId,
@@ -2059,7 +2059,7 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
 
     // EMERGENCY DETECTION: Real-time analysis of user transcript
-    logger.debug(`[Emergency Detection] Checking transcript - patientId: ${conn.clientId}, transcript length: ${message.transcript?.trim().length || 0}`);
+    logger.debug(`[Emergency Detection] Checking transcript - clientId: ${conn.clientId}, transcript length: ${message.transcript?.trim().length || 0}`);
     
     if (conn.clientId && message.transcript && message.transcript.trim().length > 10) {
       try {
@@ -2073,11 +2073,11 @@ class OpenAIRealtimeService {
         logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}, reason: ${emergencyResult.reason}`);
 
         if (emergencyResult.shouldAlert) {
-          logger.warn(`[Emergency Detection] EMERGENCY DETECTED for patient ${conn.clientId}: ${emergencyResult.reason}`);
+          logger.warn(`[Emergency Detection] EMERGENCY DETECTED for client ${conn.clientId}: ${emergencyResult.reason}`);
           logger.warn(`[Emergency Detection] Alert data:`, emergencyResult.alertData);
           
           // Create alert and notify caregivers
-          logger.info(`[Emergency Detection] Calling createAlert for patient ${conn.clientId}`);
+          logger.info(`[Emergency Detection] Calling createAlert for client ${conn.clientId}`);
           const alertResult = await emergencyProcessor.createAlert(
             conn.clientId,
             emergencyResult.alertData,

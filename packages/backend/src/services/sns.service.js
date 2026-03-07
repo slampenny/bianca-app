@@ -55,8 +55,8 @@ class SNSService {
   /**
    * Send emergency alert to caregivers
    * @param {Object} alertData - Alert information
-   * @param {string} alertData.clientId - Patient ID
-   * @param {string} alertData.patientName - Patient name
+   * @param {string} alertData.clientId - Client ID
+   * @param {string} alertData.clientName - Client name
    * @param {string} alertData.severity - Alert severity (CRITICAL, HIGH, MEDIUM)
    * @param {string} alertData.category - Alert category
    * @param {string} alertData.phrase - Matched emergency phrase
@@ -65,7 +65,7 @@ class SNSService {
    */
   async sendEmergencyAlert(alertData, caregivers = []) {
     try {
-      logger.info(`[SNS Service] sendEmergencyAlert called for patient ${alertData?.patientId}, severity: ${alertData?.severity}`);
+      logger.info(`[SNS Service] sendEmergencyAlert called for client ${alertData?.clientId}, severity: ${alertData?.severity}`);
       logger.info(`[SNS Service] enableSNSPushNotifications: ${emergencyConfig.enableSNSPushNotifications}, caregivers count: ${caregivers?.length || 0}`);
       
       if (!emergencyConfig.enableSNSPushNotifications) {
@@ -129,7 +129,7 @@ class SNSService {
           return twilioSmsService.sendSMS(phoneNumber, message, {
             severity: alertData?.severity,
             category: alertData?.category,
-            patientId: alertData?.patientId,
+            clientId: alertData?.clientId,
             alertType: 'emergency',
             locale: locale
           });
@@ -179,7 +179,7 @@ class SNSService {
    * @private
    */
   createMessage(alertData, locale = 'en') {
-    const patientName = alertData.patientName || 'Unknown Patient';
+    const clientName = alertData.clientName || 'Unknown Client';
     const category = alertData.category || 'Unknown';
     const phrase = alertData.phrase || 'Emergency detected';
     const severityKey = alertData.severity || 'MEDIUM';
@@ -193,9 +193,9 @@ class SNSService {
       
       // If template found and valid (not the key itself), use it
       if (template && !template.includes('emergencyAlert.')) {
-        // Replace placeholders in order: patientName, category, phrase
+        // Replace placeholders in order: clientName, category, phrase
         return template
-          .replace('%s', patientName)
+          .replace('%s', clientName)
           .replace('%s', category)
           .replace('%s', phrase);
       }
@@ -206,7 +206,8 @@ class SNSService {
                      emergencyConfig.sns.messageTemplate.MEDIUM;
 
     return template
-      .replace('{patientName}', patientName)
+      .replace('{clientName}', clientName)
+      .replace('{patientName}', clientName)
       .replace('{category}', category)
       .replace('{phrase}', phrase)
       .replace('{timestamp}', new Date().toLocaleString());
