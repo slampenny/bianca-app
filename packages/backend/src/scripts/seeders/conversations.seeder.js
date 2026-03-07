@@ -17,7 +17,7 @@ async function addDecliningPatientConversations(patientId) {
   // Create Call object first
   const call1 = new Call({
     callSid: `TEST_CALL_DECLINING_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    patientId: patientId,
+    clientId: patientId,
     callType: 'wellness-check',
     status: 'completed',
     callStatus: 'ended',
@@ -35,7 +35,7 @@ async function addDecliningPatientConversations(patientId) {
   
   const conv1 = new Conversation({
     callId: call1._id,
-    patientId: patientId,
+    clientId: patientId,
     messages: [],
     history: 'Patient discussing medication management and overall health status.',
     analyzedData: {},
@@ -99,7 +99,7 @@ async function addRecentPatientConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_RECENT_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId: patientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -117,7 +117,7 @@ async function addRecentPatientConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId: patientId,
       messages: [],
       history: `Recent wellness check conversation from ${days} days ago.`,
       analyzedData: {},
@@ -182,8 +182,8 @@ async function seedConversations(patient) {
   // insertConversations expects just an array of conversations
   // Set patientId on the conversation objects
   const conversationsToInsert = [
-    { ...conversationOne, patientId: patient._id },
-    { ...conversationTwo, patientId: patient._id }
+    { ...conversationOne, clientId: patient._id },
+    { ...conversationTwo, clientId: patient._id }
   ];
   
   const conversations = await insertConversations(conversationsToInsert);
@@ -224,7 +224,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_FINANCIAL_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId: patientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -242,7 +242,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId: patientId,
       messages: [],
       history: `Financial exploitation pattern conversation ${i + 1}`,
       analyzedData: {},
@@ -288,7 +288,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_ABUSE_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId: patientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -306,7 +306,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId: patientId,
       messages: [],
       history: `Physical abuse pattern conversation ${i + 1}`,
       analyzedData: {},
@@ -352,7 +352,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_EMOTIONAL_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId: patientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -370,7 +370,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId: patientId,
       messages: [],
       history: `Emotional abuse pattern conversation ${i + 1}`,
       analyzedData: {},
@@ -416,7 +416,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_NEGLECT_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId: patientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -434,7 +434,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId: patientId,
       messages: [],
       history: `Neglect pattern conversation ${i + 1}`,
       analyzedData: {},
