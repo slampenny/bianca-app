@@ -67,7 +67,7 @@ describe('Caregiver routes', () => {
         accountLocked: false,
         failedLoginAttempts: 0,
       });
-      expect(res.body.results[0].patients).toBeDefined();
+      expect(res.body.results[0].clients).toBeDefined();
     });
 
     test('should return 401 if access token is missing', async () => {
@@ -299,8 +299,8 @@ describe('Caregiver routes', () => {
         accountLocked: false,
         failedLoginAttempts: 0,
       });
-      expect(res.body).toHaveProperty('patients');
-      expect(Array.isArray(res.body.patients)).toBe(true);
+      expect(res.body).toHaveProperty('clients');
+      expect(Array.isArray(res.body.clients)).toBe(true);
     });
 
     test('should return 401 error if access token is missing', async () => {
@@ -361,7 +361,7 @@ describe('Caregiver routes', () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
 
-      caregiver.patients = [];
+      caregiver.clients = [];
       await caregiver.save();
 
       org.caregivers.push(caregiver);
@@ -398,7 +398,7 @@ describe('Caregiver routes', () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
 
-      caregiver.patients = [];
+      caregiver.clients = [];
       await caregiver.save();
 
       org.caregivers.push(caregiver);
@@ -460,7 +460,7 @@ describe('Caregiver routes', () => {
         role: 'staff',
         isEmailVerified: true, // Set by fixture
       });
-      expect(res.body).toHaveProperty('patients');
+      expect(res.body).toHaveProperty('clients');
 
       const dbCaregiver = await Caregiver.findById(caregiver.id);
       expect(dbCaregiver).toBeDefined();

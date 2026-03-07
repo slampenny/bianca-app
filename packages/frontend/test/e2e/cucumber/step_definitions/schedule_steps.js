@@ -6,7 +6,7 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 
 Given('I am on the schedules screen', async function() {
-  // Navigate to schedules via patient management
+  // Navigate to schedules via client management
   // First, ensure we're on home screen
   await Promise.race([
     this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle', timeout: 10000 }),
@@ -23,24 +23,24 @@ Given('I am on the schedules screen', async function() {
     }
   }
   
-  // Check if we have patients - if not, we need to create one
-  let editButton = this.page.locator('[data-testid^="edit-patient-button-"]').first();
+  // Check if we have clients - if not, we need to create one
+  let editButton = this.page.locator('[data-testid^="edit-client-button-"]').first();
   let editButtonCount = await editButton.count();
   
-  // Also check for patient cards
-  let patientCard = this.page.locator('[data-testid^="patient-card-"]').first();
-  let patientCardCount = await patientCard.count();
+  // Also check for client cards
+  let clientCard = this.page.locator('[data-testid^="client-card-"]').first();
+  let clientCardCount = await clientCard.count();
   
-  if (editButtonCount === 0 && patientCardCount === 0) {
-    // No patients found - check if user has permission to create patients
-    // If not, try to use existing patients from database or skip
-    let addButton = this.page.getByTestId('add-patient-button').first();
+  if (editButtonCount === 0 && clientCardCount === 0) {
+    // No clients found - check if user has permission to create clients
+    // If not, try to use existing clients from database or skip
+    let addButton = this.page.getByTestId('add-client-button').first();
     let addButtonCount = await addButton.count().catch(() => 0);
     const isDisabled = addButtonCount > 0 ? await addButton.getAttribute('disabled').catch(() => null) : null;
     
-    // If add button is disabled, user doesn't have permission - skip patient creation
+    // If add button is disabled, user doesn't have permission - skip client creation
     if (isDisabled !== null || (addButtonCount === 0)) {
-      console.log('No patients found and user cannot create patients - trying direct navigation to schedules');
+      console.log('No clients found and user cannot create clients - trying direct navigation to schedules');
       // Try direct navigation to schedules screen
       await Promise.race([
         this.page.goto(`${this.baseURL}/MainTabs/Home/Schedules`, { waitUntil: 'networkidle', timeout: 10000 }),
@@ -82,16 +82,16 @@ Given('I am on the schedules screen', async function() {
       }
     
     // Try multiple ways to find add button (reuse variable from above)
-    addButton = this.page.getByTestId('add-patient-button').first();
+    addButton = this.page.getByTestId('add-client-button').first();
     addButtonCount = await addButton.count();
     
     if (addButtonCount === 0) {
-      addButton = this.page.locator('[data-testid="add-patient-button"]').first();
+      addButton = this.page.locator('[data-testid="add-client-button"]').first();
       addButtonCount = await addButton.count();
     }
     
     if (addButtonCount === 0) {
-      addButton = this.page.getByText(/add patient|new patient/i).first();
+      addButton = this.page.getByText(/add client|new client/i).first();
       addButtonCount = await addButton.count();
     }
     
@@ -108,8 +108,8 @@ Given('I am on the schedules screen', async function() {
         }
       }
       
-      // Fill in patient form - try multiple selectors
-      let nameInput = this.page.getByTestId('patient-name-input').first();
+      // Fill in client form - try multiple selectors
+      let nameInput = this.page.getByTestId('client-name-input').first();
       let nameCount = await nameInput.count();
       if (nameCount === 0) {
         nameInput = this.page.locator('input[placeholder*="name" i]').first();
@@ -117,10 +117,10 @@ Given('I am on the schedules screen', async function() {
       }
       if (nameCount > 0) {
         await nameInput.waitFor({ state: 'visible', timeout: 10000 });
-        await nameInput.fill('Test Patient for Schedule');
+        await nameInput.fill('Test Client for Schedule');
       }
       
-      let phoneInput = this.page.getByTestId('patient-phone-input').first();
+      let phoneInput = this.page.getByTestId('client-phone-input').first();
       let phoneCount = await phoneInput.count();
       if (phoneCount === 0) {
         phoneInput = this.page.locator('input[placeholder*="phone" i]').first();
@@ -131,8 +131,8 @@ Given('I am on the schedules screen', async function() {
         await phoneInput.fill('+16045624264');
       }
       
-      // Save patient - try multiple selectors
-      let saveButton = this.page.getByTestId('save-patient-button').first();
+      // Save client - try multiple selectors
+      let saveButton = this.page.getByTestId('save-client-button').first();
       let saveCount = await saveButton.count();
       if (saveCount === 0) {
         saveButton = this.page.getByRole('button', { name: /save/i }).first();
@@ -143,7 +143,7 @@ Given('I am on the schedules screen', async function() {
         await saveButton.waitFor({ state: 'visible', timeout: 10000 });
         
         const savePromise = this.page.waitForResponse(response => 
-          response.url().includes('/api/v1/patients') && 
+          response.url().includes('/api/v1/clients') && 
           (response.status() === 200 || response.status() === 201),
           { timeout: 15000 }
         ).catch(() => null);
@@ -161,7 +161,7 @@ Given('I am on the schedules screen', async function() {
         }
       }
       
-      // Now we should be back on home screen with the patient
+      // Now we should be back on home screen with the client
       await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
       try {
         await this.page.waitForTimeout(3000);
@@ -173,15 +173,15 @@ Given('I am on the schedules screen', async function() {
         }
       }
       
-      // Try again to find patient
-      editButton = this.page.locator('[data-testid^="edit-patient-button-"]').first();
+      // Try again to find client
+      editButton = this.page.locator('[data-testid^="edit-client-button-"]').first();
       editButtonCount = await editButton.count();
-      patientCard = this.page.locator('[data-testid^="patient-card-"]').first();
-      patientCardCount = await patientCard.count();
+      clientCard = this.page.locator('[data-testid^="client-card-"]').first();
+      clientCardCount = await clientCard.count();
     }
   }
   
-  if (editButtonCount === 0 && patientCardCount === 0) {
+  if (editButtonCount === 0 && clientCardCount === 0) {
     // Last resort - try navigating to schedules directly and see if it works
     await this.page.goto(`${this.baseURL}/MainTabs/Home/Schedules`, { waitUntil: 'networkidle' });
     try {
@@ -193,7 +193,7 @@ Given('I am on the schedules screen', async function() {
         return;
       }
     }
-    // If this works, skip patient navigation
+    // If this works, skip client navigation
     const schedulesScreen = this.page.locator('[data-testid="schedules-screen"]');
     const schedulesCount = await schedulesScreen.count();
     if (schedulesCount > 0) {
@@ -201,29 +201,29 @@ Given('I am on the schedules screen', async function() {
     }
   }
   
-  // Click on patient to navigate to patient screen (use patient card selector from old tests)
-  if (patientCardCount > 0) {
-    await patientCard.waitFor({ state: 'visible', timeout: 10000 });
-    await patientCard.click({ force: true });
+  // Click on client to navigate to client screen (use client card selector)
+  if (clientCardCount > 0) {
+    await clientCard.waitFor({ state: 'visible', timeout: 10000 });
+    await clientCard.click({ force: true });
   } else if (editButtonCount > 0) {
     await editButton.waitFor({ state: 'visible', timeout: 10000 });
     await editButton.click({ force: true });
   } else {
-    // Try using patient card selector from old Playwright test
-    const firstPatientCard = this.page.getByTestId('patient-card').first();
-    const firstCardCount = await firstPatientCard.count();
+    // Try using client card selector
+    const firstClientCard = this.page.locator('[data-testid^="client-card-"]').first();
+    const firstCardCount = await firstClientCard.count();
     if (firstCardCount > 0) {
-      await firstPatientCard.waitFor({ state: 'visible', timeout: 10000 });
-      await firstPatientCard.click({ force: true });
+      await firstClientCard.waitFor({ state: 'visible', timeout: 10000 });
+      await firstClientCard.click({ force: true });
     } else {
       // Try alternative selector
-      const altCard = this.page.locator('[data-testid^="patient-card-"]').first();
+      const altCard = this.page.locator('[data-testid^="client-card-"]').first();
       const altCount = await altCard.count();
       if (altCount > 0) {
         await altCard.waitFor({ state: 'visible', timeout: 10000 });
         await altCard.click({ force: true });
       } else {
-        // No patients at all - try direct navigation to schedules
+        // No clients at all - try direct navigation to schedules
         await Promise.race([
           this.page.goto(`${this.baseURL}/MainTabs/Home/Schedules`, { waitUntil: 'networkidle', timeout: 10000 }),
           new Promise((resolve) => setTimeout(() => resolve(), 10000))
@@ -243,10 +243,10 @@ Given('I am on the schedules screen', async function() {
     }
   }
   
-  // Wait for patient screen - be more lenient
+  // Wait for client screen - be more lenient
   await this.page.waitForTimeout(2000);
-  const patientScreen = this.page.locator('[data-testid="patient-screen"], [data-testid="patient-details-screen"]');
-  const screenCount = await patientScreen.count();
+  const clientScreen = this.page.locator('[data-testid="client-screen"]');
+  const screenCount = await clientScreen.count();
   if (screenCount === 0) {
     // Wait a bit more
     await this.page.waitForTimeout(2000);
@@ -274,10 +274,10 @@ Given('I am on the schedules screen', async function() {
     buttonCount = await manageSchedulesButton.count().catch(() => 0);
   }
   
-  // Wait for button to appear (may take time for patient data to load)
+  // Wait for button to appear (may take time for client data to load)
   let buttonFound = false;
   if (buttonCount === 0) {
-    // Wait longer for patient screen to fully load
+    // Wait longer for client screen to fully load
     for (let i = 0; i < 15; i++) {
       manageSchedulesButton = this.page.getByTestId('manage-schedules-button').first();
       buttonCount = await manageSchedulesButton.count().catch(() => 0);

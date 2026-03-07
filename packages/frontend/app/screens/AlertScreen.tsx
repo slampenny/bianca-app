@@ -8,10 +8,10 @@ import {
   useMarkAlertAsReadMutation,
   useMarkAlertAsUnreadMutation,
   useGetAllAlertsQuery,
-  useGetAllPatientsQuery,
+  useGetAllClientsQuery,
 } from "../services/api"
 import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSlice"
-import { Alert, Caregiver, Patient } from "../services/api/api.types"
+import { Alert, Caregiver, Client } from "../services/api/api.types"
 import { getCurrentUser } from "app/store/authSlice"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
@@ -57,9 +57,9 @@ export function AlertScreen() {
   })
 
   const {
-    data: patientsData,
-    isLoading: isPatientsLoading,
-  } = useGetAllPatientsQuery({})
+    data: clientsData,
+    isLoading: isClientsLoading,
+  } = useGetAllClientsQuery({})
 
   const [markAllAsRead] = useMarkAllAsReadMutation()
   const [markAlertAsRead] = useMarkAlertAsReadMutation()
@@ -213,11 +213,11 @@ export function AlertScreen() {
     }
   }
 
-  // Helper function to get patient name by ID
+  // Helper function to get client name by ID (alerts may reference patientId from backend)
   const getPatientName = (patientId: string) => {
-    if (!patientsData?.results) return "Unknown Patient"
-    const patient = patientsData.results.find(p => p.id === patientId)
-    return patient?.name || "Unknown Patient"
+    if (!clientsData?.results) return "Unknown Client"
+    const client = clientsData.results.find(c => c.id === patientId)
+    return client?.name || "Unknown Client"
   }
 
   // Helper function to get alert type display text
@@ -261,9 +261,9 @@ export function AlertScreen() {
         </View>
         
         {/* Show patient information if alert is related to a patient */}
-        {item.relatedPatient && (
+        {(item.relatedClient ?? (item as { relatedPatient?: string }).relatedPatient) && (
           <Text style={styles.alertDetails}>
-            {translate("alertScreen.patient")} {getPatientName(item.relatedPatient)}
+            {translate("alertScreen.client")} {getPatientName(item.relatedClient ?? (item as { relatedPatient?: string }).relatedPatient)}
           </Text>
         )}
         

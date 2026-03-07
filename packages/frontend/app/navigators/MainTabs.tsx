@@ -6,7 +6,7 @@ import { View, Image } from "react-native"
 import { useTheme } from "app/theme/ThemeContext"
 import {
   HomeScreen,
-  PatientScreen,
+  ClientScreen,
   SchedulesScreen,
   ConversationsScreen,
   CallScreen,
@@ -32,6 +32,7 @@ import { DrawerParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
 import { useSelector } from "react-redux"
 import { getOrg } from "app/store/orgSlice"
+import { getCurrentUser } from "app/store/authSlice"
 import { selectUnreadAlertCount } from "app/store/alertSlice"
 import { Header } from "app/components/Header"
 import { Icon } from "app/components/Icon"
@@ -96,13 +97,13 @@ function HomeStack() {
       })}
     >
       <Stack.Screen name="HomeDetail" component={HomeScreen} options={() => ({ title: translate("headers.home") })} />
-      <Stack.Screen name="Patient" component={PatientScreen} options={() => ({ title: translate("headers.patient") })} />
+      <Stack.Screen name="Client" component={ClientScreen} options={() => ({ title: translate("headers.client") })} />
       <Stack.Screen name="Schedule" component={SchedulesScreen} options={() => ({ title: translate("headers.schedule") })} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} options={() => ({ title: translate("headers.conversations") })} />
       <Stack.Screen name="Call" component={CallScreen} options={() => ({ title: translate("headers.call") })} />
       <Stack.Screen name="SentimentAnalysis" component={SentimentAnalysisScreen} options={() => ({ title: translate("headers.sentimentAnalysis") })} />
       <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={() => ({ title: translate("headers.medicalAnalysis") })} />
-      <Stack.Screen name="Profile" component={ProfileScreen} options={() => ({ title: translate("headers.profile") })} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="MFASetup" component={MFASetupScreen} options={() => ({ title: translate("mfa.setupTitle") || "Multi-Factor Authentication" })} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={() => ({ title: translate("headers.privacyPolicy") })} />
       <Stack.Screen name="PrivacyRequest" component={PrivacyRequestScreen} options={() => ({ title: translate("headers.privacyRequest") || "Request My Data" })} />
@@ -172,13 +173,16 @@ function ReportsStack() {
 
 
 export default function MainTabNavigator() {
-  const unreadAlertCount = useSelector(selectUnreadAlertCount) // Get unread alert count
+  const unreadAlertCount = useSelector(selectUnreadAlertCount)
+  const currentUser = useSelector(getCurrentUser)
   const { colors, fontScale } = useTheme()
-  const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
+  const { currentLanguage } = useLanguage()
+
+  const initialTab = currentUser?.persona === "agingInPlace" ? "Reports" : "Home"
 
   return (
     <Tab.Navigator
-      initialRouteName="Home"
+      initialRouteName={initialTab}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.palette.primary500,

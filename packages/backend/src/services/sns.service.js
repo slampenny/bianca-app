@@ -55,7 +55,7 @@ class SNSService {
   /**
    * Send emergency alert to caregivers
    * @param {Object} alertData - Alert information
-   * @param {string} alertData.patientId - Patient ID
+   * @param {string} alertData.clientId - Patient ID
    * @param {string} alertData.patientName - Patient name
    * @param {string} alertData.severity - Alert severity (CRITICAL, HIGH, MEDIUM)
    * @param {string} alertData.category - Alert category

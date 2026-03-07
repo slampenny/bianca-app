@@ -155,7 +155,7 @@ async function debugEmergencySMS(patientId) {
     console.log('\n9. Checking recent alerts for this patient...');
     const { Alert } = require('../models');
     const recentAlerts = await Alert.find({
-      relatedPatient: patientId,
+      relatedClient: patientId,
       createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
     }).sort({ createdAt: -1 }).limit(5);
     

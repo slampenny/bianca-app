@@ -1,25 +1,24 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import { Schedule } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
-import { patientApi } from "./patientApi"
+import { clientApi } from "./clientApi"
 
 export const scheduleApi = createApi({
   reducerPath: "scheduleApi",
   baseQuery: baseQueryWithReauth(),
   tagTypes: ["Schedule"],
   endpoints: (builder) => ({
-    createSchedule: builder.mutation<Schedule, { patientId: string; data: Partial<Schedule> }>({
-      query: ({ patientId, data }) => ({
-        url: `/schedules/patients/${patientId}`,
+    createSchedule: builder.mutation<Schedule, { clientId: string; data: Partial<Schedule> }>({
+      query: ({ clientId, data }) => ({
+        url: `/schedules/clients/${clientId}`,
         method: "POST",
         body: data,
       }),
       invalidatesTags: ["Schedule"],
-      async onQueryStarted({ patientId }, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ clientId }, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled
-          // Invalidate patient query since patients include schedules
-          dispatch(patientApi.util.invalidateTags([{ type: "Patient", id: patientId }]))
+          dispatch(clientApi.util.invalidateTags([{ type: "Client", id: clientId }]))
         } catch {
           // Ignore errors - schedule invalidation will still happen
         }
@@ -44,11 +43,9 @@ export const scheduleApi = createApi({
       async onQueryStarted({ scheduleId, data }, { dispatch, queryFulfilled }) {
         try {
           const result = await queryFulfilled
-          // Invalidate patient queries since patients include schedules
-          if (result.data?.patient) {
-            dispatch(
-              patientApi.util.invalidateTags([{ type: "Patient", id: result.data.patient }])
-            )
+          const clientId = result.data?.client ?? result.data?.patient
+          if (clientId) {
+            dispatch(clientApi.util.invalidateTags([{ type: "Client", id: clientId }]))
           }
         } catch {
           // Ignore errors - schedule invalidation will still happen
@@ -68,11 +65,9 @@ export const scheduleApi = createApi({
       async onQueryStarted({ scheduleId, data }, { dispatch, queryFulfilled }) {
         try {
           const result = await queryFulfilled
-          // Invalidate patient queries since patients include schedules
-          if (result.data?.patient) {
-            dispatch(
-              patientApi.util.invalidateTags([{ type: "Patient", id: result.data.patient }])
-            )
+          const clientId = result.data?.client ?? result.data?.patient
+          if (clientId) {
+            dispatch(clientApi.util.invalidateTags([{ type: "Client", id: clientId }]))
           }
         } catch {
           // Ignore errors - schedule invalidation will still happen
@@ -89,17 +84,15 @@ export const scheduleApi = createApi({
         "Schedule",
       ],
       async onQueryStarted(arg, { dispatch, queryFulfilled, getState }) {
-        // Get the schedule from cache before deletion to find the patient ID
         const scheduleCache = scheduleApi.endpoints.getSchedule.select({ scheduleId: arg.scheduleId })(
           getState()
         )
-        const patientId = scheduleCache?.data?.patient
+        const clientId = scheduleCache?.data?.client ?? scheduleCache?.data?.patient
 
         try {
           await queryFulfilled
-          // Invalidate patient query since patients include schedules
-          if (patientId) {
-            dispatch(patientApi.util.invalidateTags([{ type: "Patient", id: patientId }]))
+          if (clientId) {
+            dispatch(clientApi.util.invalidateTags([{ type: "Client", id: clientId }]))
           }
         } catch {
           // Ignore errors - schedule invalidation will still happen

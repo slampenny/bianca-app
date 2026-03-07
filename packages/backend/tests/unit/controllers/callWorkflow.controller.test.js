@@ -103,7 +103,7 @@ afterAll(async () => {
 
 // Use real services - they'll use the mocked external dependencies
 const callWorkflowController = require('../../../src/controllers/callWorkflow.controller');
-const { conversationService, twilioCallService, patientService, caregiverService } = require('../../../src/services');
+const { conversationService, twilioCallService, clientService, caregiverService } = require('../../../src/services');
 
 describe('CallWorkflow Controller - Initiate Call', () => {
   let req;
@@ -147,14 +147,14 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     });
 
     // Mock services
-    jest.spyOn(patientService, 'getPatientById').mockResolvedValue(patient);
+    jest.spyOn(clientService, 'getClientById').mockResolvedValue(patient);
     jest.spyOn(caregiverService, 'getCaregiverById').mockResolvedValue(agent);
     jest.spyOn(twilioCallService, 'initiateCall').mockResolvedValue('CA1234567890abcdef');
 
     // Mock request and response
     req = {
       body: {
-        patientId: patientId.toString(),
+        clientId: patientId.toString(),
         callNotes: 'Test call notes'
       },
       caregiver: {
@@ -183,13 +183,13 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       expect(responseData).toHaveProperty('conversationId');
       expect(responseData).toHaveProperty('callId');
       expect(responseData).toHaveProperty('callSid', 'CA1234567890abcdef');
-      expect(responseData.patientId.toString()).toBe(patientId.toString());
+      expect(responseData.clientId.toString()).toBe(patientId.toString());
       expect(responseData.agentId.toString()).toBe(agentId.toString());
 
       // Verify conversation was created in database
       const conversation = await Conversation.findOne({ callId: responseData.callId });
       expect(conversation).toBeTruthy();
-      expect(conversation.patientId.toString()).toBe(patientId.toString());
+      expect(conversation.clientId.toString()).toBe(patientId.toString());
 
       // Verify call was created and linked to conversation
       const call = await Call.findById(responseData.callId);
@@ -199,8 +199,8 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       expect(call.callNotes).toBe('Test call notes');
     });
 
-    it('should return 404 if patient not found', async () => {
-      jest.spyOn(patientService, 'getPatientById').mockResolvedValue(null);
+    it('should return 404 if client not found', async () => {
+      jest.spyOn(clientService, 'getClientById').mockResolvedValue(null);
 
       await callWorkflowController.initiateCall(req, res, next);
 
@@ -208,12 +208,12 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       const error = next.mock.calls[0][0];
       expect(error).toBeInstanceOf(Error);
       expect(error.statusCode).toBe(httpStatus.NOT_FOUND);
-      expect(error.message).toBe('Patient not found');
+      expect(error.message).toBe('Client not found');
     });
 
-    it('should return 400 if patient does not have phone number', async () => {
+    it('should return 400 if client does not have phone number', async () => {
       patient.phone = undefined;
-      jest.spyOn(patientService, 'getPatientById').mockResolvedValue(patient);
+      jest.spyOn(clientService, 'getClientById').mockResolvedValue(patient);
 
       await callWorkflowController.initiateCall(req, res, next);
 
@@ -221,7 +221,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       const error = next.mock.calls[0][0];
       expect(error).toBeInstanceOf(Error);
       expect(error.statusCode).toBe(httpStatus.BAD_REQUEST);
-      expect(error.message).toBe('Patient does not have a phone number');
+      expect(error.message).toBe('Client does not have a phone number');
     });
 
     it('should return 404 if agent not found', async () => {
@@ -240,14 +240,14 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       // First, create a call and conversation
       const existingCall = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patientId,
+        clientId: patientId,
         agentId: agentId,
         status: 'initiated',
         callStatus: 'initiating'
       });
 
       const existingConversation = await Conversation.create({
-        patientId: patientId,
+        clientId: patientId,
         callId: existingCall._id
       });
 
@@ -305,7 +305,7 @@ describe('CallWorkflow Controller - End Call', () => {
     // Create a real Call record in the database
     const call = await Call.create({
       callSid: 'CA1234567890abcdef',
-      patientId: patientId,
+      clientId: patientId,
       agentId: agentId,
       asteriskChannelId: 'asterisk-channel-123',
       status: 'in-progress',
@@ -316,7 +316,7 @@ describe('CallWorkflow Controller - End Call', () => {
     // Create a real Conversation record linked to the Call
     const realConversation = await Conversation.create({
       _id: conversationId,
-      patientId: patientId,
+      clientId: patientId,
       agentId: agentId,
       callId: call._id,
       status: 'in-progress',

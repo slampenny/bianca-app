@@ -55,12 +55,12 @@ beforeAll(async () => {
   patientId = patient._id;
   
   // Ensure caregiver has access to the patient
-  caregiver.patients.push(patientId);
+  caregiver.clients.push(patientId);
   await caregiver.save();
 
   // Create test calls first (required for conversations)
   const call1 = new Call({
-    patientId: patientId,
+    clientId: patientId,
     callSid: 'medical-test-call-1',
     status: 'completed',
     direction: 'outbound',
@@ -69,7 +69,7 @@ beforeAll(async () => {
   await call1.save();
 
   const call2 = new Call({
-    patientId: patientId,
+    clientId: patientId,
     callSid: 'medical-test-call-2',
     status: 'completed',
     direction: 'outbound',
@@ -79,7 +79,7 @@ beforeAll(async () => {
 
   // Create some test conversations with medical content
   const conversation1 = new Conversation({
-    patientId: patientId,
+    clientId: patientId,
     callId: call1._id,
     callSid: 'medical-test-call-1',
     messages: [], // Will add message IDs after creating messages
@@ -116,7 +116,7 @@ beforeAll(async () => {
   await conversation1.save();
 
   const conversation2 = new Conversation({
-    patientId: patientId,
+    clientId: patientId,
     callId: call2._id,
     callSid: 'medical-test-call-2',
     messages: [], // Will add message IDs after creating messages
@@ -284,10 +284,10 @@ describe('Medical Analysis API', () => {
     });
   });
 
-  describe('POST /medical-analysis/trigger-patient/:patientId', () => {
+  describe('POST /medical-analysis/trigger-client/:patientId', () => {
     it('should handle trigger medical analysis for a patient (may fail due to scheduler)', async () => {
       const res = await request(app)
-        .post(`/v1/medical-analysis/trigger-patient/${patientId}`)
+        .post(`/v1/medical-analysis/trigger-client/${patientId}`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       // May return 500 due to Agenda scheduler mock limitations in integration tests
@@ -302,7 +302,7 @@ describe('Medical Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .post(`/v1/medical-analysis/trigger-patient/${patientId}`)
+        .post(`/v1/medical-analysis/trigger-client/${patientId}`)
         .expect(httpStatus.UNAUTHORIZED);
     });
 
@@ -310,7 +310,7 @@ describe('Medical Analysis API', () => {
       const nonExistentPatientId = new mongoose.Types.ObjectId();
 
       await request(app)
-        .post(`/v1/medical-analysis/trigger-patient/${nonExistentPatientId}`)
+        .post(`/v1/medical-analysis/trigger-client/${nonExistentPatientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.NOT_FOUND);
     });

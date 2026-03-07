@@ -12,7 +12,7 @@ import { useDispatch } from "react-redux"
 import { setAuthEmail, setAuthTokens, setCurrentUser } from "app/store/authSlice"
 import { setCaregiver } from "app/store/caregiverSlice"
 import { setOrg } from "app/store/orgSlice"
-import { setPatientsForCaregiver } from "app/store/patientSlice"
+import { setClientsForCaregiver } from "app/store/clientSlice"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
 
@@ -155,17 +155,12 @@ export const SSOAccountLinkingScreen = () => {
       // After setting password, automatically log the user in
       // Use the password they just set
       try {
-        const loginResult = await dispatch(authApi.endpoints.login.initiate({ 
-          email, 
-          password 
-        })).unwrap()
-        
-        // Login successful - set tokens and user data
+        const result = (dispatch as (action: unknown) => { unwrap: () => Promise<{ tokens: import("app/services/api/api.types").AuthTokens; caregiver: import("app/services/api/api.types").Caregiver; org?: import("app/services/api/api.types").Org }> })(authApi.endpoints.login.initiate({ email, password }))
+        const loginResult = await result.unwrap()
         dispatch(setAuthTokens(loginResult.tokens))
         dispatch(setAuthEmail(email))
         dispatch(setCurrentUser(loginResult.caregiver))
         dispatch(setCaregiver(loginResult.caregiver))
-        
         if (loginResult.org) {
           dispatch(setOrg(loginResult.org))
         }
@@ -188,13 +183,13 @@ export const SSOAccountLinkingScreen = () => {
       }
     } catch (error: unknown) {
       logger.error("Set password error:", error)
-      const errorMsg = error?.data?.message || error?.message || translate("ssoLinkingScreen.errorSetPasswordFailed")
+      const errorMsg = (error as { data?: { message?: string }; message?: string })?.data?.message || (error as { message?: string })?.message || translate("ssoLinkingScreen.errorSetPasswordFailed")
       setErrorMessage(errorMsg)
       setPasswordSet(false)
     }
   }
 
-  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] }) => {
+  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendClients?: any[]; backendAlerts?: any[] }) => {
     setIsSSOLoading(true)
     try {
       if (user.tokens && user.backendUser) {
@@ -209,11 +204,11 @@ export const SSOAccountLinkingScreen = () => {
           dispatch(setOrg(user.backendOrg))
         }
         
-        // Set patients if included in response
-        if (user.backendPatients && user.backendUser?.id) {
-          dispatch(setPatientsForCaregiver({ 
+        // Set clients if included in response
+        if (user.backendClients && user.backendUser?.id) {
+          dispatch(setClientsForCaregiver({ 
             caregiverId: user.backendUser.id, 
-            patients: user.backendPatients 
+            clients: user.backendClients 
           }))
         }
         

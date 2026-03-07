@@ -49,7 +49,7 @@ describe('conversationService', () => {
 
     // Create a call first (conversations require a callId)
     const call = new Call({
-      patientId: patient._id,
+      clientId: patient._id,
       callSid: 'CA1234567890abcdef',
       status: 'completed',
       duration: 60
@@ -58,7 +58,8 @@ describe('conversationService', () => {
 
     const conversation = await conversationService.createConversationForPatient(patient._id, call._id);
     expect(conversation).toHaveProperty('_id');
-    expect(conversation).toHaveProperty('patientId', patient._id);
+    expect(conversation).toHaveProperty('clientId');
+    expect(conversation.clientId.toString()).toBe(patient._id.toString());
     expect(conversation).toHaveProperty('callId', call._id);
   });
 
@@ -75,7 +76,7 @@ describe('conversationService', () => {
 
     // Create a call first
     const call = new Call({
-      patientId: patient._id,
+      clientId: patient._id,
       callSid: 'CA1234567890abcdef',
       status: 'completed',
       duration: 60
@@ -107,7 +108,7 @@ describe('conversationService', () => {
 
     // Create a call first
     const call = new Call({
-      patientId: patient._id,
+      clientId: patient._id,
       callSid: 'CA1234567890abcdef',
       status: 'completed',
       duration: 60
@@ -132,7 +133,7 @@ describe('conversationService', () => {
 
     // Create calls for each conversation
     const call1 = new Call({
-      patientId: patient._id,
+      clientId: patient._id,
       callSid: 'CA1111111111111111',
       status: 'completed',
       duration: 60
@@ -140,7 +141,7 @@ describe('conversationService', () => {
     await call1.save();
 
     const call2 = new Call({
-      patientId: patient._id,
+      clientId: patient._id,
       callSid: 'CA2222222222222222',
       status: 'completed',
       duration: 60

@@ -56,11 +56,25 @@ router
   );
 
 router
-  .route('/:caregiverId/patients/:patientId')
-  .post(auth('createAny:patient'), caregiverController.addPatient)
-  .delete(auth('deleteAny:patient'), caregiverController.removePatient);
+  .route('/:caregiverId/clients/:clientId')
+  .post(
+    auth('createAny:client'),
+    validate(caregiverValidation.addClient),
+    caregiverController.addClient
+  )
+  .delete(
+    auth('deleteAny:client'),
+    validate(caregiverValidation.removeClient),
+    caregiverController.removeClient
+  );
 
-router.route('/:caregiverId/patients').get(auth('readOwn:patient', 'readAny:patient'), caregiverController.getPatients);
+router
+  .route('/:caregiverId/clients')
+  .get(
+    auth('readOwn:client', 'readAny:client'),
+    validate(caregiverValidation.getClients),
+    caregiverController.getClients
+  );
 
 module.exports = router;
 

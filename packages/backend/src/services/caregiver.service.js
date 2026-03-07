@@ -1,6 +1,6 @@
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { Org, Caregiver, Patient } = require('../models');
+const { Org, Caregiver, Client } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 
@@ -103,15 +103,15 @@ const getCaregiverById = async (id) => {
   return await Caregiver.findById(id).populate('org');
 };
 
-const getPatientById = async (id) => {
-  return await Patient.findById(id).populate('schedules');
+const getClientById = async (id) => {
+  return await Client.findById(id).populate('schedules');
 };
 
 /**
  * Get caregiver by email
  * @param {string} email
  * @param {Object} options - Optional query options
- * @param {boolean} options.populatePatients - Whether to populate patients (default: false)
+ * @param {boolean} options.populatePatients - Whether to populate clients (default: false)
  * @param {boolean} options.populateOrg - Whether to populate org (default: false)
  * @returns {Promise<Caregiver>}
  */
@@ -126,7 +126,7 @@ const getCaregiverByEmail = async (email, options = {}) => {
   
   if (populatePatients) {
     query = query.populate({
-      path: 'patients',
+      path: 'clients',
       populate: {
         path: 'schedules',
         model: 'Schedule',
@@ -167,7 +167,7 @@ const getLoginCaregiverData = async (email) => {
   const caregiver = await Caregiver.findOne({ email })
     .populate('org')
     .populate({
-      path: 'patients',
+      path: 'clients',
       populate: {
         path: 'schedules',
         model: 'Schedule',
@@ -181,7 +181,7 @@ const getLoginCaregiverData = async (email) => {
   return {
     org: caregiver.org,
     caregiver,
-    patients: caregiver.patients,
+    clients: caregiver.clients,
   };
 };
 
@@ -249,11 +249,11 @@ const deleteCaregiverById = async (caregiverId) => {
     await org.save();
 
     // Remove caregiver from all patients' caregivers array
-    const patients = await Patient.find({ caregivers: { $in: [new mongoose.Types.ObjectId(caregiverId)] } });
-    for (const patient of patients) {
-      patient.caregivers = patient.caregivers.filter((id) => !id.equals(caregiverId));
-      await patient.save();
-      logger.debug(`Caregiver ${caregiverId} removed from patient ${patient._id}`);
+    const clients = await Client.find({ caregivers: { $in: [new mongoose.Types.ObjectId(caregiverId)] } });
+    for (const client of clients) {
+      client.caregivers = client.caregivers.filter((id) => !id.equals(caregiverId));
+      await client.save();
+      logger.debug(`Caregiver ${caregiverId} removed from client ${client._id}`);
     }
 
     // Remove caregiver
@@ -277,39 +277,28 @@ const addPatient = async (caregiverId, patientId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
-  const patient = await getPatientById(patientId);
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+  const client = await getClientById(patientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-
-  // Convert to ObjectId for consistent comparison
-  const caregiverObjectId = mongoose.Types.ObjectId.isValid(caregiverId) 
-    ? new mongoose.Types.ObjectId(caregiverId) 
+  const caregiverObjectId = mongoose.Types.ObjectId.isValid(caregiverId)
+    ? new mongoose.Types.ObjectId(caregiverId)
     : caregiverId;
-  const patientObjectId = mongoose.Types.ObjectId.isValid(patientId) 
-    ? new mongoose.Types.ObjectId(patientId) 
+  const clientObjectId = mongoose.Types.ObjectId.isValid(patientId)
+    ? new mongoose.Types.ObjectId(patientId)
     : patientId;
-
-  // Add patient to caregiver's patients array (with check to avoid duplicates)
-  // Convert patient.patients to strings for comparison
-  const caregiverPatientIds = caregiver.patients.map(id => id.toString());
-  if (!caregiverPatientIds.includes(patientObjectId.toString())) {
-    caregiver.patients.push(patientObjectId);
+  const caregiverClientIds = caregiver.clients.map((id) => id.toString());
+  if (!caregiverClientIds.includes(clientObjectId.toString())) {
+    caregiver.clients.push(clientObjectId);
     await caregiver.save();
   }
-
-  // Add caregiver to patient's caregivers array (with check to avoid duplicates)
-  // Convert patient.caregivers to strings for comparison
-  const patientCaregiverIds = patient.caregivers.map(id => id.toString());
-  if (!patientCaregiverIds.includes(caregiverObjectId.toString())) {
-    patient.caregivers.push(caregiverObjectId);
+  const clientCaregiverIds = client.caregivers.map((id) => id.toString());
+  if (!clientCaregiverIds.includes(caregiverObjectId.toString())) {
+    client.caregivers.push(caregiverObjectId);
   }
-  
-  // Update patient's org to match caregiver's org
-  patient.org = caregiver.org;
-  await patient.save();
-
-  return patient;
+  client.org = caregiver.org;
+  await client.save();
+  return client;
 };
 
 /**
@@ -324,19 +313,14 @@ const removePatient = async (caregiverId, patientId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
-  const patient = await getPatientById(patientId);
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+  const client = await getClientById(patientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-
-  // Remove patient from caregiver's patients array
-  caregiver.patients = caregiver.patients.filter((id) => !id.equals(patientId));
+  caregiver.clients = caregiver.clients.filter((id) => !id.equals(patientId));
   await caregiver.save();
-
-  // Remove caregiver from patient's caregivers array
-  patient.caregivers = patient.caregivers.filter((id) => !id.equals(caregiverId));
-  await patient.save();
-
+  client.caregivers = client.caregivers.filter((id) => !id.equals(caregiverId));
+  await client.save();
   return caregiver;
 };
 
@@ -346,12 +330,12 @@ const removePatient = async (caregiverId, patientId) => {
  * @returns {Promise<Array<Patient>>}
  */
 const getPatients = async (caregiverId) => {
-  const caregiver = await Caregiver.findById(caregiverId).populate('patients');
+  const caregiver = await Caregiver.findById(caregiverId).populate('clients');
   if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
 
-  return caregiver.patients;
+  return caregiver.clients;
 };
 
 const checkCaregiverOwnsPatient = async (caregiverId, patientId) => {
@@ -359,19 +343,15 @@ const checkCaregiverOwnsPatient = async (caregiverId, patientId) => {
   if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
-
-  if (caregiver.role === 'staff' && !caregiver.patients.includes(patientId)) {
-    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient');
+  if (caregiver.role === 'staff' && !caregiver.clients.some((id) => id.toString() === patientId.toString())) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client');
   }
-
   if (caregiver.role === 'orgAdmin') {
-    caregiver = await caregiver.populate('org').execPopulate();
-    if (!caregiver.org.patients.includes(patientId)) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient');
+    const pop = await Caregiver.findById(caregiverId).populate('org');
+    if (pop.org && !pop.org.clients.some((id) => id.toString() === patientId.toString())) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client');
     }
   }
-
-  // If the caregiver is a superAdmin or has passed the previous checks, return true
   return true;
 };
 
@@ -383,8 +363,13 @@ module.exports = {
   getLoginCaregiverData,
   updateCaregiverById,
   deleteCaregiverById,
+  getClientById,
   addPatient,
+  addClient: addPatient,
   removePatient,
+  removeClient: removePatient,
   getPatients,
+  getClients: getPatients,
   checkCaregiverOwnsPatient,
+  checkCaregiverOwnsClient: checkCaregiverOwnsPatient,
 };

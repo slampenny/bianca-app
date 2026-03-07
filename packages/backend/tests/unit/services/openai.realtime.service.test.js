@@ -225,7 +225,7 @@ describe('OpenAI Realtime Service', () => {
       expect(connection).toBeDefined();
       expect(connection.callSid).toBe(mockCallSid);
       expect(connection.conversationId).toBe(mockConversationId);
-      expect(connection.patientId).toBe(mockPatientId);
+      expect(connection.clientId).toBe(mockPatientId);
     });
 
     it('should handle missing call identifier', async () => {

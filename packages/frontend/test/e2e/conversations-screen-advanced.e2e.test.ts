@@ -22,7 +22,7 @@ async function navigateToConversationsScreen(page: Page, patientWorkflow: Patien
     await page.waitForTimeout(2000)
   }
   
-  await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
   await page.waitForTimeout(1000)
   
   // Click conversations button
@@ -234,7 +234,7 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
       await page.waitForTimeout(1000)
     }
     
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     
     // Click conversations button
     const conversationsButton = page.locator('[data-testid="manage-conversations-button"]').first()

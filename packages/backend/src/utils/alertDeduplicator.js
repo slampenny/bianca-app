@@ -16,7 +16,7 @@ class AlertDeduplicator {
     };
 
     // In-memory storage for tracking recent alerts
-    // Structure: { patientId: { alerts: [{ category, timestamp, text }], hourlyCount: number } }
+    // Structure: { clientId: { alerts: [{ category, timestamp, text }], hourlyCount: number } }
     this.alertHistory = new Map();
     
     // Store cleanup interval ID for proper cleanup

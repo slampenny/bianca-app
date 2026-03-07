@@ -11,11 +11,11 @@ import {
   useDeleteScheduleMutation,
 } from "../services/api/scheduleApi"
 import { getSchedules, setSchedule, getSchedule, setSchedules } from "../store/scheduleSlice"
-import { getPatient, setPatient } from "../store/patientSlice"
+import { getClient, setClient } from "../store/clientSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { store } from "../store/store"
 import { LoadingScreen } from "./LoadingScreen"
-import { Schedule, Patient } from "app/services/api"
+import { Schedule, Client } from "app/services/api"
 import { spacing } from "app/theme"
 import { logger } from "../utils/logger"
 import { useTheme } from "app/theme/ThemeContext"
@@ -29,7 +29,7 @@ export const SchedulesScreen = () => {
   const dispatch = useDispatch()
   const navigation = useNavigation()
   const route = useRoute<SchedulesScreenRouteProp>()
-  const selectedPatient = useSelector(getPatient)
+  const selectedClient = useSelector(getClient)
   const selectedSchedule = useSelector(getSchedule)
   const schedules = useSelector(getSchedules)
   const currentUser = useSelector(getCurrentUser)
@@ -175,35 +175,33 @@ export const SchedulesScreen = () => {
         // Reset changes after successful save
         setHasChanges(false)
         initialScheduleRef.current = JSON.parse(JSON.stringify(selectedSchedule))
-        // Update patient in Redux to keep patient.schedules in sync with Redux schedules
-        // This prevents the useEffect from overwriting updated schedules with stale patient data
-        if (selectedPatient) {
+        // Update client in Redux to keep client.schedules in sync with Redux schedules
+        if (selectedClient) {
           const currentState = store.getState()
           const currentSchedules = getSchedules(currentState)
-          const updatedPatient: Patient = {
-            ...selectedPatient,
+          const updatedClient: Client = {
+            ...selectedClient,
             schedules: currentSchedules,
           }
-          dispatch(setPatient(updatedPatient))
+          dispatch(setClient(updatedClient))
         }
       } else {
         // Create new schedule (no ID or ID is null/undefined)
-        if (selectedPatient && selectedPatient.id && selectedSchedule) {
-          // Filter out id and patient fields - they're not allowed in the create request
+        if (selectedClient && selectedClient.id && selectedSchedule) {
           const { id, patient, ...scheduleData } = selectedSchedule
-          const newSchedule = await createNewSchedule({ patientId: selectedPatient.id, data: scheduleData }).unwrap()
+          const newSchedule = await createNewSchedule({ clientId: selectedClient.id, data: scheduleData }).unwrap()
           // Reset changes after successful create
           setHasChanges(false)
           // The Redux matcher (createSchedule.matchFulfilled) automatically adds the schedule to state.schedules
           // Get the current schedules from Redux state (which should now include the new schedule from the matcher)
           const currentState = store.getState()
           const currentSchedules = getSchedules(currentState)
-          // Update the patient's schedules array to keep them in sync
-          const updatedPatient: Patient = {
-            ...selectedPatient,
+          // Update the client's schedules array to keep them in sync
+          const updatedClient: Client = {
+            ...selectedClient,
             schedules: currentSchedules,
           }
-          dispatch(setPatient(updatedPatient))
+          dispatch(setClient(updatedClient))
           // Explicitly update schedules to ensure the picker updates immediately
           dispatch(setSchedules(currentSchedules))
           // Note: The schedule will be updated with an ID by Redux after creation
@@ -235,7 +233,7 @@ export const SchedulesScreen = () => {
     // Create a new empty schedule with no ID
     const newSchedule: Schedule = {
       id: null,
-      patient: selectedPatient?.id || null,
+      patient: selectedClient?.id || null, // API field name
       frequency: "daily",
       intervals: [],
       time: "09:00",
@@ -259,17 +257,16 @@ export const SchedulesScreen = () => {
       try {
         await deleteSchedule({ scheduleId: selectedSchedule.id }).unwrap()
         
-        // Update the patient in Redux to reflect the deleted schedule
-        // This will also update the patient in the patients list (handled by setPatient reducer)
-        if (selectedPatient) {
+        // Update the client in Redux to reflect the deleted schedule
+        if (selectedClient) {
           const updatedSchedules = schedules.filter((s) => s.id !== selectedSchedule.id)
-          const updatedPatient: Patient = {
-            ...selectedPatient,
+          const updatedClient: Client = {
+            ...selectedClient,
             schedules: updatedSchedules,
           }
           
-          // Update the patient in Redux (setPatient will also update the patients list)
-          dispatch(setPatient(updatedPatient))
+          // Update the client in Redux
+          dispatch(setClient(updatedClient))
           // Also update the schedules in the schedule slice to ensure consistency
           dispatch(setSchedules(updatedSchedules))
         }
@@ -297,25 +294,18 @@ export const SchedulesScreen = () => {
     }
   }
   
-  // Sync schedules from patient when patient changes (but only on initial load or when patient ID changes)
-  // Don't sync on every schedule change to avoid overwriting Redux state updates
-  // CRITICAL: Only sync when patient ID changes, not when schedules change, to prevent overwriting
-  // updated schedules with stale patient data
-  const previousPatientIdRef = useRef<string | null>(null)
+  const previousClientIdRef = useRef<string | null>(null)
   useEffect(() => {
-    const currentPatientId = selectedPatient?.id || null
-    // Only sync if patient ID changed (new patient selected) - don't sync on schedule updates
-    // This prevents overwriting Redux schedules with stale patient data after schedule updates
-    if (currentPatientId !== previousPatientIdRef.current) {
-      if (selectedPatient?.schedules) {
-        dispatch(setSchedules(selectedPatient.schedules))
+    const currentClientId = selectedClient?.id || null
+    if (currentClientId !== previousClientIdRef.current) {
+      if (selectedClient?.schedules) {
+        dispatch(setSchedules(selectedClient.schedules))
       } else if (schedules.length === 0) {
-        // Only clear if we have no schedules and patient has no schedules
         dispatch(setSchedules([]))
       }
-      previousPatientIdRef.current = currentPatientId
+      previousClientIdRef.current = currentClientId
     }
-  }, [selectedPatient?.id, dispatch]) // Removed selectedPatient?.schedules and schedules.length from dependencies
+  }, [selectedClient?.id, dispatch])
 
   // Initialize tracking when schedule changes
   useEffect(() => {

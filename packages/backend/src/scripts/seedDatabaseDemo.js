@@ -118,7 +118,7 @@ async function createDemoPatients(caregiver, org) {
       schedules: [],
     });
     await patient.save();
-    caregiver.patients.push(patient._id);
+    caregiver.clients.push(patient._id);
     demoPatients.push(patient);
   }
   
@@ -147,7 +147,7 @@ async function createDemoConversations(patients) {
       
       const call = new Call({
         callSid: `DEMO_CALL_${patient._id}_${Date.now()}_${j}_${Math.random().toString(36).substr(2, 9)}`,
-        patientId: patient._id,
+        clientId: patient._id,
         callType: 'wellness-check',
         status: 'completed',
         callStatus: 'ended',
@@ -188,7 +188,7 @@ async function createDemoConversations(patients) {
       
       const conv = new Conversation({
         callId: call._id,
-        patientId: patient._id,
+        clientId: patient._id,
         messages: [],
         history: `Wellness check conversation from ${days} days ago.`,
         analyzedData: {},
@@ -258,7 +258,7 @@ async function createDemoSchedules(patients) {
     for (const scheduleData of scheduleTypes) {
       const schedule = new Schedule({
         ...scheduleData,
-        patient: patient._id,
+        client: patient._id,
         org: patient.org,
       });
       // Calculate next call date (required by schedule model)
@@ -288,7 +288,7 @@ async function createDemoAlerts(caregiver, patients, conversations) {
       importance: 'urgent',
       alertType: 'conversation',
       message: 'Emergency Detected: Patient mentioned feeling chest pain and shortness of breath.',
-      relatedPatient: patients[0]?._id,
+      relatedClient: patients[0]?._id,
       relatedConversation: conversations[0]?._id,
       visibility: 'allCaregivers',
       createdBy: caregiver._id,
@@ -300,7 +300,7 @@ async function createDemoAlerts(caregiver, patients, conversations) {
       importance: 'high',
       alertType: 'patient',
       message: 'Medication Missed: Patient has missed medication for 3 consecutive days.',
-      relatedPatient: patients[1]?._id,
+      relatedClient: patients[1]?._id,
       visibility: 'assignedCaregivers',
       createdBy: caregiver._id,
       createdModel: 'Caregiver',
@@ -311,7 +311,7 @@ async function createDemoAlerts(caregiver, patients, conversations) {
       importance: 'medium',
       alertType: 'conversation',
       message: 'Declining Health Pattern: Patient showing signs of declining health over the past month.',
-      relatedPatient: patients[2]?._id,
+      relatedClient: patients[2]?._id,
       relatedConversation: conversations[10]?._id,
       visibility: 'allCaregivers',
       createdBy: caregiver._id,
@@ -323,7 +323,7 @@ async function createDemoAlerts(caregiver, patients, conversations) {
       importance: 'high',
       alertType: 'conversation',
       message: 'Potential Financial Exploitation: Patient mentioned sending large amounts of money to unknown individuals.',
-      relatedPatient: patients[3]?._id,
+      relatedClient: patients[3]?._id,
       relatedConversation: conversations[15]?._id,
       visibility: 'orgAdmin',
       createdBy: caregiver._id,
@@ -335,7 +335,7 @@ async function createDemoAlerts(caregiver, patients, conversations) {
       importance: 'medium',
       alertType: 'patient',
       message: 'Missed Call: Patient did not answer scheduled wellness check call.',
-      relatedPatient: patients[4]?._id,
+      relatedClient: patients[4]?._id,
       visibility: 'assignedCaregivers',
       createdBy: caregiver._id,
       createdModel: 'Caregiver',
@@ -476,7 +476,7 @@ async function seedDatabaseDemo() {
       isActive: true
     });
     await patient3.save();
-    caregiverOneRecord.patients.push(patient3._id);
+    caregiverOneRecord.clients.push(patient3._id);
     await caregiverOneRecord.save();
 
     // Create additional demo patients

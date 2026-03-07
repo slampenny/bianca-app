@@ -47,7 +47,7 @@ describe('Payment routes', () => {
     await Message.deleteMany();
   });
 
-  describe('POST /v1/payments/patients/:patientId/invoices', () => {
+  describe('POST /v1/payments/clients/:clientId/invoices', () => {
     test('should create an invoice from conversations and return 201', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
@@ -70,7 +70,7 @@ describe('Payment routes', () => {
       const patientConversations = [
         {
           ...conversationOne,
-          patientId: patient._id,
+          clientId: patient._id,
           messages: [message1._id, message2._id],
           lineItemId: null,
           startTime: new Date(Date.now() - 3600000),
@@ -83,7 +83,7 @@ describe('Payment routes', () => {
       await insertConversations(patientConversations);
 
       const res = await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.CREATED);
@@ -122,7 +122,7 @@ describe('Payment routes', () => {
       const patientConversations = [
         {
           ...conversationOne,
-          patientId: patient._id,
+          clientId: patient._id,
           messages: [message1._id, message2._id],
           lineItemId: null,
           startTime: new Date(Date.now() - 3600000),
@@ -134,7 +134,7 @@ describe('Payment routes', () => {
       await insertConversations(patientConversations);
 
       const res = await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.CREATED);
@@ -157,12 +157,12 @@ describe('Payment routes', () => {
       const nonExistentPatientId = new mongoose.Types.ObjectId();
 
       const res = await request(app)
-        .post(`/v1/payments/patients/${nonExistentPatientId}/invoices`)
+        .post(`/v1/payments/clients/${nonExistentPatientId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.NOT_FOUND);
 
-      expect(res.body.message).toBe('Patient not found');
+      expect(res.body.message).toBe('Client not found');
     });
 
     test('should return 404 when no uncharged conversations exist', async () => {
@@ -185,7 +185,7 @@ describe('Payment routes', () => {
 
       const chargedConversation = {
         ...conversationOne,
-        patientId: patient._id,
+        clientId: patient._id,
         messages: [message1._id, message2._id],
         lineItemId: new mongoose.Types.ObjectId(), // Already charged
         startTime: new Date(Date.now() - 3600000),
@@ -196,7 +196,7 @@ describe('Payment routes', () => {
       await insertConversations([chargedConversation]);
 
       const res = await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.NOT_FOUND);
@@ -209,7 +209,7 @@ describe('Payment routes', () => {
       const [patient] = await insertPatients([{ ...patientOne, org: org._id }]);
 
       await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .send()
         .expect(httpStatus.UNAUTHORIZED);
     });
@@ -220,7 +220,7 @@ describe('Payment routes', () => {
       const [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
 
       await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.FORBIDDEN);
@@ -246,7 +246,7 @@ describe('Payment routes', () => {
       const zeroDurationConversation = [
         {
           ...conversationOne,
-          patientId: patient._id,
+          clientId: patient._id,
           messages: [message1._id, message2._id],
           lineItemId: null,
           startTime: new Date(Date.now() - 3600000),
@@ -259,7 +259,7 @@ describe('Payment routes', () => {
       await insertConversations(zeroDurationConversation);
 
       const res = await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.CREATED);
@@ -273,7 +273,7 @@ describe('Payment routes', () => {
     });
   });
 
-  describe('GET /v1/payments/patients/:patientId/invoices', () => {
+  describe('GET /v1/payments/clients/:clientId/invoices', () => {
     test('should return 200 and all invoices for a patient', async () => {
       // Use admin (orgAdmin role) instead of caregiverOne (staff role)
       const [org] = await insertOrgs([orgOne]);
@@ -282,15 +282,15 @@ describe('Payment routes', () => {
       await insertInvoices(patient, [invoiceOne, invoiceTwo]);
 
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient.id}/invoices`)
+        .get(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.OK);
 
       expect(res.body).toHaveLength(2);
-      expect(res.body[0]).toEqual({
+      const first = res.body[0];
+      expect(first).toMatchObject({
         id: expect.any(String),
-        org: patient.org.toString(),
         invoiceNumber: expect.any(String),
         issueDate: expect.any(String),
         dueDate: expect.any(String),
@@ -298,8 +298,11 @@ describe('Payment routes', () => {
         totalAmount: expect.any(Number),
         notes: expect.any(String),
         stripeSynced: false,
-        // createdAt and updatedAt no longer expected
       });
+      expect(first.org).toBeDefined();
+      const expectedOrgId = (patient.org && (patient.org._id || patient.org).toString()) || patient.org;
+      const actualOrgId = typeof first.org === 'string' ? first.org : (first.org && (first.org.id || first.org._id));
+      expect(String(actualOrgId)).toBe(String(expectedOrgId));
     });
 
     test('should return 200 and filtered invoices by status', async () => {
@@ -309,7 +312,7 @@ describe('Payment routes', () => {
       await insertInvoices(patient, [invoiceOne, invoiceTwo]);
 
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient.id}/invoices?status=pending`)
+        .get(`/v1/payments/clients/${patient.id}/invoices?status=pending`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.OK);
@@ -331,7 +334,7 @@ describe('Payment routes', () => {
       await insertInvoices(patient, [todayInvoice, invoiceTwo]);
 
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient.id}/invoices?dueDate=${today}`)
+        .get(`/v1/payments/clients/${patient.id}/invoices?dueDate=${today}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.OK);
@@ -346,7 +349,7 @@ describe('Payment routes', () => {
       const nonExistentPatientId = new mongoose.Types.ObjectId();
 
       const res = await request(app)
-        .get(`/v1/payments/patients/${nonExistentPatientId}/invoices`)
+        .get(`/v1/payments/clients/${nonExistentPatientId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.OK); // Returns empty array, not 404
@@ -359,7 +362,7 @@ describe('Payment routes', () => {
       const [patient] = await insertPatients([{ ...patientOne, org: org._id }]);
 
       await request(app)
-        .get(`/v1/payments/patients/${patient.id}/invoices`)
+        .get(`/v1/payments/clients/${patient.id}/invoices`)
         .send()
         .expect(httpStatus.UNAUTHORIZED);
     });
@@ -370,7 +373,7 @@ describe('Payment routes', () => {
       const [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
 
       await request(app)
-        .get(`/v1/payments/patients/${patient.id}/invoices`)
+        .get(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.FORBIDDEN);
@@ -382,7 +385,7 @@ describe('Payment routes', () => {
       const [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
 
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient.id}/invoices`)
+        .get(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.OK);
@@ -572,7 +575,7 @@ describe('Payment routes', () => {
 
         conversations.push({
           ...conversationOne,
-          patientId: patient._id,
+          clientId: patient._id,
           messages: [message1._id, message2._id],
           lineItemId: null,
           startTime: new Date(Date.now() - (i + 1) * 3600000),
@@ -584,7 +587,7 @@ describe('Payment routes', () => {
       await insertConversations(conversations);
 
       const res = await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.CREATED);
@@ -593,7 +596,7 @@ describe('Payment routes', () => {
       expect(res.body.totalAmount).toBeGreaterThan(0);
       
       // Verify all calls are now marked as charged (payment service uses Call records, not Conversation)
-      const updatedCalls = await Call.find({ patientId: patient._id });
+      const updatedCalls = await Call.find({ clientId: patient._id });
       updatedCalls.forEach(call => {
         expect(call.lineItemId).toBeDefined();
       });
@@ -621,7 +624,7 @@ describe('Payment routes', () => {
 
       const conversation1 = {
         ...conversationOne,
-        patientId: patient._id,
+        clientId: patient._id,
         messages: [message1._id, message2._id],
         lineItemId: null,
         startTime: new Date(Date.now() - 3600000),
@@ -632,7 +635,7 @@ describe('Payment routes', () => {
       await insertConversations([conversation1]);
 
       const res1 = await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.CREATED);
@@ -652,7 +655,7 @@ describe('Payment routes', () => {
 
       const conversation2 = {
         ...conversationTwo,
-        patientId: patient._id,
+        clientId: patient._id,
         messages: [message3._id, message4._id],
         lineItemId: null,
         startTime: new Date(Date.now() - 1800000),
@@ -663,7 +666,7 @@ describe('Payment routes', () => {
       await insertConversations([conversation2]);
 
       const res2 = await request(app)
-        .post(`/v1/payments/patients/${patient.id}/invoices`)
+        .post(`/v1/payments/clients/${patient.id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.CREATED);

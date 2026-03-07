@@ -5,8 +5,8 @@ import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
-import { getPatientsForCaregiver, setPatient } from "../store/patientSlice"
-import { Patient } from "../services/api/api.types"
+import { getClientsForCaregiver, setClient } from "../store/clientSlice"
+import { Client } from "../services/api/api.types"
 import { translate } from "../i18n"
 import { Button, Text } from "app/components"
 import { logger } from "../utils/logger"
@@ -18,43 +18,35 @@ export function ReportsScreen() {
   const navigation = useNavigation()
   const dispatch = useDispatch()
   const currentUser = useSelector(getCurrentUser)
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  const [showPatientPicker, setShowPatientPicker] = useState(false)
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [showClientPicker, setShowClientPicker] = useState(false)
   const { colors, isLoading: themeLoading } = useTheme()
 
-  // Get patients for the current user
-  const patientsSelector = useMemo(
+  const clientsSelector = useMemo(
     () => (state: any) => {
-      const patientList = currentUser && currentUser.id ? getPatientsForCaregiver(state, currentUser.id) : []
-      return patientList
+      return currentUser && currentUser.id ? getClientsForCaregiver(state, currentUser.id) : []
     },
     [currentUser?.id]
   )
-  const patients = useSelector(patientsSelector)
+  const clients = useSelector(clientsSelector)
 
   const handleSentimentPress = () => {
-    if (selectedPatient) {
-      // Set the patient in Redux state
-      dispatch(setPatient(selectedPatient))
-      // Navigate to sentiment analysis screen
+    if (selectedClient) {
+      dispatch(setClient(selectedClient))
       navigation.navigate("SentimentReport" as never)
     }
   }
 
   const handleHealthPress = () => {
-    if (selectedPatient) {
-      // Set the patient in Redux state
-      dispatch(setPatient(selectedPatient))
-      // Navigate to medical analysis screen
+    if (selectedClient) {
+      dispatch(setClient(selectedClient))
       navigation.navigate("MedicalAnalysis" as never)
     }
   }
 
   const handleFraudAbusePress = () => {
-    if (selectedPatient) {
-      // Set the patient in Redux state
-      dispatch(setPatient(selectedPatient))
-      // Navigate to fraud/abuse analysis screen
+    if (selectedClient) {
+      dispatch(setClient(selectedClient))
       navigation.navigate("FraudAbuseAnalysis" as never)
     }
   }
@@ -72,19 +64,18 @@ export function ReportsScreen() {
 
   return (
     <View style={styles.container} testID="reports-screen" accessibilityLabel="reports-screen">
-      {/* Patient Selector */}
-      <View style={styles.patientSelector}>
-        <Text style={styles.selectorLabel}>{translate("reportsScreen.selectPatient")}</Text>
+      <View style={styles.clientSelector}>
+        <Text style={styles.selectorLabel}>{translate("reportsScreen.selectClient")}</Text>
         <Pressable
-          style={styles.patientPicker}
-          onPress={() => setShowPatientPicker(true)}
-          testID="patient-picker-button"
+          style={styles.clientPicker}
+          onPress={() => setShowClientPicker(true)}
+          testID="client-picker-button"
           accessibilityRole="button"
-          accessibilityLabel={selectedPatient ? `Selected patient: ${selectedPatient.name}` : translate("reportsScreen.choosePatient") || "Choose patient"}
-          accessibilityHint="Opens patient selection dialog"
+          accessibilityLabel={selectedClient ? `Selected client: ${selectedClient.name}` : translate("reportsScreen.chooseClient") || "Choose client"}
+          accessibilityHint="Opens client selection dialog"
         >
-          <Text style={styles.patientPickerText}>
-            {selectedPatient ? selectedPatient.name : translate("reportsScreen.choosePatient")}
+          <Text style={styles.clientPickerText}>
+            {selectedClient ? selectedClient.name : translate("reportsScreen.chooseClient")}
           </Text>
           <Ionicons name="chevron-down" size={20} color={colors.palette.neutral600} />
         </Pressable>
@@ -98,12 +89,12 @@ export function ReportsScreen() {
             style={[
               styles.button, 
               { width: buttonSize, height: buttonSize },
-              !selectedPatient && styles.buttonDisabled
+              !selectedClient && styles.buttonDisabled
             ]} 
             onPress={handleSentimentPress}
-            disabled={!selectedPatient}
+            disabled={!selectedClient}
             testID="sentiment-reports-button"
-            accessibilityHint="Opens sentiment analysis report for the selected patient"
+            accessibilityHint="Opens sentiment analysis report for the selected client"
           >
             <View style={styles.buttonContent}>
               <Ionicons 
@@ -120,10 +111,10 @@ export function ReportsScreen() {
             style={[
               styles.button, 
               { width: buttonSize, height: buttonSize },
-              !selectedPatient && styles.buttonDisabled
+              !selectedClient && styles.buttonDisabled
             ]} 
             onPress={handleHealthPress}
-            disabled={!selectedPatient}
+            disabled={!selectedClient}
             testID="health-reports-button"
           >
             <View style={styles.buttonContent}>
@@ -144,12 +135,12 @@ export function ReportsScreen() {
             style={[
               styles.button, 
               { width: buttonSize, height: buttonSize },
-              !selectedPatient && styles.buttonDisabled
+              !selectedClient && styles.buttonDisabled
             ]} 
             onPress={handleFraudAbusePress}
-            disabled={!selectedPatient}
+            disabled={!selectedClient}
             testID="fraud-abuse-reports-button"
-            accessibilityHint="Opens fraud and abuse analysis report for the selected patient"
+            accessibilityHint="Opens fraud and abuse analysis report for the selected client"
           >
             <View style={styles.buttonContent}>
               <Ionicons 
@@ -179,34 +170,34 @@ export function ReportsScreen() {
         </View>
       </View>
 
-      {/* Patient Picker Modal */}
+      {/* Client Picker Modal */}
       <Modal
-        visible={showPatientPicker}
+        visible={showClientPicker}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowPatientPicker(false)}
+        onRequestClose={() => setShowClientPicker(false)}
       >
-        <TouchableWithoutFeedback onPress={() => setShowPatientPicker(false)}>
+        <TouchableWithoutFeedback onPress={() => setShowClientPicker(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>{translate("reportsScreen.modalTitle")}</Text>
-                <ScrollView style={styles.patientList}>
-                  {patients.map((patient) => (
+                <ScrollView style={styles.clientList}>
+                  {clients.map((client) => (
                     <Pressable
-                      key={patient.id}
+                      key={client.id}
                       style={[
-                        styles.patientItem,
-                        selectedPatient?.id === patient.id && styles.selectedPatientItem
+                        styles.clientItem,
+                        selectedClient?.id === client.id && styles.selectedClientItem
                       ]}
                       onPress={() => {
-                        setSelectedPatient(patient)
-                        setShowPatientPicker(false)
+                        setSelectedClient(client)
+                        setShowClientPicker(false)
                       }}
-                      testID={`patient-option-${patient.id}`}
+                      testID={`client-option-${client.id}`}
                     >
-                      <Text style={styles.patientItemText}>{patient.name}</Text>
-                      {selectedPatient?.id === patient.id && (
+                      <Text style={styles.clientItemText}>{client.name}</Text>
+                      {selectedClient?.id === client.id && (
                         <Ionicons name="checkmark" size={20} color={colors.palette.biancaButtonSelected} />
                       )}
                     </Pressable>
@@ -215,7 +206,7 @@ export function ReportsScreen() {
                   <Button
                   preset="default"
                   text={translate("reportsScreen.modalCancel")}
-                  onPress={() => setShowPatientPicker(false)}
+                  onPress={() => setShowClientPicker(false)}
                   style={styles.modalCloseButton}
                 />
               </View>
@@ -233,7 +224,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.palette.biancaBackground,
     padding: 20,
   },
-  patientSelector: {
+  clientSelector: {
     marginBottom: 20,
   },
   selectorLabel: {
@@ -242,7 +233,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.palette.biancaHeader,
     marginBottom: 8,
   },
-  patientPicker: {
+  clientPicker: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -252,7 +243,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.palette.neutral300,
   },
-  patientPickerText: {
+  clientPickerText: {
     fontSize: 16,
     color: colors.palette.biancaHeader,
     flex: 1,
@@ -328,11 +319,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  patientList: {
+  clientList: {
     maxHeight: 300,
     marginBottom: 16,
   },
-  patientItem: {
+  clientItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -341,12 +332,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: 8,
     backgroundColor: colors.palette.neutral200,
   },
-  selectedPatientItem: {
+  selectedClientItem: {
     backgroundColor: colors.palette.biancaSuccessBackground,
     borderWidth: 1,
     borderColor: colors.palette.biancaSuccess,
   },
-  patientItemText: {
+  clientItemText: {
     fontSize: 16,
     color: colors.palette.biancaHeader,
     flex: 1,

@@ -3,9 +3,35 @@
  * Following Ignite's pattern: styles accept theme colors and return StyleSheet
  */
 
-import { StyleSheet, ViewStyle, TextStyle } from 'react-native'
+import { StyleSheet, ViewStyle, TextStyle, Platform } from 'react-native'
 import { spacing } from '../theme'
 import type { ThemeColors } from '../types'
+
+/**
+ * Platform-aware shadow: use boxShadow on web (shadow* are deprecated), shadow* on native.
+ */
+export function platformShadow(opts: {
+  color?: string
+  offset?: { width: number; height: number }
+  opacity?: number
+  radius?: number
+}): ViewStyle {
+  const { color = '#000', offset = { width: 0, height: 2 }, opacity = 0.1, radius = 4 } = opts
+  if (Platform.OS === 'web') {
+    const [r, g, b] = color.startsWith('#') && color.length === 7
+      ? [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)]
+      : [0, 0, 0]
+    return {
+      boxShadow: `${offset.width}px ${offset.height}px ${radius}px rgba(${r},${g},${b},${opacity})`,
+    } as ViewStyle
+  }
+  return {
+    shadowColor: color,
+    shadowOffset: offset,
+    shadowOpacity: opacity,
+    shadowRadius: radius,
+  }
+}
 
 /**
  * Common styles used across multiple screens
@@ -34,10 +60,12 @@ export const createCommonStyles = (colors: ThemeColors) => {
       borderRadius: spacing.sm,
       padding: spacing.lg,
       marginBottom: spacing.lg,
-      shadowColor: colors.palette.neutral900,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
+      ...platformShadow({
+        color: colors.palette.neutral900,
+        offset: { width: 0, height: 2 },
+        opacity: 0.1,
+        radius: 4,
+      }),
       elevation: 3,
     } as ViewStyle,
 

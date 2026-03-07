@@ -112,7 +112,7 @@ describe('Auth Service - Email Verification', () => {
       const result = await authService.loginCaregiverWithEmailAndPassword('test@example.com', 'Password123');
 
       expect(result).toHaveProperty('caregiver');
-      expect(result).toHaveProperty('patients');
+      expect(result).toHaveProperty('clients');
       expect(result.caregiver.email).toBe('test@example.com');
     });
 

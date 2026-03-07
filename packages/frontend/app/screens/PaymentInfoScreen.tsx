@@ -336,7 +336,7 @@ function CurrentChargesScreen() {
               </Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{translate("paymentScreen.patientsWithCharges")}</Text>
+              <Text style={styles.summaryLabel}>{translate("paymentScreen.clientsWithCharges" as import("../i18n").TxKeyPath)}</Text>
               <Text style={styles.summaryValue}>
                 {unbilledCosts.patientCosts.length} {unbilledCosts.patientCosts.length !== 1 ? translate("paymentScreen.patients") : translate("paymentScreen.patient")}
               </Text>
@@ -348,11 +348,11 @@ function CurrentChargesScreen() {
       {/* Patient Charges List */}
       <View style={styles.patientChargesSection}>
         <Text preset="subheading" style={styles.patientChargesTitle}>
-          {translate("paymentScreen.chargesByPatient")}
+          {translate("paymentScreen.chargesByClient" as import("../i18n").TxKeyPath)}
         </Text>
         <FlatList
           data={unbilledCosts.patientCosts}
-          keyExtractor={(item) => item.patientId}
+          keyExtractor={(item) => (item as any).clientId ?? (item as any).patientId}
           renderItem={({ item }) => (
             <Card
               preset="default"
@@ -361,7 +361,7 @@ function CurrentChargesScreen() {
                 <View style={styles.patientChargeContent}>
                   <View style={styles.patientChargeHeader}>
                     <Text preset="bold" style={styles.patientName}>
-                      {item.patientName}
+                      {(item as any).clientName ?? (item as any).patientName}
                     </Text>
                     <Text preset="bold" style={styles.patientTotalCost}>
                       {formatCurrency(item.totalCost)}

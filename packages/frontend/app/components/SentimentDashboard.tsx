@@ -11,7 +11,7 @@ import { SentimentTrend, SentimentSummary } from "../services/api/api.types"
 import { translate } from "../i18n"
 
 interface SentimentDashboardProps {
-  patientId: string
+  clientId: string
   trend?: SentimentTrend
   summary?: SentimentSummary
   isLoading?: boolean
@@ -22,7 +22,7 @@ interface SentimentDashboardProps {
 }
 
 export function SentimentDashboard({
-  patientId,
+  clientId,
   trend,
   summary,
   isLoading = false,
@@ -66,7 +66,7 @@ export function SentimentDashboard({
     >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>{translate("sentimentAnalysis.patientSentimentAnalysis")}</Text>
+        <Text style={styles.title}>{translate("sentimentAnalysis.clientSentimentAnalysis")}</Text>
         <Text style={styles.subtitle}>{translate("sentimentAnalysis.emotionalWellnessInsights")}</Text>
       </View>
 

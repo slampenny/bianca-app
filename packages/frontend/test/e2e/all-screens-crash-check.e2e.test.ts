@@ -100,10 +100,10 @@ test.describe('All Screens Crash Check', () => {
     await homeTab.click()
     await page.waitForTimeout(1000)
     // Check if button is enabled before clicking
-    const addPatientButton = page.locator('[data-testid="add-patient-button"]').first()
-    const isEnabled = await addPatientButton.isEnabled().catch(() => false)
+    const addClientButton = page.locator('[data-testid="add-client-button"]').first()
+    const isEnabled = await addClientButton.isEnabled().catch(() => false)
     if (isEnabled) {
-      await addPatientButton.click().catch(() => {})
+      await addClientButton.click().catch(() => {})
     }
     await page.waitForTimeout(2000)
     

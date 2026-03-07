@@ -25,6 +25,7 @@ interface PhoneInputProps {
   style?: any
   containerStyle?: any
   inputWrapperStyle?: any
+  onFocus?: () => void
 }
 
 // Format phone number to E.164 format (+1XXXXXXXXXX)
@@ -88,7 +89,7 @@ const validatePhoneNumber = (value: string): string | null => {
 }
 
 export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
-  ({ value, onChangeText, placeholder, placeholderTx, placeholderTxOptions, label, labelTx, labelTxOptions, error, disabled, editable, testID, accessibilityLabel, status, helper, style, containerStyle, inputWrapperStyle }, ref) => {
+  ({ value, onChangeText, placeholder, placeholderTx, placeholderTxOptions, label, labelTx, labelTxOptions, error, disabled, editable, testID, accessibilityLabel, status, helper, style, containerStyle, inputWrapperStyle, onFocus }, ref) => {
     const { colors: themeColors } = useTheme()
     const [isFocused, setIsFocused] = useState(false)
     const [internalValue, setInternalValue] = useState(value || '')
@@ -119,7 +120,7 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
     
     const displayError = error || validationError || (status === 'error' ? helper : null)
     const placeholderContent = placeholderTx
-      ? translate(placeholderTx, placeholderTxOptions)
+      ? translate(placeholderTx as import("../i18n").TxKeyPath, placeholderTxOptions)
       : placeholder
     
     // IMPORTANT: Only "disabled" status disables the input, NOT "error" status
@@ -148,9 +149,9 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
         shadowRadius: 3,
         elevation: 2,
       },
-      isFocused && { borderColor: themeColors.palette?.primary500 || themeColors.tint || colors.primary500, borderWidth: 2 },
+      isFocused && { borderColor: (themeColors.palette as { primary500?: string })?.primary500 || themeColors.tint || (colors as { primary500?: string }).primary500, borderWidth: 2 },
       displayError && { borderColor: themeColors.error || colors.error },
-      (disabled || !isEditable) && { backgroundColor: themeColors.palette?.neutral200 || themeColors.backgroundDim || "#F5F5F5", opacity: 0.6 },
+      (disabled || !isEditable) && { backgroundColor: themeColors.palette?.neutral200 || (themeColors as { backgroundDim?: string }).backgroundDim || "#F5F5F5", opacity: 0.6 },
       inputWrapperStyle
     ]
     
@@ -192,7 +193,7 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
         {!!(label || labelTx) && (
           <Text
             preset="formLabel"
-            text={label || (labelTx ? translate(labelTx, labelTxOptions) : undefined)}
+            text={label || (labelTx ? translate(labelTx as import("../i18n").TxKeyPath, labelTxOptions) : undefined)}
             style={labelStyles}
           />
         )}
@@ -205,14 +206,14 @@ export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(
             placeholder={placeholderContent || 'Enter phone number (e.g., 5551234567)'}
             placeholderTextColor={themeColors.textDim || themeColors.palette?.neutral500 || themeColors.palette?.neutral600 || "#666666"}
             style={inputStyles}
-            onFocus={() => setIsFocused(true)}
+            onFocus={() => { setIsFocused(true); onFocus?.() }}
             onBlur={() => setIsFocused(false)}
             editable={isEditable}
             keyboardType="phone-pad"
             autoComplete="tel"
             testID={testID}
             {...testingProps(testID)}
-            accessibilityLabel={accessibilityLabel || label || (labelTx ? translate(labelTx, labelTxOptions) : undefined) || "Phone number"}
+            accessibilityLabel={accessibilityLabel || label || (labelTx ? translate(labelTx as import("../i18n").TxKeyPath, labelTxOptions) : undefined) || "Phone number"}
             accessibilityState={{ disabled: !isEditable }}
             accessibilityHint={error || validationError || helper}
           />

@@ -1,22 +1,18 @@
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { Org, Patient, Call, Conversation, Invoice, LineItem } = require('../models');
+const { Org, Client, Call, Conversation, Invoice, LineItem } = require('../models');
 const ApiError = require('../utils/ApiError');
 const config = require('../config/config');
 const logger = require('../config/logger');
 
-const createInvoiceFromConversations = async (patientId) => {
-  const patient = await Patient.findById(patientId);
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+const createInvoiceFromConversations = async (clientId) => {
+  const client = await Client.findById(clientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-
-  const orgId = patient.org;
-
-  // Use direct query instead of aggregation for better test compatibility
-  // Query Call records instead of Conversation (Call tracks billing, Conversation tracks messages)
+  const orgId = client.org;
   const unchargedCalls = await Call.find({ 
-    patientId: new mongoose.Types.ObjectId(patientId),
+    clientId: new mongoose.Types.ObjectId(clientId),
     lineItemId: null 
   });
   
@@ -64,7 +60,7 @@ const createInvoiceFromConversations = async (patientId) => {
   let lineItem;
   try {
     lineItem = await LineItem.create({
-      patientId,
+      clientId,
       invoiceId: invoice._id,
       amount,
       description: `Billing for ${totalDuration} seconds of calls`,
@@ -123,11 +119,10 @@ const listInvoicesByOrg = async (orgId, filters = {}) => {
   return await Invoice.find(query).populate('lineItems');
 };
 
-const listInvoicesByPatient = async (patientId, filters = {}) => {
-  // Assumes a patient invoice is identified by a line item matching the patient
+const listInvoicesByClient = async (clientId, filters = {}) => {
   let invoices = await Invoice.find({}).populate({
     path: 'lineItems',
-    match: { patientId },
+    match: { clientId },
   });
   invoices = invoices.filter((inv) => inv.lineItems && inv.lineItems.length);
 
@@ -153,7 +148,8 @@ const getUnbilledCostsByOrg = async (orgId, days = 7) => {
 module.exports = {
   createInvoiceFromConversations,
   listInvoicesByOrg,
-  listInvoicesByPatient,
+  listInvoicesByClient,
+  listInvoicesByPatient: listInvoicesByClient,
   calculateAmount,
   getUnbilledCostsByOrg,
 };

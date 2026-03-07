@@ -216,7 +216,7 @@ const router = express.Router();
  *         description: Patient not found
  */
 router
-  .route('/patient/:patientId/trend')
+  .route('/client/:clientId/trend')
   .get(
     auth('readAny:conversation'),
     validate(sentimentValidation.getSentimentTrend),
@@ -254,7 +254,7 @@ router
  *         description: Patient not found
  */
 router
-  .route('/patient/:patientId/summary')
+  .route('/client/:clientId/summary')
   .get(
     auth('readAny:conversation'),
     validate(sentimentValidation.getSentimentSummary),

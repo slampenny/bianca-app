@@ -95,7 +95,7 @@ router.post('/reset', async (req, res) => {
       success: true,
       message: 'Demo database reset successfully',
       data: {
-        patients: result.patients?.length || 0,
+        clients: result.clients?.length || 0,
         org: result.org?._id || null,
         caregiver: result.caregiver?._id || null,
       }

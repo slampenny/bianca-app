@@ -9,17 +9,16 @@ export const fraudAbuseAnalysisApi = createApi({
   baseQuery: baseQueryWithReauth(),
   tagTypes: ["FraudAbuseAnalysisResult"],
   endpoints: (builder) => ({
-    // Get fraud/abuse analysis results for a specific patient
     getFraudAbuseAnalysisResults: builder.query<
       { success: boolean; results: FraudAbuseAnalysisResult[] },
-      { patientId: string; limit?: number }
+      { clientId: string; limit?: number }
     >({
-      query: ({ patientId, limit = 10 }) => {
-        const url = `/fraud-abuse-analysis/results/${patientId}`
+      query: ({ clientId, limit = 10 }) => {
+        const url = `/fraud-abuse-analysis/results/${clientId}`
         logger.debug('Fraud Abuse Analysis API - getFraudAbuseAnalysisResults:', {
           baseUrl: getDefaultApiConfig().url,
           fullUrl: getDefaultApiConfig().url + url,
-          patientId,
+          clientId,
           limit
         })
         return {
@@ -27,18 +26,17 @@ export const fraudAbuseAnalysisApi = createApi({
           params: { limit },
         }
       },
-      providesTags: (result, error, { patientId }) => [
-        { type: "FraudAbuseAnalysisResult", id: patientId },
+      providesTags: (result, error, { clientId }) => [
+        { type: "FraudAbuseAnalysisResult", id: clientId },
       ],
     }),
 
-    // Get fraud/abuse analysis for a patient with time range
     getFraudAbuseAnalysis: builder.query<
       { 
         success: boolean
         data: {
-          patientId: string
-          patientName: string
+          clientId: string
+          clientName: string
           timeRange: string
           startDate: string
           endDate: string
@@ -55,40 +53,38 @@ export const fraudAbuseAnalysisApi = createApi({
           generatedAt: string
         }
       },
-      { patientId: string; timeRange?: "month" | "quarter" | "year" | "custom"; startDate?: string; endDate?: string }
+      { clientId: string; timeRange?: "month" | "quarter" | "year" | "custom"; startDate?: string; endDate?: string }
     >({
-      query: ({ patientId, timeRange = "month", startDate, endDate }) => ({
-        url: `/fraud-abuse-analysis/${patientId}`,
+      query: ({ clientId, timeRange = "month", startDate, endDate }) => ({
+        url: `/fraud-abuse-analysis/${clientId}`,
         params: { timeRange, startDate, endDate },
       }),
-      providesTags: (result, error, { patientId }) => [
-        { type: "FraudAbuseAnalysisResult", id: patientId },
+      providesTags: (result, error, { clientId }) => [
+        { type: "FraudAbuseAnalysisResult", id: clientId },
       ],
     }),
 
-    // Trigger fraud/abuse analysis for a specific patient (synchronous)
     triggerFraudAbuseAnalysis: builder.mutation<
       { success: boolean; message: string; result?: FraudAbuseAnalysisResult },
-      { patientId: string }
+      { clientId: string }
     >({
-      query: ({ patientId }) => {
-        const url = `/fraud-abuse-analysis/trigger-patient/${patientId}`
+      query: ({ clientId }) => {
+        const url = `/fraud-abuse-analysis/trigger-client/${clientId}`
         logger.debug('Fraud Abuse Analysis API - triggerFraudAbuseAnalysis:', {
           baseUrl: getDefaultApiConfig().url,
           fullUrl: getDefaultApiConfig().url + url,
-          patientId
+          clientId
         })
         return {
           url,
           method: "POST",
         }
       },
-      async onQueryStarted({ patientId }, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ clientId }, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled
-          // Immediately invalidate cache since analysis is synchronous
           dispatch(fraudAbuseAnalysisApi.util.invalidateTags([
-            { type: "FraudAbuseAnalysisResult", id: patientId }
+            { type: "FraudAbuseAnalysisResult", id: clientId }
           ]))
         } catch (error) {
           logger.error('Trigger failed, not invalidating cache:', error)

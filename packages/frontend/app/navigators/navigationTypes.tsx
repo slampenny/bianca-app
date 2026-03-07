@@ -10,7 +10,7 @@ export type AppStackParamList = {
   EmailVerified: undefined
   EmailVerificationRequired: { email?: string } | undefined
   VerifyPhone: undefined
-  PatientConsent: { token?: string } | undefined
+  ClientConsent: { token?: string } | undefined
 }
 
 export type DrawerParamList = {
@@ -24,21 +24,21 @@ export type DrawerParamList = {
 
 export type HomeStackParamList = {
   HomeDetail: undefined
-  Patient: undefined
-  Schedule: { isNewPatient?: boolean } | undefined
+  Client: undefined
+  Schedule: { isNewClient?: boolean } | undefined
   Conversations: undefined
   Call: undefined
   SentimentAnalysis: {
-    patientId?: string
-    patientName?: string
+    clientId?: string
+    clientName?: string
   } | undefined
   MedicalAnalysis: {
-    patientId?: string
-    patientName?: string
+    clientId?: string
+    clientName?: string
   } | undefined
   FraudAbuseAnalysis: {
-    patientId?: string
-    patientName?: string
+    clientId?: string
+    clientName?: string
   } | undefined
   Privacy: undefined
   PrivacyPractices: undefined
@@ -83,7 +83,10 @@ export type LogoutStackParamList = {
 
 export type LoginStackParamList = {
   Login: undefined
-  Register: undefined
+  Register: { persona?: import("../services/api/api.types").OnboardingPersona; orgName?: string; orgCountry?: string; orgTimezone?: string } | undefined
+  OnboardingAboutYou: undefined
+  OnboardingHowBiancaWorks: { persona: import("../services/api/api.types").OnboardingPersona }
+  OnboardingOrgInfo: { persona: import("../services/api/api.types").OnboardingPersona }
   RequestReset: undefined
   ConfirmReset: { token?: string }
   Privacy: undefined
@@ -96,7 +99,17 @@ export type LoginStackParamList = {
   SSOAccountLinking: { email: string; ssoProvider?: string } | undefined
   Signup: { token?: string }
   MFAVerification: { email: string; password: string; tempToken: string }
-  PatientConsent: { token?: string } | undefined
+  ClientConsent: { token?: string } | undefined
+}
+
+export type OnboardingStackParamList = {
+  OnboardingAboutYou: undefined
+  OnboardingHowBiancaWorks: { persona: import("../services/api/api.types").OnboardingPersona }
+  OnboardingOrgInfo: { persona: import("../services/api/api.types").OnboardingPersona }
+  OnboardingRegistration: { persona: import("../services/api/api.types").OnboardingPersona }
+  OnboardingTermsAndConsent: { persona?: import("../services/api/api.types").OnboardingPersona }
+  Terms: undefined
+  Privacy: undefined
 }
 
 export interface NavigationProps extends Partial<NavigationContainerProps> {

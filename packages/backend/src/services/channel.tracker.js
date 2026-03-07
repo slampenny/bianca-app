@@ -60,7 +60,7 @@ class ChannelTracker {
             asteriskChannelId: asteriskChannelId,
             mainChannel: initialData.channel || null,
             twilioCallSid: initialData.twilioCallSid || null, // Primary external identifier
-            patientId: initialData.patientId || null,
+            clientId: initialData.clientId || initialData.patientId || null,
             startTime: new Date(),
             state: initialData.state || 'init', // Initial state
             mainBridge: null,
@@ -136,7 +136,7 @@ class ChannelTracker {
         const readPort = portManager.acquirePort(`${primarySid}-read`, {
             asteriskChannelId,
             twilioCallSid: callData.twilioCallSid,
-            patientId: callData.patientId,
+            clientId: callData.clientId,
             direction: 'read'
         });
 

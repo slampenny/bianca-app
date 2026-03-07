@@ -6,6 +6,8 @@ import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 import { Caregiver } from "../api.types"
 
 describe("caregiverApi", () => {
+  jest.setTimeout(20000)
+
   let store: EnhancedStore<RootState>
   let caregiverId: string
   let orgId: string
@@ -24,10 +26,9 @@ describe("caregiverApi", () => {
       caregiverId = response.caregiver.id as string
       orgId = response.org.id as string
       // authTokens = response.tokens;
-    } catch (error) {
-      // If registration fails (e.g., email verification endpoint not available), 
-      // set IDs to null so tests can skip gracefully
-      console.log('Registration failed in beforeEach:', error)
+    } catch {
+      // If registration fails (e.g., email verification endpoint not available),
+      // set IDs to empty so tests can skip or fail with clear auth errors
       caregiverId = ''
       orgId = ''
     }
@@ -37,11 +38,12 @@ describe("caregiverApi", () => {
     if (orgId) {
       try {
         await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
-      } catch (error) {
+      } catch {
         // Ignore cleanup errors
       }
     }
     jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   it("should get all caregivers", async () => {
@@ -141,9 +143,8 @@ describe("caregiverApi", () => {
     let createdCaregiver
     try {
       createdCaregiver = await createCaregiver(orgId, newData)
-    } catch (error) {
+    } catch {
       // If createCaregiver fails (e.g., test endpoint not available), skip the test
-      console.log('Skipping test - createCaregiver helper failed (test endpoint may not be available)')
       return
     }
 
@@ -206,11 +207,12 @@ describe("caregiverApi - patients", () => {
     if (orgId) {
       try {
         await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
-      } catch (error) {
+      } catch {
         // Ignore cleanup errors
       }
     }
     jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   // it('should assign a caregiver to a patient', async () => {
@@ -249,7 +251,7 @@ describe("caregiverApi - patients", () => {
   // });
 
   it("should get patients for a caregiver", async () => {
-    const result = await caregiverApi.endpoints.getPatientsForCaregiver.initiate(caregiverId)(
+    const result = await caregiverApi.endpoints.getClientsForCaregiver.initiate(caregiverId)(
       store.dispatch,
       store.getState,
       {},

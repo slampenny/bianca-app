@@ -348,7 +348,7 @@ const processAccessRequest = async (requestId, processedBy) => {
   
   const caregiver = await Caregiver.findById(request.requestorId)
     .populate('org')
-    .populate('patients');
+    .populate('clients');
   
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
@@ -372,17 +372,18 @@ const processAccessRequest = async (requestId, processedBy) => {
       updatedAt: caregiver.updatedAt
     },
     patients: [],
+    clients: [],
     conversations: [],
     medicalAnalysis: [],
     consentHistory: []
   };
   
   // Get all patients associated with this caregiver
-  if (caregiver.patients && caregiver.patients.length > 0) {
-    for (const patientId of caregiver.patients) {
-      const patient = await Patient.findById(patientId);
+  if (caregiver.clients && caregiver.clients.length > 0) {
+    for (const clientId of caregiver.clients) {
+      const patient = await Patient.findById(clientId);
       if (patient) {
-        userData.patients.push({
+        userData.clients.push({
           id: patient._id,
           name: patient.name,
           email: patient.email,
@@ -394,14 +395,14 @@ const processAccessRequest = async (requestId, processedBy) => {
         });
         
         // Get conversations for this patient
-        const conversations = await Conversation.find({ patientId: patient._id })
+        const conversations = await Conversation.find({ clientId: patient._id })
           .populate('messages')
           .sort({ startTime: -1 })
           .limit(100); // Limit to most recent 100
         
         userData.conversations.push(...conversations.map(c => ({
           id: c._id,
-          patientId: c.patientId,
+          clientId: c.clientId,
           patientName: patient.name,
           status: c.status,
           startTime: c.startTime,
@@ -411,13 +412,13 @@ const processAccessRequest = async (requestId, processedBy) => {
         })));
         
         // Get medical analysis for this patient
-        const analyses = await MedicalAnalysis.find({ patientId: patient._id })
+        const analyses = await MedicalAnalysis.find({ clientId: patient._id })
           .sort({ createdAt: -1 })
           .limit(50);
         
         userData.medicalAnalysis.push(...analyses.map(a => ({
           id: a._id,
-          patientId: a.patientId,
+          clientId: a.clientId,
           patientName: patient.name,
           analysisDate: a.analysisDate,
           cognitiveMetrics: a.cognitiveMetrics,

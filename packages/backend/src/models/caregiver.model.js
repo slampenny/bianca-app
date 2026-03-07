@@ -169,7 +169,19 @@ const caregiverSchema = mongoose.Schema(
       default: null, // null = not set, false = opted out, true = opted in
       required: false,
     },
-    patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
+    // Onboarding: set true after user completes "About you" + "How Bianca works" + (if org/caregiver) terms and consent
+    onboardingComplete: {
+      type: Boolean,
+      default: false,
+      required: false,
+    },
+    // Persona chosen during onboarding: 'organization' | 'caregiver' | 'agingInPlace'
+    persona: {
+      type: String,
+      enum: ['organization', 'caregiver', 'agingInPlace'],
+      required: false,
+    },
+    clients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Client' }],
   },
   {
     timestamps: true,
@@ -187,7 +199,7 @@ const caregiverSchema = mongoose.Schema(
 caregiverSchema.index({ org: 1 });
 caregiverSchema.index({ role: 1 }); // For role-based queries
 caregiverSchema.index({ org: 1, role: 1 }); // Compound
-caregiverSchema.index({ patients: 1 }); // Array index for patient lookups
+caregiverSchema.index({ clients: 1 });
 caregiverSchema.index({ phone: 1, isPhoneVerified: 1 }); // Compound index for phone verification queries
 
 // Plugin to convert mongoose to JSON, and paginate results

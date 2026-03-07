@@ -820,7 +820,7 @@ router.post('/seed', async (req, res) => {
       data: {
         org: result.org ? result.org._id : null,
         caregiver: result.caregiver ? result.caregiver._id : null,
-        patients: result.patients ? result.patients.map(p => p._id) : []
+        clients: result.clients ? result.clients.map(p => p._id) : []
       }
     });
   } catch (error) {
@@ -1251,7 +1251,7 @@ router.post('/get-caregiver-by-email', async (req, res) => {
  *                 type: string
  *                 enum: [patient, system, conversation, schedule]
  *                 description: Type of alert
- *               relatedPatient:
+ *               relatedClient:
  *                 type: string
  *                 description: ID of related patient (if alertType is patient)
  *     responses:
@@ -1269,7 +1269,7 @@ router.post('/create-alert', async (req, res) => {
       return res.status(403).json({ error: 'This endpoint is not available in production' });
     }
 
-    const { caregiverId, message, importance = 'medium', alertType = 'system', relatedPatient, visibility = 'allCaregivers', relevanceUntil } = req.body;
+    const { caregiverId, message, importance = 'medium', alertType = 'system', relatedClient, visibility = 'allCaregivers', relevanceUntil } = req.body;
     
     if (!caregiverId || !message) {
       return res.status(400).json({ error: 'caregiverId and message are required' });
@@ -1284,13 +1284,13 @@ router.post('/create-alert', async (req, res) => {
       importance,
       alertType,
       visibility: visibility || 'allCaregivers', // Default visibility for test alerts
-      relatedPatient,
+      relatedClient,
       readBy: [],
       relevanceUntil: relevanceUntil ? new Date(relevanceUntil) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to 7 days from now
     };
 
-    if (relatedPatient) {
-      alertData.relatedPatient = relatedPatient;
+    if (relatedClient) {
+      alertData.relatedClient = relatedClient;
     }
 
     const alert = await alertService.createAlert(alertData);
@@ -1724,12 +1724,12 @@ router.post('/create-app-store-review-account', async (req, res) => {
     });
     
     // Add patients to caregiver
-    caregiver.patients.push(patient1._id, patient2._id);
+    caregiver.clients.push(patient1._id, patient2._id);
     await caregiver.save();
     
     // Create sample conversations
     const conversation1 = await Conversation.create({
-      patient: patient1._id,
+      client: patient1._id,
       startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
       endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000),
       duration: 5 * 60,
@@ -1742,7 +1742,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     await Message.create({
       conversation: conversation1._id,
-      patient: patient1._id,
+      client: patient1._id,
       content: 'Hello, how are you feeling today?',
       role: 'system',
       timestamp: conversation1.startTime,
@@ -1750,14 +1750,14 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     await Message.create({
       conversation: conversation1._id,
-      patient: patient1._id,
+      client: patient1._id,
       content: 'I\'m doing well, thank you for checking in.',
       role: 'user',
       timestamp: new Date(conversation1.startTime.getTime() + 30 * 1000),
     });
     
     const conversation2 = await Conversation.create({
-      patient: patient1._id,
+      client: patient1._id,
       startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
       endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3 * 60 * 1000),
       duration: 3 * 60,
@@ -1769,7 +1769,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     });
     
     const conversation3 = await Conversation.create({
-      patient: patient2._id,
+      client: patient2._id,
       startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
       endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 1000),
       duration: 4 * 60,
@@ -1782,7 +1782,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     // Create sample schedules
     const schedule1 = await Schedule.create({
-      patient: patient1._id,
+      client: patient1._id,
       caregiver: caregiver._id,
       type: 'daily',
       time: '09:00',
@@ -1792,7 +1792,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     });
     
     const schedule2 = await Schedule.create({
-      patient: patient1._id,
+      client: patient1._id,
       caregiver: caregiver._id,
       type: 'weekly',
       dayOfWeek: 1,
@@ -1803,7 +1803,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     });
     
     const schedule3 = await Schedule.create({
-      patient: patient2._id,
+      client: patient2._id,
       caregiver: caregiver._id,
       type: 'daily',
       time: '10:00',

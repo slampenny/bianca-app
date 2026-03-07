@@ -471,7 +471,7 @@ When('I navigate to the billing screen', async function() {
   
   // Wait for home screen elements or tabs to appear
   try {
-    await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="patient-list"]', { timeout: 15000 });
+    await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="client-list"]', { timeout: 15000 });
   } catch (e) {
     // Tabs might not have testid, try waiting for any navigation element
     if (typeof safeWait === 'function') {
@@ -538,7 +538,7 @@ When('I navigate to the billing screen', async function() {
     const anyTabCount = await anyTab.count().catch(() => 0);
     
     // Also check for home screen elements
-    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="patient-list"]').count().catch(() => 0);
+    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').count().catch(() => 0);
     
     // Check URL to see if we're on home screen
     const urlAfterWait = this.page.url();

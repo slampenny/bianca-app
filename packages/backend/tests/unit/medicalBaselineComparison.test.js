@@ -62,7 +62,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
       );
 
       expect(baseline).toBeDefined();
-      expect(baseline.patientId).toBe(medicalPatients.cognitiveDeclinePatient._id);
+      expect(baseline.clientId).toBe(medicalPatients.cognitiveDeclinePatient._id);
       expect(baseline.type).toBe('initial');
       expect(baseline.metrics).toBeDefined();
       

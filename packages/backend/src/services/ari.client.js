@@ -579,7 +579,7 @@ class AsteriskAriClient extends EventEmitter {
                 channel: channel,
                 mainChannel: channel,
                 twilioCallSid: null,
-                patientId: null,
+                clientId: null,
                 state: 'answered', // Initial high-level state
                 isReadStreamReady: false,
                 isWriteStreamReady: false,
@@ -632,7 +632,7 @@ class AsteriskAriClient extends EventEmitter {
 
         return {
             twilioCallSid: paramMap.callSid,
-            patientId: paramMap.patientId
+            clientId: paramMap.clientId || paramMap.patientId
         };
     }
 
@@ -2166,7 +2166,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             }
             if (!patientDoc?._id) {
                 const existingCall = await Call.findOne({ callSid: twilioCallSid }).select('patientId').lean();
-                if (existingCall?.patientId) {
+                if (existingCall?.clientId) {
                     const resolvedId = existingCall.patientId?.toString?.() || existingCall.patientId;
                     patientDoc = await Patient.findById(resolvedId).select('_id name').lean();
                     if (patientDoc?._id) {
@@ -2187,7 +2187,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
                 // Create Call record for inbound call
                 call = await Call.create({
                     callSid: twilioCallSid,
-                    patientId: patientDoc._id,
+                    clientId: patientDoc._id,
                     asteriskChannelId,
                     startTime: new Date(),
                     callStartTime: new Date(),
@@ -2212,7 +2212,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             if (!conversation) {
                 conversation = await Conversation.create({
                     callId: call._id,
-                    patientId: patientDoc._id,
+                    clientId: patientDoc._id,
                 });
                 
                 // Update call with conversation reference

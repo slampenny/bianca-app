@@ -3,7 +3,7 @@ const { objectId } = require('./custom.validation');
 
 const initiateCall = {
   body: Joi.object().keys({
-    patientId: Joi.string().custom(objectId).required(),
+    clientId: Joi.string().custom(objectId).required(),
     callNotes: Joi.string().max(500).optional(),
   }),
 };

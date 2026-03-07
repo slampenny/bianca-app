@@ -61,12 +61,17 @@ const mockPatientService = {
   checkPatientConsent: jest.fn().mockResolvedValue(true), // Default to consent granted
 };
 
+const mockClientService = {
+  checkClientConsent: jest.fn().mockResolvedValue(true), // Default to consent granted
+};
+
 const mockAlertService = {
   createAlert: jest.fn().mockResolvedValue({}),
 };
 
 jest.mock('../../../src/services', () => ({
   patientService: mockPatientService,
+  clientService: mockClientService,
   twilioCallService: mockTwilioCallService,
   alertService: mockAlertService,
   paymentService: {},
@@ -145,7 +150,7 @@ describe('Agenda - runSchedules', () => {
       // Create schedule with nextCallDate, then update it directly in DB to bypass validation
       // Create schedule - let the hook set nextCallDate, then update it directly in DB
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -241,7 +246,7 @@ describe('Agenda - runSchedules', () => {
 
       // Create schedule - let the hook set nextCallDate, then update it directly in DB
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -273,7 +278,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const inactiveSchedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'daily',
         intervals: [],
         isActive: false, // Inactive
@@ -303,7 +308,7 @@ describe('Agenda - runSchedules', () => {
       futureDate.setUTCHours(2, 0, 0, 0);
 
       const futureSchedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -348,7 +353,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'weekly',
         intervals: [{ day: 1, weeks: 1 }], // Monday
         isActive: true,
@@ -375,7 +380,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'weekly',
         intervals: [{ day: 1, weeks: 1 }], // Monday
         isActive: true,
@@ -411,7 +416,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'monthly',
         intervals: [{ day: 15, weeks: 0 }],
         isActive: true,
@@ -445,7 +450,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: new mongoose.Types.ObjectId(), // Non-existent patient
+        client: new mongoose.Types.ObjectId(), // Non-existent client
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -477,7 +482,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -537,7 +542,7 @@ describe('Agenda - runSchedules', () => {
       const mockNow = new Date(baseDate.getTime() + 5 * 60 * 1000); // 2:05 AM UTC (5 minutes past, within 15 min window)
 
       const schedule = await Schedule.create({
-        patient: unconsentedPatient._id,
+        client: unconsentedPatient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -551,8 +556,8 @@ describe('Agenda - runSchedules', () => {
         { $set: { nextCallDate: pastDate } }
       );
 
-      // Mock checkPatientConsent to return false
-      mockPatientService.checkPatientConsent = jest.fn().mockResolvedValue(false);
+      // Mock checkClientConsent to return false
+      mockClientService.checkClientConsent = jest.fn().mockResolvedValue(false);
 
       // Verify the schedule exists and nextCallDate is in the past
       const foundSchedule = await Schedule.findById(schedule._id);
@@ -610,7 +615,7 @@ describe('Agenda - runSchedules', () => {
       const mockNow = new Date(baseDate.getTime() + 5 * 60 * 1000); // 2:05 AM UTC
 
       const schedule = await Schedule.create({
-        patient: consentedPatient._id,
+        client: consentedPatient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -623,8 +628,8 @@ describe('Agenda - runSchedules', () => {
         { $set: { nextCallDate: pastDate } }
       );
 
-      // Mock checkPatientConsent to return true
-      mockPatientService.checkPatientConsent = jest.fn().mockResolvedValue(true);
+      // Mock checkClientConsent to return true
+      mockClientService.checkClientConsent = jest.fn().mockResolvedValue(true);
       
       // Reset initiateCall mock to ensure it's not throwing an error from a previous test
       mockTwilioCallService.initiateCall.mockReset();
@@ -683,7 +688,7 @@ describe('Agenda - runSchedules', () => {
       const mockNow = new Date(baseDate.getTime() + 5 * 60 * 1000); // 2:05 AM UTC
 
       const schedule = await Schedule.create({
-        patient: patientNoConsent._id,
+        client: patientNoConsent._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -696,8 +701,8 @@ describe('Agenda - runSchedules', () => {
         { $set: { nextCallDate: pastDate } }
       );
 
-      // Mock checkPatientConsent to return true (because org doesn't require it)
-      mockPatientService.checkPatientConsent = jest.fn().mockResolvedValue(true);
+      // Mock checkClientConsent to return true (because org doesn't require it)
+      mockClientService.checkClientConsent = jest.fn().mockResolvedValue(true);
 
       // Mock Date constructor and Date.now
       const mockTimestamp = mockNow.getTime();

@@ -695,7 +695,7 @@ const createConversationsFromFixture = async (patientId, conversationData) => {
       // Create a Call first (Conversation requires callId)
       const call = await Call.create({
         callSid: `CA${new mongoose.Types.ObjectId().toString()}`,
-        patientId,
+        clientId: patientId,
         duration: 30 * 60, // 30 minutes in seconds
         status: 'completed',
         startTime: convData.date,
@@ -706,7 +706,7 @@ const createConversationsFromFixture = async (patientId, conversationData) => {
       // Note: Conversation model uses createdAt (from timestamps), not startTime
       // We'll set createdAt explicitly to match the conversation date
       const conversation = new Conversation({
-        patientId,
+        clientId: patientId,
         callId: call._id,
         messages: []
       });

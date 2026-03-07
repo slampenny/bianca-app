@@ -7,9 +7,9 @@ const mongoose = require('mongoose');
  * Stores analysis results for fraud, exploitation, abuse, and neglect detection
  */
 const fraudAbuseAnalysisSchema = new mongoose.Schema({
-  patientId: {
+  clientId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Patient',
+    ref: 'Client',
     required: true,
     index: true
   },
@@ -273,8 +273,8 @@ const fraudAbuseAnalysisSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient querying
-fraudAbuseAnalysisSchema.index({ patientId: 1, analysisDate: -1 });
-fraudAbuseAnalysisSchema.index({ patientId: 1, timeRange: 1, startDate: -1 });
+fraudAbuseAnalysisSchema.index({ clientId: 1, analysisDate: -1 });
+fraudAbuseAnalysisSchema.index({ clientId: 1, timeRange: 1, startDate: -1 });
 fraudAbuseAnalysisSchema.index({ overallRiskScore: 1 });
 fraudAbuseAnalysisSchema.index({ 'financialRisk.riskScore': 1 });
 fraudAbuseAnalysisSchema.index({ 'abuseRisk.riskScore': 1 });
@@ -292,7 +292,7 @@ fraudAbuseAnalysisSchema.virtual('riskLevel').get(function() {
 // Method to get analysis summary for dashboard
 fraudAbuseAnalysisSchema.methods.getSummary = function() {
   return {
-    patientId: this.patientId,
+    clientId: this.clientId,
     analysisDate: this.analysisDate,
     timeRange: this.timeRange,
     overallRiskScore: this.overallRiskScore,
@@ -309,14 +309,13 @@ fraudAbuseAnalysisSchema.methods.getSummary = function() {
 };
 
 // Static method to get latest analysis for a patient
-fraudAbuseAnalysisSchema.statics.getLatestAnalysis = function(patientId) {
-  return this.findOne({ patientId }).sort({ analysisDate: -1 });
+fraudAbuseAnalysisSchema.statics.getLatestAnalysis = function(clientId) {
+  return this.findOne({ clientId }).sort({ analysisDate: -1 });
 };
 
-// Static method to get analyses for date range
-fraudAbuseAnalysisSchema.statics.getAnalysesByDateRange = function(patientId, startDate, endDate) {
+fraudAbuseAnalysisSchema.statics.getAnalysesByDateRange = function(clientId, startDate, endDate) {
   return this.find({
-    patientId,
+    clientId,
     startDate: { $gte: startDate },
     endDate: { $lte: endDate }
   }).sort({ analysisDate: -1 });
@@ -333,8 +332,8 @@ fraudAbuseAnalysisSchema.statics.getHighRiskAnalyses = function(options = {}) {
     ]
   };
   
-  if (options.patientId) {
-    query.patientId = options.patientId;
+  if (options.clientId) {
+    query.clientId = options.clientId;
   }
   
   return this.find(query).sort({ analysisDate: -1 });

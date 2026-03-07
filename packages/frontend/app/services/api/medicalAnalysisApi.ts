@@ -13,17 +13,16 @@ export const medicalAnalysisApi = createApi({
   baseQuery: baseQueryWithReauth(),
   tagTypes: ["MedicalAnalysisResult", "MedicalAnalysisTrend", "MedicalAnalysisSummary"],
   endpoints: (builder) => ({
-    // Get medical analysis results for a specific patient
     getMedicalAnalysisResults: builder.query<
       { success: boolean; results: MedicalAnalysisResult[]; count: number },
-      { patientId: string; limit?: number }
+      { clientId: string; limit?: number }
     >({
-      query: ({ patientId, limit = 10 }) => {
-        const url = `/medical-analysis/results/${patientId}`
+      query: ({ clientId, limit = 10 }) => {
+        const url = `/medical-analysis/results/${clientId}`
         logger.debug('Medical Analysis API - getMedicalAnalysisResults:', {
           baseUrl: getDefaultApiConfig().url,
           fullUrl: getDefaultApiConfig().url + url,
-          patientId,
+          clientId,
           limit
         })
         return {
@@ -31,62 +30,58 @@ export const medicalAnalysisApi = createApi({
           params: { limit },
         }
       },
-      providesTags: (result, error, { patientId }) => [
-        { type: "MedicalAnalysisResult", id: patientId },
+      providesTags: (result, error, { clientId }) => [
+        { type: "MedicalAnalysisResult", id: clientId },
       ],
     }),
 
-    // Get medical analysis trend for a specific patient
     getMedicalAnalysisTrend: builder.query<
       { success: boolean; trend: MedicalAnalysisTrend },
-      { patientId: string; timeRange?: "month" | "quarter" | "year" }
+      { clientId: string; timeRange?: "month" | "quarter" | "year" }
     >({
-      query: ({ patientId, timeRange = "month" }) => ({
-        url: `/medical-analysis/trend/${patientId}`,
+      query: ({ clientId, timeRange = "month" }) => ({
+        url: `/medical-analysis/trend/${clientId}`,
         params: { timeRange },
       }),
-      providesTags: (result, error, { patientId, timeRange }) => [
-        { type: "MedicalAnalysisTrend", id: `${patientId}-${timeRange}` },
+      providesTags: (result, error, { clientId, timeRange }) => [
+        { type: "MedicalAnalysisTrend", id: `${clientId}-${timeRange}` },
       ],
     }),
 
-    // Get medical analysis summary for a specific patient
     getMedicalAnalysisSummary: builder.query<
       { success: boolean; summary: MedicalAnalysisSummary },
-      { patientId: string }
+      { clientId: string }
     >({
-      query: ({ patientId }) => ({
-        url: `/medical-analysis/summary/${patientId}`,
+      query: ({ clientId }) => ({
+        url: `/medical-analysis/summary/${clientId}`,
       }),
-      providesTags: (result, error, { patientId }) => [
-        { type: "MedicalAnalysisSummary", id: patientId },
+      providesTags: (result, error, { clientId }) => [
+        { type: "MedicalAnalysisSummary", id: clientId },
       ],
     }),
 
-    // Trigger medical analysis for a specific patient (synchronous)
     triggerMedicalAnalysis: builder.mutation<
       { success: boolean; message: string; result?: any },
-      { patientId: string }
+      { clientId: string }
     >({
-      query: ({ patientId }) => {
-        const url = `/medical-analysis/trigger-patient/${patientId}`
+      query: ({ clientId }) => {
+        const url = `/medical-analysis/trigger-client/${clientId}`
         logger.debug('Medical Analysis API - triggerMedicalAnalysis:', {
           baseUrl: getDefaultApiConfig().url,
           fullUrl: getDefaultApiConfig().url + url,
-          patientId
+          clientId
         })
         return {
           url,
           method: "POST",
         }
       },
-      async onQueryStarted({ patientId }, { dispatch, queryFulfilled }) {
+      async onQueryStarted({ clientId }, { dispatch, queryFulfilled }) {
         try {
           await queryFulfilled
-          // Immediately invalidate cache since analysis is now synchronous
           dispatch(medicalAnalysisApi.util.invalidateTags([
-            { type: "MedicalAnalysisResult", id: patientId },
-            { type: "MedicalAnalysisTrend", id: `${patientId}-month` }
+            { type: "MedicalAnalysisResult", id: clientId },
+            { type: "MedicalAnalysisTrend", id: `${clientId}-month` }
           ]))
         } catch (error) {
           logger.error('Trigger failed, not invalidating cache:', error)
@@ -94,16 +89,16 @@ export const medicalAnalysisApi = createApi({
       },
     }),
 
-    // Trigger medical analysis for all patients
+    // Trigger medical analysis for all clients
     triggerAllMedicalAnalysis: builder.mutation<
       { 
         success: boolean; 
         message: string; 
-        patientsAnalyzed: number; 
+        clientsAnalyzed: number; 
         jobsScheduled: number;
         batchId?: string;
-        patients?: Array<{ id: string; name: string }>;
-        errors?: Array<{ patientId: string; error: string }>;
+        clients?: Array<{ id: string; name: string }>;
+        errors?: Array<{ clientId: string; error: string }>;
       },
       void
     >({

@@ -212,11 +212,11 @@ describe('Emergency Processor', () => {
       
       expect(result.success).toBe(true);
       expect(result.alert).toBeDefined();
-      expect(result.patient.id).toBe(mockPatient._id.toString());
-      expect(result.patient.name).toBe('John Doe');
+      expect(result.client.id).toBe(mockPatient._id.toString());
+      expect(result.client.name).toBe('John Doe');
     });
 
-    test('should handle patient not found', async () => {
+    test('should handle client not found', async () => {
       // Using real models now - no mocking needed
 
       const alertData = {

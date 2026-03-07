@@ -415,8 +415,8 @@ When('I click the {string} button', async function(buttonText) {
     return;
   }
   
-  // Special case for "Add Patient" button
-  if (buttonText.toLowerCase().includes('add') && buttonText.toLowerCase().includes('patient')) {
+  // Special case for "Add Client" button
+  if (buttonText.toLowerCase().includes('add') && buttonText.toLowerCase().includes('client')) {
     // Ensure we're on the home screen
     const currentUrl = this.page.url();
     if (!currentUrl.includes('/MainTabs/Home') && currentUrl.endsWith('/')) {
@@ -426,21 +426,21 @@ When('I click the {string} button', async function(buttonText) {
     }
     
     // Wait for home screen to be fully loaded
-    await this.page.waitForSelector('[data-testid="home-header"], [data-testid="patient-list"]', { timeout: 15000 }).catch(() => {});
+    await this.page.waitForSelector('[data-testid="home-header"], [data-testid="client-list"]', { timeout: 15000 }).catch(() => {});
     
-    // Wait for patients API call to complete
+    // Wait for clients API call to complete
     try {
       await this.page.waitForResponse(response => 
-        response.url().includes('/api/v1/patients') && response.status() === 200,
+        response.url().includes('/api/v1/clients') && response.status() === 200,
         { timeout: 10000 }
       );
     } catch (e) {
       // API call might have already completed
     }
     
-    // Wait for React to render - check for patient list in DOM
+    // Wait for React to render - check for client list in DOM
     try {
-      await this.page.waitForSelector('[data-testid="patient-list"]', { timeout: 10000 });
+      await this.page.waitForSelector('[data-testid="client-list"]', { timeout: 10000 });
     } catch (e) {
       // List might be empty
     }
@@ -479,7 +479,7 @@ When('I click the {string} button', async function(buttonText) {
     let buttonFound = false;
     for (let i = 0; i < 5; i++) {
       const buttonInDOM = await this.page.evaluate(() => {
-        return !!document.querySelector('[data-testid="add-patient-button"]');
+        return !!document.querySelector('[data-testid="add-client-button"]');
       });
       if (buttonInDOM) {
         buttonFound = true;
@@ -491,10 +491,10 @@ When('I click the {string} button', async function(buttonText) {
     if (!buttonFound) {
       // Try waiting for the button selector
       try {
-        await this.page.waitForSelector('[data-testid="add-patient-button"]', { timeout: 10000 });
+        await this.page.waitForSelector('[data-testid="add-client-button"]', { timeout: 10000 });
         buttonFound = true;
       } catch (e) {
-        console.log('Add Patient button still not in DOM after waiting');
+        console.log('Add Client button still not in DOM after waiting');
       }
     }
     
@@ -504,42 +504,42 @@ When('I click the {string} button', async function(buttonText) {
     
     // Try multiple approaches - button is visible in screenshot, so it's in DOM
     // First, try direct data-testid selector (most reliable)
-    let button = this.page.locator('[data-testid="add-patient-button"]').first();
+    let button = this.page.locator('[data-testid="add-client-button"]').first();
     let count = await button.count();
     
     if (count === 0) {
       // Try getByTestId
-      button = this.page.getByTestId('add-patient-button').first();
+      button = this.page.getByTestId('add-client-button').first();
       count = await button.count();
     }
     
     if (count === 0) {
       // Try by role with accessible name (Pressable has accessibilityRole="button")
-      button = this.page.getByRole('button', { name: /add.*patient/i }).first();
+      button = this.page.getByRole('button', { name: /add.*client/i }).first();
       count = await button.count();
     }
     
     if (count === 0) {
       // Try any element with role="button" that contains the text
-      button = this.page.locator('[role="button"]').filter({ hasText: /add.*patient/i }).first();
+      button = this.page.locator('[role="button"]').filter({ hasText: /add.*client/i }).first();
       count = await button.count();
     }
     
     if (count === 0) {
       // Try by text content (text might be in nested Text component)
-      button = this.page.getByText('Add Patient', { exact: false }).first();
+      button = this.page.getByText(/Add Client/, { exact: false }).first();
       count = await button.count();
     }
     
     if (count === 0) {
       // Try case-insensitive text search
-      button = this.page.getByText(/add.*patient/i).first();
+      button = this.page.getByText(/add.*client/i).first();
       count = await button.count();
     }
     
     if (count === 0) {
       // Try any pressable/button element
-      button = this.page.locator('button, [role="button"], [data-testid*="button"]').filter({ hasText: /add.*patient/i }).first();
+      button = this.page.locator('button, [role="button"], [data-testid*="button"]').filter({ hasText: /add.*client/i }).first();
       count = await button.count();
     }
     
@@ -553,7 +553,7 @@ When('I click the {string} button', async function(buttonText) {
       if (isDisabled) {
         // Button is disabled - user may not have permission
         // Try logging in as orgAdmin to get permission
-        console.log('Add Patient button is disabled - logging in as orgAdmin for permission');
+        console.log('Add Client button is disabled - logging in as orgAdmin for permission');
         
         // Navigate to login if not already there
         const currentUrl = this.page.url();
@@ -652,10 +652,10 @@ When('I click the {string} button', async function(buttonText) {
           throw new Error('Login failed - still on login screen after navigation');
         }
         
-        // Wait for home screen to load and patients API to complete
+        // Wait for home screen to load and clients API to complete
         try {
           await this.page.waitForResponse(response => 
-            response.url().includes('/api/v1/patients') && response.status() === 200,
+            response.url().includes('/api/v1/clients') && response.status() === 200,
             { timeout: 15000 }
           );
         } catch (e) {
@@ -664,7 +664,7 @@ When('I click the {string} button', async function(buttonText) {
         
         // Wait for home screen elements
         try {
-          await this.page.waitForSelector('[data-testid="home-header"], [data-testid="patient-list"]', { timeout: 15000 });
+          await this.page.waitForSelector('[data-testid="home-header"], [data-testid="client-list"]', { timeout: 15000 });
         } catch (e) {
           // Elements might already be visible
         }
@@ -681,17 +681,17 @@ When('I click the {string} button', async function(buttonText) {
         }
         
         // Try finding the button again with multiple selectors
-        button = this.page.getByTestId('add-patient-button').first();
+        button = this.page.getByTestId('add-client-button').first();
         let newCount = await button.count();
         
         if (newCount === 0) {
-          button = this.page.locator('[data-testid="add-patient-button"]').first();
+          button = this.page.locator('[data-testid="add-client-button"]').first();
           newCount = await button.count();
         }
         
         if (newCount === 0) {
           // Try by text
-          button = this.page.getByText(/add.*patient/i).first();
+          button = this.page.getByText(/add.*client/i).first();
           newCount = await button.count();
         }
         
@@ -707,16 +707,16 @@ When('I click the {string} button', async function(buttonText) {
             }
           }
           
-          button = this.page.getByTestId('add-patient-button').first();
+          button = this.page.getByTestId('add-client-button').first();
           newCount = await button.count();
           
           if (newCount === 0) {
-            button = this.page.locator('[data-testid="add-patient-button"]').first();
+            button = this.page.locator('[data-testid="add-client-button"]').first();
             newCount = await button.count();
           }
           
           if (newCount === 0) {
-            button = this.page.getByText(/add.*patient/i).first();
+            button = this.page.getByText(/add.*client/i).first();
             newCount = await button.count();
           }
         }
@@ -727,8 +727,8 @@ When('I click the {string} button', async function(buttonText) {
             return {
               url: window.location.href,
               hasHomeHeader: !!document.querySelector('[data-testid="home-header"]'),
-              hasPatientList: !!document.querySelector('[data-testid="patient-list"]'),
-              hasAddButton: !!document.querySelector('[data-testid="add-patient-button"]'),
+              hasClientList: !!document.querySelector('[data-testid="client-list"]'),
+              hasAddButton: !!document.querySelector('[data-testid="add-client-button"]'),
               allButtons: Array.from(document.querySelectorAll('button, [role="button"]')).map(btn => ({
                 testId: btn.getAttribute('data-testid'),
                 text: btn.textContent?.substring(0, 50),
@@ -736,15 +736,15 @@ When('I click the {string} button', async function(buttonText) {
               })).slice(0, 10)
             };
           });
-          console.log('[DEBUG] Page state when looking for Add Patient button:', JSON.stringify(debugInfo, null, 2));
+          console.log('[DEBUG] Page state when looking for Add Client button:', JSON.stringify(debugInfo, null, 2));
           
-          throw new Error('Add Patient button still not found after logging in as orgAdmin');
+          throw new Error('Add Client button still not found after logging in as orgAdmin');
         }
         
         // Check if still disabled
         const stillDisabled = await button.isDisabled().catch(() => false);
         if (stillDisabled) {
-          throw new Error('Add Patient button is still disabled after logging in as orgAdmin');
+          throw new Error('Add Client button is still disabled after logging in as orgAdmin');
         }
       }
       
@@ -763,7 +763,7 @@ When('I click the {string} button', async function(buttonText) {
         };
         
         // Check by testID
-        const btn = document.querySelector('[data-testid="add-patient-button"]');
+        const btn = document.querySelector('[data-testid="add-client-button"]');
         if (btn) {
           results.byTestId = {
             tagName: btn.tagName,
@@ -775,7 +775,7 @@ When('I click the {string} button', async function(buttonText) {
         }
         
         // Check all buttons and pressables
-        const allElements = Array.from(document.querySelectorAll('button, [role="button"], [data-testid*="button"], [data-testid*="patient"]'));
+        const allElements = Array.from(document.querySelectorAll('button, [role="button"], [data-testid*="button"], [data-testid*="client"]'));
         results.allButtons = allElements.map(el => ({
           tagName: el.tagName,
           testId: el.getAttribute('data-testid'),
@@ -785,34 +785,34 @@ When('I click the {string} button', async function(buttonText) {
         }));
         
         // Check for button by text
-        const addPatientBtn = allElements.find(b => {
+        const addClientBtn = allElements.find(b => {
           const text = (b.textContent || b.innerText || '').toLowerCase();
-          return text.includes('add') && text.includes('patient');
+          return text.includes('add') && text.includes('client');
         });
-        if (addPatientBtn) {
+        if (addClientBtn) {
           results.byText = {
-            tagName: addPatientBtn.tagName,
-            testId: addPatientBtn.getAttribute('data-testid'),
-            role: addPatientBtn.getAttribute('role'),
-            textContent: addPatientBtn.textContent?.substring(0, 100),
-            outerHTML: addPatientBtn.outerHTML.substring(0, 300)
+            tagName: addClientBtn.tagName,
+            testId: addClientBtn.getAttribute('data-testid'),
+            role: addClientBtn.getAttribute('role'),
+            textContent: addClientBtn.textContent?.substring(0, 100),
+            outerHTML: addClientBtn.outerHTML.substring(0, 300)
           };
         }
         
         return results;
       });
       
-      console.log('Debug info for Add Patient button:', JSON.stringify(debugInfo, null, 2));
+      console.log('Debug info for Add Client button:', JSON.stringify(debugInfo, null, 2));
       
       const buttonExists = debugInfo.byTestId || debugInfo.byText;
       
       if (buttonExists) {
         // Button exists but Playwright can't find it - try direct DOM manipulation
         const clicked = await this.page.evaluate(() => {
-          const btn = document.querySelector('[data-testid="add-patient-button"]') || 
+          const btn = document.querySelector('[data-testid="add-client-button"]') || 
                      Array.from(document.querySelectorAll('button, [role="button"], [data-testid*="button"]')).find(b => {
                        const text = b.textContent || b.innerText || '';
-                       return text.toLowerCase().includes('add') && text.toLowerCase().includes('patient');
+                       return text.toLowerCase().includes('add') && text.toLowerCase().includes('client');
                      });
           if (btn && !btn.disabled) {
             btn.click();
@@ -834,11 +834,11 @@ When('I click the {string} button', async function(buttonText) {
         // Try one more time with a longer wait
         await this.page.waitForTimeout(3000);
         const finalCheck = await this.page.evaluate(() => {
-          return !!document.querySelector('[data-testid="add-patient-button"]');
+          return !!document.querySelector('[data-testid="add-client-button"]');
         });
         if (finalCheck) {
           await this.page.evaluate(() => {
-            const btn = document.querySelector('[data-testid="add-patient-button"]');
+            const btn = document.querySelector('[data-testid="add-client-button"]');
             if (btn && !btn.disabled) btn.click();
           });
           await this.page.waitForTimeout(1000);
@@ -847,8 +847,8 @@ When('I click the {string} button', async function(buttonText) {
       }
       
       // Take screenshot for debugging
-      await this.page.screenshot({ path: 'test/e2e/cucumber/screenshots/add-patient-button-not-found.png' });
-      throw new Error('Add Patient button not found on page. Check screenshot for details.');
+      await this.page.screenshot({ path: 'test/e2e/cucumber/screenshots/add-client-button-not-found.png' });
+      throw new Error('Add Client button not found on page. Check screenshot for details.');
     }
   }
   

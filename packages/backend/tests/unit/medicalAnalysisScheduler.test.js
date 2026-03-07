@@ -3,6 +3,7 @@
 // Only mock external dependencies
 jest.mock('agenda');
 
+const mongoose = require('mongoose');
 const Agenda = require('agenda');
 const MedicalPatternAnalyzer = require('../../src/services/ai/medicalPatternAnalyzer.service');
 const conversationService = require('../../src/services/conversation.service');
@@ -170,12 +171,14 @@ describe('Medical Analysis Scheduler', () => {
   });
 
   describe('Patient Analysis Job', () => {
+    const validClientId = new mongoose.Types.ObjectId();
+
     it('should handle patient analysis job with conversations', async () => {
       const mockJob = {
         attrs: {
           _id: 'test-job-2',
           data: {
-            patientId: 'patient1',
+            patientId: validClientId.toString(),
             trigger: 'monthly',
             batchId: 'batch-1'
           }
@@ -185,28 +188,29 @@ describe('Medical Analysis Scheduler', () => {
       const mockConversations = [
         {
           _id: 'conv1',
-          patientId: 'patient1',
+          clientId: validClientId,
           messages: [
             { role: 'patient', content: 'I have been feeling very sad and depressed lately. I cannot concentrate on anything and I feel hopeless about the future.' }
           ]
         }
       ];
 
-      // Mock the conversation service
-      scheduler.conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue(mockConversations);
+      // Mock the conversation service (scheduler calls getConversationsByClientAndDateRange)
+      const getConversationsByClientAndDateRange = jest.fn().mockResolvedValue(mockConversations);
+      scheduler.conversationService.getConversationsByClientAndDateRange = getConversationsByClientAndDateRange;
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
       scheduler.getBaselineAnalysis = jest.fn().mockResolvedValue(null);
 
       await scheduler.handlePatientAnalysis(mockJob);
 
-      expect(scheduler.conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
-        'patient1',
+      expect(getConversationsByClientAndDateRange).toHaveBeenCalledWith(
+        validClientId.toString(),
         expect.any(Date),
         expect.any(Date)
       );
       expect(scheduler.medicalAnalyzer.analyzeMonth).toHaveBeenCalledWith(mockConversations, null);
       expect(scheduler.storeAnalysisResult).toHaveBeenCalledWith(
-        'patient1',
+        validClientId.toString(),
         expect.objectContaining({
           cognitiveMetrics: expect.any(Object),
           psychiatricMetrics: expect.any(Object),
@@ -223,26 +227,26 @@ describe('Medical Analysis Scheduler', () => {
         attrs: {
           _id: 'test-job-3',
           data: {
-            patientId: 'patient1',
+            patientId: validClientId.toString(),
             trigger: 'monthly',
             batchId: 'batch-1'
           }
         }
       };
 
-      // Mock the conversation service to return empty array
-      scheduler.conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue([]);
+      const getConversationsByClientAndDateRange = jest.fn().mockResolvedValue([]);
+      scheduler.conversationService.getConversationsByClientAndDateRange = getConversationsByClientAndDateRange;
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
 
       await scheduler.handlePatientAnalysis(mockJob);
 
-      expect(scheduler.conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
-        'patient1',
+      expect(getConversationsByClientAndDateRange).toHaveBeenCalledWith(
+        validClientId.toString(),
         expect.any(Date),
         expect.any(Date)
       );
       expect(scheduler.storeAnalysisResult).toHaveBeenCalledWith(
-        'patient1',
+        validClientId.toString(),
         expect.objectContaining({
           cognitiveMetrics: expect.any(Object),
           psychiatricMetrics: expect.any(Object),
@@ -262,20 +266,19 @@ describe('Medical Analysis Scheduler', () => {
         attrs: {
           _id: 'test-job-4',
           data: {
-            patientId: 'patient1',
+            patientId: validClientId.toString(),
             trigger: 'monthly',
             batchId: 'batch-1'
           }
         }
       };
 
-      // Mock the conversation service to throw error
-      scheduler.conversationService.getConversationsByPatientAndDateRange = jest.fn().mockRejectedValue(new Error('Database error'));
+      scheduler.conversationService.getConversationsByClientAndDateRange = jest.fn().mockRejectedValue(new Error('Database error'));
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
 
       await expect(scheduler.handlePatientAnalysis(mockJob)).rejects.toThrow('Database error');
       expect(scheduler.storeAnalysisResult).toHaveBeenCalledWith(
-        'patient1',
+        validClientId.toString(),
         expect.objectContaining({
           error: 'Database error',
           status: 'failed',
@@ -474,7 +477,7 @@ describe('Medical Analysis Scheduler', () => {
       expect(jobs).toHaveLength(2);
       expect(jobs[0].attrs._id).toBe('job1');
       expect(jobs[1].error).toBe('Scheduling error');
-      expect(jobs[1].patientId).toBe('patient2');
+      expect(jobs[1].clientId).toBe('patient2');
     });
   });
 });

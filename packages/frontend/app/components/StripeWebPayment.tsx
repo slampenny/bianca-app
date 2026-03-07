@@ -20,21 +20,7 @@ import ConfirmationModal from './ConfirmationModal'
 import Toast from './Toast'
 import i18n from 'i18n-js'
 import { logger } from '../utils/logger'
-
-interface PaymentMethod {
-  id: string
-  type: string
-  brand?: string
-  last4?: string
-  expMonth?: number
-  expYear?: number
-  isDefault: boolean
-  billingDetails?: {
-    name?: string
-    email?: string
-    phone?: string
-  }
-}
+import type { PaymentMethod } from 'app/services/api/api.types'
 
 interface StripeWebPaymentProps {
   orgId: string
@@ -268,7 +254,7 @@ const PaymentForm: React.FC<{
 
       {!paymentMethodsLoading && paymentMethodsError && (
         <View style={[styles.errorContainer, { backgroundColor: themeColors.palette.angry100 }]} accessibilityLabel="payment-methods-error">
-          <Text style={dynamicStyles.errorText}>{translate("paymentScreen.errorLoadingPaymentMethods")} {paymentMethodsError.message}</Text>
+          <Text style={dynamicStyles.errorText}>{translate("paymentScreen.errorLoadingPaymentMethods")} {(paymentMethodsError as { message?: string }).message ?? String(paymentMethodsError)}</Text>
         </View>
       )}
 
@@ -278,7 +264,7 @@ const PaymentForm: React.FC<{
             {translate("paymentScreen.existingPaymentMethods")} ({paymentMethods.length})
           </Text>
           
-          {paymentMethods.map((method: PaymentMethod, index: number) => {
+          {paymentMethods.map((method: PaymentMethod, index: number): React.ReactElement => {
             // Create display text based on available data
             let displayText = translate("paymentScreen.paymentMethod")
             let subText = method.isDefault ? translate("paymentScreen.default") : ''
@@ -430,7 +416,7 @@ const StripeWebPayment: React.FC<StripeWebPaymentProps> = ({
     <Elements 
       key={elementsKey}
       stripe={stripePromise} 
-      options={{ locale: stripeLocale }}
+      options={{ locale: stripeLocale as import("@stripe/stripe-js").StripeElementLocale }}
     >
       <PaymentForm
         key={`payment-form-${stripeLocale}`}

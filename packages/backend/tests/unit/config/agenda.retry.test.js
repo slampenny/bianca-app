@@ -119,7 +119,7 @@ describe('Agenda - Retry Missed Call Job', () => {
     // Create a Call first (Conversation requires callId)
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       org: org._id,
       status: 'failed',
       duration: 0
@@ -128,7 +128,7 @@ describe('Agenda - Retry Missed Call Job', () => {
     // Create failed conversation
     conversation = await Conversation.create({
       callId: call._id,
-      patientId: patient._id,
+      clientId: patient._id,
       status: 'failed',
     });
   });
@@ -146,7 +146,7 @@ describe('Agenda - Retry Missed Call Job', () => {
       // This simulates what agenda would do
       const jobData = {
         conversationId: conversation._id.toString(),
-        patientId: patient._id.toString(),
+        clientId: patient._id.toString(),
         retryAttempt: 1,
         originalCallId: conversation._id.toString(),
       };
@@ -166,7 +166,7 @@ describe('Agenda - Retry Missed Call Job', () => {
       const originalCall = await Call.findOne({ callSid: 'CA1234567890' });
       const newCall = await Call.create({
         callSid: newCallSid,
-        patientId: patient._id,
+        clientId: patient._id,
         org: org._id,
         status: 'initiated',
         duration: 0,
@@ -177,7 +177,7 @@ describe('Agenda - Retry Missed Call Job', () => {
       
       const newConversation = await Conversation.create({
         callId: newCall._id,
-        patientId: patient._id,
+        clientId: patient._id,
         status: 'initiated',
       });
 
@@ -193,7 +193,7 @@ describe('Agenda - Retry Missed Call Job', () => {
 
     const jobData = {
       conversationId: conversation._id.toString(),
-      patientId: patient._id.toString(),
+      clientId: patient._id.toString(),
       retryAttempt: 3,
       originalCallId: conversation._id.toString(),
     };
@@ -210,7 +210,7 @@ describe('Agenda - Retry Missed Call Job', () => {
     const fakeConversationId = new mongoose.Types.ObjectId();
     const jobData = {
       conversationId: fakeConversationId.toString(),
-      patientId: patient._id.toString(),
+      clientId: patient._id.toString(),
       retryAttempt: 1,
       originalCallId: fakeConversationId.toString(),
     };
@@ -224,7 +224,7 @@ describe('Agenda - Retry Missed Call Job', () => {
     const fakePatientId = new mongoose.Types.ObjectId();
     const jobData = {
       conversationId: conversation._id.toString(),
-      patientId: fakePatientId.toString(),
+      clientId: fakePatientId.toString(),
       retryAttempt: 1,
       originalCallId: conversation._id.toString(),
     };

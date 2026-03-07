@@ -4,10 +4,10 @@ const { toJSON, paginate } = require('./plugins');
 
 const scheduleSchema = mongoose.Schema(
   {
-    patient: {
+    client: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient',
+      ref: 'Client',
     },
     frequency: {
       type: String,

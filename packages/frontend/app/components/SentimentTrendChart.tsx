@@ -39,8 +39,8 @@ export function SentimentTrendChart({ trend, style }: SentimentTrendChartProps) 
         <Text style={styles.title}>{translate("sentimentAnalysis.sentimentTrend")}</Text>
         <View style={[styles.emptyChart, { width: chartWidth, height: chartHeight }]}>
           <Text style={styles.emptyText}>
-            {summary.analyzedConversations > 0 
-              ? translate("sentimentAnalysis.conversationsAnalyzedNoTrend", { s: summary.analyzedConversations === 1 ? '' : 's' })
+            {(summary.analyzedConversations ?? trend.analyzedConversations ?? 0) > 0 
+              ? translate("sentimentAnalysis.conversationsAnalyzedNoTrend", { s: (summary.analyzedConversations ?? trend.analyzedConversations ?? 0) === 1 ? '' : 's' })
               : translate("sentimentAnalysis.noSentimentData")
             }
           </Text>

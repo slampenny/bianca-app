@@ -50,7 +50,7 @@ const insertPatientsAndAddToCaregiver = async (caregiver, patients) => {
   const dbPatients = await Patient.insertMany(patientsWithCaregiver);
   
   // Add patients to caregiver's patients array (two-way link)
-  caregiver.patients.push(...dbPatients.map(p => p._id));
+  caregiver.clients.push(...dbPatients.map(p => p._id));
   await caregiver.save();
 
   return dbPatients;

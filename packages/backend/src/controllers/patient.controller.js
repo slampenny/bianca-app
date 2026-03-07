@@ -81,7 +81,7 @@ const createPatient = catchAsync(async (req, res) => {
 
   if (schedules) {
     for (const schedule of schedules) {
-      await scheduleService.createSchedule({ patientId: patient.id, ...schedule });
+      await scheduleService.createSchedule(patient.id, schedule);
     }
   }
   
@@ -106,7 +106,7 @@ const getPatients = catchAsync(async (req, res) => {
 const getPatient = catchAsync(async (req, res) => {
   const patient = await patientService.getPatientById(req.params.patientId);
   if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
   res.send(PatientDTO(patient));
 });
@@ -190,7 +190,7 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
     const caregiverDoc = await caregiverService.getCaregiverById(caregiver.id);
     
     // Check if caregiver is assigned to this patient (check both directions)
-    const hasPatientAccess = caregiverDoc.patients.some(
+    const hasPatientAccess = caregiverDoc.clients.some(
       (p) => {
         const pId = p._id ? p._id.toString() : p.toString();
         return pId === patientId.toString();
@@ -269,10 +269,10 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
     logger.info('[PatientController] Sending paginated conversations', {
       count: transformedResults.length,
       firstConvId: transformedResults[0].id,
-      firstConvPatientId: transformedResults[0].patientId,
+      firstConvClientId: transformedResults[0].clientId,
       sampleConv: {
         id: transformedResults[0].id,
-        patientId: transformedResults[0].patientId,
+        clientId: transformedResults[0].clientId,
         status: transformedResults[0].status,
         hasMessages: !!transformedResults[0].messages,
         messageCount: transformedResults[0].messages?.length || 0,
@@ -327,7 +327,7 @@ const verifyConsent = catchAsync(async (req, res) => {
         success: true,
         message: result.message,
         alreadyConsented: result.alreadyConsented,
-        patient: PatientDTO(result.patient),
+        client: PatientDTO(result.patient),
       });
     }
     

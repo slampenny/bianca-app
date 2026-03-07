@@ -54,7 +54,7 @@ describe('Call Workflow Integration Tests', () => {
   describe('POST /v1/calls/initiate', () => {
     it('should initiate a call to a patient successfully', async () => {
       const callData = {
-        patientId: patient.id,
+        clientId: patient.id,
         callNotes: 'Test call for patient check-in'
       };
 
@@ -67,7 +67,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('conversationId');
       expect(response.body).toHaveProperty('callId');
       expect(response.body).toHaveProperty('callSid', 'mock-call-sid-12345');
-      expect(response.body.patientId.toString()).toBe(patient.id);
+      expect(response.body.clientId.toString()).toBe(patient.id);
       expect(response.body.patientName).toBe(patient.name);
       expect(response.body.agentId.toString()).toBe(caregiver.id);
       expect(response.body.status).toBe('in-progress');
@@ -76,7 +76,7 @@ describe('Call Workflow Integration Tests', () => {
       // Verify conversation was created in database
       const conversation = await Conversation.findById(response.body.conversationId);
       expect(conversation).toBeTruthy();
-      expect(conversation.patientId.toString()).toBe(patient.id);
+      expect(conversation.clientId.toString()).toBe(patient.id);
       expect(conversation.callId.toString()).toBe(response.body.callId);
 
       // Verify call was created and linked to conversation
@@ -89,13 +89,13 @@ describe('Call Workflow Integration Tests', () => {
       expect(call.callNotes).toBe(callData.callNotes);
     });
 
-    it('should return 400 if patient does not have phone number', async () => {
+    it('should return 400 if client does not have phone number', async () => {
       // Update patient to remove phone number
       patient.phone = undefined;
       await patient.save({ validateBeforeSave: false });
 
       const callData = {
-        patientId: patient.id,
+        clientId: patient.id,
         callNotes: 'Test call'
       };
 
@@ -105,13 +105,13 @@ describe('Call Workflow Integration Tests', () => {
         .send(callData)
         .expect(httpStatus.BAD_REQUEST);
 
-      expect(response.body.message).toBe('Patient does not have a phone number');
+      expect(response.body.message).toBe('Client does not have a phone number');
     });
 
-    it('should return 404 if patient not found', async () => {
-      const fakePatientId = new mongoose.Types.ObjectId();
+    it('should return 404 if client not found', async () => {
+      const fakeClientId = new mongoose.Types.ObjectId();
       const callData = {
-        patientId: fakePatientId,
+        clientId: fakeClientId,
         callNotes: 'Test call'
       };
 
@@ -121,12 +121,12 @@ describe('Call Workflow Integration Tests', () => {
         .send(callData)
         .expect(httpStatus.NOT_FOUND);
 
-      expect(response.body.message).toBe('Patient not found');
+      expect(response.body.message).toBe('Client not found');
     });
 
     it('should return 401 without valid token', async () => {
       const callData = {
-        patientId: patient.id,
+        clientId: patient.id,
         callNotes: 'Test call'
       };
 
@@ -145,7 +145,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: patient.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -156,7 +156,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: patient.id,
         callId: call._id
       });
 
@@ -174,7 +174,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.conversationId.toString()).toBe(conversation.id);
       expect(response.body.data.status).toBe('in-progress'); // Call status, not conversation status
-      expect(response.body.data.patient).toBeTruthy();
+      expect(response.body.data.client).toBeTruthy();
       expect(response.body.data.agent).toBeTruthy();
     });
 
@@ -202,7 +202,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: patient.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -213,7 +213,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: patient.id,
         callId: call._id
       });
 
@@ -292,7 +292,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: patient.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -303,7 +303,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: patient.id,
         callId: call._id
       });
 
@@ -355,7 +355,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create multiple calls with different statuses and their conversations
       const call1 = await Call.create({
         callSid: 'CA1111111111111111',
-        patientId: patient.id,
+        clientId: patient.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -366,7 +366,7 @@ describe('Call Workflow Integration Tests', () => {
 
       const call2 = await Call.create({
         callSid: 'CA2222222222222222',
-        patientId: patient.id,
+        clientId: patient.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -376,12 +376,12 @@ describe('Call Workflow Integration Tests', () => {
       });
 
       const conversation1 = await Conversation.create({
-        patientId: patient.id,
+        clientId: patient.id,
         callId: call1._id
       });
 
       const conversation2 = await Conversation.create({
-        patientId: patient.id,
+        clientId: patient.id,
         callId: call2._id
       });
 
@@ -422,7 +422,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: patient.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -434,7 +434,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: patient.id,
         callId: call._id
       });
 
@@ -452,7 +452,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.conversationId.toString()).toBe(conversation.id);
       expect(response.body.data.status).toBe('in-progress');
-      expect(response.body.data.patient).toBeTruthy();
+      expect(response.body.data.client).toBeTruthy();
       expect(response.body.data.agent).toBeTruthy();
     });
   });

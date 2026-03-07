@@ -11,6 +11,8 @@ interface AuthState {
   authEmail: string
   currentUser: Caregiver | null
   inviteToken: string | null // Store invite token for invited users
+  /** True only when user just completed registration (verify-email) or first-time SSO; never true after normal email/password login */
+  pendingOnboarding: boolean
 }
 
 const initialState: AuthState = {
@@ -18,6 +20,7 @@ const initialState: AuthState = {
   authEmail: "",
   currentUser: null,
   inviteToken: null,
+  pendingOnboarding: false,
 }
 
 export const authSlice = createSlice({
@@ -38,9 +41,13 @@ export const authSlice = createSlice({
       state.authEmail = ""
       state.currentUser = null
       state.inviteToken = null
+      state.pendingOnboarding = false
     },
     setInviteToken(state, action: PayloadAction<string | null>) {
       state.inviteToken = action.payload
+    },
+    setPendingOnboarding(state, action: PayloadAction<boolean>) {
+      state.pendingOnboarding = action.payload
     },
   },
   extraReducers: (builder) => {
@@ -54,18 +61,22 @@ export const authSlice = createSlice({
       if ('caregiver' in payload && 'tokens' in payload) {
         state.currentUser = payload.caregiver
         state.tokens = payload.tokens
+        // Normal email/password login: never show onboarding (only Register or first-time SSO should)
+        state.pendingOnboarding = false
       }
     })
     builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
       state.currentUser = payload.caregiver
       state.tokens = payload.tokens
       state.inviteToken = null // Clear invite token after successful registration
+      state.pendingOnboarding = payload.caregiver?.onboardingComplete === false
     })
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
       state.tokens = null
       state.authEmail = ""
       state.currentUser = null
       state.inviteToken = null
+      state.pendingOnboarding = false
     })
     // Also clear local state if logout fails (e.g., network error, expired token)
     // This ensures users can always log out locally even if the API is down
@@ -75,6 +86,7 @@ export const authSlice = createSlice({
       state.authEmail = ""
       state.currentUser = null
       state.inviteToken = null
+      state.pendingOnboarding = false
     })
     builder.addMatcher(authApi.endpoints.refreshTokens.matchFulfilled, (state, { payload }) => {
       logger.debug("refreshed tokens", JSON.stringify(payload.tokens))
@@ -95,6 +107,21 @@ export const authSlice = createSlice({
         }
       },
     )
+    builder.addMatcher(authApi.endpoints.completeOnboarding.matchFulfilled, (state, { payload }) => {
+      if (payload?.caregiver && state.currentUser && payload.caregiver.id === state.currentUser.id) {
+        state.currentUser = payload.caregiver
+      }
+      state.pendingOnboarding = false
+    })
+    // Verify-email (after registration): allow onboarding flow only when backend says incomplete
+    builder.addMatcher(authApi.endpoints.verifyEmail.matchFulfilled, (state, { payload }) => {
+      if (payload?.tokens && payload?.caregiver) {
+        state.tokens = payload.tokens;
+        state.currentUser = payload.caregiver;
+        state.authEmail = payload.caregiver?.email ?? state.authEmail;
+        state.pendingOnboarding = payload.caregiver?.onboardingComplete === false;
+      }
+    })
     // SSO login: update store when API succeeds so we don't rely only on component callback (avoids empty profile after redirect/reload)
     builder.addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
       // Validate that we have complete caregiver data before updating state
@@ -110,6 +137,8 @@ export const authSlice = createSlice({
           state.tokens = payload.tokens;
           state.currentUser = caregiver;
           if (caregiver.email) state.authEmail = caregiver.email;
+          // First-time SSO: show onboarding only when backend says incomplete
+          state.pendingOnboarding = caregiver.onboardingComplete === false;
         } else {
           logger.error('[authSlice] SSO login fulfilled but caregiver data incomplete:', {
             hasId: !!caregiver.id,
@@ -129,7 +158,7 @@ export const authSlice = createSlice({
   },
 })
 
-export const { setAuthTokens, setAuthEmail, setCurrentUser, clearAuth, setInviteToken } = authSlice.actions
+export const { setAuthTokens, setAuthEmail, setCurrentUser, clearAuth, setInviteToken, setPendingOnboarding } = authSlice.actions
 
 export const isAuthenticated = (state: RootState) => {
   return !!state.auth.tokens
@@ -151,5 +180,6 @@ export const getAuthTokens = (state: { auth: AuthState }) => {
 export const getInviteToken = (state: RootState) => {
   return state.auth.inviteToken
 }
+export const getPendingOnboarding = (state: RootState) => state.auth.pendingOnboarding
 
 export default authSlice.reducer

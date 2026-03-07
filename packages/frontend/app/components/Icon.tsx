@@ -107,6 +107,28 @@ export const iconRegistry = {
   settings: { uri: `${assetsBaseUrl}/icons/settings.png` },
   view: { uri: `${assetsBaseUrl}/icons/view.png` },
   x: { uri: `${assetsBaseUrl}/icons/x.png` },
+  // Extended set for sentiment and other screens (fallback to existing assets)
+  question: { uri: `${assetsBaseUrl}/icons/more.png` },
+  checkCircle: { uri: `${assetsBaseUrl}/icons/check.png` },
+  xCircle: { uri: `${assetsBaseUrl}/icons/x.png` },
+  minusCircle: { uri: `${assetsBaseUrl}/icons/more.png` },
+  alertCircle: { uri: `${assetsBaseUrl}/icons/bell.png` },
+  alertTriangle: { uri: `${assetsBaseUrl}/icons/bell.png` },
+  phoneOff: { uri: `${assetsBaseUrl}/icons/x.png` },
+  calendar: { uri: `${assetsBaseUrl}/icons/view.png` },
+  clock: { uri: `${assetsBaseUrl}/icons/lock.png` },
+  shield: { uri: `${assetsBaseUrl}/icons/lock.png` },
+  target: { uri: `${assetsBaseUrl}/icons/view.png` },
+  heart: { uri: `${assetsBaseUrl}/icons/check.png` },
+  smile: { uri: `${assetsBaseUrl}/icons/check.png` },
+  frown: { uri: `${assetsBaseUrl}/icons/x.png` },
+  meh: { uri: `${assetsBaseUrl}/icons/more.png` },
+  zap: { uri: `${assetsBaseUrl}/icons/view.png` },
+  lightbulb: { uri: `${assetsBaseUrl}/icons/view.png` },
+  arrowUp: { uri: `${assetsBaseUrl}/icons/caretRight.png` },
+  arrowDown: { uri: `${assetsBaseUrl}/icons/caretRight.png` },
+  minus: { uri: `${assetsBaseUrl}/icons/more.png` },
+  caretDown: { uri: `${assetsBaseUrl}/icons/caretRight.png` },
 }
 
 const $imageStyleBase: ImageStyle = {

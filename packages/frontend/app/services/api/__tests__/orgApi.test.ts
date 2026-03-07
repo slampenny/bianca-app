@@ -4,6 +4,8 @@ import { store as appStore, RootState } from "../../../store/store"
 import { registerNewOrgAndCaregiver } from "../../../../test/helpers"
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 describe("orgApi", () => {
+  jest.setTimeout(20000)
+
   // const testOrg = (): Org => ({
   //     name: 'Test Org',
   //     email: generateUniqueEmail(),
@@ -35,8 +37,11 @@ describe("orgApi", () => {
   })
 
   afterEach(async () => {
-    await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+    if (orgId) {
+      await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+    }
     jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   //   const loginAndGetTokens = async (email: string, password: string) => {

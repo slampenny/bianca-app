@@ -27,6 +27,8 @@ export interface CaregiverPages {
 
 export type CaregiverRole = "admin" | "staff" | "orgAdmin" | "superAdmin" | "unverified"
 
+export type OnboardingPersona = "organization" | "caregiver" | "agingInPlace"
+
 export interface Caregiver {
   id?: string
   name: string
@@ -35,12 +37,14 @@ export interface Caregiver {
   phone: string
   org: string
   role: CaregiverRole
-  patients: string[] // Assuming this is the ID of the caregiver
+  clients: string[] // Client IDs assigned to this caregiver
   preferredLanguage?: string
   isEmailVerified?: boolean
   isPhoneVerified?: boolean
   ssoProvider?: "google" | "microsoft" | null
   ssoProviderId?: string | null
+  onboardingComplete?: boolean
+  persona?: OnboardingPersona
 }
 
 export interface AlertPages {
@@ -51,17 +55,17 @@ export interface AlertPages {
   totalResults: number
 }
 
-export type CreatedModel = "Patient" | "Caregiver" | "Org" | "Schedule"
+export type CreatedModel = "Client" | "Caregiver" | "Org" | "Schedule"
 export type AlertVisibility = "orgAdmin" | "allCaregivers" | "assignedCaregivers"
 export type AlertImportance = "low" | "medium" | "high"
-export type AlertType = "conversation" | "patient" | "system"
+export type AlertType = "conversation" | "client" | "system"
 
 export interface Alert {
   id?: string
   message: string
   importance: AlertImportance
   alertType: AlertType
-  relatedPatient?: string // Patient ID if alert is related to a patient or conversation
+  relatedClient?: string
   relatedConversation?: string // Conversation ID if alert is related to a conversation
   createdBy: string // Assuming this is the ID of the creator
   createdModel: CreatedModel
@@ -90,7 +94,7 @@ export interface Org {
   isEmailVerified: boolean
   timezone?: string // IANA timezone identifier (e.g., 'America/New_York', 'Europe/London')
   caregivers: string[]
-  patients: string[]
+  clients: string[]
   planName?: string
   nextBillingDate?: string
   requirePatientConsent?: boolean
@@ -101,15 +105,15 @@ export interface Org {
   }
 }
 
-export interface PatientPages {
+export interface ClientPages {
   limit: number
   page: number
-  results: Patient[]
+  results: Client[]
   totalPages: number
   totalResults: number
 }
 
-export interface Patient {
+export interface Client {
   id?: string
   name: string
   avatar: string
@@ -121,6 +125,9 @@ export interface Patient {
   schedules: Schedule[]
 }
 
+/** @deprecated Use Client. Kept for API response compatibility (e.g. login returns patients[]) */
+export type Patient = Client
+
 export interface Interval {
   day?: number
   weeks?: number
@@ -128,14 +135,15 @@ export interface Interval {
 
 export interface Schedule {
   id?: string | null | undefined
-  patient?: string | null
+  client?: string | null
+  patient?: string | null // deprecated, use client (API may still send)
   frequency: "daily" | "weekly" | "monthly"
   intervals: Interval[]
   time: string
   isActive: boolean
 }
 
-export type MessageRole = "patient" | "assistant" | "system" | "debug-user"
+export type MessageRole = "client" | "patient" | "assistant" | "system" | "debug-user"
 
 export interface Message {
   id?: string
@@ -156,7 +164,7 @@ export interface ConversationPages {
 export interface Conversation {
   id?: string
   callSid: string
-  patientId: string
+  clientId: string
   lineItemId: string | null
   messages: Message[]
   history: string
@@ -186,7 +194,7 @@ export type InvoiceStatus = "draft" | "pending" | "paid" | "void" | "overdue"
 
 export interface LineItem {
   id: string
-  patientId: string
+  clientId: string
   invoiceId?: string
   amount: number
   description: string
@@ -270,7 +278,8 @@ export interface SentimentAnalysis {
   overallSentiment: SentimentType
   sentimentScore: number // -1 to 1
   confidence: number // 0 to 1
-  patientMood?: string
+  clientMood?: string
+  patientMood?: string // deprecated, use clientMood
   keyEmotions?: string[]
   concernLevel?: ConcernLevel
   satisfactionIndicators?: {
@@ -291,7 +300,7 @@ export interface SentimentTrendPoint {
 }
 
 export interface SentimentTrend {
-  patientId: string
+  clientId: string
   timeRange: "lastCall" | "month" | "lifetime"
   startDate: string
   endDate: string
@@ -304,6 +313,7 @@ export interface SentimentTrend {
     trendDirection: TrendDirection
     confidence: number
     keyInsights: string[]
+    analyzedConversations?: number
   }
 }
 
@@ -327,16 +337,24 @@ export interface CognitiveMetrics {
   fillerWordDensity: number
   vagueReferenceDensity: number
   repetitionRate: number
+  repetitionScore?: number
   complexityScore: number
   attentionDeficit: number
   memoryIssues: number
   languageDecline: number
+  temporalConfusionCount?: number
+  wordFindingDifficultyCount?: number
+  informationDensity?: { score?: number }
+  indicators?: Array<{ severity?: string; message?: string }>
 }
 
 export interface PsychiatricMetrics {
   depressionScore: number
   anxietyScore: number
   overallRiskScore: number
+  crisisIndicators?: { hasCrisisIndicators?: boolean }
+  emotionalTone?: { dominantTone?: string; negativeRatio?: number }
+  protectiveFactors?: number | string
   detailedAnalysis: {
     depression: {
       sadness: { count: number; examples: string[] }
@@ -356,6 +374,8 @@ export interface PsychiatricMetrics {
 export interface VocabularyMetrics {
   complexityScore: number
   avgSentenceLength: number
+  avgWordLength?: number
+  uniqueWords?: number
   typeTokenRatio: number
   lexicalDiversity: number
   sophisticatedWords: number
@@ -364,7 +384,7 @@ export interface VocabularyMetrics {
 }
 
 export interface MedicalAnalysisResult {
-  patientId: string
+  clientId: string
   analysisDate: string
   conversationCount: number
   messageCount: number
@@ -387,7 +407,7 @@ export interface MedicalAnalysisTrendPoint {
 }
 
 export interface MedicalAnalysisTrend {
-  patientId: string
+  clientId: string
   timeRange: "month" | "quarter" | "year"
   startDate: string
   endDate: string
@@ -504,7 +524,7 @@ export interface RelationshipRiskMetrics {
 
 export interface FraudAbuseAnalysisResult {
   id?: string
-  patientId: string
+  clientId: string
   analysisDate: string
   timeRange: "month" | "quarter" | "year" | "custom"
   conversationCount: number

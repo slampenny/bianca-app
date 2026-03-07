@@ -4,7 +4,9 @@ module.exports.Alert = require('./alert.model');
 module.exports.Token = require('./token.model');
 module.exports.Org = require('./org.model');
 module.exports.Caregiver = require('./caregiver.model');
-module.exports.Patient = require('./patient.model');
+const Client = require('./client.model');
+module.exports.Client = Client;
+module.exports.Patient = Client;
 module.exports.EmergencyPhrase = require('./emergencyPhrase.model');
 
 module.exports.Invoice = Invoice;

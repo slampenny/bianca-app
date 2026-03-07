@@ -8,10 +8,10 @@ const callSchema = mongoose.Schema(
       type: String,
       required: true,
     },
-    patientId: {
+    clientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient',
+      ref: 'Client',
     },
     callType: {
       type: String,
@@ -136,13 +136,13 @@ const callSchema = mongoose.Schema(
 );
 
 // Indexes for efficient querying
-callSchema.index({ patientId: 1 });
+callSchema.index({ clientId: 1 });
 callSchema.index({ callSid: 1 });
 callSchema.index({ lineItemId: 1 });
-callSchema.index({ patientId: 1, lineItemId: 1 }); // Critical for billing queries
-callSchema.index({ patientId: 1, lineItemId: 1, billingSessionId: 1 }); // For atomic billing operations
+callSchema.index({ clientId: 1, lineItemId: 1 });
+callSchema.index({ clientId: 1, lineItemId: 1, billingSessionId: 1 });
 callSchema.index({ billingSessionId: 1 }); // For fetching claimed calls during billing
-callSchema.index({ patientId: 1, startTime: -1 }); // For patient call history
+callSchema.index({ clientId: 1, startTime: -1 });
 callSchema.index({ status: 1, startTime: -1 }); // For status-based queries
 callSchema.index({ originalCallId: 1 }); // For retry queries
 

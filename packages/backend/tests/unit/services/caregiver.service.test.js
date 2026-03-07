@@ -94,7 +94,7 @@ describe('caregiverService', () => {
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     await caregiverService.addPatient(caregiver.id, patient.id);
     const updatedCaregiver = await caregiverService.removePatient(caregiver.id, patient.id);
-    expect(updatedCaregiver.patients.toObject()).toEqual([]);
+    expect(updatedCaregiver.clients.toObject()).toEqual([]);
   });
 
   it('should get patients by caregiver id', async () => {

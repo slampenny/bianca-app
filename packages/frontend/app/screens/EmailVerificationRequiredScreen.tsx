@@ -153,15 +153,16 @@ export const EmailVerificationRequiredScreen = () => {
         timeoutRef.current = null
       }, TIMEOUTS.SUCCESS_MESSAGE_DISPLAY)
     } catch (error: unknown) {
+      const err = error as { status?: number; data?: { message?: string }; error?: unknown; message?: string }
       logger.error("Resend verification email error:", error)
       logger.error("Error details:", {
-        status: error?.status,
-        data: error?.data,
-        error: error?.error,
-        message: error?.message
+        status: err?.status,
+        data: err?.data,
+        error: err?.error,
+        message: err?.message
       })
       // Extract specific error message from API response
-      const errorMsg = error?.data?.message || error?.message || translate("emailVerificationScreen.errorSendFailed")
+      const errorMsg = err?.data?.message || err?.message || translate("emailVerificationScreen.errorSendFailed")
       setErrorMessage(errorMsg)
       setEmailSent(false) // Clear success state if error occurs
     } finally {
@@ -171,7 +172,7 @@ export const EmailVerificationRequiredScreen = () => {
   }
 
   const handleBackToLogin = () => {
-    navigation.navigate("Login" as never)
+    (navigation.navigate as (name: string) => void)("Login")
   }
 
   return (

@@ -13,7 +13,7 @@ All API routes are prefixed with `/v1`:
 
 ```
 /v1/auth/login
-/v1/patients
+/v1/clients
 /v1/conversations
 /v1/alerts
 ```

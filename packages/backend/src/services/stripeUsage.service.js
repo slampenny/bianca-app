@@ -68,7 +68,7 @@ const reportConversationUsage = async (subscriptionItemId, call, config = {}) =>
     const metadata = {
       callId: call._id?.toString() || call.id,
       conversationId: call.conversationId?.toString() || call.conversationId,
-      patientId: call.patientId?.toString() || call.patientId,
+      clientId: call.clientId?.toString() || call.clientId,
       duration: call.duration,
       billableDuration: billableDuration,
     };

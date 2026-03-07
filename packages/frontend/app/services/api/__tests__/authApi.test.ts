@@ -13,6 +13,8 @@ describe("authApi", () => {
   let caregiver: Caregiver
   let authTokens: AuthTokens
 
+  jest.setTimeout(20000)
+
   beforeAll(async () => {
     await cleanTestDatabase()
   })
@@ -61,7 +63,7 @@ describe("authApi", () => {
       }
     } else {
       // Registration failed - check if it's due to email service failure
-      const errorMessage = registerResult.error?.data?.message || ""
+      const errorMessage = (registerResult.error as { data?: { message?: string } })?.data?.message || ""
       if (errorMessage.includes("verification email failed")) {
         // Registration succeeded but email failed - backend throws error in this case
         // This is a backend configuration issue, not a test issue
@@ -74,8 +76,11 @@ describe("authApi", () => {
   })
 
   afterEach(async () => {
-    await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+    if (orgId) {
+      await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+    }
     jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   it("should fail to register a new caregiver with a duplicate email", async () => {
@@ -123,7 +128,6 @@ describe("authApi", () => {
   it("should refresh tokens", async () => {
     // Skip if tokens weren't properly set up (e.g., login failed due to email verification)
     if (!authTokens || !authTokens.refresh || !authTokens.refresh.token) {
-      console.log('Skipping token refresh test - tokens not available')
       return
     }
 
@@ -135,8 +139,7 @@ describe("authApi", () => {
       expect(refreshResult.data.tokens.refresh).toBeDefined()
     } else {
       // Token refresh might fail if token is expired or invalid - that's acceptable
-      if (refreshResult.error?.status === 401 || refreshResult.error?.status === 403) {
-        console.log('Token refresh failed - token may be expired or invalid (acceptable in test)')
+      if ((refreshResult.error as { status?: number })?.status === 401 || (refreshResult.error as { status?: number })?.status === 403) {
         return
       }
       throw new Error(`Token refresh failed: ${JSON.stringify(refreshResult.error)}`)

@@ -115,9 +115,10 @@ export function OrgScreen() {
       // If user has an org reference but org not in Redux, fetch it
       if (currentUser?.org && !currentOrg) {
         try {
-          const orgResponse = await dispatch(orgApi.endpoints.getOrg.initiate({ orgId: currentUser.org }))
-          if (orgResponse.data) {
-            dispatch(setOrg(orgResponse.data))
+          const thunkResult = (dispatch as (arg: unknown) => { unwrap: () => Promise<import("app/services/api/api.types").Org> })(orgApi.endpoints.getOrg.initiate({ orgId: currentUser.org }))
+          const orgData = await thunkResult.unwrap()
+          if (orgData) {
+            dispatch(setOrg(orgData))
             // The useEffect will run again when currentOrg updates
           } else {
             // No org found - stop loading to show the screen
@@ -603,6 +604,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: colors.palette.neutral300,
+  },
+  pickerWrapper: {
+    marginTop: 8,
+  },
+  picker: {
+    color: colors.palette.biancaHeader,
+  },
+  pickerItem: {
+    color: colors.palette.biancaHeader,
   },
   callRetrySection: {
     marginTop: 20,

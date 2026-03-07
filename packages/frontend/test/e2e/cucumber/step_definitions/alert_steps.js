@@ -53,7 +53,7 @@ When('I navigate to the alerts screen', async function() {
   
   // Wait for home screen elements or tabs to appear (React Native Web specific)
   try {
-    await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="patient-list"]', { timeout: 15000 });
+    await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="client-list"]', { timeout: 15000 });
   } catch (e) {
     // Tabs might not have testid, try waiting for any navigation element
     await safeWait(this.page, 3000);
@@ -117,7 +117,7 @@ When('I navigate to the alerts screen', async function() {
     const anyTabCount = await anyTab.count().catch(() => 0);
     
     // Also check for home screen elements (React Native Web specific)
-    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="patient-list"]').count().catch(() => 0);
+    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').count().catch(() => 0);
     
     // Check URL to see if we're on home screen (React Native Web uses specific routes)
     const urlAfterWait = this.page.url();
@@ -313,7 +313,7 @@ Given('I am on the alerts screen', async function() {
   if (tabCount === 0) {
     // Wait for home screen to load (tabs might not be visible immediately)
     try {
-      await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="patient-list"]', { timeout: 15000 });
+      await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="client-list"]', { timeout: 15000 });
     } catch (e) {
       // Tabs might not have testid, try waiting for any navigation element
       await safeWait(this.page, 2000);
@@ -324,7 +324,7 @@ Given('I am on the alerts screen', async function() {
     const anyTabCount = await anyTab.count().catch(() => 0);
     
     // Also check for home screen elements
-    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="patient-list"]').count().catch(() => 0);
+    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').count().catch(() => 0);
     
     if (anyTabCount === 0 && homeElements === 0) {
       throw new Error('No tabs found - user may not be logged in');
@@ -392,14 +392,14 @@ Given('I have both read and unread alerts', async function() {
 When('I view the {string} tab', async function(tabName) {
   const tab = this.page.getByText(new RegExp(tabName, 'i')).first();
   await tab.waitFor({ state: 'visible', timeout: 10000 });
-  await tab.click();
+  await tab.click({ force: true });
   await safeWait(this.page, 500);
 });
 
 When('I switch to the {string} tab', async function(tabName) {
   const tab = this.page.getByText(new RegExp(tabName, 'i')).first();
   await tab.waitFor({ state: 'visible', timeout: 10000 });
-  await tab.click();
+  await tab.click({ force: true });
   await safeWait(this.page, 500);
 });
 
@@ -504,18 +504,28 @@ let testAlertMessage = null;
 Given('I have an unread alert', async function() {
   // IMPORTANT: Create alert AFTER ensuring we're on the alerts screen
   // This ensures RTK Query polling has started before we create the alert
-  
-  // Wait for the alert screen to be fully loaded and polling to have started
+
   const alertScreen = this.page.locator('[data-testid="alert-screen"]').or(this.page.getByLabel('alert-screen'));
+  let visible = await alertScreen.isVisible().catch(() => false);
+  if (!visible) {
+    // Navigate to alerts tab if not already there (e.g. home detection used client-list and we're on home)
+    const alertTab = this.page.getByTestId('tab-alert').or(this.page.locator('[aria-label*="alert" i]').first());
+    const tabCount = await alertTab.count().catch(() => 0);
+    if (tabCount > 0) {
+      await alertTab.first().click({ force: true });
+      await safeWait(this.page, 2000);
+    }
+    visible = await alertScreen.isVisible().catch(() => false);
+  }
   await alertScreen.waitFor({ state: 'visible', timeout: 15000 });
-  
+
   // Wait an additional 3+ seconds to ensure at least one polling cycle has completed
   await safeWait(this.page, 4000);
   
   testAlertMessage = `Checkbox Test Alert - ${Date.now()}`;
   
   // Get caregiver data
-  const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1';
+  const API_BASE_URL = (this.apiURL || process.env.API_URL || 'http://localhost:3000').replace(/\/$/, '') + '/v1';
   const credentials = this.getCredentials('caregiver');
   const email = credentials.email;
   
@@ -530,12 +540,13 @@ Given('I have an unread alert', async function() {
   
   const caregiver = await caregiverResponse.json();
   const caregiverId = caregiver.id || caregiver._id;
-  const patientId = caregiver.patients?.[0]?.id || caregiver.patients?.[0]?._id || caregiver.patients?.[0];
-  
-  if (!patientId) {
-    throw new Error('Caregiver has no patients');
+  const clientId = caregiver.clients?.[0]?.id ?? caregiver.clients?.[0]?._id ?? caregiver.clients?.[0]
+    ?? null;
+
+  if (!clientId) {
+    throw new Error('Caregiver has no clients');
   }
-  
+
   // Create alert
   const alertResponse = await this.page.request.post(`${API_BASE_URL}/test/create-alert`, {
     headers: { 'Content-Type': 'application/json' },
@@ -543,8 +554,8 @@ Given('I have an unread alert', async function() {
       caregiverId,
       message: testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     },

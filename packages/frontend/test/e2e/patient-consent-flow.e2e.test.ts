@@ -107,16 +107,16 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     await navigateToHome(page)
     
     // Navigate to patient screen
-    const addPatientButton = page.locator('[data-testid="add-patient-button"]').first()
-    await addPatientButton.waitFor({ timeout: 10000, state: 'visible' })
-    await addPatientButton.click()
+    const addClientButton = page.locator('[data-testid="add-client-button"]').first()
+    await addClientButton.waitFor({ timeout: 10000, state: 'visible' })
+    await addClientButton.click()
     
     // Wait for patient screen
-    await page.waitForSelector('[data-testid="patient-screen"]', { timeout: 10000 }).catch(() => {})
+    await page.waitForSelector('[data-testid="client-screen"]', { timeout: 10000 }).catch(() => {})
     await page.waitForTimeout(2000)
     
     // Fill patient form
-    const nameInput = page.locator('[data-testid="patient-name-input"]').or(page.locator('input[placeholder*="name" i]')).first()
+    const nameInput = page.locator('[data-testid="client-name-input"]').or(page.locator('input[placeholder*="name" i]')).first()
     const emailInput = page.locator('[data-testid="patient-email-input"]').or(page.locator('input[type="email"]')).first()
     const phoneInput = page.locator('[data-testid="patient-phone-input"]').or(page.locator('input[placeholder*="phone" i]')).first()
     
@@ -284,7 +284,7 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     })
     
     // Create patient via API
-    const patientResponse = await page.request.post(`${API_BASE_URL}/patients`, {
+    const patientResponse = await page.request.post(`${API_BASE_URL}/clients`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',

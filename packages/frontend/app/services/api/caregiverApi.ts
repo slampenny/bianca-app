@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import { Caregiver, CaregiverPages, Patient } from "./api.types"
+import { Caregiver, CaregiverPages, Client } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const caregiverApi = createApi({
@@ -97,19 +97,19 @@ export const caregiverApi = createApi({
         { type: "Caregiver", id: "LIST" },
       ],
     }),
-    getPatientForCaregiver: builder.query<Patient, { patientId: string; caregiverId: string }>({
-      query: ({ patientId, caregiverId }) => ({
-        url: `/caregivers/${caregiverId}/patients/${patientId}`,
+    getClientForCaregiver: builder.query<Client, { clientId: string; caregiverId: string }>({
+      query: ({ clientId, caregiverId }) => ({
+        url: `/caregivers/${caregiverId}/clients/${clientId}`,
         method: "GET",
       }),
     }),
-    getPatientsForCaregiver: builder.query<Patient[], string | null>({
+    getClientsForCaregiver: builder.query<Client[], string | null>({
       query: (caregiverId) => {
         if (caregiverId === null) {
           throw new Error("No caregiver provided")
         }
         return {
-          url: `/caregivers/${caregiverId}/patients`,
+          url: `/caregivers/${caregiverId}/clients`,
           method: "GET",
         }
       },
@@ -123,6 +123,6 @@ export const {
   useUpdateCaregiverMutation,
   useUploadAvatarMutation,
   useDeleteCaregiverMutation,
-  useGetPatientForCaregiverQuery,
-  useGetPatientsForCaregiverQuery,
+  useGetClientForCaregiverQuery,
+  useGetClientsForCaregiverQuery,
 } = caregiverApi

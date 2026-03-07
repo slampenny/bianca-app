@@ -94,16 +94,16 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                   ]}
                   onPress={() => handleThemeChange(key as ThemeType)}
                   accessibilityRole="button"
-                  accessibilityLabel={translate(`themes.${key}.name`)}
+                  accessibilityLabel={translate(`themes.${key}.name` as import("../i18n").TxKeyPath)}
                   accessibilityState={{ selected: currentTheme === key }}
-                  accessibilityHint={translate(`themes.${key}.description`)}
+                  accessibilityHint={translate(`themes.${key}.description` as import("../i18n").TxKeyPath)}
                 >
                   <View style={styles.themeHeader}>
                     <Text style={[
                       dynamicStyles.themeName, 
                       { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.biancaHeader || colors.text) }
                     ]}>
-                      {translate(`themes.${key}.name`)}
+                      {translate(`themes.${key}.name` as import("../i18n").TxKeyPath)}
                     </Text>
                     <View style={styles.themeSwatches}>
                       <View style={[styles.colorSwatch, { backgroundColor: theme.colors.palette.primary500 }]} testID="colorSwatch-primary" accessibilityLabel="colorSwatch-primary" />
@@ -124,7 +124,7 @@ export function ThemeSelector({ testID }: { testID?: string }) {
                     dynamicStyles.themeDescription,
                     { color: currentTheme === key ? colors.palette.neutral100 : (colors.palette.biancaHeader || colors.text) }
                   ]}>
-                    {translate(`themes.${key}.description`)}
+                    {translate(`themes.${key}.description` as import("../i18n").TxKeyPath)}
                   </Text>
                   <View style={styles.accessibilityInfo}>
                     <Text style={[

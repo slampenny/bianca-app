@@ -43,7 +43,7 @@ describe('Schedule routes', () => {
       const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
 
       const res = await request(app)
-        .post(`/v1/schedules/patients/${patient.id}`)
+        .post(`/v1/schedules/clients/${patient.id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send(scheduleOne)
         .expect(httpStatus.CREATED);
@@ -60,7 +60,7 @@ describe('Schedule routes', () => {
         ]),
         isActive: true,
         nextCallDate: expect.any(String),
-        patient: expect.any(String),
+        client: expect.any(String),
         time: scheduleOne.time,
       });
     });
@@ -74,7 +74,7 @@ describe('Schedule routes', () => {
       
       // Create schedule via API to ensure proper timezone conversion
       const createRes = await request(app)
-        .post(`/v1/schedules/patients/${patient.id}`)
+        .post(`/v1/schedules/clients/${patient.id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send(scheduleOne)
         .expect(httpStatus.CREATED);
@@ -99,7 +99,7 @@ describe('Schedule routes', () => {
         ]),
         isActive: true,
         nextCallDate: expect.any(String),
-        patient: expect.any(String),
+        client: expect.any(String),
         time: createRes.body.time, // Use the time returned from creation (after timezone conversion)
       });
     });
@@ -131,7 +131,7 @@ describe('Schedule routes', () => {
         intervals: expect.arrayContaining(scheduleTwo.intervals.map((interval) => expect.objectContaining(interval))),
         isActive: schedule.isActive,
         nextCallDate: expect.any(String),
-        patient: expect.any(String),
+        client: expect.any(String),
         time: scheduleTwo.time,
       });
     });

@@ -114,7 +114,7 @@ class PlaywrightWorld {
   }
 
   getCredentials(username) {
-    // Map of test user credentials - matches backend test fixtures
+    // Map of test user credentials - matches backend test fixtures / seed data
     const credentials = {
       'admin': { email: 'admin@example.org', password: 'Password1' },
       'caregiver': { email: 'fake@example.org', password: 'Password1' },
@@ -123,6 +123,26 @@ class PlaywrightWorld {
       'superAdmin': { email: 'superadmin@example.org', password: 'Password1' },
     };
     return credentials[username] || { email: `${username}@example.org`, password: 'Password1' };
+  }
+
+  /**
+   * Ensure the backend has seed data (fake@example.org, admin, etc.) so login works.
+   * Calls POST /v1/test/seed once per run. Safe to call multiple times; only seeds once.
+   */
+  async ensureBackendSeeded() {
+    if (this._backendSeeded) return;
+    const apiURL = this.apiURL || process.env.API_URL || 'http://localhost:3000';
+    try {
+      const res = await fetch(`${apiURL}/v1/test/seed`, { method: 'POST' });
+      if (res.ok) {
+        this._backendSeeded = true;
+        console.log('[E2E] Backend seed completed (test users available)');
+      }
+      // If 403 (production) or other error, assume backend is already seeded or not using test route
+    } catch (e) {
+      console.warn('[E2E] Backend seed request failed (backend may already be seeded):', e.message);
+    }
+    this._backendSeeded = true; // Don't retry every scenario
   }
 }
 

@@ -14,15 +14,14 @@ const alertSchema = new mongoose.Schema(
     },
     alertType: {
       type: String,
-      enum: ['conversation', 'patient', 'system'],
+      enum: ['conversation', 'client', 'system'],
       required: true,
     },
-    // Reference to the related entity (patient or conversation)
-    relatedPatient: {
+    relatedClient: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Patient',
+      ref: 'Client',
       required: function() {
-        return this.alertType === 'conversation' || this.alertType === 'patient';
+        return this.alertType === 'conversation' || this.alertType === 'client';
       },
     },
     relatedConversation: {
@@ -40,7 +39,7 @@ const alertSchema = new mongoose.Schema(
     createdModel: {
       type: String,
       required: true,
-      enum: ['Patient', 'Caregiver', 'Org', 'Schedule'],
+      enum: ['Client', 'Caregiver', 'Org', 'Schedule'],
     },
     visibility: {
       type: String,

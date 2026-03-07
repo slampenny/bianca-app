@@ -20,7 +20,7 @@ const caregiverOne = {
   email: 'fake@example.org',
   phone: '+16045624263',
   role: 'staff',
-  patients: [],
+  clients: [],
 };
 
 const caregiverOneWithPassword = {
@@ -33,7 +33,7 @@ const caregiverTwo = {
   email: faker.internet.email().toLowerCase(),
   phone: '+16045624263',
   role: 'staff',
-  patients: [],
+  clients: [],
 };
 
 const admin = {
@@ -41,7 +41,7 @@ const admin = {
   email: 'admin@example.org',
   phone: '+16045624263',
   role: 'orgAdmin',
-  patients: [],
+  clients: [],
   isPhoneVerified: true, // Admin user's phone is verified
 };
 
@@ -50,7 +50,7 @@ const superAdmin = {
   email: 'superAdmin@example.org',
   phone: '+16045624263',
   role: 'superAdmin',
-  patients: [],
+  clients: [],
 };
 
 const playwrightTestUser = {
@@ -58,7 +58,7 @@ const playwrightTestUser = {
   email: 'playwright@example.org',
   phone: '+16045624263',
   role: 'orgAdmin',
-  patients: [],
+  clients: [],
 };
 
 const insertCaregivers = async (caregivers, org = null) => {
@@ -84,8 +84,9 @@ const insertCaregivers = async (caregivers, org = null) => {
 };
 
 const insertCaregiversAndAddToOrg = async (org, caregivers) => {
+  const orgId = org._id || org.id;
   const insertedCaregivers = await Caregiver.insertMany(
-    caregivers.map((caregiver) => ({ ...caregiver, org: org.id, password: hashedPassword, isEmailVerified: true }))
+    caregivers.map((caregiver) => ({ ...caregiver, org: orgId, password: hashedPassword, isEmailVerified: true }))
   );
   // Add the inserted caregivers to the org.caregivers array
   org.caregivers.push(...insertedCaregivers.map((caregiver) => caregiver._id));
@@ -96,14 +97,12 @@ const insertCaregiversAndAddToOrg = async (org, caregivers) => {
 
 const insertCaregivertoOrgAndReturnToken = async (org, caregiverChoice) => {
   const [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverChoice]);
-  // Fetch the full document to ensure it has all Mongoose document properties
-  const caregiverDoc = await Caregiver.findById(caregiver._id);
+  // Fetch the full document with org populated so role and org are available
+  const caregiverDoc = await Caregiver.findById(caregiver._id).populate('org');
   if (!caregiverDoc) {
     throw new Error(`Caregiver not found with ID: ${caregiver._id}`);
   }
-  // Use the _id directly as a string to avoid any extraction issues
-  const caregiverIdString = caregiverDoc._id.toString();
-  const authTokens = await tokenService.generateAuthTokens(caregiverIdString);
+  const authTokens = await tokenService.generateAuthTokens(caregiverDoc);
 
   return { caregiver: caregiverDoc, accessToken: authTokens.access.token };
 };

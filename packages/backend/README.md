@@ -112,9 +112,9 @@ src/
 - `POST /v1/auth/login` - User login
 - `GET /v1/auth/verify-email` - Verify email address
 
-### Patients & Care
-- `GET /v1/patients` - Get patients
-- `POST /v1/patients` - Create patient
+### Clients & Care
+- `GET /v1/clients` - Get clients
+- `POST /v1/clients` - Create client
 - `GET /v1/wellness-checks` - Get wellness checks
 - `POST /v1/calls/initiate` - Initiate voice call
 
@@ -133,6 +133,20 @@ src/
 - **[Testing Strategy](docs/testing-strategy.md)** - Comprehensive testing approach
 - **[Medical Analysis API](docs/MEDICAL_ANALYSIS_API.md)** - Medical analysis endpoints
 - **[Emergency System](docs/EMERGENCY_SYSTEM.md)** - Emergency detection system
+
+## 🔧 Troubleshooting
+
+### Docker: "network ... not found" when running `yarn dev`
+
+If you see `failed to set up container networking: network ... not found`, Docker’s Compose network was removed or is stale. Reset it and try again:
+
+```bash
+cd packages/backend
+docker compose --env-file .env -f docker/docker-compose.yml -f docker/docker-compose.dev.yml down --remove-orphans
+docker network prune -f
+```
+
+Then from the repo root run `yarn dev` again. Compose will recreate the network and start mongodb, redis, and asterisk.
 
 ## 📞 Support
 

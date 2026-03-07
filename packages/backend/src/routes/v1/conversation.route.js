@@ -36,11 +36,11 @@ const router = express.Router();
  *         description: Unauthorized
  */
 router
-  .route('/patient/:patientId')
+  .route('/client/:clientId')
   .post(
     auth('updateAny:conversation'),
-    validate(conversationValidation.createConversationForPatient),
-    conversationController.createConversationForPatient
+    validate(conversationValidation.createConversationForClient),
+    conversationController.createConversationForClient
   );
 
 /**

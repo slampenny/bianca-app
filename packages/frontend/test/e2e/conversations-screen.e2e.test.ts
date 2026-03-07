@@ -22,7 +22,7 @@ async function navigateToConversationsScreen(page: Page, patientWorkflow: Patien
     await page.waitForTimeout(2000)
   }
   
-  await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
   await page.waitForTimeout(1000)
   
   // Click conversations button
@@ -77,7 +77,7 @@ test.describe('Conversations Screen', () => {
     }
     
     // Wait for patient screen/form to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"], [data-testid="patient-form"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Look for conversations button on patient screen
@@ -113,16 +113,16 @@ test.describe('Conversations Screen', () => {
     // Wait for conversations screen to load
     // It might show error if no patient, or the actual screen
     const conversationsScreen = page.locator('[data-testid="conversations-screen"]')
-    const noPatientError = page.getByText(/no patient selected/i)
+    const noClientError = page.getByText(/no client selected/i)
     
     // Wait for either the screen or error to appear
     try {
       await conversationsScreen.waitFor({ state: 'visible', timeout: 10000 })
     } catch (e) {
       // Check if error is showing instead
-      const hasError = await noPatientError.isVisible({ timeout: 2000 }).catch(() => false)
+      const hasError = await noClientError.isVisible({ timeout: 2000 }).catch(() => false)
       if (hasError) {
-        throw new Error('Patient not set in Redux - conversations screen shows "no patient selected" error')
+        throw new Error('Client not set in Redux - conversations screen shows "no client selected" error')
       }
       throw e
     }

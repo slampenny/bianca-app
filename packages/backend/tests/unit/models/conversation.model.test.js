@@ -27,7 +27,7 @@ describe('Conversation Model', () => {
     // Create a Call first (Call tracks billing, Conversation tracks messages)
     callData = {
       callSid: 'CA1234567890abcdef1234567890abcdef',
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       callType: 'outbound',
       status: 'completed',
       startTime: new Date(),
@@ -37,7 +37,7 @@ describe('Conversation Model', () => {
     };
     
     conversationData = {
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       messages: [],
     };
   });
@@ -46,11 +46,11 @@ describe('Conversation Model', () => {
     it('should create conversation with callId reference', async () => {
       const call = await Call.create(callData);
       conversationData.callId = call._id;
-      conversationData.patientId = call.patientId;
+      conversationData.clientId = call.clientId;
       
       const conversation = await Conversation.create(conversationData);
       expect(conversation.callId.toString()).toBe(call._id.toString());
-      expect(conversation.patientId.toString()).toBe(call.patientId.toString());
+      expect(conversation.clientId.toString()).toBe(call.clientId.toString());
     });
 
     it('should require callId', async () => {
@@ -61,14 +61,14 @@ describe('Conversation Model', () => {
     it('should enforce unique callId (one conversation per call)', async () => {
       const call = await Call.create(callData);
       conversationData.callId = call._id;
-      conversationData.patientId = call.patientId;
+      conversationData.clientId = call.clientId;
       
       await Conversation.create(conversationData);
       
       // Try to create another conversation for the same call
       const duplicateConversation = new Conversation({
         ...conversationData,
-        patientId: call.patientId,
+        clientId: call.clientId,
       });
       await expect(duplicateConversation.save()).rejects.toThrow();
     });
@@ -78,7 +78,7 @@ describe('Conversation Model', () => {
     it('should allow adding messages to conversation', async () => {
       const call = await Call.create(callData);
       conversationData.callId = call._id;
-      conversationData.patientId = call.patientId;
+      conversationData.clientId = call.clientId;
       
       const conversation = await Conversation.create(conversationData);
       expect(conversation.messages).toEqual([]);

@@ -234,14 +234,16 @@ export function CountryPicker({
           dropdownIconColor={textColor}
           testID={testID}
           accessibilityLabel={getAccessibilityLabel()}
-          accessibilityHint={getAccessibilityHint()}
-          accessibilityRole="combobox"
-          accessibilityState={{ 
-            disabled: !enabled,
-            selected: true,
-          }}
+          {...(Platform.OS !== 'web' && {
+            accessibilityHint: getAccessibilityHint(),
+            accessibilityRole: "combobox" as const,
+            accessibilityState: {
+              disabled: !enabled,
+              selected: true,
+            },
+          })}
           {...(Platform.OS === 'web' && {
-            // ARIA attributes for web WCAG compliance
+            // ARIA attributes for web WCAG compliance (DOM doesn't support RN accessibilityHint/accessibilityState)
             'aria-label': getAccessibilityLabel(),
             'aria-describedby': helper || helperTx ? `${testID || 'country'}-helper` : undefined,
             'aria-disabled': !enabled,

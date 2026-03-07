@@ -76,6 +76,14 @@ const setPasswordForSSO = {
   }),
 };
 
+const completeOnboarding = {
+  body: Joi.object().keys({
+    persona: Joi.string().valid('organization', 'caregiver', 'agingInPlace').required(),
+    acceptTerms: Joi.boolean().valid(true).required(),
+    singleConsentState: Joi.boolean().optional(),
+  }),
+};
+
 module.exports = {
   register,
   registerWithInvite,
@@ -87,4 +95,5 @@ module.exports = {
   verifyEmail,
   resendVerificationEmail,
   setPasswordForSSO,
+  completeOnboarding,
 };

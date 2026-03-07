@@ -130,7 +130,8 @@ class SSOService {
         const apiConfig = getDefaultApiConfig();
         
         try {
-          const exchangeResponse = await fetch(`${apiConfig.url}/sso/exchange-code`, {
+          const exchangeUrl = `${apiConfig.url}/sso/exchange-code`;
+          const exchangeResponse = await fetch(exchangeUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -143,7 +144,7 @@ class SSOService {
             }),
           });
 
-          const exchangeData = await exchangeResponse.json();
+          const exchangeData = await exchangeResponse.json().catch(() => ({}));
 
           if (!exchangeResponse.ok || !exchangeData.success) {
             logger.error('Backend code exchange failed:', exchangeData);
@@ -170,13 +171,19 @@ class SSOService {
           return backendResponse;
         } catch (exchangeError) {
           logger.error('Code exchange error:', exchangeError);
+          const isNetworkError =
+            exchangeError instanceof TypeError &&
+            (exchangeError.message === 'Failed to fetch' || exchangeError.message?.includes('fetch'));
+          const description = isNetworkError
+            ? `Cannot reach the server at ${apiConfig.url}. Make sure the backend is running (e.g. \`yarn workspace backend start\` or \`cd packages/backend && yarn start\`).`
+            : exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token';
           return {
             error: 'Authentication failed',
-            description: exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token',
+            description,
           };
         }
       } else {
-        logger.warn('Google OAuth result:', { type: result.type, params: result.params });
+        logger.warn('Google OAuth result:', { type: result.type, params: (result as { params?: unknown }).params });
         return {
           error: 'Authentication cancelled',
           description: result.type === 'cancel' ? 'User cancelled the authentication' : 'Authentication failed',
@@ -223,7 +230,8 @@ class SSOService {
         const apiConfig = getDefaultApiConfig();
         
         try {
-          const exchangeResponse = await fetch(`${apiConfig.url}/sso/exchange-code`, {
+          const exchangeUrl = `${apiConfig.url}/sso/exchange-code`;
+          const exchangeResponse = await fetch(exchangeUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -236,7 +244,7 @@ class SSOService {
             }),
           });
 
-          const exchangeData = await exchangeResponse.json();
+          const exchangeData = await exchangeResponse.json().catch(() => ({}));
 
           if (!exchangeResponse.ok || !exchangeData.success) {
             logger.error('Backend code exchange failed:', exchangeData);
@@ -263,13 +271,19 @@ class SSOService {
           return backendResponse;
         } catch (exchangeError) {
           logger.error('Code exchange error:', exchangeError);
+          const isNetworkError =
+            exchangeError instanceof TypeError &&
+            (exchangeError.message === 'Failed to fetch' || exchangeError.message?.includes('fetch'));
+          const description = isNetworkError
+            ? `Cannot reach the server at ${apiConfig.url}. Make sure the backend is running (e.g. \`yarn workspace backend start\` or \`cd packages/backend && yarn start\`).`
+            : exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token';
           return {
             error: 'Authentication failed',
-            description: exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token',
+            description,
           };
         }
       } else {
-        logger.warn('Microsoft OAuth result:', { type: result.type, params: result.params });
+        logger.warn('Microsoft OAuth result:', { type: result.type, params: (result as { params?: unknown }).params });
         return {
           error: 'Authentication cancelled',
           description: result.type === 'cancel' ? 'User cancelled the authentication' : 'Authentication failed',
@@ -361,24 +375,21 @@ class SSOService {
       // Intentionally no debug logging here to reduce console noise in web dev builds
       
       // Use RTK Query mutation for backend authentication
-      const result = store.dispatch(
-        ssoApi.endpoints.ssoLogin.initiate(requestPayload)
-      );
+      const result = (store.dispatch as (arg: unknown) => { unwrap: () => Promise<{ success?: boolean; tokens?: unknown; caregiver?: unknown; org?: unknown; clients?: unknown[]; alerts?: unknown[]; message?: string }> })(ssoApi.endpoints.ssoLogin.initiate(requestPayload));
 
       try {
-        // Unwrap throws on RTK Query errors, returns payload on success
         const data = await result.unwrap();
 
         if (data?.success) {
-          // Return the user info with tokens, org, patients, and alerts for the frontend to handle
+          // Return the user info with tokens, org, clients, and alerts for the frontend to handle
           return {
             ...userInfo,
             tokens: data.tokens,
             backendUser: data.caregiver,
             backendOrg: data.org,
-            backendPatients: data.patients,
+            backendClients: data.clients,
             backendAlerts: data.alerts,
-          } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] };
+          } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any; backendClients?: any[]; backendAlerts?: any[] };
         }
 
         return {
@@ -441,8 +452,9 @@ class SSOService {
           description: errorMessage,
         };
       } finally {
-        if (typeof (result as any)?.unsubscribe === 'function') {
-          result.unsubscribe();
+        const r = result as { unsubscribe?: () => void }
+        if (typeof r?.unsubscribe === 'function') {
+          r.unsubscribe();
         }
       }
     } catch (error) {

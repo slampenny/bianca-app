@@ -71,7 +71,7 @@ describe('paymentService', () => {
       // Second call: 180 seconds (3 minutes).
       await Call.insertMany([
         { 
-          patientId: patient._id, 
+          clientId: patient._id, 
           org: org._id,
           callSid: 'CA1234567890abcdef',
           duration: 120,
@@ -81,7 +81,7 @@ describe('paymentService', () => {
           status: 'completed'
         },
         { 
-          patientId: patient._id, 
+          clientId: patient._id, 
           org: org._id,
           callSid: 'CA0987654321fedcba',
           duration: 180,
@@ -112,7 +112,7 @@ describe('paymentService', () => {
       expect(lineItems).toHaveLength(1);
       
       const lineItem = lineItems[0];
-      expect(lineItem.patientId.toString()).toBe(patient._id.toString());
+      expect(lineItem.clientId.toString()).toBe(patient._id.toString());
       expect(lineItem.amount).toBe(expectedAmount);
       // The line item quantity should be the total duration in minutes (5 minutes).
       expect(lineItem.quantity).toBe(5);
@@ -120,7 +120,7 @@ describe('paymentService', () => {
       expect(lineItem.description).toContain('300 seconds');
       
       // Verify that all calls for the patient have been updated with the created line item ID.
-      const updatedCalls = await Call.find({ patientId: patient._id });
+      const updatedCalls = await Call.find({ clientId: patient._id });
       updatedCalls.forEach(call => {
         expect(call.lineItemId?.toString()).toBe(lineItem._id.toString());
       });
@@ -139,11 +139,11 @@ describe('paymentService', () => {
         .rejects.toThrow('No uncharged calls found');
     });
 
-    it('should throw an error if patient is not found', async () => {
-      const nonExistentPatientId = new mongoose.Types.ObjectId();
+    it('should throw an error if client is not found', async () => {
+      const nonExistentClientId = new mongoose.Types.ObjectId();
       
-      await expect(paymentService.createInvoiceFromConversations(nonExistentPatientId))
-        .rejects.toThrow('Patient not found');
+      await expect(paymentService.createInvoiceFromConversations(nonExistentClientId))
+        .rejects.toThrow('Client not found');
     });
 
     it('should handle conversations with zero duration by setting minimum duration', async () => {
@@ -155,7 +155,7 @@ describe('paymentService', () => {
       await insertConversations([
         { 
           ...conversationOne, 
-          patientId: patient._id, 
+          clientId: patient._id, 
           duration: 0, // This will be overridden by the pre-save hook
           lineItemId: null,
           startTime: new Date('2023-01-01T10:00:00Z'),
@@ -188,7 +188,7 @@ describe('paymentService', () => {
       await insertConversations([
         { 
           ...conversationOne, 
-          patientId: patient._id, 
+          clientId: patient._id, 
           duration: 60,
           lineItemId: null,
           startTime: new Date('2023-01-01T10:00:00Z'),
@@ -202,7 +202,7 @@ describe('paymentService', () => {
       await insertConversations([
         { 
           ...conversationTwo, 
-          patientId: patient._id, 
+          clientId: patient._id, 
           duration: 120,
           lineItemId: null,
           startTime: new Date('2023-01-02T10:00:00Z'),
@@ -228,7 +228,7 @@ describe('paymentService', () => {
       await insertConversations([
         { 
           ...conversationOne, 
-          patientId: patient._id, 
+          clientId: patient._id, 
           duration: 90.5,
           lineItemId: null,
           startTime: new Date('2023-01-01T10:00:00Z'),
@@ -254,7 +254,7 @@ describe('paymentService', () => {
       await insertConversations([
         { 
           ...conversationOne, 
-          patientId: patient._id, 
+          clientId: patient._id, 
           duration: 0,
           lineItemId: null,
           startTime: new Date('2023-01-01T10:00:00Z'),
@@ -267,7 +267,7 @@ describe('paymentService', () => {
       await insertConversations([
         { 
           ...conversationTwo, 
-          patientId: patient._id, 
+          clientId: patient._id, 
           duration: 120, // 2 minutes
           lineItemId: null,
           startTime: new Date('2023-01-01T11:00:00Z'),
@@ -421,7 +421,7 @@ describe('paymentService', () => {
       await invoice.save();
 
       const lineItem = new LineItem({
-        patientId: patient1._id,
+        clientId: patient1._id,
         invoiceId: invoice._id,
         amount: 100,
         description: 'Test service',
@@ -474,7 +474,7 @@ describe('paymentService', () => {
 
       // Create line items linking invoices to patients
       const lineItem1 = new LineItem({
-        patientId: patient1._id,
+        clientId: patient1._id,
         invoiceId: invoice1._id,
         amount: 100,
         description: 'Patient 1 service',
@@ -484,7 +484,7 @@ describe('paymentService', () => {
       await lineItem1.save();
 
       const lineItem2 = new LineItem({
-        patientId: patient2._id,
+        clientId: patient2._id,
         invoiceId: invoice2._id,
         amount: 200,
         description: 'Patient 2 service',
@@ -495,11 +495,11 @@ describe('paymentService', () => {
 
       const patient1Invoices = await paymentService.listInvoicesByPatient(patient1._id);
       expect(patient1Invoices).toHaveLength(1);
-      expect(patient1Invoices[0].lineItems[0].patientId.toString()).toBe(patient1._id.toString());
+      expect(patient1Invoices[0].lineItems[0].clientId.toString()).toBe(patient1._id.toString());
 
       const patient2Invoices = await paymentService.listInvoicesByPatient(patient2._id);
       expect(patient2Invoices).toHaveLength(1);
-      expect(patient2Invoices[0].lineItems[0].patientId.toString()).toBe(patient2._id.toString());
+      expect(patient2Invoices[0].lineItems[0].clientId.toString()).toBe(patient2._id.toString());
     });
 
     it('should filter patient invoices by status', async () => {
@@ -525,7 +525,7 @@ describe('paymentService', () => {
 
       // Create line items for both invoices for the same patient
       const lineItem1 = new LineItem({
-        patientId: patient1._id,
+        clientId: patient1._id,
         invoiceId: invoice1._id,
         amount: 100,
         description: 'Service 1',
@@ -535,7 +535,7 @@ describe('paymentService', () => {
       await lineItem1.save();
 
       const lineItem2 = new LineItem({
-        patientId: patient1._id,
+        clientId: patient1._id,
         invoiceId: invoice2._id,
         amount: 200,
         description: 'Service 2',
@@ -579,7 +579,7 @@ describe('paymentService', () => {
 
       // Create line items for both invoices
       const lineItem1 = new LineItem({
-        patientId: patient1._id,
+        clientId: patient1._id,
         invoiceId: invoice1._id,
         amount: 100,
         description: 'Service 1',
@@ -589,7 +589,7 @@ describe('paymentService', () => {
       await lineItem1.save();
 
       const lineItem2 = new LineItem({
-        patientId: patient1._id,
+        clientId: patient1._id,
         invoiceId: invoice2._id,
         amount: 200,
         description: 'Service 2',

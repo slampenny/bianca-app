@@ -105,7 +105,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     // Create Call record (Call tracks call metadata, not Conversation)
     call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callStartTime: new Date(),
       callType: 'wellness-check',
@@ -126,7 +126,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
         'retryMissedCall',
         {
           callId: call._id.toString(),
-          patientId: patient._id.toString(),
+          clientId: patient._id.toString(),
           retryAttempt: 1,
           originalCallId: call._id.toString(),
         }
@@ -325,8 +325,8 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       // Verify alert was created (proving org settings were correctly retrieved)
       expect(alertService.createAlert).toHaveBeenCalled();
       const alertCall = alertService.createAlert.mock.calls[0][0];
-      expect(alertCall.relatedPatient.toString()).toBe(patient._id.toString());
-      expect(alertCall.alertType).toBe('patient');
+      expect(alertCall.relatedClient.toString()).toBe(patient._id.toString());
+      expect(alertCall.alertType).toBe('client');
     });
 
     it('should correctly retrieve org settings from populated patient', async () => {
@@ -348,7 +348,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       // Verify alert was created with correct settings
       expect(alertService.createAlert).toHaveBeenCalled();
       const alertCall = alertService.createAlert.mock.calls[0][0];
-      expect(alertCall.relatedPatient.toString()).toBe(patient._id.toString());
+      expect(alertCall.relatedClient.toString()).toBe(patient._id.toString());
     });
 
     it('should cancel remaining retries when retry call succeeds', async () => {

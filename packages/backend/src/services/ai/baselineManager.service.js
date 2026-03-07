@@ -74,7 +74,8 @@ class BaselineManager {
   async establishBaseline(patientId, initialMetrics) {
     try {
       const baseline = {
-        patientId,
+        clientId: patientId,
+        patientId, // Legacy alias
         type: 'initial',
         establishedDate: new Date(),
         lastUpdated: new Date(),

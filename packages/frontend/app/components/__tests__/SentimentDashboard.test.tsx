@@ -28,7 +28,7 @@ jest.mock("../SentimentSummaryCard", () => ({
 
 describe("SentimentDashboard", () => {
   const mockTrend: SentimentTrend = {
-    patientId: "test-patient-id",
+    clientId: "test-patient-id",
     timeRange: "month",
     startDate: "2024-01-01T00:00:00.000Z",
     endDate: "2024-01-31T23:59:59.999Z",
@@ -89,7 +89,7 @@ describe("SentimentDashboard", () => {
   }
 
   const defaultProps = {
-    patientId: "test-patient-id"
+    clientId: "test-patient-id"
   }
 
   it("should render with trend and summary data", () => {
@@ -102,7 +102,7 @@ describe("SentimentDashboard", () => {
       />
     )
 
-    expect(screen.getByText("Patient Sentiment Analysis")).toBeTruthy()
+    expect(screen.getByText("Client Sentiment Analysis")).toBeTruthy()
     expect(screen.getByText("Emotional wellness insights and trends")).toBeTruthy()
     expect(screen.getByTestId("sentiment-trend-chart")).toBeTruthy()
     expect(screen.getByTestId("sentiment-summary-card")).toBeTruthy()
@@ -183,7 +183,7 @@ describe("SentimentDashboard", () => {
     )
 
     expect(screen.getByText("No Sentiment Data Available")).toBeTruthy()
-    expect(screen.getByText("Sentiment analysis will appear here once the patient has completed conversations.")).toBeTruthy()
+    expect(screen.getByText("Sentiment analysis will appear here once the client has completed conversations.")).toBeTruthy()
   })
 
   it("should handle different time range selections", async () => {
@@ -252,7 +252,7 @@ describe("SentimentDashboard", () => {
       />
     )
 
-    expect(screen.getByText("Patient Sentiment Analysis")).toBeTruthy()
+    expect(screen.getByText("Client Sentiment Analysis")).toBeTruthy()
   })
 
   it("should handle empty trend data", () => {

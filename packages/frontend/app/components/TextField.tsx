@@ -81,26 +81,26 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
   // Error status is purely visual (red border) and should never make inputs uneditable
   const disabled = TextInputProps.editable === false || status === "disabled"
   const placeholderContent = placeholderTx
-    ? translate(placeholderTx, placeholderTxOptions)
+    ? translate(placeholderTx as import("../i18n").TxKeyPath, placeholderTxOptions)
     : placeholder
   
   // Generate accessibility label from label if not provided
   const getAccessibilityLabel = () => {
     if (accessibilityLabel) return accessibilityLabel
     if (label) return label
-    if (labelTx) return translate(labelTx, labelTxOptions)
+    if (labelTx) return translate(labelTx as import("../i18n").TxKeyPath, labelTxOptions)
     return undefined
   }
 
   const $containerStyles: StyleProp<ViewStyle> = [
     $containerStyleOverride,
-    Platform.OS === "web" && {
+    Platform.OS === "web" && ({
       outlineStyle: "none",
       outlineWidth: 0,
       outlineColor: "transparent",
       boxShadow: "none",
       width: "100%",
-    },
+    } as ViewStyle),
   ]
 
   const $labelStyles = [
@@ -108,14 +108,10 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     LabelTextProps?.style,
   ]
 
-  const $inputWrapperStyles = [
+  const $inputWrapperStyles: StyleProp<ViewStyle> = [
     {
       ...$inputWrapperStyle,
-      // CRITICAL: Use theme-aware background with proper fallbacks
-      // In dark mode: neutral100 = #000000 (black)
-      // In light mode: neutral100 = #FFFFFF (white)
       backgroundColor: themeColors.palette?.neutral100 || themeColors.background || "#FFFFFF",
-      // CRITICAL: Border color should have good contrast
       borderColor: themeColors.palette?.neutral300 || themeColors.palette?.biancaBorder || themeColors.border || "#E2E8F0",
       shadowColor: themeColors.palette?.neutral900 || "#000000",
     },
@@ -123,12 +119,8 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     TextInputProps.multiline && { minHeight: 112 },
     LeftAccessory && { paddingStart: 0 },
     RightAccessory && { paddingEnd: 0 },
-    keyboardFocusStyle, // Add keyboard focus styles (web only)
-    Platform.OS === "web" && {
-      width: "100%",
-      display: "flex",
-      flexDirection: "row",
-    },
+    keyboardFocusStyle,
+    Platform.OS === "web" && ({ width: "100%", display: "flex", flexDirection: "row" } as ViewStyle),
     $inputWrapperStyleOverride,
   ]
 
@@ -146,7 +138,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
     isRTL && { textAlign: "right" as TextStyle["textAlign"] },
     TextInputProps.multiline && { height: "auto" },
     $inputStyleOverride,
-    Platform.OS === "web" && {
+    Platform.OS === "web" && ({
       outlineStyle: "none",
       outlineWidth: 0,
       outlineColor: "transparent",
@@ -155,7 +147,7 @@ export const TextField = forwardRef(function TextField(props: TextFieldProps, re
       flex: 1,
       flexGrow: 1,
       flexShrink: 1,
-    },
+    } as TextStyle),
   ]
 
   const $helperStyles = [

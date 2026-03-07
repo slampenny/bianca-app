@@ -85,21 +85,19 @@ const router = express.Router();
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/patients/:patientId/invoices')
+  .route('/clients/:clientId/invoices')
   .post(
     (req, res, next) => {
-      logger.debug('Received POST to /patients/:patientId/invoices', {
-        patientId: req.params.patientId
+      logger.debug('Received POST to /payments/clients/:clientId/invoices', {
+        clientId: req.params.clientId
       });
       next();
     },
     auth('createAny:invoice'),
-    // validate(paymentValidation.createInvoiceFromConversations),
     paymentController.createInvoiceFromConversations
   )
   .get(
     auth('readAny:invoice'),
-    // validate(paymentValidation.listInvoicesByPatient),
     paymentController.listInvoicesByPatient
   );
 

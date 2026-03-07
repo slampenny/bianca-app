@@ -3,7 +3,7 @@ const twilio = require('twilio');
 const httpStatus = require('http-status');
 const config = require('../config/config');
 const logger = require('../config/logger');
-const { Call, Conversation, Patient, Org } = require('../models');
+const { Call, Conversation, Client, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { chatService, alertService } = require('.');
 const { agenda } = require('../config/agenda');
@@ -29,27 +29,24 @@ const { VoiceResponse } = twilio.twiml;
  */
 class TwilioCallService {
   /**
-   * Initiate an outbound call to a patient
-   * @param {string} patientId - Database ID of the patient
+   * Initiate an outbound call to a client
+   * @param {string} clientId - Database ID of the client
    * @returns {Promise<string>} - The call SID
    */
-  async initiateCall(patientId) {
-    logger.info(`[Twilio Service] Initiating call for patient ID: ${patientId}`);
-    let patient;
+  async initiateCall(clientId) {
+    logger.info(`[Twilio Service] Initiating call for client ID: ${clientId}`);
+    let client;
     let conversation;
 
     try {
-      // Get patient information
-      patient = await Patient.findById(patientId);
-      if (!patient || !patient.phone) {
-        logger.error(`[Twilio Service] Patient not found or phone missing for ID: ${patientId}`);
-        throw new ApiError(httpStatus.NOT_FOUND, 'Patient or phone number not found');
+      client = await Client.findById(clientId);
+      if (!client || !client.phone) {
+        logger.error(`[Twilio Service] Client not found or phone missing for ID: ${clientId}`);
+        throw new ApiError(httpStatus.NOT_FOUND, 'Client or phone number not found');
       }
-      
-      logger.info(`[Twilio Service] Found patient ${patient.name} with phone ${patient.phone}`);
+      logger.info(`[Twilio Service] Found client ${client.name} with phone ${client.phone}`);
 
-      // Set up TwiML and callback URLs
-      const initialTwiMLUrl = `${config.twilio.apiUrl}/v1/twilio/start-call/${patientId}`;
+      const initialTwiMLUrl = `${config.twilio.apiUrl}/v1/twilio/start-call/${clientId}`;
       const statusCallbackUrl = `${config.twilio.apiUrl}/v1/twilio/call-status`;
       
       logger.info(`[Twilio Service] Using TwiML URL: ${initialTwiMLUrl}`);
@@ -76,7 +73,7 @@ class TwilioCallService {
       // Only record calls in staging/dev, not in production
       const callOptions = {
         url: initialTwiMLUrl,
-        to: patient.phone,
+        to: client.phone,
         from: config.twilio.phone,
         statusCallback: statusCallbackUrl,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
@@ -90,19 +87,13 @@ class TwilioCallService {
         timeout: 30 // Ring for 30 seconds before giving up
       };
       
-      // Check patient consent before enabling recording
-      const patientService = require('./patient.service');
-      const hasConsent = await patientService.checkPatientConsent(patientId);
-      
-      // Only add record option if:
-      // 1. Enabled in config (staging/dev only)
-      // 2. Patient has consented (or org doesn't require consent)
+      const clientService = require('./client.service');
+      const hasConsent = await clientService.checkClientConsent(clientId);
       if (config.twilio.recordCalls && hasConsent) {
         callOptions.record = true;
-        logger.info(`[Twilio Service] Call recording enabled for ${config.env} environment (patient has consented)`);
+        logger.info(`[Twilio Service] Call recording enabled for ${config.env} environment (client has consented)`);
       } else if (config.twilio.recordCalls && !hasConsent) {
-        logger.warn(`[Twilio Service] Call recording disabled: patient ${patientId} has not consented to recording`);
-        // Don't record if patient hasn't consented
+        logger.warn(`[Twilio Service] Call recording disabled: client ${clientId} has not consented to recording`);
       } else {
         logger.info(`[Twilio Service] Call recording disabled for ${config.env} environment`);
       }
@@ -120,8 +111,8 @@ class TwilioCallService {
         // Provide more helpful error messages
         if (twilioError.code === 20003 || twilioError.status === 401) {
           throw new ApiError(httpStatus.UNAUTHORIZED, 'Twilio authentication failed. Please check your Twilio credentials.');
-        } else if (twilioError.code === 21211) {
-          throw new ApiError(httpStatus.BAD_REQUEST, `Invalid phone number format: ${patient.phone}`);
+        } else         if (twilioError.code === 21211) {
+          throw new ApiError(httpStatus.BAD_REQUEST, `Invalid phone number format: ${client.phone}`);
         } else if (twilioError.code === 21212) {
           throw new ApiError(httpStatus.BAD_REQUEST, `Invalid caller ID: ${config.twilio.phone}`);
         } else {
@@ -134,7 +125,7 @@ class TwilioCallService {
       // Create Call record (not Conversation - Conversation is only created when call is answered)
       const callRecord = await Call.create({
         callSid: call.sid,
-        patientId: patient._id,
+        clientId: client._id,
         startTime: new Date(),
         callStartTime: new Date(),
         callType: 'wellness-check',
@@ -390,13 +381,10 @@ class TwilioCallService {
             // Save call first
             await call.save();
             
-            // Get patient and org for retry logic
-            const voicemailPatient = await Patient.findById(call.patientId).populate('org');
-            const voicemailOrg = voicemailPatient?.org;
-            
-            // Warn if patient doesn't have an org (shouldn't happen in normal operation)
+            const voicemailClient = await Client.findById(call.clientId).populate('org');
+            const voicemailOrg = voicemailClient?.org;
             if (!voicemailOrg) {
-              logger.warn(`[Twilio Service] Patient ${call.patientId} does not have an org assigned - using default retry settings`);
+              logger.warn(`[Twilio Service] Client ${call.clientId} does not have an org assigned - using default retry settings`);
             }
             
             // Schedule retry if org has retry settings enabled
@@ -421,11 +409,11 @@ class TwilioCallService {
                 await alertService.createAlert({
                   message: 'Wellness check call went to voicemail',
                   importance: 'medium',
-                  alertType: 'patient',
-                  relatedPatient: call.patientId,
+                  alertType: 'client',
+                  relatedClient: call.clientId,
                   relatedCall: call._id,
-                  createdBy: call.patientId,
-                  createdModel: 'Patient',
+                  createdBy: call.clientId,
+                  createdModel: 'Client',
                   visibility: 'assignedCaregivers',
                   relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                 });
@@ -525,13 +513,10 @@ class TwilioCallService {
           // Save call first to ensure it's persisted before scheduling retry
           await call.save();
           
-          // Get patient and org for retry logic
-          const patient = await Patient.findById(call.patientId).populate('org');
-          const org = patient?.org;
-          
-          // Warn if patient doesn't have an org (shouldn't happen in normal operation)
+          const client = await Client.findById(call.clientId).populate('org');
+          const org = client?.org;
           if (!org) {
-            logger.warn(`[Twilio Service] Patient ${call.patientId} does not have an org assigned - using default retry settings`);
+            logger.warn(`[Twilio Service] Client ${call.clientId} does not have an org assigned - using default retry settings`);
           }
           
           // Schedule retry if org has retry settings enabled
@@ -574,11 +559,11 @@ class TwilioCallService {
               await alertService.createAlert({
                 message: alertMessage,
                 importance: 'medium',
-                alertType: 'patient',
-                relatedPatient: call.patientId,
+                alertType: 'client',
+                relatedClient: call.clientId,
                 relatedCall: call._id,
-                createdBy: call.patientId, // Using patient as creator since it's about their call
-                createdModel: 'Patient',
+                createdBy: call.clientId,
+                createdModel: 'Client',
                 visibility: 'assignedCaregivers',
                 relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
               });
@@ -607,13 +592,10 @@ class TwilioCallService {
           // Save call first
           await call.save();
           
-          // Get patient and org for retry logic
-          const machinePatient = await Patient.findById(call.patientId).populate('org');
-          const machineOrg = machinePatient?.org;
-          
-          // Warn if patient doesn't have an org (shouldn't happen in normal operation)
+          const machineClient = await Client.findById(call.clientId).populate('org');
+          const machineOrg = machineClient?.org;
           if (!machineOrg) {
-            logger.warn(`[Twilio Service] Patient ${call.patientId} does not have an org assigned - using default retry settings`);
+            logger.warn(`[Twilio Service] Client ${call.clientId} does not have an org assigned - using default retry settings`);
           }
           
           // Schedule retry if org has retry settings enabled
@@ -638,11 +620,11 @@ class TwilioCallService {
               await alertService.createAlert({
                 message: 'Wellness check call went to voicemail',
                 importance: 'medium',
-                alertType: 'patient',
-                relatedPatient: call.patientId,
+                alertType: 'client',
+                relatedClient: call.clientId,
                 relatedCall: call._id,
-                createdBy: call.patientId,
-                createdModel: 'Patient',
+                createdBy: call.clientId,
+                createdModel: 'Client',
                 visibility: 'assignedCaregivers',
                 relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
               });
@@ -686,9 +668,8 @@ class TwilioCallService {
                 call.cost = this.calculateCallCost(call.duration || 0);
                 await call.save();
                 
-                // Get patient and org for retry logic
-                const inProgressVoicemailPatient = await Patient.findById(call.patientId).populate('org');
-                const inProgressVoicemailOrg = inProgressVoicemailPatient?.org;
+                const inProgressVoicemailClient = await Client.findById(call.clientId).populate('org');
+                const inProgressVoicemailOrg = inProgressVoicemailClient?.org;
                 
                 // Schedule retry if org has retry settings enabled
                 if (inProgressVoicemailOrg && inProgressVoicemailOrg.callRetrySettings && inProgressVoicemailOrg.callRetrySettings.retryCount > 0) {
@@ -710,11 +691,11 @@ class TwilioCallService {
                     await alertService.createAlert({
                       message: 'Wellness check call went to voicemail',
                       importance: 'medium',
-                      alertType: 'patient',
-                      relatedPatient: call.patientId,
+                      alertType: 'client',
+                      relatedClient: call.clientId,
                       relatedCall: call._id,
-                      createdBy: call.patientId,
-                      createdModel: 'Patient',
+                      createdBy: call.clientId,
+                      createdModel: 'Client',
                       visibility: 'assignedCaregivers',
                       relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                     });
@@ -748,9 +729,8 @@ class TwilioCallService {
                 call.cost = this.calculateCallCost(call.duration || 0);
                 await call.save();
                 
-                // Get patient and org for retry logic
-                const earlyVoicemailPatient = await Patient.findById(call.patientId).populate('org');
-                const earlyVoicemailOrg = earlyVoicemailPatient?.org;
+                const earlyVoicemailClient = await Client.findById(call.clientId).populate('org');
+                const earlyVoicemailOrg = earlyVoicemailClient?.org;
                 
                 // Schedule retry if org has retry settings enabled
                 if (earlyVoicemailOrg && earlyVoicemailOrg.callRetrySettings && earlyVoicemailOrg.callRetrySettings.retryCount > 0) {
@@ -772,11 +752,11 @@ class TwilioCallService {
                     await alertService.createAlert({
                       message: 'Wellness check call went to voicemail',
                       importance: 'medium',
-                      alertType: 'patient',
-                      relatedPatient: call.patientId,
+                      alertType: 'client',
+                      relatedClient: call.clientId,
                       relatedCall: call._id,
-                      createdBy: call.patientId,
-                      createdModel: 'Patient',
+                      createdBy: call.clientId,
+                      createdModel: 'Client',
                       visibility: 'assignedCaregivers',
                       relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                     });
@@ -840,7 +820,7 @@ class TwilioCallService {
       // Schedule the retry job
       await agenda.schedule(retryTime, 'retryMissedCall', {
         callId: call._id.toString(),
-        patientId: call.patientId.toString(),
+        clientId: call.clientId.toString(),
         retryAttempt: nextRetryAttempt,
         originalCallId: originalCallId.toString(),
       });

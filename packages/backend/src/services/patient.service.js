@@ -58,7 +58,7 @@ const getPatientByEmail = async (email) => {
 const updatePatientById = async (patientId, updateBody) => {
   const patient = await getPatientById(patientId);
   if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
   // Note: Email uniqueness check removed - emails can be duplicated (e.g., family members sharing email)
   Object.assign(patient, updateBody);
@@ -74,7 +74,7 @@ const updatePatientById = async (patientId, updateBody) => {
 const deletePatientById = async (patientId) => {
   const patient = await getPatientById(patientId);
   if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
   await patient.deleteOne();
   return patient;
@@ -89,7 +89,7 @@ const deletePatientById = async (patientId) => {
 const assignCaregiver = async (caregiverId, patientId) => {
   const patient = await getPatientById(patientId);
   if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
 
   const caregiver = await Caregiver.findById(caregiverId);
@@ -103,9 +103,9 @@ const assignCaregiver = async (caregiverId, patientId) => {
     await patient.save();
   }
 
-  // Add patient to caregiver's patients list
-  if (!caregiver.patients.includes(patientId)) {
-    caregiver.patients.push(patientId);
+  // Add patient to caregiver's clients list
+  if (!caregiver.clients.includes(patientId)) {
+    caregiver.clients.push(patientId);
     await caregiver.save();
   }
 
@@ -120,7 +120,7 @@ const assignCaregiver = async (caregiverId, patientId) => {
 const removeCaregiver = async (caregiverId, patientId) => {
   const patient = await getPatientById(patientId);
   if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
 
   const caregiver = await Caregiver.findById(caregiverId);
@@ -136,9 +136,9 @@ const removeCaregiver = async (caregiverId, patientId) => {
   }
 
   // Remove patient from caregiver's patients list
-  const patientIndex = caregiver.patients.indexOf(patientId);
+  const patientIndex = caregiver.clients.indexOf(patientId);
   if (patientIndex !== -1) {
-    caregiver.patients.splice(patientIndex, 1);
+    caregiver.clients.splice(patientIndex, 1);
     await caregiver.save();
   }
 
@@ -148,7 +148,7 @@ const removeCaregiver = async (caregiverId, patientId) => {
 const getCaregivers = async (patientId) => {
   const patient = await Patient.findById(patientId).populate('caregivers');
   if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
   return patient.caregivers;
 };
@@ -277,13 +277,13 @@ const verifyConsentToken = async (consentToken) => {
     
     // Verify the token
     const consentTokenDoc = await tokenService.verifyToken(consentToken, tokenTypes.PATIENT_CONSENT);
-    logger.info(`[Patient Service] Token verified successfully, patient ID: ${consentTokenDoc.patient}`);
+    logger.info(`[Patient Service] Token verified successfully, patient ID: ${consentTokenDoc.client}`);
     
-    const patient = await Patient.findById(consentTokenDoc.patient).populate('org');
+    const patient = await Patient.findById(consentTokenDoc.client).populate('org');
     
     if (!patient) {
-      logger.error(`[Patient Service] Patient not found for ID: ${consentTokenDoc.patient}`);
-      throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+      logger.error(`[Patient Service] Client not found for ID: ${consentTokenDoc.client}`);
+      throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
     }
     
     logger.info(`[Patient Service] Patient found: ${patient.name}, already consented: ${patient.consented}`);
@@ -291,7 +291,7 @@ const verifyConsentToken = async (consentToken) => {
     // Check if already consented
     if (patient.consented === true) {
       // Delete the token but return success
-      await Token.deleteMany({ patient: patient.id, type: tokenTypes.PATIENT_CONSENT });
+      await Token.deleteMany({ client: patient.id, type: tokenTypes.PATIENT_CONSENT });
       return {
         success: true,
         alreadyConsented: true,
@@ -301,7 +301,7 @@ const verifyConsentToken = async (consentToken) => {
     }
     
     // Delete all consent tokens for this patient
-    await Token.deleteMany({ patient: patient.id, type: tokenTypes.PATIENT_CONSENT });
+    await Token.deleteMany({ client: patient.id, type: tokenTypes.PATIENT_CONSENT });
     
     // Update patient consent status
     const consentEmailVersion = patient.consentEmailVersion || '1.0';

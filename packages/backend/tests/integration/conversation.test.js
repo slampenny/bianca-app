@@ -59,13 +59,13 @@ describe('Conversation routes', () => {
     return { org, accessToken, caregiver, patient };
   };
 
-  describe('POST /v1/conversations/patient/:patientId', () => {
+  describe('POST /v1/conversations/client/:clientId', () => {
     test('should create a new conversation for a patient', async () => {
       const { accessToken, patient } = await setupTestData();
 
       // Create a call first (required for conversation)
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: 'test-call-sid',
         status: 'in-progress',
         startTime: new Date()
@@ -73,14 +73,14 @@ describe('Conversation routes', () => {
       await call.save();
 
       const res = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
 
       expect(res.body).toEqual({
         id: expect.any(String),
-        patientId: patient._id.toString(),
+        clientId: patient._id.toString(),
         callSid: expect.any(String),
         messages: expect.arrayContaining([]),
         analyzedData: expect.any(Object),
@@ -108,7 +108,7 @@ describe('Conversation routes', () => {
       
       // Create a call first
       const call = new Call({
-        patientId: nonExistentPatientId,
+        clientId: nonExistentPatientId,
         callSid: 'test-call-sid-2',
         status: 'in-progress',
         startTime: new Date()
@@ -116,7 +116,7 @@ describe('Conversation routes', () => {
       await call.save();
       
       await request(app)
-        .post(`/v1/conversations/patient/${nonExistentPatientId}`)
+        .post(`/v1/conversations/client/${nonExistentPatientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.NOT_FOUND);
@@ -127,7 +127,7 @@ describe('Conversation routes', () => {
 
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: 'test-call-sid-unauth',
         status: 'in-progress',
         startTime: new Date()
@@ -135,7 +135,7 @@ describe('Conversation routes', () => {
       await call.save();
 
       await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.UNAUTHORIZED);
     });
@@ -145,7 +145,7 @@ describe('Conversation routes', () => {
 
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: 'test-call-sid-forbidden',
         status: 'in-progress',
         startTime: new Date()
@@ -154,7 +154,7 @@ describe('Conversation routes', () => {
 
       // Try to create a conversation with staff role (should fail)
       await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.FORBIDDEN);
@@ -167,7 +167,7 @@ describe('Conversation routes', () => {
 
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: 'test-call-sid-4',
         status: 'in-progress',
         startTime: new Date()
@@ -176,7 +176,7 @@ describe('Conversation routes', () => {
 
       // Create a conversation first
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -190,7 +190,7 @@ describe('Conversation routes', () => {
 
       expect(res.body).toEqual({
         id: conversationId,
-        patientId: patient._id.toString(),
+        clientId: patient._id.toString(),
         callSid: expect.any(String),
         messages: expect.arrayContaining([]),
         analyzedData: expect.any(Object),
@@ -228,14 +228,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -252,7 +252,7 @@ describe('Conversation routes', () => {
 
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: 'test-call-sid-forbidden-get',
         status: 'in-progress',
         startTime: new Date()
@@ -261,7 +261,7 @@ describe('Conversation routes', () => {
 
       // Try to create a conversation with staff role (should fail)
       await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.FORBIDDEN);
@@ -312,12 +312,12 @@ describe('Conversation routes', () => {
       await patient.save();
       
       // Add patient to caregiver
-      staffCaregiver.patients.push(patient._id);
+      staffCaregiver.clients.push(patient._id);
       await staffCaregiver.save();
 
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: 'test-call-sid-staff-access',
         status: 'in-progress',
         startTime: new Date()
@@ -326,7 +326,7 @@ describe('Conversation routes', () => {
 
       // Create a conversation first (using orgAdmin token)
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${orgAdminToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -407,15 +407,15 @@ describe('Conversation routes', () => {
       await patient2.save();
       
       // Add patients to caregivers
-      staffCaregiver1.patients.push(patient1._id);
+      staffCaregiver1.clients.push(patient1._id);
       await staffCaregiver1.save();
       
-      staffCaregiver2.patients.push(patient2._id);
+      staffCaregiver2.clients.push(patient2._id);
       await staffCaregiver2.save();
 
       // Create a call first
       const call = new Call({
-        patientId: patient2._id,
+        clientId: patient2._id,
         callSid: 'test-call-sid-staff-forbidden',
         status: 'in-progress',
         startTime: new Date()
@@ -424,7 +424,7 @@ describe('Conversation routes', () => {
 
       // Create a conversation for patient2 using orgAdmin
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient2._id}`)
+        .post(`/v1/conversations/client/${patient2._id}`)
         .set('Authorization', `Bearer ${orgAdminToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -447,14 +447,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -474,7 +474,7 @@ describe('Conversation routes', () => {
 
       expect(res.body).toEqual({
         id: conversationId,
-        patientId: patient._id.toString(),
+        clientId: patient._id.toString(),
         callSid: expect.any(String),
         messages: expect.arrayContaining([expect.any(Object)]),
         analyzedData: expect.any(Object),
@@ -508,14 +508,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -548,14 +548,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -588,14 +588,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -620,14 +620,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -652,14 +652,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -698,14 +698,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -731,7 +731,7 @@ describe('Conversation routes', () => {
 
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: 'test-call-sid-forbidden-post',
         status: 'in-progress',
         startTime: new Date()
@@ -740,7 +740,7 @@ describe('Conversation routes', () => {
 
       // Create conversation with orgAdmin
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${orgAdminToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
@@ -763,14 +763,14 @@ describe('Conversation routes', () => {
       // Create a conversation first
       // Create a call first
       const call = new Call({
-        patientId: patient._id,
+        clientId: patient._id,
         callSid: `test-call-sid-${Date.now()}`,
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
       const createRes = await request(app)
-        .post(`/v1/conversations/patient/${patient._id}`)
+        .post(`/v1/conversations/client/${patient._id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);

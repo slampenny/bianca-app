@@ -6,36 +6,57 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 
 When('I navigate to the reports screen', async function() {
-  // Navigate to reports tab
+  const base = (this.baseURL || '').replace(/\/$/, '');
   const reportsTab = this.page.getByTestId('tab-reports')
     .or(this.page.locator('[data-testid="tab-reports"], [aria-label="Reports tab"]').first());
   
   await reportsTab.waitFor({ state: 'visible', timeout: 10000 });
   await reportsTab.click();
-  await this.page.waitForTimeout(1000);
+  await this.page.waitForTimeout(2000);
   
-  // Wait for reports screen
-  await this.page.waitForSelector('[data-testid="reports-screen"]', { timeout: 10000 });
+  const reportsScreen = this.page.locator('[data-testid="reports-screen"]');
+  const clientPicker = this.page.locator('[data-testid="client-picker-button"]');
+  let reportsVisible = await Promise.race([
+    reportsScreen.waitFor({ state: 'visible', timeout: 30000 }).then(() => true),
+    clientPicker.waitFor({ state: 'visible', timeout: 30000 }).then(() => true),
+  ]).catch(() => false);
+  
+  if (!reportsVisible) {
+    await this.page.goto(`${base}#/MainTabs/Reports`, { waitUntil: 'load' });
+    await this.page.waitForTimeout(4000);
+    reportsVisible = await Promise.race([
+      reportsScreen.waitFor({ state: 'visible', timeout: 30000 }).then(() => true),
+      clientPicker.waitFor({ state: 'visible', timeout: 30000 }).then(() => true),
+    ]).catch(() => false);
+  }
+  
+  if (!reportsVisible) {
+    throw new Error('Reports screen did not load - wait for reports-screen or client-picker-button timed out (theme may still be loading)');
+  }
 });
 
-When('I select a patient from the patient picker', async function() {
-  // Click patient picker button
-  const patientPicker = this.page.locator('[data-testid="patient-picker-button"]');
-  await patientPicker.waitFor({ timeout: 10000, state: 'visible' });
-  await patientPicker.click();
+When('I select a client from the client picker', async function() {
+  const reportsScreen = this.page.locator('[data-testid="reports-screen"]');
+  await reportsScreen.waitFor({ state: 'visible', timeout: 25000 }).catch(() => {});
+  await this.page.waitForTimeout(1000);
+  
+  // Use only test id so we don't match client cards (e.g. client-card-*) which also contain "client"
+  const clientPicker = this.page.getByTestId('client-picker-button');
+  await clientPicker.waitFor({ timeout: 20000, state: 'visible' });
+  await clientPicker.scrollIntoViewIfNeeded().catch(() => {});
+  await clientPicker.click();
   await this.page.waitForTimeout(500);
   
-  // Select first patient from picker
-  const firstPatient = this.page.locator('[data-testid^="patient-option-"]').first();
-  await firstPatient.waitFor({ timeout: 5000, state: 'visible' });
-  await firstPatient.click();
-  await this.page.waitForTimeout(1000); // Wait for patient to be selected
+  const firstClient = this.page.locator('[data-testid^="client-option-"]').first();
+  await firstClient.waitFor({ timeout: 10000, state: 'visible' });
+  await firstClient.click();
+  await this.page.waitForTimeout(1000);
 });
 
 When(/^I click the fraud\/abuse reports button$/, async function() {
   const button = this.page.locator('[data-testid="fraud-abuse-reports-button"]');
   
-  // Wait for button to be enabled (it's disabled until patient is selected)
+  // Wait for button to be enabled (it's disabled until client is selected)
   await this.page.waitForFunction(
     (buttonSelector) => {
       const button = document.querySelector(buttonSelector);
@@ -70,71 +91,75 @@ Then(/^I should see the fraud\/abuse analysis screen$/, async function() {
 });
 
 Given(/^I am on the fraud\/abuse analysis screen$/, async function() {
-  // Navigate to home first
-  await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-  await this.page.waitForTimeout(1000);
+  const base = (this.baseURL || '').replace(/\/$/, '');
+  await this.page.goto(`${base}/`, { waitUntil: 'networkidle' });
+  await this.page.waitForTimeout(2000);
   
-  // Navigate to reports tab
-  let reportsTab = this.page.getByTestId('tab-reports').first();
-  let tabCount = await reportsTab.count();
-  
-  if (tabCount === 0) {
-    reportsTab = this.page.locator('[data-testid="tab-reports"]').first();
-    tabCount = await reportsTab.count();
-  }
-  
-  if (tabCount === 0) {
-    reportsTab = this.page.locator('[aria-label="Reports tab"], [aria-label*="report" i]').first();
-    tabCount = await reportsTab.count();
-  }
-  
-  if (tabCount === 0) {
-    // Try by text
-    reportsTab = this.page.getByText(/reports/i).first();
-    tabCount = await reportsTab.count();
-  }
-  
-  if (tabCount === 0) {
-    // Try direct navigation (from old Playwright test - uses helper)
-    await this.page.goto(`${this.baseURL}/MainTabs/Home/Reports`, { waitUntil: 'load' });
+  const reportsPaths = [
+    `${base}/MainTabs/Reports`,
+    `${base}/MainTabs/Reports/ReportsList`,
+    `${base}#/MainTabs/Reports`,
+    `${base}#/MainTabs/Reports/ReportsList`,
+  ];
+  let onReports = false;
+  for (const path of reportsPaths) {
+    await this.page.goto(path, { waitUntil: 'load' });
     await this.page.waitForTimeout(2000);
-    // Continue with patient selection even if tab not found
-  } else {
-    await reportsTab.waitFor({ state: 'visible', timeout: 10000 });
-    await reportsTab.click({ force: true });
-  }
-  await this.page.waitForTimeout(1000);
-  
-  // Wait for reports screen (from old Playwright test - uses helper with 10s timeout)
-  // Be more lenient - check if screen exists or if we're on reports URL
-  const reportsScreen = this.page.locator('[data-testid="reports-screen"]');
-  const reportsScreenCount = await reportsScreen.count();
-  
-  if (reportsScreenCount === 0) {
-    // Check URL
-    const currentUrl = this.page.url();
-    const isOnReports = currentUrl.includes('Report') || currentUrl.includes('report');
-    if (isOnReports) {
-      // We're on reports page - that's acceptable
-      await this.page.waitForTimeout(1000);
-      return;
+    const reportsEl = this.page.locator('[data-testid="reports-screen"]');
+    const pickerEl = this.page.locator('[data-testid="client-picker-button"]');
+    const hasReports = await Promise.race([
+      reportsEl.waitFor({ state: 'visible', timeout: 30000 }).then(() => true),
+      pickerEl.waitFor({ state: 'visible', timeout: 30000 }).then(() => true),
+    ]).catch(() => false);
+    if (hasReports) {
+      onReports = true;
+      break;
     }
-    // Wait for screen with timeout
-    await this.page.waitForSelector('[data-testid="reports-screen"]', { timeout: 10000 }).catch(() => {
-      // If screen not found, continue anyway - might be loading
-    });
   }
+  
+  if (!onReports) {
+    await this.page.goto(`${base}/`, { waitUntil: 'load' });
+    await this.page.waitForTimeout(2000);
+    let reportsTab = this.page.getByTestId('tab-reports').first();
+    let tabCount = await reportsTab.count();
+    if (tabCount === 0) {
+      reportsTab = this.page.locator('[data-testid="tab-reports"], [aria-label*="Reports"]').first();
+      tabCount = await reportsTab.count();
+    }
+    if (tabCount === 0) {
+      reportsTab = this.page.getByText(/reports/i).first();
+      tabCount = await reportsTab.count();
+    }
+    if (tabCount > 0) {
+      await reportsTab.waitFor({ state: 'visible', timeout: 10000 });
+      await reportsTab.click({ force: true });
+      await this.page.waitForTimeout(4000);
+    }
+  }
+  
+  const reportsScreen = this.page.locator('[data-testid="reports-screen"]');
+  const clientPicker = this.page.getByTestId('client-picker-button');
+  const reportsVisible = await Promise.race([
+    reportsScreen.waitFor({ state: 'visible', timeout: 35000 }).then(() => true),
+    clientPicker.waitFor({ state: 'visible', timeout: 35000 }).then(() => true),
+  ]).catch(() => false);
+  
+  if (!reportsVisible) {
+    throw new Error('Reports screen did not load - reports-screen or client-picker-button not found (theme may still be loading)');
+  }
+  
+  await this.page.waitForTimeout(1000);
+  await reportsScreen.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+  await clientPicker.scrollIntoViewIfNeeded().catch(() => {});
+  await this.page.waitForTimeout(300);
+  
+  await clientPicker.waitFor({ timeout: 25000, state: 'visible' });
+  await clientPicker.click({ force: true });
   await this.page.waitForTimeout(1000);
   
-  // Select patient
-  const patientPicker = this.page.locator('[data-testid="patient-picker-button"]');
-  await patientPicker.waitFor({ timeout: 15000, state: 'visible' });
-  await patientPicker.click({ force: true });
-  await this.page.waitForTimeout(1000);
-  
-  const firstPatient = this.page.locator('[data-testid^="patient-option-"]').first();
-  await firstPatient.waitFor({ timeout: 10000, state: 'visible' });
-  await firstPatient.click({ force: true });
+  const firstClient = this.page.locator('[data-testid^="client-option-"]').first();
+  await firstClient.waitFor({ timeout: 15000, state: 'visible' });
+  await firstClient.click({ force: true });
   await this.page.waitForTimeout(2000);
   
   // Click fraud/abuse button

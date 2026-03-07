@@ -241,7 +241,7 @@ const router = express.Router();
  *         description: Internal server error
  */
 router.get(
-  '/results/:patientId',
+  '/results/:clientId',
   auth(),
   fraudAbuseAnalysisController.getFraudAbuseAnalysisResults
 );
@@ -304,13 +304,13 @@ router.get(
  *         description: Internal server error
  */
 router.post(
-  '/trigger-patient/:patientId',
+  '/trigger-client/:clientId',
   auth(),
-  fraudAbuseAnalysisController.triggerPatientAnalysis
+  fraudAbuseAnalysisController.triggerClientAnalysis
 );
 
 router.get(
-  '/:patientId',
+  '/:clientId',
   auth(),
   fraudAbuseAnalysisController.getFraudAbuseAnalysis
 );

@@ -69,8 +69,8 @@ flowchart LR
 ```mermaid
 flowchart TB
   subgraph client["Client (Web / iOS / Android)"]
-    Screens["Screens\n(Home, Conversations, Schedules,\nAlerts, Call, Profile, Patient,\nCaregivers, Login, MFA, etc.)"]
-    Store["Redux Store\n(auth, alert, caregiver, org,\nconversation, schedule, patient,\npayment, callWorkflow, call, home)"]
+    Screens["Screens\n(Home, Conversations, Schedules,\nAlerts, Call, Profile, Client,\nCaregivers, Login, MFA, etc.)"]
+    Store["Redux Store\n(auth, alert, caregiver, org,\nconversation, schedule, client,\npayment, callWorkflow, call, home)"]
     API["API layer\n(RTK Query + baseQueryWithAuth)\nApisauce → Config.API_URL"]
   end
 
@@ -98,7 +98,7 @@ flowchart TB
 
   subgraph routes["API routes (v1)"]
     R1["/auth, /mfa, /sso"]
-    R2["/patients, /caregivers, /orgs"]
+    R2["/clients, /caregivers, /orgs"]
     R3["/conversations, /alerts"]
     R4["/schedules, /calls"]
     R5["/openai, /sentiment\n/medical-analysis\n/fraud-abuse-analysis"]
@@ -109,7 +109,7 @@ flowchart TB
 
   subgraph services["Backend services"]
     Auth["auth, token, mfa\nbreachDetection"]
-    Core["patient, caregiver\norg, schedule"]
+    Core["client, caregiver\norg, schedule"]
     Comms["conversation, alert\nemail, twilioSms"]
     Voice["call, ari.client\nrtp.listener, rtp.sender\nopenai.realtime"]
     AI["sentiment, analysis\nmedicalAnalysisScheduler"]
@@ -207,3 +207,4 @@ flowchart TB
 - **Audit:** Audit logging for PHI access
 - **Policies:** Rate limiting (auth), minimum-necessary middleware, breach detection
 - **Data:** Mongo sanitization, XSS clean, CORS allowlist
+

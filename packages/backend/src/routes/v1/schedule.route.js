@@ -57,9 +57,9 @@ const router = express.Router();
  *         $ref: '#/components/responses/Unauthorized'
  */
 router
-  .route('/patients/:patientId')
+  .route('/clients/:clientId')
   .post(
-    auth('updateOwn:patient', 'updateAny:patient'),
+    auth('updateOwn:client', 'updateAny:client'),
     validate(scheduleValidation.createSchedule),
     scheduleController.createSchedule
   );
@@ -207,19 +207,19 @@ router
  */
 router
   .route('/:scheduleId')
-  .get(auth('readOwn:patient', 'readAny:patient'), validate(scheduleValidation.getSchedule), scheduleController.getSchedule)
+  .get(auth('readOwn:client', 'readAny:client'), validate(scheduleValidation.getSchedule), scheduleController.getSchedule)
   .put(
-    auth('updateOwn:patient', 'updateAny:patient'),
+    auth('updateOwn:client', 'updateAny:client'),
     validate(scheduleValidation.updateSchedule),
     scheduleController.updateSchedule
   )
   .patch(
-    auth('updateOwn:patient', 'updateAny:patient'),
+    auth('updateOwn:client', 'updateAny:client'),
     validate(scheduleValidation.patchSchedule),
     scheduleController.patchSchedule
   )
   .delete(
-    auth('deleteOwn:patient', 'deleteAny:patient'),
+    auth('deleteOwn:client', 'deleteAny:client'),
     validate(scheduleValidation.deleteSchedule),
     scheduleController.deleteSchedule
   );

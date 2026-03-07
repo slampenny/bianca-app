@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph users["Users"]
+    Caregiver["Caregiver (Web / iOS / Android)"]
+  end
+
+  subgraph bianca["Bianca App"]
+    Frontend["Frontend (React Native / Expo)"]
+    Backend["Backend API (Node.js / Express)"]
+    subgraph our_infra["Our infrastructure (AWS)"]
+      Asterisk["Asterisk (VoIP / ARI)\nself-managed"]
+    end
+  end
+
+  subgraph external["External Services"]
+    Twilio["Twilio (SMS / Voice)"]
+    Stripe["Stripe (Billing)"]
+    OpenAI["OpenAI (Realtime Voice, Sentiment)"]
+    AWS["AWS (S3, SES, SNS, Secrets)"]
+    SSO["SSO / OAuth"]
+  end
+
+  Caregiver --> Frontend
+  Frontend -->|REST / JWT| Backend
+  Backend --> Asterisk
+  Backend --> Twilio
+  Backend --> Stripe
+  Backend --> OpenAI
+  Backend --> AWS
+  Backend --> SSO

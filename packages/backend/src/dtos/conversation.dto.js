@@ -28,10 +28,10 @@ const ConversationDTO = (conversation) => {
     conversation.messages[0].content !== undefined;
   
   // Preserve patientId BEFORE toObject/depopulate in case it gets lost
-  const originalPatientId = conversation?.patientId;
+  const originalClientId = conversation?.clientId;
   
   // Debug logging to understand patientId loss
-  if (conversation && !originalPatientId) {
+  if (conversation && !originalClientId) {
     logger.warn('[ConversationDTO] WARN: conversation has no patientId before toObject', {
       conversationId: conversation._id || conversation.id,
       hasCallId: !!conversation.callId,
@@ -50,17 +50,17 @@ const ConversationDTO = (conversation) => {
   }
   
   // Restore patientId if it was lost during toObject/depopulate
-  if (originalPatientId && conversationObj && !conversationObj.patientId) {
+  if (originalClientId && conversationObj && !conversationObj.clientId) {
     logger.info('[ConversationDTO] Restoring patientId that was lost during toObject', {
       conversationId: conversationObj._id || conversationObj.id,
-      originalPatientId: originalPatientId.toString ? originalPatientId.toString() : originalPatientId,
+      originalClientId: originalClientId.toString ? originalClientId.toString() : originalClientId,
     });
     // Convert to string if it's an ObjectId
-    conversationObj.patientId = originalPatientId.toString ? originalPatientId.toString() : originalPatientId;
+    conversationObj.clientId = originalClientId.toString ? originalClientId.toString() : originalClientId;
   }
   
   // Debug: Check if patientId is still missing after restore
-  if (conversationObj && !conversationObj.patientId && !originalPatientId) {
+  if (conversationObj && !conversationObj.clientId && !originalClientId) {
     logger.error('[ConversationDTO] CRITICAL: patientId is missing and cannot be restored', {
       conversationId: conversationObj._id || conversationObj.id,
       hasCallId: !!conversationObj.callId,
@@ -78,7 +78,7 @@ const ConversationDTO = (conversation) => {
   // to ensure we get the value even when other fields are populated
   const _id = conversationObj._id || conversation._id;
   const callSid = conversationObj.callSid || conversation.callSid;
-  const patientId = conversationObj.patientId || conversation.patientId;
+  const patientId = conversationObj.clientId || conversation.clientId;
   const lineItemId = conversationObj.lineItemId || conversation.lineItemId;
   const messages = conversationObj.messages || conversation.messages;
   const history = conversationObj.history || conversation.history;
@@ -127,7 +127,7 @@ const ConversationDTO = (conversation) => {
       _id_type: typeof _id,
       conversation_type: conversation.constructor?.name || typeof conversation,
       conversation_keys: Object.keys(conversation || {}),
-      patientId: patientId?.toString(),
+      clientId: patientId?.toString(),
       callSid,
       isMongooseDoc: conversation.constructor?.name === 'model' || conversation._id !== undefined,
     };
@@ -155,7 +155,7 @@ const ConversationDTO = (conversation) => {
   return {
     id,
     callSid,
-    patientId: patientIdStr,
+    clientId: patientIdStr,
     lineItemId: lineItemIdStr,
     messages,
     history,

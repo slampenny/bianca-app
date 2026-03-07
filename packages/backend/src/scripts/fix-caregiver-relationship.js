@@ -49,13 +49,13 @@ async function fixRelationship(patientIdOrEmail, caregiverIdOrEmail) {
     console.log('✅ Caregiver found:', caregiver.name || caregiver.email);
     console.log(`   - ID: ${caregiver._id}`);
     console.log(`   - Phone: ${caregiver.phone || 'MISSING'}`);
-    console.log(`   - Current patients: ${caregiver.patients?.length || 0}`);
+    console.log(`   - Current patients: ${caregiver.clients?.length || 0}`);
     
     // Check if relationship exists
     const patientHasCaregiver = patient.caregivers?.some(
       cg => cg.toString() === caregiver._id.toString()
     );
-    const caregiverHasPatient = caregiver.patients?.some(
+    const caregiverHasPatient = caregiver.clients?.some(
       pt => pt.toString() === patient._id.toString()
     );
     
@@ -85,12 +85,12 @@ async function fixRelationship(patientIdOrEmail, caregiverIdOrEmail) {
     
     // Verify it worked
     await patient.populate('caregivers');
-    await caregiver.populate('patients');
+    await caregiver.populate('clients');
     
     const patientHasCaregiverAfter = patient.caregivers?.some(
       cg => cg._id.toString() === caregiver._id.toString()
     );
-    const caregiverHasPatientAfter = caregiver.patients?.some(
+    const caregiverHasPatientAfter = caregiver.clients?.some(
       pt => pt._id.toString() === patient._id.toString()
     );
     

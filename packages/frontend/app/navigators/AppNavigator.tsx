@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react"
 import { NavigationContainer, getStateFromPath as getStateFromPathDefault } from "@react-navigation/native"
 import { useSelector, useDispatch } from "react-redux"
-import { isAuthenticated, getCurrentUser, getInviteToken } from "app/store/authSlice"
+import { isAuthenticated, getCurrentUser, getInviteToken, getPendingOnboarding } from "app/store/authSlice"
 import { clearAuth } from "app/store/authSlice"
 import { clearOrg } from "app/store/orgSlice"
 import { getOrg } from "app/store/orgSlice"
@@ -13,7 +13,7 @@ import {
   resetRoot,
   getActiveRouteName,
 } from "./navigationUtilities"
-import { AuthStack, UnauthStack } from "./AppNavigators"
+import { AuthStack, UnauthStack, OnboardingStackNavigator } from "./AppNavigators"
 import { getNavigationTheme } from "./NavigationConfig"
 import { NavigationProps } from "./navigationTypes"
 import * as storage from "../utils/storage"
@@ -25,6 +25,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   const isLoggedIn = useSelector(isAuthenticated)
   const currentUser = useSelector(getCurrentUser)
   const inviteToken = useSelector(getInviteToken)
+  const pendingOnboarding = useSelector(getPendingOnboarding)
   const currentOrg = useSelector(getOrg)
   const { currentTheme, colors } = useTheme()
   const shouldNavigateToRegister = useRef(false)
@@ -59,7 +60,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
           const isUnauthRoute = typeof window !== 'undefined' && 
             (window.location.pathname.includes('reset-password') || 
              window.location.pathname.includes('signup') || 
-             window.location.pathname.includes('patient/consent'))
+             window.location.pathname.includes('client/consent'))
       
       // Only reset navigation if we're NOT on an unauth route
       if (!isUnauthRoute) {
@@ -122,7 +123,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
     }
   }, [isLoggedIn, currentUser, currentOrg, dispatch])
   
-  // Navigate to Register when user is logged out and was previously missing org
+  // Navigate into onboarding (not Register form) when user is logged out and was previously missing org
   useEffect(() => {
     if (!isLoggedIn && shouldNavigateToRegister.current && navigationRef.isReady()) {
       shouldNavigateToRegister.current = false
@@ -131,7 +132,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
         if (navigationRef.isReady()) {
           resetRoot({
             index: 0,
-            routes: [{ name: "Register" as never }],
+            routes: [{ name: "OnboardingAboutYou" as never }],
           })
         }
       }, 100)
@@ -140,10 +141,11 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
     }
   }, [isLoggedIn])
 
-  // Redirect users with incomplete profiles to profile screen
+  // Redirect users with incomplete profiles to profile screen (only after onboarding is complete)
   useEffect(() => {
     const hasMissingPhone = !currentUser?.phone || (typeof currentUser.phone === 'string' && currentUser.phone.trim() === '')
-    if (isLoggedIn && currentUser && currentOrg && (!currentUser.isEmailVerified || hasMissingPhone)) {
+    const onboardingComplete = currentUser?.onboardingComplete !== false
+    if (isLoggedIn && currentUser && currentOrg && onboardingComplete && (!currentUser.isEmailVerified || hasMissingPhone)) {
       if (navigationRef.isReady()) {
         navigationRef.navigate('Profile')
       }
@@ -153,7 +155,7 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   // Redirect invited users to signup screen
   useEffect(() => {
     if (!isLoggedIn && inviteToken && navigationRef.isReady()) {
-      navigationRef.navigate('Signup', { token: inviteToken })
+      (navigationRef.navigate as (name: string, params?: object) => void)('Signup', { token: inviteToken })
     }
   }, [isLoggedIn, inviteToken])
 
@@ -206,12 +208,12 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
           return null
         },
         getStateFromPath: (path: string, options: any) => {
-          // Allow reset-password, signup, and patient consent routes even when logged out
-          if (path.includes('reset-password') || path.includes('signup') || path.includes('patient/consent')) {
+          // Allow reset-password, signup, and client consent routes even when logged out
+          if (path.includes('reset-password') || path.includes('signup') || path.includes('client/consent')) {
             try {
               return getStateFromPathDefault(path, options)
             } catch (error) {
-              logger.warn("getStateFromPath failed for reset-password/signup/patient-consent:", error)
+              logger.warn("getStateFromPath failed for reset-password/signup/client-consent:", error)
               return undefined
             }
           }
@@ -348,7 +350,15 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
       onStateChange={handleStateChange}
       {...otherProps}
     >
-      {isLoggedIn ? <AuthStack /> : <UnauthStack />}
+      {isLoggedIn ? (
+        currentUser && currentUser.onboardingComplete === false && pendingOnboarding ? (
+          <OnboardingStackNavigator />
+        ) : (
+          <AuthStack />
+        )
+      ) : (
+        <UnauthStack />
+      )}
     </NavigationContainer>
   )
 }

@@ -1,5 +1,4 @@
 const { ObjectId } = require('mongodb');
-const PatientDTO = require('./patient.dto');
 const OrgDTO = require('./org.dto');
 
 /**
@@ -23,12 +22,17 @@ const CaregiverDTO = (caregiver) => {
     return null;
   }
   
-  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, patients, ssoProvider, ssoProviderId } = caregiverObj;
+  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, patients, ssoProvider, ssoProviderId, onboardingComplete, persona, mfaEnabled, accountLocked, failedLoginAttempts } = caregiverObj;
   
   const id = _id;
 
-  // Check if patients are ObjectIds, if so, convert them to strings
-  const patientIds = (patients || []).map((patient) => (patient instanceof ObjectId ? patient.toString() : (patient?._id || patient)));
+  // Check if patients (clients) are ObjectIds, if so, convert them to strings. Schema field remains "patients" for DB.
+  const clientIds = (patients || []).map((p) => (p instanceof ObjectId ? p.toString() : (p?._id || p)));
+
+  // Legacy: if onboardingComplete is not set (old record), treat as complete so existing users don't see onboarding
+  const completed = Object.prototype.hasOwnProperty.call(caregiverObj, 'onboardingComplete')
+    ? onboardingComplete === true
+    : true;
 
   return {
     id,
@@ -38,13 +42,16 @@ const CaregiverDTO = (caregiver) => {
     phone,
     role,
     isEmailVerified: isEmailVerified === true,
-    // Explicitly check for true - if it's true in DB, return true, otherwise false
-    // This ensures we don't lose the true value if the field exists
     isPhoneVerified: isPhoneVerified === true,
     org: toOrgIdString(org),
-    patients: patientIds,
+    clients: clientIds,
     ssoProvider: ssoProvider || undefined,
     ssoProviderId: ssoProviderId || undefined,
+    onboardingComplete: completed,
+    persona: persona || undefined,
+    mfaEnabled: mfaEnabled === true,
+    accountLocked: accountLocked === true,
+    failedLoginAttempts: failedLoginAttempts ?? 0,
   };
 };
 

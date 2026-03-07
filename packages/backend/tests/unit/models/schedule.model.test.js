@@ -21,7 +21,7 @@ describe('Schedule model', () => {
     let newSchedule;
     beforeEach(() => {
       newSchedule = {
-        patient: new mongoose.Types.ObjectId(),
+        client: new mongoose.Types.ObjectId(),
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -57,7 +57,7 @@ describe('Schedule model', () => {
       };
 
       const newSchedule = {
-        patientId: new mongoose.Types.ObjectId(),
+        client: new mongoose.Types.ObjectId(),
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -84,7 +84,7 @@ describe('Schedule model', () => {
       };
 
       const newSchedule = {
-        patientId: new mongoose.Types.ObjectId(),
+        client: new mongoose.Types.ObjectId(),
         frequency: 'weekly',
         intervals: [],
         isActive: true,
@@ -111,7 +111,7 @@ describe('Schedule model', () => {
       };
 
       const newSchedule = {
-        patientId: new mongoose.Types.ObjectId(),
+        client: new mongoose.Types.ObjectId(),
         frequency: 'monthly',
         intervals: [],
         isActive: true,
@@ -138,7 +138,7 @@ describe('Schedule model', () => {
       };
 
       const newSchedule = {
-        patientId: new mongoose.Types.ObjectId(),
+        client: new mongoose.Types.ObjectId(),
         frequency: 'weekly',
         intervals: [
           { day: 1, weeks: 1 }, // Monday every week
@@ -169,7 +169,7 @@ describe('Schedule model', () => {
       };
 
       const newSchedule = {
-        patientId: new mongoose.Types.ObjectId(),
+        client: new mongoose.Types.ObjectId(),
         frequency: 'weekly',
         intervals: [
           { day: 1, weeks: 2 }, // Monday every two weeks

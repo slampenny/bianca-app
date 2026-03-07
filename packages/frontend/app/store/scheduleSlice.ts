@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Schedule } from "../services/api/api.types"
 // Import APIs directly to break circular dependency with app/services/api/index.ts
-import { patientApi } from "../services/api/patientApi"
+import { clientApi } from "../services/api/clientApi"
 import { scheduleApi } from "../services/api/scheduleApi"
 
 interface ScheduleState {
@@ -56,7 +56,7 @@ export const scheduleSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state) => {
+    builder.addMatcher(clientApi.endpoints.createClient.matchFulfilled, (state) => {
       state.schedule = defaultSchedule
       state.schedules = []
     })

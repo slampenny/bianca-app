@@ -277,18 +277,16 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       navigation.navigate("MainTabs" as any)
       
     } catch (error: unknown) {
+      const err = error as { data?: { message?: string }; message?: string }
       logger.error("Signup error:", error)
-      
-      if (error?.data?.message) {
-        setGeneralError(error.data.message)
-      } else if (error?.message) {
-        setGeneralError(error.message)
+      if (err?.data?.message) {
+        setGeneralError(err.data.message)
+      } else if (err?.message) {
+        setGeneralError(err.message)
       } else {
         setGeneralError("An error occurred during signup. Please try again.")
       }
-      
-      // For specific token errors, don't navigate away
-      const errorMessage = error?.data?.message || error?.message || ""
+      const errorMessage = err?.data?.message || err?.message || ""
       if (errorMessage.includes("Invalid or expired invite token") || 
           errorMessage.includes("Invite token has expired")) {
         return // Stay on the page to show the error

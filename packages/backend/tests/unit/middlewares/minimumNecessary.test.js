@@ -214,7 +214,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'conv-123',
-        patient: 'patient-123',
+        client: 'patient-123',
         status: 'completed',
         duration: 300,
         transcript: 'Full conversation transcript',
@@ -245,7 +245,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'conv-123',
-        patient: 'patient-123',
+        client: 'patient-123',
         transcript: 'Full conversation transcript',
         summary: 'Conversation summary',
         cost: 1.50
@@ -365,15 +365,15 @@ describe('Minimum Necessary Middleware', () => {
       expect(rules.staff).toHaveProperty('conversation');
       expect(rules.staff).toHaveProperty('medicalAnalysis');
 
-      expect(Array.isArray(rules.staff.patient)).toBe(true);
+      expect(Array.isArray(rules.staff.client)).toBe(true);
     });
 
     it('should have different access levels for each role', () => {
       const rules = getFieldAccessRules();
 
-      const staffPatientFields = rules.staff.patient.length;
-      const orgAdminPatientFields = rules.orgAdmin.patient.length;
-      const superAdminPatientAccess = rules.superAdmin.patient;
+      const staffPatientFields = rules.staff.client.length;
+      const orgAdminPatientFields = rules.orgAdmin.client.length;
+      const superAdminPatientAccess = rules.superAdmin.client;
 
       expect(orgAdminPatientFields).toBeGreaterThan(staffPatientFields);
       expect(superAdminPatientAccess).toBe('*');
@@ -396,7 +396,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'analysis-123',
-        patient: 'patient-123',
+        client: 'patient-123',
         summary: 'High-level summary',
         recommendations: ['Take medication'],
         detailedMetrics: {
@@ -429,7 +429,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'analysis-123',
-        patient: 'patient-123',
+        client: 'patient-123',
         summary: 'High-level summary',
         cognitiveMetrics: { score: 85 },
         riskLevel: 'low'

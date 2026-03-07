@@ -80,7 +80,7 @@ async function seedDatabase() {
       isActive: true
     });
     await patient3.save();
-    caregiverOneRecord.patients.push(patient3._id);
+    caregiverOneRecord.clients.push(patient3._id);
     await caregiverOneRecord.save();
     patients.push(patient3);
 

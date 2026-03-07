@@ -229,7 +229,7 @@ class EmergencyProcessor {
       // Get patient information
       const patient = await Patient.findById(patientId);
       if (!patient) {
-        return { success: false, error: 'Patient not found' };
+        return { success: false, error: 'Client not found' };
       }
 
       // Create alert message (stored in English, will be translated when fetched)
@@ -239,10 +239,10 @@ class EmergencyProcessor {
       const alertRecord = {
         message: alertMessage,
         importance: this.mapSeverityToImportance(alertData.severity),
-        alertType: 'patient',
-        relatedPatient: patientId,
-        createdBy: patientId, // Patient created this alert
-        createdModel: 'Patient',
+        alertType: 'client',
+        relatedClient: patientId,
+        createdBy: patientId,
+        createdModel: 'Client',
         visibility: 'assignedCaregivers',
         relevanceUntil: new Date(Date.now() + (alertData.responseTimeSeconds * 1000))
       };
@@ -282,7 +282,7 @@ class EmergencyProcessor {
         success: true,
         alert,
         notificationResult,
-        patient: {
+        client: {
           id: patientId,
           name: patient.name,
           preferredName: patient.preferredName

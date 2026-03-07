@@ -58,7 +58,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
     // Create a Call first (conversations require callId)
     const call = await Call.create({
       callSid: callSid,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       status: 'in-progress',
       duration: 0
     });
@@ -67,7 +67,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
     // Create test conversation in database
     const conversation = new Conversation({
       _id: conversationId,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       callId: call._id, // Use Call ObjectId, not callSid
       status: 'in-progress',
       startTime: new Date(),
@@ -107,7 +107,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // Setup connection
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: 'Hello, how are you?',
         activeUserMessageId: null,
         _userIsSpeaking: true,
@@ -167,7 +167,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // Setup connection
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingAssistantTranscript: '',
         activeAssistantMessageId: null,
         _aiIsSpeaking: false,
@@ -235,7 +235,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
 
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: 'Hello',
         activeUserMessageId: null,
         pendingAssistantTranscript: '',
@@ -337,7 +337,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
 
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: '',
         activeUserMessageId: null,
         pendingAssistantTranscript: '',
@@ -407,7 +407,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: '',
         activeUserMessageId: null,
         _userIsSpeaking: true,

@@ -30,19 +30,19 @@ const isOwnerPatient = (caregiver, targetId) => {
   }
 
   // Ensure caregiver object and patientId are provided, and caregiver has patients array
-  if (!caregiver || !caregiver.patients || !Array.isArray(caregiver.patients)) {
+  if (!caregiver || !caregiver.clients || !Array.isArray(caregiver.clients)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid parameters for isOwnerPatient function.');
   }
 
   // Check if the patientId exists in the caregiver's patients array
-  return caregiver.patients.includes(targetId);
+  return caregiver.clients.includes(targetId);
 };
 
 // Map of resources to their respective ownership checking functions
 const ownershipChecks = {
   org: isOwnerOrg,
   caregiver: isOwnerCaregiver,
-  patient: isOwnerPatient,
+  client: isOwnerPatient,
   alert: () => {
     return true;
   },

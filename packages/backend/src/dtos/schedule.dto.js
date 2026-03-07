@@ -2,18 +2,16 @@
 const { convertUTCToOrgTime } = require('../utils/timezone.utils');
 
 const ScheduleDTO = (schedule) => {
-  const { _id, patient, frequency, intervals, isActive, time, nextCallDate } = schedule;
+  const { _id, client, frequency, intervals, isActive, time, nextCallDate } = schedule;
 
   const id = _id;
-  const patientId = patient ? (typeof patient === 'object' ? patient._id : patient) : null;
+  const clientId = client ? (typeof client === 'object' ? client._id : client) : null;
 
-  // Get org timezone (default to 'America/Los_Angeles' if not set)
-  // Check if patient is populated and has org
   let orgTimezone = 'America/Los_Angeles';
-  if (patient && typeof patient === 'object' && patient.org) {
-    if (typeof patient.org === 'object' && patient.org.timezone) {
-      orgTimezone = patient.org.timezone;
-    } else if (typeof patient.org === 'string') {
+  if (client && typeof client === 'object' && client.org) {
+    if (typeof client.org === 'object' && client.org.timezone) {
+      orgTimezone = client.org.timezone;
+    } else if (typeof client.org === 'string') {
       // If org is just an ID, we can't get timezone - use default
       // In practice, schedules should be populated with org when needed
     }
@@ -32,7 +30,7 @@ const ScheduleDTO = (schedule) => {
 
   return {
     id,
-    patient: patientId,
+    client: clientId,
     frequency,
     intervals: intervalData,
     isActive,

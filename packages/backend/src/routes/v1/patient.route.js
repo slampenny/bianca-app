@@ -93,7 +93,7 @@ module.exports = router;
 
 /**
  * @swagger
- * /patients:
+ * /clients:
  *   post:
  *     summary: Create a patient
  *     description: Only admins can create other Patients.
@@ -238,7 +238,7 @@ module.exports = router;
 
 /**
  * @swagger
- * /patients/{patientId}:
+ * /clients/{patientId}:
  *   get:
  *     summary: Get a patient
  *     description: Logged in Patients can fetch only their own patient information. Only admins can fetch other Patients.

@@ -33,9 +33,9 @@ const OrgDTO = (org) => {
     caregiver instanceof ObjectId ? caregiver.toString() : (caregiver?._id || caregiver)
   );
   
-  // Convert patients array to string IDs
-  const patientIds = (patients || []).map((patient) => 
-    patient instanceof ObjectId ? patient.toString() : (patient?._id || patient)
+  // Convert patients (clients) array to string IDs. Schema field remains "patients" for DB.
+  const clientIds = (patients || []).map((p) =>
+    p instanceof ObjectId ? p.toString() : (p?._id || p)
   );
   
   return {
@@ -50,7 +50,7 @@ const OrgDTO = (org) => {
     timezone,
     country,
     caregivers: caregiverIds,
-    patients: patientIds,
+    clients: clientIds,
     callRetrySettings,
     privacyOfficerId: privacyOfficerId ? (privacyOfficerId instanceof ObjectId ? privacyOfficerId.toString() : (privacyOfficerId?._id || privacyOfficerId)) : null,
     requirePatientConsent: requirePatientConsent === true,

@@ -5,7 +5,7 @@ const { objectId } = require('./custom.validation');
 
 const getMedicalAnalysis = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId).required(),
+    clientId: Joi.string().custom(objectId).required(),
   }),
   query: Joi.object().keys({
     timeRange: Joi.string().valid('month', 'quarter', 'year', 'custom').default('month'),
@@ -17,19 +17,19 @@ const getMedicalAnalysis = {
 
 const getMedicalAnalysisSummary = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId).required(),
+    clientId: Joi.string().custom(objectId).required(),
   }),
 };
 
 const getBaseline = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId).required(),
+    clientId: Joi.string().custom(objectId).required(),
   }),
 };
 
 const establishBaseline = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId).required(),
+    clientId: Joi.string().custom(objectId).required(),
   }),
   body: Joi.object().keys({
     metrics: Joi.object().keys({

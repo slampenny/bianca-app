@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, FC, useContext } from "react"
-import { TextInput, View, StyleSheet, Image, Platform } from "react-native"
+import { TextInput, View, StyleSheet, Image, ImageStyle, Platform } from "react-native"
 import { useDispatch, useSelector } from "react-redux"
 import { useLoginMutation } from "../services/api/authApi"
 import { setAuthEmail, setAuthTokens, setCurrentUser, getValidationError, getAuthEmail } from "../store/authSlice"
 import { setCaregiver } from "../store/caregiverSlice"
 import { setOrg } from "../store/orgSlice"
-import { setPatientsForCaregiver } from "../store/patientSlice"
+import { setClientsForCaregiver } from "../store/clientSlice"
 import { Button, Text, TextField, PasswordField } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { SSOLoginButtons } from "./SSOLoginButtons"
@@ -121,11 +121,11 @@ export const LoginForm: FC<LoginFormProps> = ({
           onMFARequired(authEmail, authPassword, result.tempToken)
         } else if (navigationRef.isReady()) {
           // Use global navigationRef to navigate to MFA verification screen
-          navigationRef.navigate("MFAVerification" as never, {
+          ;(navigationRef.navigate as (name: string, params?: object) => void)("MFAVerification", {
             email: authEmail,
             password: authPassword,
             tempToken: result.tempToken,
-          } as never)
+          })
         } else {
           // No navigation available and no callback - show error
           setErrorMessage("MFA verification required but navigation is not available. Please use the main login screen.")
@@ -156,8 +156,9 @@ export const LoginForm: FC<LoginFormProps> = ({
       }
     } catch (error: unknown) {
       console.error('Login error:', error)
-      console.error('Error data:', error?.data)
-      console.error('Error status:', error?.status)
+      const err = error as { data?: unknown; status?: number; ssoProvider?: string }
+      console.error('Error data:', err?.data)
+      console.error('Error status:', err?.status)
       
       // RTK Query errors: when .unwrap() throws, error structure is:
       // - error.status: HTTP status code (e.g., 401) or 'CUSTOM_ERROR'
@@ -200,7 +201,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         hasOnError: !!onError
       })
       
-      const ssoProvider = errorData?.ssoProvider || error?.ssoProvider || 'google'
+      const ssoProvider = errorData?.ssoProvider || (error as { ssoProvider?: string })?.ssoProvider || 'google'
       
       if (requiresLinking) {
         logger.debug('✅ SSO account linking required')
@@ -267,7 +268,7 @@ export const LoginForm: FC<LoginFormProps> = ({
     }
   }
 
-  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] }) => {
+  const handleSSOSuccess = async (user: SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendClients?: any[]; backendAlerts?: any[] }) => {
     setIsLoading(true)
     try {
       logger.debug('LoginForm: SSO success handler called with user:', {
@@ -277,7 +278,7 @@ export const LoginForm: FC<LoginFormProps> = ({
         userEmail: user.backendUser?.email,
         userName: user.backendUser?.name,
         hasOrg: !!user.backendOrg,
-        hasPatients: !!user.backendPatients
+        hasClients: !!user.backendClients
       });
       
       if (user.tokens && user.backendUser) {
@@ -306,12 +307,11 @@ export const LoginForm: FC<LoginFormProps> = ({
           dispatch(setOrg(user.backendOrg));
         }
         
-        // Set patients if included in response
-        if (user.backendPatients && user.backendUser?.id) {
-          logger.debug('LoginForm: dispatching patients to Redux, count:', user.backendPatients.length);
-          dispatch(setPatientsForCaregiver({ 
+        if (user.backendClients && user.backendUser?.id) {
+          logger.debug('LoginForm: dispatching clients to Redux, count:', user.backendClients.length);
+          dispatch(setClientsForCaregiver({ 
             caregiverId: user.backendUser.id, 
-            patients: user.backendPatients 
+            clients: user.backendClients 
           }));
         }
         
@@ -382,7 +382,6 @@ export const LoginForm: FC<LoginFormProps> = ({
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
         editable={true}
-        disabled={false}
       />
       <PasswordField
         testID="password-input"
@@ -400,7 +399,6 @@ export const LoginForm: FC<LoginFormProps> = ({
         inputWrapperStyle={styles.inputWrapper}
         style={styles.input}
         editable={true}
-        disabled={false}
         showRules={false}
       />
     </>
@@ -414,19 +412,19 @@ export const LoginForm: FC<LoginFormProps> = ({
           <View style={styles.iconWrapper}>
             <Image 
               source={{ uri: Config.appIconUrl }}
-              style={styles.appIcon}
+              style={styles.appIcon as ImageStyle}
               resizeMode="contain"
               accessibilityLabel="Bianca App Icon"
               testID="app-icon"
               {...(Platform.OS === 'web' && {
                 style: [
-                  styles.appIcon,
+                  styles.appIcon as ImageStyle,
                   {
                     backgroundColor: 'transparent',
-                    border: 'none',
-                    outline: 'none',
-                    boxShadow: 'none',
-                  }
+                    borderWidth: 0,
+                    shadowOpacity: 0,
+                    elevation: 0,
+                  } as ImageStyle
                 ]
               })}
             />
@@ -549,8 +547,8 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     // Web-specific styles
     ...(Platform.OS === 'web' && {
       objectFit: 'contain',
-      display: 'block',
-    }),
+      display: 'flex',
+    } as const),
   },
   appName: {
     fontSize: 24, // Reduced from 28
@@ -575,7 +573,6 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     minHeight: 40, // Ensure minimum height for visibility
     zIndex: 10,
     elevation: 5, // For Android
-    importantForAccessibility: "yes" as const,
   },
   errorText: {
     color: colors.palette.biancaError || "#dc2626",

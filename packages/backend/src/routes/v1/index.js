@@ -10,7 +10,7 @@ const mfaRoute = require('./mfa.route');
 const openaiRoute = require('./openai.route');
 const orgRoute = require('./org.route');
 const phoneVerificationRoute = require('./phoneVerification.route');
-const patientRoute = require('./patient.route');
+const clientRoute = require('./client.route');
 const paymentRoute = require('./payment.route');
 const paymentMethodRoute = require('./paymentMethod.route');
 const privacyRoute = require('./privacy.route');
@@ -73,8 +73,8 @@ const defaultRoutes = [
     route: orgRoute,
   },
   {
-    path: '/patients',
-    route: patientRoute,
+    path: '/clients',
+    route: clientRoute,
   },
   {
     path: '/phone-verification',

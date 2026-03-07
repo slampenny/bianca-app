@@ -7,7 +7,7 @@ import { useTheme } from "../theme/ThemeContext"
 
 type Sizes = keyof typeof $sizeStyles
 type Weights = keyof typeof typography.primary
-type Presets = keyof typeof $presets
+type Presets = "default" | "bold" | "heading" | "subheading" | "formLabel" | "formHelper"
 
 export interface TextProps extends RNTextProps {
   /**

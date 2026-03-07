@@ -56,7 +56,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Create a Call first (Conversation requires callId)
     const call = await Call.create({
       callSid: callSid,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       status: 'in-progress',
       duration: 0
     });
@@ -65,7 +65,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Create test conversation in database
     const conversation = new Conversation({
       _id: conversationId,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       callId: call._id, // Use Call ObjectId, not callSid
       messages: []
     });
@@ -103,7 +103,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Setup connection - conversationId must be ObjectId, not string
     const conn = {
       conversationId: conversationId, // Keep as ObjectId, not string
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       pendingUserTranscript: '',
       activeUserMessageId: null,
       pendingAssistantTranscript: '',
@@ -260,7 +260,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Setup connection - conversationId must be ObjectId, not string
     const conn = {
       conversationId: conversationId, // Keep as ObjectId, not string
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       pendingUserTranscript: '',
       activeUserMessageId: null,
       pendingAssistantTranscript: '',

@@ -53,7 +53,7 @@ describe('patientService - Consent Functionality', () => {
       );
 
       // Verify token was created
-      const token = await Token.findOne({ patient: patient._id, type: tokenTypes.PATIENT_CONSENT });
+      const token = await Token.findOne({ client: patient._id, type: tokenTypes.PATIENT_CONSENT });
       expect(token).toBeTruthy();
       expect(token.expires).toBeTruthy();
 
@@ -160,7 +160,7 @@ describe('patientService - Consent Functionality', () => {
       expect(updatedPatient.consentEmailVersion).toBe('1.0');
 
       // Verify token was deleted
-      const token = await Token.findOne({ patient: patient._id, type: tokenTypes.PATIENT_CONSENT });
+      const token = await Token.findOne({ client: patient._id, type: tokenTypes.PATIENT_CONSENT });
       expect(token).toBeNull();
     });
 

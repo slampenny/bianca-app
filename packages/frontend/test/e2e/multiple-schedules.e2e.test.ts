@@ -53,27 +53,27 @@ async function countSchedulesInPicker(picker: any): Promise<number> {
   return validCount
 }
 
-// Helper to navigate to schedules via patient
+// Helper to navigate to schedules via client
 async function navigateToSchedulesViaPatient(page: any): Promise<void> {
-  // Step 1: Click on the edit button for a patient from home screen
-  const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+  // Step 1: Click on the edit button for a client from home screen
+  const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
   const editButtonCount = await editButton.count()
   if (editButtonCount === 0) {
-    const patientCard = page.locator('[data-testid^="patient-card-"]').first()
-    const patientCount = await patientCard.count()
-    if (patientCount === 0) {
-      throw new Error('No patients found - cannot access schedules without patients')
+    const clientCard = page.locator('[data-testid^="client-card-"]').first()
+    const clientCount = await clientCard.count()
+    if (clientCount === 0) {
+      throw new Error('No clients found - cannot access schedules without clients')
     }
-    throw new Error('No edit buttons found on patient cards')
+    throw new Error('No edit buttons found on client cards')
   }
   await editButton.waitFor({ timeout: 10000, state: 'visible' })
   await editButton.click()
   
-  // Step 2: Wait for patient screen to load
-  const patientScreen = page.locator('[data-testid="patient-screen"]')
-  await patientScreen.waitFor({ timeout: 10000, state: 'visible' })
+  // Step 2: Wait for client screen to load
+  const clientScreen = page.locator('[data-testid="client-screen"]')
+  await clientScreen.waitFor({ timeout: 10000, state: 'visible' })
   
-  // Step 3: Wait for patient data to load
+  // Step 3: Wait for client data to load
   await page.waitForTimeout(1500)
   
   // Step 4: Wait for the manage-schedules-button to appear
@@ -90,7 +90,7 @@ async function navigateToSchedulesViaPatient(page: any): Promise<void> {
   }
   
   if (!buttonFound) {
-    throw new Error('Manage schedules button not found on patient screen')
+    throw new Error('Manage schedules button not found on client screen')
   }
   
   // Step 5: Click the manage schedules button

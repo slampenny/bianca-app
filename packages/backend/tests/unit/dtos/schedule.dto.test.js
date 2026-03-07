@@ -6,7 +6,7 @@ describe('Schedule DTO', () => {
       // Mock schedule with UTC time stored in database
       const schedule = {
         _id: 'schedule123',
-        patient: {
+        client: {
           _id: 'patient123',
           org: {
             _id: 'org123',
@@ -54,9 +54,9 @@ describe('Schedule DTO', () => {
       testCases.forEach(({ timezone, utcTime, expectedOrgTime }) => {
         const schedule = {
           _id: 'schedule123',
-          patient: {
-            _id: 'patient123',
-            org: {
+client: {
+          _id: 'patient123',
+          org: {
               _id: 'org123',
               timezone,
             },
@@ -76,7 +76,7 @@ describe('Schedule DTO', () => {
     test('should use default timezone if org timezone is not set', () => {
       const schedule = {
         _id: 'schedule123',
-        patient: {
+        client: {
           _id: 'patient123',
           org: {
             _id: 'org123',
@@ -97,10 +97,10 @@ describe('Schedule DTO', () => {
       expect(['06:00', '07:00']).toContain(dto.time);
     });
 
-    test('should handle patient as ID string (not populated)', () => {
+    test('should handle client as ID string (not populated)', () => {
       const schedule = {
         _id: 'schedule123',
-        patient: 'patient123', // Just an ID, not populated
+        client: 'patient123', // Just an ID, not populated
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -113,13 +113,13 @@ describe('Schedule DTO', () => {
       // Should use default timezone (America/Los_Angeles) when org is not populated
       // 14:00 UTC = 6:00 AM PST or 7:00 AM PDT
       expect(['06:00', '07:00']).toContain(dto.time);
-      expect(dto.patient).toBe('patient123');
+      expect(dto.client).toBe('patient123');
     });
 
     test('should handle missing time gracefully', () => {
       const schedule = {
         _id: 'schedule123',
-        patient: {
+        client: {
           _id: 'patient123',
           org: {
             _id: 'org123',
@@ -141,7 +141,7 @@ describe('Schedule DTO', () => {
     test('should preserve all other schedule properties', () => {
       const schedule = {
         _id: 'schedule123',
-        patient: {
+        client: {
           _id: 'patient123',
           org: {
             _id: 'org123',
@@ -158,7 +158,7 @@ describe('Schedule DTO', () => {
       const dto = ScheduleDTO(schedule);
 
       expect(dto.id).toBe('schedule123');
-      expect(dto.patient).toBe('patient123');
+      expect(dto.client).toBe('patient123');
       expect(dto.frequency).toBe('weekly');
       expect(dto.intervals).toEqual([{ day: 1, weeks: 1 }]);
       expect(dto.isActive).toBe(true);

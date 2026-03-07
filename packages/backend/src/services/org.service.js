@@ -108,7 +108,7 @@ const deleteOrgById = async (orgId) => {
     await patient.delete();
 
     // Soft delete all schedules that belong to the patient
-    const schedules = await Schedule.find({ patient: patient.id });
+    const schedules = await Schedule.find({ client: patient.id });
     for (const schedule of schedules) {
       await schedule.delete();
     }

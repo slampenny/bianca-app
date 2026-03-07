@@ -29,6 +29,32 @@ async function safeWait(page, ms) {
   });
 }
 
+// New registration flow: Register button → Onboarding (About you → How Bianca works) → Register form
+async function goThroughOnboardingToRegister(page, persona = 'caregiver', orgName = 'Test Org') {
+  const aboutYou = page.getByTestId('onboarding-about-you-screen');
+  const registerName = page.locator('input[data-testid="register-name"]');
+  await Promise.race([
+    aboutYou.waitFor({ state: 'visible', timeout: 10000 }),
+    registerName.waitFor({ state: 'visible', timeout: 10000 }),
+  ]);
+  const onAboutYou = await aboutYou.isVisible().catch(() => false);
+  if (!onAboutYou) return;
+  const personaTestId = persona === 'organization' ? 'onboarding-persona-organization'
+    : persona === 'caregiver' ? 'onboarding-persona-caregiver' : 'onboarding-persona-agingInPlace';
+  await page.getByTestId(personaTestId).click();
+  await page.getByTestId('onboarding-about-you-continue').click();
+  await page.getByTestId('onboarding-how-it-works-next').waitFor({ state: 'visible', timeout: 10000 });
+  await page.getByTestId('onboarding-how-it-works-next').click();
+  if (persona === 'organization') {
+    await page.getByTestId('onboarding-org-info-screen').waitFor({ state: 'visible', timeout: 10000 });
+    const orgNameInput = page.locator('input[data-testid="onboarding-org-name"]');
+    await orgNameInput.waitFor({ state: 'visible', timeout: 5000 });
+    await orgNameInput.fill(orgName);
+    await page.getByTestId('onboarding-org-info-continue').click();
+  }
+  await registerName.waitFor({ state: 'visible', timeout: 10000 });
+}
+
 Given('the frontend is running on {string}', async function(baseURL) {
   // Ignore the hardcoded port in feature files - use centralized config instead
   // This ensures all tests use the same port configuration
@@ -49,9 +75,12 @@ Given('the backend is running on {string}', async function(apiURL) {
 
 // Common login step - reusable across all test suites
 Given('I am logged in as {string}', async function(username) {
+  // Ensure backend has seed data (fake@example.org, admin, etc.) so login succeeds
+  await this.ensureBackendSeeded();
+
   const credentials = this.getCredentials(username);
   this.credentials = credentials; // Store credentials for later use in test steps
-  
+
   // Navigate to login page with retries in case frontend is still starting
   let navigationSuccess = false;
   let attempts = 0;
@@ -149,11 +178,11 @@ Given('I am logged in as {string}', async function(username) {
   while (!homeScreenFound && navAttempts < maxNavAttempts) {
     // Check for home screen elements
     const homeHeader = this.page.getByTestId('home-header');
-    const patientList = this.page.getByTestId('patient-list');
-    const addButton = this.page.getByTestId('add-patient-button');
+    const clientList = this.page.getByTestId('client-list');
+    const addButton = this.page.getByTestId('add-client-button');
     
     const headerCount = await homeHeader.count();
-    const listCount = await patientList.count();
+    const listCount = await clientList.count();
     const buttonCount = await addButton.count();
     
     if (headerCount > 0 || listCount > 0 || buttonCount > 0) {
@@ -514,9 +543,8 @@ When('I navigate to the registration page', async function() {
   
   await registerButton.waitFor({ state: 'visible', timeout: 10000 });
   await registerButton.click();
-  
-  // Wait for registration form
-  await this.page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 });
+  // New flow: onboarding before Register form
+  await goThroughOnboardingToRegister(this.page, 'caregiver');
 });
 
 When('I enter email {string}', async function(email) {
@@ -644,8 +672,8 @@ Then('I should be logged in', async function() {
   // Also check for home screen indicators
   const homeIndicators = [
     this.page.getByTestId('home-header'),
-    this.page.getByText('Add Patient', { exact: true }),
-    this.page.getByTestId('add-patient-button'),
+    this.page.getByText(/Add Client/, { exact: true }),
+    this.page.getByTestId('add-client-button'),
     this.page.getByTestId('home-screen'),
     this.page.getByTestId('tab-home'),
   ];
@@ -687,7 +715,7 @@ Then('I should see the home screen', async function() {
   // Wait for home screen indicators
   const homeIndicators = [
     this.page.getByTestId('home-header'),
-    this.page.getByTestId('patient-list'),
+    this.page.getByTestId('client-list'),
     this.page.getByTestId('dashboard'),
   ];
   
@@ -783,9 +811,8 @@ Given('I am on the registration page', async function() {
   
   await registerButton.waitFor({ state: 'visible', timeout: 10000 });
   await registerButton.click();
-  
-  // Wait for registration form
-  await this.page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 });
+  // New flow: onboarding before Register form
+  await goThroughOnboardingToRegister(this.page, 'caregiver');
 });
 
 When('I enter registration confirm password {string}', async function(password) {

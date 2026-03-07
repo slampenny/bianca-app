@@ -55,8 +55,8 @@ describe('Schedule Service', () => {
       const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
 
       expect(schedule).toHaveProperty('id');
-      // schedule.patient is now populated, so check the ID from the populated object
-      const patientId = typeof schedule.patient === 'object' ? schedule.patient._id.toString() : schedule.patient.toString();
+      // schedule.client is now populated, so check the ID from the populated object
+      const patientId = typeof schedule.client === 'object' ? schedule.client._id.toString() : schedule.client.toString();
       expect(patientId).toEqual(patient.id.toString());
 
       const updatedPatient = await Patient.findById(patient.id);
@@ -219,9 +219,9 @@ describe('Schedule Service', () => {
       });
 
       // Schedule should have patient populated with org
-      expect(schedule.patient).toBeDefined();
-      expect(schedule.patient.org).toBeDefined();
-      expect(schedule.patient.org.timezone).toBe('America/New_York');
+      expect(schedule.client).toBeDefined();
+      expect(schedule.client.org).toBeDefined();
+      expect(schedule.client.org.timezone).toBe('America/New_York');
     });
 
     test('should populate patient.org when getting schedule by ID', async () => {
@@ -237,9 +237,9 @@ describe('Schedule Service', () => {
 
       const foundSchedule = await scheduleService.getScheduleById(schedule.id);
 
-      expect(foundSchedule.patient).toBeDefined();
-      expect(foundSchedule.patient.org).toBeDefined();
-      expect(foundSchedule.patient.org.timezone).toBe('America/Chicago');
+      expect(foundSchedule.client).toBeDefined();
+      expect(foundSchedule.client.org).toBeDefined();
+      expect(foundSchedule.client.org.timezone).toBe('America/Chicago');
     });
   });
 });

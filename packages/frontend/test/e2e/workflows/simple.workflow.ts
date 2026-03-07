@@ -22,9 +22,10 @@ export class SimpleWorkflow {
 
   async authWorkflow_NavigateToRegister() {
     // GIVEN: I am on the login screen
-    // WHEN: I want to register
+    // WHEN: I want to register (new flow: Register → onboarding → Register form)
     await this.page.getByTestId('register-button').click()
-    
+    const { goThroughOnboardingToRegister } = await import('../helpers/navigation')
+    await goThroughOnboardingToRegister(this.page, 'caregiver')
     // THEN: I should see registration form
     await expect(this.page.getByTestId('register-name')).toBeVisible()
   }
@@ -85,12 +86,12 @@ export class SimpleWorkflow {
 
   // PATIENT WORKFLOWS  
   async patientWorkflow_CheckPatientInterface() {
-    // GIVEN: I want to manage patients
-    // WHEN: I look for patient-related elements
+    // GIVEN: I want to manage clients
+    // WHEN: I look for client-related elements
     const patientElements = [
-      { name: 'Patient Cards', testId: 'patient-card' },
-      { name: 'Add Patient Button', text: 'Add Patient' },
-      { name: 'No Patients Message', text: 'No patients found' },
+      { name: 'Client Cards', testId: 'client-card' },
+      { name: 'Add Client Button', text: 'Add Client' },
+      { name: 'No Clients Message', text: 'No clients found' },
       { name: 'Home Header', testId: 'home-header' }
     ]
     

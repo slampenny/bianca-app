@@ -117,7 +117,7 @@ beforeAll(async () => {
         patientsChecked++;
         
         // Check if patient has any schedules
-        const scheduleCount = await Schedule.countDocuments({ patient: patient._id });
+        const scheduleCount = await Schedule.countDocuments({ client: patient._id });
         
         if (scheduleCount === 0) {
           // Create alert for patient without schedule
@@ -130,7 +130,7 @@ beforeAll(async () => {
             message: alertMessage,
             importance: 'medium',
             alertType: 'patient',
-            relatedPatient: patient._id,
+            relatedClient: patient._id,
             createdBy: patient._id,
             createdModel: 'Patient',
             visibility: 'assignedCaregivers',
@@ -225,7 +225,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
           message: `Patient ${patient.name} has no schedule configured`,
           importance: 'medium',
           alertType: 'patient',
-          relatedPatient: patient._id,
+          relatedClient: patient._id,
           createdBy: patient._id,
           createdModel: 'Patient',
           visibility: 'assignedCaregivers',
@@ -307,7 +307,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
 
       // Create a schedule for this patient
       await Schedule.create({
-        patient: patient._id,
+        client: patient._id,
         frequency: 'daily',
         time: '10:00',
         isActive: true,
@@ -347,7 +347,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
         createdAt: new Date(mockTimestamp - 45 * 60 * 1000),
       });
       await Schedule.create({
-        patient: patient2._id,
+        client: patient2._id,
         frequency: 'daily',
         time: '10:00',
         isActive: true,

@@ -43,7 +43,7 @@ describe('Call Model - Retry Fields', () => {
   it('should create call with default retryAttempt of 0', async () => {
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -55,7 +55,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow setting retryAttempt', async () => {
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -68,7 +68,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow setting originalCallId', async () => {
     const originalCall = await Call.create({
       callSid: 'CA1111111111',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'failed',
@@ -76,7 +76,7 @@ describe('Call Model - Retry Fields', () => {
 
     const retryCall = await Call.create({
       callSid: 'CA2222222222',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -91,7 +91,7 @@ describe('Call Model - Retry Fields', () => {
     const scheduledTime = new Date(Date.now() + 15 * 60 * 1000);
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -104,7 +104,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow setting maxRetries', async () => {
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -117,7 +117,7 @@ describe('Call Model - Retry Fields', () => {
   it('should enforce minimum retryAttempt of 0', async () => {
     const call = new Call({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -130,7 +130,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow querying calls by originalCallId', async () => {
     const originalCall = await Call.create({
       callSid: 'CA1111111111',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'failed',
@@ -138,7 +138,7 @@ describe('Call Model - Retry Fields', () => {
 
     const retry1 = await Call.create({
       callSid: 'CA2222222222',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -148,7 +148,7 @@ describe('Call Model - Retry Fields', () => {
 
     const retry2 = await Call.create({
       callSid: 'CA3333333333',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',

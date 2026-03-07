@@ -36,6 +36,10 @@ export interface ListItemProps extends TouchableOpacityProps {
    */
   tx?: TextProps["tx"]
   /**
+   * Optional secondary text (e.g. subtitle).
+   */
+  subText?: string
+  /**
    * Children components.
    */
   children?: TextProps["children"]
@@ -114,6 +118,7 @@ export function ListItem(props: ListItemProps) {
     rightIcon,
     rightIconColor,
     style,
+    subText,
     text,
     TextProps,
     topSeparator,
@@ -145,9 +150,14 @@ export function ListItem(props: ListItemProps) {
           Component={LeftComponent}
         />
 
-        <Text {...TextProps} tx={tx} text={text} txOptions={txOptions} style={$textStyles}>
-          {children}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text {...TextProps} tx={tx} text={text} txOptions={txOptions} style={$textStyles}>
+            {children}
+          </Text>
+          {subText !== undefined && subText !== '' && (
+            <Text text={subText} style={$subTextStyle} />
+          )}
+        </View>
 
         <ListItemAction
           side="right"
@@ -206,6 +216,12 @@ const $textStyle: TextStyle = {
   alignSelf: "center",
   flexGrow: 1,
   flexShrink: 1,
+}
+
+const $subTextStyle: TextStyle = {
+  fontSize: 12,
+  marginTop: 2,
+  opacity: 0.8,
 }
 
 const $touchableStyle: ViewStyle = {

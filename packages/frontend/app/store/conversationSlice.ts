@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit"
 import { RootState } from "./store"
 import { Conversation } from "../services/api/api.types"
 // Import APIs directly to break circular dependency with app/services/api/index.ts
-import { patientApi } from "../services/api/patientApi"
+import { clientApi } from "../services/api/clientApi"
 import { conversationApi } from "../services/api/conversationApi"
 import { setActiveCall } from "./callSlice"
 import { logger } from "../utils/logger"
@@ -15,7 +15,7 @@ interface ConversationState {
 const defaultConversation: Conversation = {
   id: "",
   callSid: "",
-  patientId: "",
+  clientId: "",
   lineItemId: null,
   messages: [],
   history: "",
@@ -70,7 +70,7 @@ export const conversationSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    builder.addMatcher(patientApi.endpoints.createPatient.matchFulfilled, (state) => {
+    builder.addMatcher(clientApi.endpoints.createClient.matchFulfilled, (state) => {
       state.conversation = defaultConversation
       state.conversations = []
     })
@@ -82,9 +82,9 @@ export const conversationSlice = createSlice({
       },
     )
     builder.addMatcher(
-      conversationApi.endpoints.getConversationsByPatient.matchFulfilled,
+      conversationApi.endpoints.getConversationsByClient.matchFulfilled,
       (state, { payload }) => {
-        logger.debug('[ConversationSlice] getConversationsByPatient fulfilled:', {
+        logger.debug('[ConversationSlice] getConversationsByClient fulfilled:', {
           page: payload.page,
           totalResults: payload.totalResults,
           resultsCount: payload.results?.length || 0
@@ -102,7 +102,7 @@ export const conversationSlice = createSlice({
             // Only clear if we explicitly got empty AND we don't have any conversations already
             // This allows API to clear conversations when patient has none, but preserves them during loading
             state.conversations = [];
-            logger.debug('[ConversationSlice] Cleared conversations (patient has none)');
+            logger.debug('[ConversationSlice] Cleared conversations (client has none)');
           }
         } else {
           // For subsequent pages, append to existing conversations

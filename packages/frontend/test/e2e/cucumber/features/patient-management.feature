@@ -1,6 +1,6 @@
-Feature: Patient Management Workflow
+Feature: Client Management Workflow
   As a caregiver
-  I want to manage patients
+  I want to manage clients
   So that I can coordinate care and monitor wellness
 
   Background:
@@ -8,27 +8,27 @@ Feature: Patient Management Workflow
     And the backend is running on "http://localhost:3000"
     And I am logged in as "orgAdmin"
 
-  Scenario: View patient list
-    When I navigate to the patients screen
-    Then I should see the patient list
-    And I should see at least one patient
+  Scenario: View client list
+    When I navigate to the clients screen
+    Then I should see the client list
+    And I should see at least one client
 
-  Scenario: Create a new patient
-    When I navigate to the patients screen
-    And I click the "Add Patient" button
-    And I enter patient name "John Doe"
-    And I enter patient email "john.doe@example.com"
-    And I enter patient phone "+16045624264"
-    And I submit the patient form
-    Then I should see the new patient in the list
-    And the patient should have name "John Doe"
+  Scenario: Create a new client
+    When I navigate to the clients screen
+    And I click the "Add Client" button
+    And I enter client name "John Doe"
+    And I enter client email "john.doe@example.com"
+    And I enter client phone "+16045624264"
+    And I submit the client form
+    Then I should see the new client in the list
+    And the client should have name "John Doe"
 
-  Scenario: View patient details
-    Given a patient exists with name "Test Patient"
-    When I navigate to the patients screen
-    And I click on the patient "Test Patient"
-    Then I should see the patient details screen
-    And I should see patient name "Test Patient"
+  Scenario: View client details
+    Given a client exists with name "Test Client"
+    When I navigate to the clients screen
+    And I click on the client "Test Client"
+    Then I should see the client details screen
+    And I should see client name "Test Client"
 
 
 

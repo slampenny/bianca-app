@@ -90,7 +90,7 @@ describe('Payment Service - Billing', () => {
     const baseTime = new Date();
     call1 = await Call.create({
       callSid: 'CA11111111111111111111111111111111',
-      patientId: patient1._id,
+      clientId: patient1._id,
       cost: 0.20,
       duration: 120,
       status: 'completed',
@@ -101,7 +101,7 @@ describe('Payment Service - Billing', () => {
 
     call2 = await Call.create({
       callSid: 'CA22222222222222222222222222222222',
-      patientId: patient1._id,
+      clientId: patient1._id,
       cost: 0.30,
       duration: 180,
       status: 'completed',
@@ -112,7 +112,7 @@ describe('Payment Service - Billing', () => {
 
     call3 = await Call.create({
       callSid: 'CA33333333333333333333333333333333',
-      patientId: patient2._id,
+      clientId: patient2._id,
       cost: 0.15,
       duration: 90,
       status: 'completed',
@@ -143,7 +143,7 @@ describe('Payment Service - Billing', () => {
       // Check John Doe's data
       const johnDoe = result.patientCosts.find(p => p.patientName === 'John Doe');
       expect(johnDoe).toBeDefined();
-      expect(johnDoe.patientId.toString()).toBe(patient1._id.toString());
+      expect(johnDoe.clientId.toString()).toBe(patient1._id.toString());
       expect(johnDoe.callCount).toBe(2);
       expect(johnDoe.totalCost).toBe(0.50); // 0.20 + 0.30
       expect(johnDoe.calls).toHaveLength(2);
@@ -151,7 +151,7 @@ describe('Payment Service - Billing', () => {
       // Check Jane Smith's data
       const janeSmith = result.patientCosts.find(p => p.patientName === 'Jane Smith');
       expect(janeSmith).toBeDefined();
-      expect(janeSmith.patientId.toString()).toBe(patient2._id.toString());
+      expect(janeSmith.clientId.toString()).toBe(patient2._id.toString());
       expect(janeSmith.callCount).toBe(1);
       expect(janeSmith.totalCost).toBe(0.15);
       expect(janeSmith.calls).toHaveLength(1);
@@ -178,7 +178,7 @@ describe('Payment Service - Billing', () => {
       
       await Call.create({
         callSid: 'CA44444444444444444444444444444444',
-        patientId: patient1._id,
+        clientId: patient1._id,
         duration: 60,
         cost: 0.10,
         status: 'completed',
@@ -198,7 +198,7 @@ describe('Payment Service - Billing', () => {
       // Create a call with zero cost
       await Call.create({
         callSid: 'CA55555555555555555555555555555555',
-        patientId: patient1._id,
+        clientId: patient1._id,
         duration: 0,
         cost: 0,
         status: 'failed',
@@ -247,7 +247,7 @@ describe('Payment Service - Billing', () => {
 
       expect(invoice.invoiceNumber).toMatch(/^INV-\d{6}$/);
       expect(invoice.lineItems).toHaveLength(1);
-      expect(invoice.lineItems[0].patientId.toString()).toBe(patient1._id.toString());
+      expect(invoice.lineItems[0].clientId.toString()).toBe(patient1._id.toString());
       expect(invoice.lineItems[0].amount).toBe(0.50);
       expect(invoice.lineItems[0].description).toContain('Billing for 300 seconds');
       expect(invoice.lineItems[0].quantity).toBe(5); // 5 minutes total (120 + 180 seconds = 300 seconds = 5 minutes)
@@ -256,13 +256,13 @@ describe('Payment Service - Billing', () => {
     it('should mark calls as billed after creating invoice', async () => {
       await paymentService.createInvoiceFromConversations(patient1._id);
 
-      const updatedCalls = await Call.find({ patientId: patient1._id });
+      const updatedCalls = await Call.find({ clientId: patient1._id });
       expect(updatedCalls.every(call => call.lineItemId !== null)).toBe(true);
     });
 
     it('should throw error when no unbilled calls exist', async () => {
       // Mark all calls as billed
-      await Call.updateMany({ patientId: patient1._id }, { 
+      await Call.updateMany({ clientId: patient1._id }, { 
         lineItemId: new mongoose.Types.ObjectId() 
       });
 
@@ -295,14 +295,14 @@ describe('Payment Service - Billing', () => {
       // Create line items
       await LineItem.create([
         {
-          patientId: patient1._id,
+          clientId: patient1._id,
           invoiceId: invoice._id,
           amount: 0.50,
           description: 'Billing for patient 1',
           quantity: 2
         },
         {
-          patientId: patient2._id,
+          clientId: patient2._id,
           invoiceId: invoice._id,
           amount: 0.15,
           description: 'Billing for patient 2',

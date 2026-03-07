@@ -42,12 +42,12 @@ export class OrgWorkflow {
       })
       await this.page.waitForTimeout(1000)
     }
-    const patientCards = await this.page.locator('[data-testid^="patient-card-"]').count()
-    if (patientCards === 0) {
-      console.log('⚠️ No patients found - test may still pass')
+    const clientCards = await this.page.locator('[data-testid^="client-card-"]').count()
+    if (clientCards === 0) {
+      console.log('⚠️ No clients found - test may still pass')
     }
-    console.log(`Found ${patientCards} existing patients`)
-    return patientCards
+    console.log(`Found ${clientCards} existing clients`)
+    return clientCards
   }
 
   async givenIHaveExistingCaregivers() {
@@ -87,7 +87,7 @@ export class OrgWorkflow {
       
       // Fill patient form if it appears
       const patientForm = await this.page.getByTestId('patient-form').count()
-      const nameInput = await this.page.getByTestId('patient-name-input').count()
+      const nameInput = await this.page.getByTestId('client-name-input').count()
       
       if (patientForm > 0 || nameInput > 0) {
         await this.whenIFillPatientForm(patientData)
@@ -100,7 +100,7 @@ export class OrgWorkflow {
   async whenIFillPatientForm(patientData: any) {
     // Fill patient creation form
     const formFields = [
-      { testId: 'patient-name-input', value: patientData.name },
+      { testId: 'client-name-input', value: patientData.name },
       { testId: 'patient-email-input', value: patientData.email },
       { testId: 'patient-phone-input', value: patientData.phone }
     ]

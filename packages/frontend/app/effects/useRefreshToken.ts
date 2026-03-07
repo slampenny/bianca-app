@@ -10,11 +10,14 @@ const useRefreshToken = () => {
 
   useEffect(() => {
     if (tokens && new Date(Number(tokens.access.expires) * 1000).getTime() < Date.now()) {
-      dispatch(authApi.endpoints.refreshTokens.initiate({ refreshToken: tokens.refresh.token }))
-        .unwrap()
-        .catch((error) => {
+      const promise = (dispatch as (arg: unknown) => unknown)(
+        authApi.endpoints.refreshTokens.initiate({ refreshToken: tokens.refresh.token })
+      )
+      if (promise && typeof (promise as { unwrap?: () => Promise<unknown> }).unwrap === "function") {
+        ;(promise as { unwrap: () => Promise<unknown> }).unwrap().catch((error: unknown) => {
           logger.error("Failed to refresh tokens", error)
         })
+      }
     }
   }, [dispatch, tokens])
 }

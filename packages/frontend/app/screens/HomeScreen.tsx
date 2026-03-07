@@ -4,14 +4,14 @@ import { AutoImage, Card, Button, Text } from "app/components"
 import { Ionicons } from "@expo/vector-icons"
 import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
-import { setPatient, getPatientsForCaregiver, clearPatient } from "../store/patientSlice"
+import { setClient, getClientsForCaregiver, clearClient } from "../store/clientSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
 import { setPendingCallData, clearCallData } from "../store/callSlice"
 import { clearConversation } from "../store/conversationSlice"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { isAuthCancelledError } from "../services/api/baseQueryWithAuth"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
-import { Caregiver, Patient } from "../services/api/api.types"
+import { Caregiver, Client } from "../services/api/api.types"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { RootState } from "../store/store"
 import { useTheme } from "app/theme/ThemeContext"
@@ -28,41 +28,17 @@ export function HomeScreen() {
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   const { colors, isLoading: themeLoading } = useTheme()
   
-  // Get patients from Redux - get currentUser first, then patients
-  // This ensures we re-render when either currentUser or patients change
-  const patients = useSelector((state: RootState) => {
-    const user = state.auth.currentUser || state.auth.user
-    if (!user || !user.id) {
-      console.log(`[HOMESCREEN] No current user in Redux`)
-      return []
-    }
-    const patientList = getPatientsForCaregiver(state, user.id)
-    // Always log in test mode to debug
-    console.log(`[HOMESCREEN] useSelector: user.id=${user.id}, patientCount=${patientList.length}`)
-    if (patientList.length === 0) {
-      console.log(`[HOMESCREEN] Patient list empty! Redux state.patient.patients keys:`, Object.keys(state.patient.patients || {}))
-      console.log(`[HOMESCREEN] Redux state.patient.patients[${user.id}]:`, state.patient.patients[user.id]?.length || 0, 'patients')
-      if (state.patient.patients[user.id]) {
-        console.log(`[HOMESCREEN] First 3 patient IDs in Redux:`, state.patient.patients[user.id].slice(0, 3).map(p => p.id))
-      }
-    } else {
-      console.log(`[HOMESCREEN] First 3 patient IDs:`, patientList.slice(0, 3).map(p => p.id))
-    }
-    return patientList
+  const clients = useSelector((state: RootState) => {
+    const user = state.auth.currentUser || (state.auth as { user?: { id: string } }).user
+    if (!user || !user.id) return []
+    return getClientsForCaregiver(state, user.id)
   })
   
-  // Debug logging when patients change
   React.useEffect(() => {
-    console.log(`[HOMESCREEN] Component rendered: patients.count=${patients.length}, currentUser.id=${currentUser?.id}`)
-    if (patients.length > 0) {
-      console.log(`[HOMESCREEN] First 3 patient IDs:`, patients.slice(0, 3).map(p => p.id))
-      console.log(`[HOMESCREEN] FlatList will render ${patients.length} patients`)
-    } else if (currentUser?.id) {
-      console.log(`[HOMESCREEN] Patient list is empty for user ${currentUser.id}`)
-    } else {
-      console.log(`[HOMESCREEN] No current user`)
+    if (clients.length > 0 && currentUser?.id) {
+      console.log(`[HOMESCREEN] Rendered ${clients.length} clients for user ${currentUser.id}`)
     }
-  }, [patients.length, currentUser?.id, patients])
+  }, [clients.length, currentUser?.id])
   
 
   
@@ -75,35 +51,31 @@ export function HomeScreen() {
   const isSuperAdmin = currentUser?.role === "superAdmin"
   
   // Role-based access control for patient creation
-  // Only org admins and super admins can create patients
-  // Staff users can only view patients
+  // Only org admins and super admins can create clients
+  // Staff users can only view clients
   const shouldDisableButton = isStaff
   
   const tooltipMessage = translate("homeScreen.adminOnlyMessage")
 
-  const handlePatientPress = (patient: Patient) => {
-    dispatch(setPatient(patient))
-    dispatch(setSchedules(patient.schedules))
-    navigation.navigate("Patient")
+  const handleClientPress = (client: Client) => {
+    dispatch(setClient(client))
+    dispatch(setSchedules(client.schedules))
+    navigation.navigate("Client")
   }
 
-  const handleAddPatient = () => {
-    dispatch(clearPatient())
+  const handleAddClient = () => {
+    dispatch(clearClient())
     dispatch(clearSchedules())
-    navigation.navigate("Patient")
+    navigation.navigate("Client")
   }
 
-
-  const handleCallNow = async (patient: Patient) => {
+  const handleCallNow = async (client: Client) => {
     try {
-      // Set the patient in Redux first
-      dispatch(setPatient(patient))
-      
-      // Actually initiate the call via backend API
-      logger.debug('Initiating call for patient:', patient.id, patient.name)
+      dispatch(setClient(client))
+      logger.debug('Initiating call for client:', client.id, client.name)
       const response = await initiateCall({
-        patientId: patient.id || '',
-        callNotes: `Manual call initiated by agent to ${patient.name}`
+        clientId: client.id || '',
+        callNotes: `Manual call initiated by agent to ${client.name}`
       }).unwrap()
       
       logger.debug('Call initiated successfully, response:', response)
@@ -119,9 +91,9 @@ export function HomeScreen() {
         conversationId: response.conversationId, // Always available now
         callId: response.callId,
         callSid: response.callSid,
-        patientId: response.patientId,
-        patientName: response.patientName,
-        patientPhone: response.patientPhone,
+        clientId: response.clientId,
+        clientName: response.clientName,
+        clientPhone: response.clientPhone,
         agentId: response.agentId,
         agentName: response.agentName,
         status: response.status || 'initiated',
@@ -144,21 +116,21 @@ export function HomeScreen() {
     }
   }
 
-  const renderPatient = ({ item }: { item: Patient }) => {
+  const renderClient = ({ item }: { item: Client }) => {
     const hasNoSchedule = !item.schedules || item.schedules.length === 0
     const cardStyle = hasNoSchedule 
-      ? [styles.patientCard, styles.patientCardWarning]
-      : styles.patientCard
+      ? [styles.clientCard, styles.clientCardWarning]
+      : styles.clientCard
     
     return (
       <Card
         style={cardStyle}
-        testID={`patient-card-${item.id}`}
-        accessibilityLabel={`patient-card-${item.name}`}
+        testID={`client-card-${item.id}`}
+        accessibilityLabel={`client-card-${item.name}`}
         LeftComponent={<AutoImage source={{ uri: item.avatar }} style={styles.avatar} />}
         content={item.name}
-        contentStyle={styles.patientName}
-        ContentTextProps={{ testID: `patient-name-${item.name}` }}
+        contentStyle={styles.clientName}
+        ContentTextProps={{ testID: `client-name-${item.name}` }}
         footer={hasNoSchedule ? translate("homeScreen.noScheduleWarning") : undefined}
         footerStyle={hasNoSchedule ? styles.warningFooter : undefined}
         FooterTextProps={hasNoSchedule ? { testID: `no-schedule-warning-${item.name}` } : undefined}
@@ -184,8 +156,8 @@ export function HomeScreen() {
             <Button
               preset="primary"
               text="" // Empty text for icon-only button
-              onPress={() => handlePatientPress(item)}
-              testID={`edit-patient-button-${item.id}`}
+              onPress={() => handleClientPress(item)}
+              testID={`edit-client-button-${item.id}`}
               accessibilityLabel={`Edit ${item.name}`}
               accessibilityHint="Opens patient details for editing"
               style={styles.editButton}
@@ -204,7 +176,7 @@ export function HomeScreen() {
     )
   }
 
-  const ListEmpty = () => <Text style={styles.noUsersText} testID="home-no-patients">{translate("homeScreen.noPatientsFound")}</Text>
+  const ListEmpty = () => <Text style={styles.noUsersText} testID="home-no-clients">{translate("homeScreen.noClientsFound")}</Text>
 
   // Don't return null during theme loading - render with default theme instead
   // This prevents the component from not rendering during async theme loading
@@ -214,7 +186,7 @@ export function HomeScreen() {
   }
   
   // Debug log to confirm component is rendering
-  console.log('[HOMESCREEN] Component rendering: currentUser.id=', currentUser?.id, 'patients.count=', patients.length, 'themeLoading=', themeLoading)
+  console.log('[HOMESCREEN] Component rendering: currentUser.id=', currentUser?.id, 'clients.count=', clients.length, 'themeLoading=', themeLoading)
 
   const styles = createStyles(colors)
 
@@ -228,19 +200,19 @@ export function HomeScreen() {
       {/* Phone Verification Banner */}
       <PhoneVerificationBanner />
 
-      {/* Patient List */}
+      {/* Client List */}
       <FlatList
-        data={patients}
+        data={clients}
         keyExtractor={(item, index) => item.id || String(index)}
-        renderItem={renderPatient}
+        renderItem={renderClient}
         contentContainerStyle={styles.listContentContainer}
         ListEmptyComponent={ListEmpty}
-        testID="patient-list"
-        extraData={patients.length} // Force re-render when patient count changes
+        testID="client-list"
+        extraData={clients.length}
         removeClippedSubviews={false} // Ensure all items are rendered (important for testing)
       />
 
-      {/* Footer (Add Patient) with Tooltip */}
+      {/* Footer (Add Client) with Tooltip */}
       <View style={styles.addButtonContainer}>
         <View
           onTouchStart={() => { if (shouldDisableButton) setShowTooltip(true) }}
@@ -251,16 +223,16 @@ export function HomeScreen() {
           } : {})}
         >
           <Button
-            text={translate("homeScreen.addPatient")}
+            text={translate("homeScreen.addClient")}
             preset="primary"
-            onPress={shouldDisableButton ? undefined : handleAddPatient}
-            testID="add-patient-button"
+            onPress={shouldDisableButton ? undefined : handleAddClient}
+            testID="add-client-button"
             disabled={shouldDisableButton}
             style={styles.addButton}
           />
         </View>
         {shouldDisableButton && showTooltip && (
-          <View style={styles.tooltip} testID="add-patient-tooltip">
+          <View style={styles.tooltip} testID="add-client-tooltip">
             <Text style={styles.tooltipText}>{tooltipMessage}</Text>
           </View>
         )}
@@ -344,7 +316,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: 20,
     textAlign: "center",
   },
-  patientCard: {
+  clientCard: {
     backgroundColor: colors.palette.neutral100,
     flexDirection: "row",
     alignItems: "center",
@@ -362,7 +334,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     // Android elevation
     elevation: 2,
   },
-  patientCardWarning: {
+  clientCardWarning: {
     backgroundColor: colors.palette.warning100 || colors.palette.warning200 || "#FEF3C7",
     borderWidth: 1,
     borderColor: colors.palette.warning300 || colors.palette.warning400 || "#FCD34D",
@@ -373,11 +345,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: "500",
     marginTop: 4,
   },
-  patientInfo: {
+  clientInfo: {
     alignItems: "center",
     flexDirection: "row",
   },
-  patientName: {
+  clientName: {
     color: colors.palette.biancaHeader,
     flexShrink: 1,
     fontSize: 16,

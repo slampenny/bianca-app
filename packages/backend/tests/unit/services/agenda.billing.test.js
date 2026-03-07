@@ -49,7 +49,7 @@ const mockProcessOrgBilling = async (org) => {
   // For testing, look for any unbilled calls (not just from yesterday)
   // In production, this would filter by date, but for unit tests we want to bill all test calls
   const unchargedCalls = await Call.find({
-    patientId: { $in: patients.map(p => p._id) },
+    clientId: { $in: patients.map(p => p._id) },
     lineItemId: null,
     duration: { $gt: 0 }
   });
@@ -63,10 +63,10 @@ const mockProcessOrgBilling = async (org) => {
   let totalCost = 0;
   
   for (const call of unchargedCalls) {
-    const patientId = call.patientId._id.toString();
+    const patientId = call.clientId._id.toString();
     if (!patientBilling[patientId]) {
       patientBilling[patientId] = {
-        patient: call.patientId,
+        client: call.clientId,
         calls: [],
         totalCost: 0
       };
@@ -118,7 +118,7 @@ const mockProcessOrgBilling = async (org) => {
   // Create a mapping of patientId to lineItemId
   const patientToLineItem = {};
   for (const lineItem of lineItems) {
-    const patientIdStr = lineItem.patientId.toString();
+    const patientIdStr = lineItem.clientId.toString();
     patientToLineItem[patientIdStr] = lineItem._id;
   }
   
@@ -126,7 +126,7 @@ const mockProcessOrgBilling = async (org) => {
   let updatedCount = 0;
   for (const call of stillUnchargedCalls) {
     // patientId is an ObjectId, convert to string for matching
-    const patientId = call.patientId.toString();
+    const patientId = call.clientId.toString();
     const lineItemId = patientToLineItem[patientId];
     
     if (lineItemId) {
@@ -206,7 +206,7 @@ const mockCreateOrgInvoice = async (org, patientBilling, totalCost) => {
     // Calculate quantity as total duration in minutes
     const totalDuration = billing.calls.reduce((sum, call) => sum + call.duration, 0);
     lineItemData.push({
-      patientId: billing.patient._id,
+      clientId: billing.client._id,
       invoiceId: createdInvoice._id,
       amount: billing.totalCost,
       description: `Daily billing - ${billing.calls.length} call(s)`,
@@ -299,7 +299,7 @@ describe('Daily Billing Agenda Job', () => {
 
     conversation1 = await Call.create({
       callSid: 'CA11111111111111111111111111111111',
-      patientId: patient1._id,
+      clientId: patient1._id,
       org: org1._id,
       duration: 120, // 2 minutes
       status: 'completed',
@@ -310,7 +310,7 @@ describe('Daily Billing Agenda Job', () => {
 
     conversation2 = await Call.create({
       callSid: 'CA22222222222222222222222222222222',
-      patientId: patient1._id,
+      clientId: patient1._id,
       org: org1._id,
       duration: 180, // 3 minutes
       status: 'completed',
@@ -321,7 +321,7 @@ describe('Daily Billing Agenda Job', () => {
 
     conversation3 = await Call.create({
       callSid: 'CA33333333333333333333333333333333',
-      patientId: patient2._id,
+      clientId: patient2._id,
       org: org1._id,
       duration: 90, // 1.5 minutes
       status: 'completed',
@@ -332,7 +332,7 @@ describe('Daily Billing Agenda Job', () => {
 
     conversation4 = await Call.create({
       callSid: 'CA44444444444444444444444444444444',
-      patientId: patient3._id,
+      clientId: patient3._id,
       org: org2._id,
       duration: 240, // 4 minutes
       status: 'completed',
@@ -390,11 +390,11 @@ describe('Daily Billing Agenda Job', () => {
     it('should group conversations by patient in line items', async () => {
       await mockProcessDailyBilling();
 
-      const lineItems = await LineItem.find({}).populate('patientId');
+      const lineItems = await LineItem.find({}).populate('clientId');
       
       // Find line item for patient1 (should have 2 calls: 120s + 180s = 300s = 5 min)
       const patient1LineItem = lineItems.find(item => 
-        item.patientId._id.toString() === patient1._id.toString()
+        item.clientId._id.toString() === patient1._id.toString()
       );
       expect(patient1LineItem.amount).toBeCloseTo(0.50, 2); // 5 min * 0.10 = 0.50
       expect(patient1LineItem.quantity).toBe(5); // 5 minutes total
@@ -402,7 +402,7 @@ describe('Daily Billing Agenda Job', () => {
 
       // Find line item for patient2 (should have 1 call: 90s = 1.5 min)
       const patient2LineItem = lineItems.find(item => 
-        item.patientId._id.toString() === patient2._id.toString()
+        item.clientId._id.toString() === patient2._id.toString()
       );
       expect(patient2LineItem.amount).toBeCloseTo(0.15, 2); // 1.5 min * 0.10 = 0.15
       expect(patient2LineItem.quantity).toBe(1.5); // 1.5 minutes
@@ -456,7 +456,7 @@ describe('Daily Billing Agenda Job', () => {
       // Create a call with zero duration
       await Call.create({
         callSid: 'CA55555555555555555555555555555555',
-        patientId: patient1._id,
+        clientId: patient1._id,
         org: org1._id,
         duration: 0,
         status: 'failed',
@@ -576,7 +576,7 @@ describe('Daily Billing Agenda Job', () => {
       for (let i = 0; i < 100; i++) {
         calls.push({
           callSid: `CA${i.toString().padStart(30, '0')}`,
-          patientId: patient1._id,
+          clientId: patient1._id,
           org: org1._id,
           duration: 60, // 1 minute each
           status: 'completed',
@@ -601,7 +601,7 @@ describe('Daily Billing Agenda Job', () => {
       // Create call with very small duration
       await Call.create({
         callSid: 'CA66666666666666666666666666666666',
-        patientId: patient1._id,
+        clientId: patient1._id,
         org: org1._id,
         duration: 6, // 6 seconds
         status: 'completed',

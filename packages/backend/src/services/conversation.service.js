@@ -1,5 +1,6 @@
 const httpStatus = require('http-status');
-const { Conversation, Message, Patient } = require('../models');
+const config = require('../config/config');
+const { Conversation, Message, Client, Call } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 
@@ -8,19 +9,29 @@ const logger = require('../config/logger');
 const { prompts } = require('../templates/prompts'); // Original Bianca system prompt
 const { prompts: refinedPrompts } = require('../templates/prompts.refined'); // Refined prompt with voice-first rules
 
-// ===== EXISTING METHODS (unchanged) =====
-const createConversationForPatient = async (patientId, callId) => {
-  // Validate that the patient exists
-  const patient = await Patient.findById(patientId);
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+// ===== CONVERSATION METHODS =====
+const createConversationForClient = async (clientId, callId) => {
+  const client = await Client.findById(clientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  
-  if (!callId) {
+  let resolvedCallId = callId;
+  if (!resolvedCallId && (config.env === 'test' || config.env === 'development')) {
+    const call = await Call.create({
+      callSid: `TEST_CALL_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      clientId: client._id,
+      callType: 'outbound',
+      status: 'initiated',
+      callStatus: 'initiating',
+      startTime: new Date(),
+      callStartTime: new Date(),
+    });
+    resolvedCallId = call._id;
+  }
+  if (!resolvedCallId) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'callId is required to create a conversation');
   }
-  
-  const conversation = new Conversation({ patientId, callId });
+  const conversation = new Conversation({ clientId, callId: resolvedCallId });
   await conversation.save();
   return conversation;
 };
@@ -62,32 +73,22 @@ const getConversationById = async (id) => {
   return conversation;
 };
 
-const getConversationsByPatient = async (patientId) => {
-  const conversations = await Conversation.find({ patientId }).populate('messages');
+const getConversationsByClient = async (clientId) => {
+  const conversations = await Conversation.find({ clientId }).populate('messages');
   if (!conversations) {
-    throw new ApiError(httpStatus.NOT_FOUND, `No conversation found for patient <${patientId}>`);
+    throw new ApiError(httpStatus.NOT_FOUND, `No conversation found for client <${clientId}>`);
   }
-  
-  // Return messages in insertion order (as they appear in the messages array)
-  // No sorting - messages are shown in the order they were added
-  
   return conversations;
 };
 
 /**
- * Query conversations by patient with pagination
- * @param {ObjectId} patientId
+ * Query conversations by client with pagination
+ * @param {ObjectId} clientId
  * @param {Object} options - Query options
- * @param {string} [options.sortBy] - Sort option in the format: sortField:(desc|asc)
- * @param {number} [options.limit] - Maximum number of results per page (default = 10)
- * @param {number} [options.page] - Current page (default = 1)
- * @returns {Promise<QueryResult>}
  */
-const queryConversationsByPatient = async (patientId, options) => {
-  const filter = { patientId };
-  
-  // Debug logging
-  logger.info(`[Conversation Service] Querying conversations for patient ${patientId} with filter:`, filter);
+const queryConversationsByClient = async (clientId, options) => {
+  const filter = { clientId };
+  logger.info(`[Conversation Service] Querying conversations for client ${clientId} with filter:`, filter);
   logger.info(`[Conversation Service] Options:`, options);
   
   // Ensure proper sorting - default to startTime:desc, fallback to createdAt:desc if startTime is not available
@@ -167,7 +168,7 @@ const queryConversationsByPatient = async (patientId, options) => {
 const getConversationHistory = async (patientId, limit = 5) => {
   try {
     const recentConversations = await Conversation.find({
-      patientId: patientId,
+      clientId,
       endTime: { $exists: true }, // Completed conversations
       $or: [
         { history: { $exists: true, $ne: null, $ne: '' } }, // Has summary in history field
@@ -195,7 +196,7 @@ const getConversationHistory = async (patientId, limit = 5) => {
       })
       .join('\n');
 
-    logger.info(`[Conversation History] Found ${recentConversations.length} previous conversations for patient ${patientId}`);
+    logger.info(`[Conversation History] Found ${recentConversations.length} previous conversations for client ${clientId}`);
     return historyText;
 
   } catch (err) {
@@ -328,7 +329,7 @@ Note: Use this context naturally to provide continuity, but don't explicitly men
     return enhancedPrompt;
 
   } catch (err) {
-    logger.error(`[Enhanced Prompt] Error building prompt for patient ${patientId}: ${err.message}`);
+    logger.error(`[Enhanced Prompt] Error building prompt for client ${clientId}: ${err.message}`);
     // Fallback to base Bianca prompt
     return prompts.system.content;
   }
@@ -378,7 +379,7 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
 const finalizeConversation = async (conversationId, useRealtimeMessages = false) => {
   try {
     const conversation = await Conversation.findById(conversationId)
-      .populate('patientId', 'name age')
+      .populate('clientId', 'name age')
       .lean();
 
     if (!conversation) {
@@ -416,7 +417,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       } else {
         conversationText = messages
           .map(msg => {
-            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
             return `${speaker}: ${msg.content}`;
           })
           .join('\n');
@@ -432,7 +433,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       } else {
         conversationText = messages
           .map(msg => {
-            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
             return `${speaker}: ${msg.content}`;
           })
           .join('\n');
@@ -440,12 +441,11 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     }
 
     // Determine user domain
-    let userDomain = 'patient wellness conversation';
-    if (conversation.patientId?.age >= 65) {
+    let userDomain = 'client wellness conversation';
+    if (conversation.clientId?.age >= 65) {
       userDomain = 'elderly wellness conversation';
     }
-    
-    const summaryPrompt = "Create a concise summary of this patient conversation with Bianca, highlighting key topics discussed, any concerns raised, and the patient's overall mood or needs.";
+    const summaryPrompt = "Create a concise summary of this client conversation with Bianca, highlighting key topics discussed, any concerns raised, and the client's overall mood or needs.";
     let summary = 'Summary generation failed - manual review needed';
     
     try {
@@ -510,14 +510,14 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     logger.info(`[Finalize] Successfully finalized conversation ${conversationId} with ${messages.length} messages${sentimentAnalysis && sentimentAnalysis.success ? ' and sentiment analysis' : ''}`);
     
     // Trigger medical and fraud/abuse analysis after call completion (async, don't wait)
-    if (conversation.patientId) {
-      const patientId = conversation.patientId._id || conversation.patientId;
+    const clientIdForAnalysis = conversation.clientId && (conversation.clientId._id || conversation.clientId);
+    if (clientIdForAnalysis) {
       logger.info(
-        `[Finalize] Scheduling post-call analysis for patient ${patientId} from conversation ${conversationId}`
+        `[Finalize] Scheduling post-call analysis for client ${clientIdForAnalysis} from conversation ${conversationId}`
       );
-      triggerAnalysisAfterCall(patientId).catch(err => {
+      triggerAnalysisAfterCall(clientIdForAnalysis).catch(err => {
         logger.error(
-          `[Finalize] Error triggering analysis after call for patient ${patientId}: ${err.message}`,
+          `[Finalize] Error triggering analysis after call for client ${clientIdForAnalysis}: ${err.message}`,
           err
         );
       });
@@ -574,7 +574,7 @@ const getPatientContext = async (patientId) => {
     };
 
   } catch (err) {
-    logger.error(`[Patient Context] Error getting context for patient ${patientId}: ${err.message}`);
+    logger.error(`[Patient Context] Error getting context for client ${clientId}: ${err.message}`);
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to get patient context: ${err.message}`);
   }
 };
@@ -615,7 +615,7 @@ const getMedicalAnalysisResults = async (patientId, limit = 10) => {
   try {
     const MedicalAnalysis = require('../models/medicalAnalysis.model');
     
-    const results = await MedicalAnalysis.find({ patientId })
+    const results = await MedicalAnalysis.find({ clientId: patientId })
       .sort({ analysisDate: -1 })
       .limit(limit)
       .lean(); // Use lean() for better performance since we don't need Mongoose documents
@@ -646,7 +646,7 @@ const storeMedicalAnalysisResult = async (patientId, result) => {
     
     // Create medical analysis document
     const medicalAnalysis = new MedicalAnalysis({
-      patientId,
+      clientId: patientId,
       analysisDate: result.analysisDate || new Date(),
       timeRange: 'month', // Default to monthly analysis
       startDate: result.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
@@ -803,32 +803,26 @@ const deleteOldMedicalAnalyses = async (cutoffDate) => {
   }
 };
 
-const getActivePatients = async () => {
+const getActiveClients = async () => {
   try {
-    // This would typically get active patients from the patient service
-    // For now, return empty array as placeholder
     return [];
   } catch (error) {
-    logger.error('Error getting active patients:', error);
+    logger.error('Error getting active clients:', error);
     throw error;
   }
 };
 
-const getConversationsByPatientAndDateRange = async (patientId, startDate, endDate) => {
+const getConversationsByClientAndDateRange = async (clientId, startDate, endDate) => {
   try {
     const conversations = await Conversation.find({
-      patientId,
-      createdAt: {
-        $gte: startDate,
-        $lte: endDate
-      }
+      clientId,
+      createdAt: { $gte: startDate, $lte: endDate }
     })
-    .populate('messages')
-    .sort({ createdAt: 1 });
-
+      .populate('messages')
+      .sort({ createdAt: 1 });
     return conversations;
   } catch (error) {
-    logger.error('Error getting conversations by patient and date range:', error);
+    logger.error('Error getting conversations by client and date range:', error);
     throw error;
   }
 };
@@ -888,7 +882,7 @@ const calculateTrends = async (patientId, currentTimeSeriesData) => {
     const MedicalAnalysis = require('../models/medicalAnalysis.model');
     
     // Get the last 3 analyses for trend calculation
-    const previousAnalyses = await MedicalAnalysis.find({ patientId })
+    const previousAnalyses = await MedicalAnalysis.find({ clientId: patientId })
       .select('timeSeriesData')
       .sort({ analysisDate: -1 })
       .limit(3)
@@ -969,11 +963,11 @@ const calculateVariance = (values) => {
 /**
  * Trigger medical and fraud/abuse analysis after a call completes
  * This runs asynchronously and doesn't block call finalization
- * @param {string} patientId - Patient ID
+ * @param {string} clientId - Client ID
  */
-const triggerAnalysisAfterCall = async (patientId) => {
+const triggerAnalysisAfterCall = async (clientId) => {
   try {
-    logger.info(`[Analysis Trigger] Triggering analysis after call for patient ${patientId}`);
+    logger.info(`[Analysis Trigger] Triggering analysis after call for client ${clientId}`);
     
     // Trigger medical analysis
     try {
@@ -981,23 +975,23 @@ const triggerAnalysisAfterCall = async (patientId) => {
       const analyzer = new MedicalPatternAnalyzer();
       
       // Get all conversations for the patient
-      const conversations = await getConversationsByPatient(patientId);
+      const conversations = await getConversationsByClient(clientId);
       logger.info(
-        `[Analysis Trigger] Medical analysis input for patient ${patientId}: ${conversations.length} conversations`
+        `[Analysis Trigger] Medical analysis input for client ${clientId}: ${conversations.length} conversations`
       );
       
       if (conversations.length > 0) {
         // Get baseline analysis (previous result)
-        const baselineResults = await getMedicalAnalysisResults(patientId, 1);
+        const baselineResults = await getMedicalAnalysisResults(clientId, 1);
         const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
         
         // Perform medical pattern analysis
         logger.info(
-          `[Analysis Trigger] Medical analysis baseline ${baseline ? 'found' : 'missing'} for patient ${patientId}`
+          `[Analysis Trigger] Medical analysis baseline ${baseline ? 'found' : 'missing'} for client ${clientId}`
         );
         const analysisResult = await analyzer.analyzeMonth(conversations, baseline);
         logger.info(
-          `[Analysis Trigger] Medical analysis result for patient ${patientId}: ` +
+          `[Analysis Trigger] Medical analysis result for client ${clientId}: ` +
           `confidence=${analysisResult?.confidence || 'unknown'}, warnings=${analysisResult?.warnings?.length || 0}`
         );
         
@@ -1009,21 +1003,21 @@ const triggerAnalysisAfterCall = async (patientId) => {
           processingTime: 0
         };
         
-        await storeMedicalAnalysisResult(patientId, resultToStore);
+        await storeMedicalAnalysisResult(clientId, resultToStore);
         logger.info(
-          `[Analysis Trigger] Medical analysis stored for patient ${patientId} ` +
+          `[Analysis Trigger] Medical analysis stored for client ${clientId} ` +
           `(conversations=${conversations.length})`
         );
         
-        logger.info(`[Analysis Trigger] Medical analysis completed for patient ${patientId}`, {
+        logger.info(`[Analysis Trigger] Medical analysis completed for client ${clientId}`, {
           conversationCount: conversations.length,
           confidence: analysisResult.confidence
         });
       } else {
-        logger.info(`[Analysis Trigger] No conversations found for patient ${patientId}, skipping medical analysis`);
+        logger.info(`[Analysis Trigger] No conversations found for client ${clientId}, skipping medical analysis`);
       }
     } catch (medicalErr) {
-      logger.error(`[Analysis Trigger] Error in medical analysis for patient ${patientId}: ${medicalErr.message}`);
+      logger.error(`[Analysis Trigger] Error in medical analysis for client ${clientId}: ${medicalErr.message}`);
     }
     
     // Trigger fraud/abuse analysis
@@ -1032,32 +1026,32 @@ const triggerAnalysisAfterCall = async (patientId) => {
       const analyzer = new FraudAbuseAnalyzer();
       
       // Get all conversations for the patient
-      const conversations = await getConversationsByPatient(patientId);
+      const conversations = await getConversationsByClient(clientId);
       logger.info(
-        `[Analysis Trigger] Fraud/abuse analysis input for patient ${patientId}: ${conversations.length} conversations`
+        `[Analysis Trigger] Fraud/abuse analysis input for client ${clientId}: ${conversations.length} conversations`
       );
       
       if (conversations.length > 0) {
         // Get baseline analysis (previous result)
         const FraudAbuseAnalysis = require('../models/fraudAbuseAnalysis.model');
-        const baselineResults = await FraudAbuseAnalysis.find({ patientId })
+        const baselineResults = await FraudAbuseAnalysis.find({ clientId })
           .sort({ analysisDate: -1 })
           .limit(1);
         const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
         
         // Perform fraud/abuse analysis
         logger.info(
-          `[Analysis Trigger] Fraud/abuse baseline ${baseline ? 'found' : 'missing'} for patient ${patientId}`
+          `[Analysis Trigger] Fraud/abuse baseline ${baseline ? 'found' : 'missing'} for client ${clientId}`
         );
         const analysisResult = await analyzer.analyzeConversations(conversations, baseline);
         logger.info(
-          `[Analysis Trigger] Fraud/abuse analysis result for patient ${patientId}: ` +
+          `[Analysis Trigger] Fraud/abuse analysis result for client ${clientId}: ` +
           `confidence=${analysisResult?.confidence || 'unknown'}, warnings=${analysisResult?.warnings?.length || 0}`
         );
         
         // Store analysis result
         const resultToStore = {
-          patientId,
+          clientId,
           analysisDate: new Date(),
           timeRange: 'custom',
           startDate: conversations.length > 0 ? conversations[conversations.length - 1].createdAt : new Date(),
@@ -1076,53 +1070,50 @@ const triggerAnalysisAfterCall = async (patientId) => {
           processingTime: 0,
           version: '1.0'
         };
-        
         await FraudAbuseAnalysis.create(resultToStore);
         
-        logger.info(`[Analysis Trigger] Fraud/abuse analysis completed for patient ${patientId}`, {
+        logger.info(`[Analysis Trigger] Fraud/abuse analysis completed for client ${clientId}`, {
           conversationCount: conversations.length,
           confidence: analysisResult.confidence,
           overallRiskScore: analysisResult.overallRiskScore
         });
       } else {
-        logger.info(`[Analysis Trigger] No conversations found for patient ${patientId}, skipping fraud/abuse analysis`);
+        logger.info(`[Analysis Trigger] No conversations found for client ${clientId}, skipping fraud/abuse analysis`);
       }
     } catch (fraudErr) {
-      logger.error(`[Analysis Trigger] Error in fraud/abuse analysis for patient ${patientId}: ${fraudErr.message}`);
+      logger.error(`[Analysis Trigger] Error in fraud/abuse analysis for client ${clientId}: ${fraudErr.message}`);
     }
     
-    logger.info(`[Analysis Trigger] Completed analysis triggering for patient ${patientId}`);
+    logger.info(`[Analysis Trigger] Completed analysis triggering for client ${clientId}`);
   } catch (error) {
-    logger.error(`[Analysis Trigger] Error triggering analysis after call for patient ${patientId}: ${error.message}`, error);
+    logger.error(`[Analysis Trigger] Error triggering analysis after call for client ${clientId}: ${error.message}`, error);
   }
 };
 
 module.exports = {
-  // Existing methods (unchanged)
-  createConversationForPatient,
+  createConversationForClient,
   addMessageToConversation,
   getConversationById,
-  getConversationsByPatient,
-  queryConversationsByPatient,
-  
-  // New enhanced methods
+  getConversationsByClient,
+  queryConversationsByClient,
   getConversationHistory,
   buildEnhancedPrompt,
   saveRealtimeMessage,
   finalizeConversation,
   getPatientContext,
-  
-  // Medical analysis methods
   getMedicalBaseline,
   storeMedicalBaseline,
   clearMedicalBaselines,
   getMedicalAnalysisResults,
   storeMedicalAnalysisResult,
   deleteOldMedicalAnalyses,
-  getActivePatients,
-  getConversationsByPatientAndDateRange,
-  
-  // Helper functions (exported for use in other services)
+  getActiveClients,
+  getConversationsByClientAndDateRange,
+  // Backward compat aliases
+  createConversationForPatient: createConversationForClient,
+  getConversationsByPatient: getConversationsByClient,
+  queryConversationsByPatient: queryConversationsByClient,
+  getConversationsByPatientAndDateRange: getConversationsByClientAndDateRange,
   calculateLinearTrend,
-  calculateVariance
+  calculateVariance,
 };

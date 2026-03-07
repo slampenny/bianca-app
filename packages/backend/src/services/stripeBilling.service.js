@@ -94,11 +94,11 @@ const processOrgBilling = async (orgId) => {
     yesterday.setDate(yesterday.getDate() - 1);
 
     const unbilledCalls = await Call.find({
-      patientId: { $in: patients.map((p) => p._id) },
+      clientId: { $in: patients.map((p) => p._id) },
       lineItemId: null, // Not yet billed
       endTime: { $gte: yesterday }, // From last 24 hours
       cost: { $gt: 0 }, // Has a cost
-    }).populate('patientId');
+    }).populate('clientId');
 
     if (unbilledCalls.length === 0) {
       logger.info(`No unbilled calls found for org ${org.name}`);
@@ -182,23 +182,23 @@ const getUnbilledCosts = async (orgId, days = 7) => {
 
     const patients = await Patient.find({ org: orgId });
     const unbilledCalls = await Call.find({
-      patientId: { $in: patients.map((p) => p._id) },
+      clientId: { $in: patients.map((p) => p._id) },
       lineItemId: null, // Not yet linked to an invoice
       endTime: { $gte: startDate },
       cost: { $gt: 0 },
-    }).populate('patientId');
+    }).populate('clientId');
 
     // Group by patient
     const patientCosts = {};
     let totalUnbilledCost = 0;
 
     for (const call of unbilledCalls) {
-      const patientId = call.patientId._id.toString();
-      const patientName = call.patientId.name;
+      const patientId = call.clientId._id.toString();
+      const patientName = call.clientId.name;
 
       if (!patientCosts[patientId]) {
         patientCosts[patientId] = {
-          patientId,
+          clientId: patientId,
           patientName,
           callCount: 0,
           totalCost: 0,

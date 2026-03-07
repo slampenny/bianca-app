@@ -24,7 +24,7 @@ const createPatient = {
     schedules: Joi.array()
       .items(
         Joi.object().keys({
-          patient: Joi.string().custom(objectId).optional(),
+          client: Joi.string().custom(objectId).optional(),
           nextCallDate: Joi.string().optional(),
           frequency: Joi.string().valid('daily', 'weekly', 'monthly'),
           intervals: Joi.array().items(
@@ -53,13 +53,13 @@ const getPatients = {
 
 const getPatient = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    clientId: Joi.string().custom(objectId),
   }),
 };
 
 const updatePatient = {
   params: Joi.object().keys({
-    patientId: Joi.required().custom(objectId),
+    clientId: Joi.required().custom(objectId),
   }),
   body: Joi.object()
     .keys({
@@ -86,7 +86,7 @@ const updatePatient = {
         .items(
           Joi.object().keys({
             id: Joi.required().custom(objectId),
-            patient: Joi.string().custom(objectId).optional(),
+            client: Joi.string().custom(objectId).optional(),
             nextCallDate: Joi.string().optional(),
             frequency: Joi.string().valid('daily', 'weekly', 'monthly'),
             intervals: Joi.array().items(
@@ -108,19 +108,19 @@ const updatePatient = {
 
 const uploadPatientAvatar = {
   params: Joi.object().keys({
-    patientId: Joi.required().custom(objectId),
+    clientId: Joi.required().custom(objectId),
   }),
 };
 
 const deletePatient = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    clientId: Joi.string().custom(objectId),
   }),
 };
 
 const getConversationsByPatient = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    clientId: Joi.string().custom(objectId),
   }),
   query: Joi.object().keys({
     sortBy: Joi.string(),
@@ -131,7 +131,7 @@ const getConversationsByPatient = {
 
 const getCaregivers = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    clientId: Joi.string().custom(objectId),
   }),
 };
 

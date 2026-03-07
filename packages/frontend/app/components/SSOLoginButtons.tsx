@@ -111,7 +111,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     },
   });
   
-  const isDarkMode = themeInfo.darkMode;
+  const isDarkMode = themeInfo.accessibility.darkMode;
   const styles = createStyles(colors, isDarkMode);
   
   // No debug logging here to reduce console noise in web dev builds

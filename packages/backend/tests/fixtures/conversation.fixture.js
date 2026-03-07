@@ -37,7 +37,7 @@ const generateMessage = (role) => {
 };
 
 const conversationOne = {
-  patientId: new mongoose.Types.ObjectId(),
+  clientId: new mongoose.Types.ObjectId(),
   messages: [], // Start with empty array, will be populated after creating messages
   history: faker.lorem.paragraph(),
   analyzedData: {},
@@ -50,7 +50,7 @@ const conversationOne = {
 };
 
 const conversationTwo = {
-  patientId: new mongoose.Types.ObjectId(),
+  clientId: new mongoose.Types.ObjectId(),
   messages: [], // Start with empty array, will be populated after creating messages
   history: faker.lorem.paragraph(),
   analyzedData: {},
@@ -74,7 +74,7 @@ const insertConversations = async (conversations) => {
     // Create a Call object first (required for conversation)
     const call = new Call({
       callSid: `TEST_CALL_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: conversationData.patientId,
+      clientId: conversationData.clientId,
       callType: conversationData.callType || 'inbound',
       status: 'completed',
       callStatus: 'ended',

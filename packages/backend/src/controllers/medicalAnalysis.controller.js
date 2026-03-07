@@ -4,7 +4,7 @@ const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const {
   conversationService,
-  patientService,
+  clientService,
   medicalPatternAnalyzer: MedicalPatternAnalyzer,
   baselineManager,
   medicalAnalysisScheduler,
@@ -16,21 +16,20 @@ const logger = require('../config/logger');
  * Get medical analysis for a patient for a specific time period
  */
 const getMedicalAnalysis = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { 
-    timeRange = 'month', // month, quarter, year, custom
+    timeRange = 'month',
     startDate,
     endDate,
     includeBaseline = true
   } = req.query;
 
   try {
-    // Validate patient exists
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
@@ -69,9 +68,8 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
         });
     }
 
-    // Get conversations for the time period
-    const conversations = await conversationService.getConversationsByPatientAndDateRange(
-      patientId,
+    const conversations = await conversationService.getConversationsByClientAndDateRange(
+      clientId,
       start,
       end
     );
@@ -80,7 +78,7 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
       return res.status(httpStatus.OK).json({
         success: true,
         data: {
-          patientId,
+          clientId,
           timeRange,
           startDate: start,
           endDate: end,
@@ -102,7 +100,7 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
 
     // Check if analysis already exists for this time period
     const existingAnalysis = await MedicalAnalysis.findOne({
-      patientId,
+      clientId,
       startDate: start,
       endDate: end,
       timeRange
@@ -113,7 +111,7 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
     if (existingAnalysis && existingAnalysis.createdAt > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
       // Use existing analysis if it's less than 24 hours old
       analysis = existingAnalysis;
-      logger.info('Using existing medical analysis for patient:', patientId);
+      logger.info('Using existing medical analysis for patient:', clientId);
     } else {
       // Perform fresh medical analysis
       const startTime = Date.now();
@@ -124,9 +122,9 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
       // Get baseline comparison if requested
       if (includeBaseline === 'true') {
         try {
-          baseline = await baselineManager.getBaseline(patientId);
+          baseline = await baselineManager.getBaseline(clientId);
         } catch (error) {
-          logger.warn('Could not retrieve baseline for patient:', patientId, error.message);
+          logger.warn('Could not retrieve baseline for patient:', clientId, error.message);
         }
       }
 
@@ -135,7 +133,7 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
 
       // Store analysis in database
       const analysisData = {
-        patientId,
+        clientId,
         analysisDate: new Date(),
         timeRange,
         startDate: start,
@@ -162,7 +160,7 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
 
       try {
         await MedicalAnalysis.create(analysisData);
-        logger.info('Medical analysis stored for patient:', patientId);
+        logger.info('Medical analysis stored for patient:', clientId);
       } catch (error) {
         logger.error('Failed to store medical analysis:', error);
         // Continue with response even if storage fails
@@ -175,8 +173,8 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
     res.status(httpStatus.OK).json({
       success: true,
       data: {
-        patientId,
-        patientName: `${patient.firstName} ${patient.lastName}`,
+        clientId,
+        clientName: client.name,
         timeRange,
         startDate: start,
         endDate: end,
@@ -204,27 +202,27 @@ const getMedicalAnalysis = catchAsync(async (req, res) => {
  * Get medical analysis summary for dashboard
  */
 const getMedicalAnalysisSummary = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
 
   try {
     // Validate patient exists
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
     // Get latest medical analysis from database
-    const latestAnalysis = await MedicalAnalysis.getLatestAnalysis(patientId);
+    const latestAnalysis = await MedicalAnalysis.getLatestAnalysis(clientId);
 
     if (!latestAnalysis) {
       return res.status(httpStatus.OK).json({
         success: true,
         data: {
-          patientId,
-          patientName: `${patient.firstName} ${patient.lastName}`,
+          clientId,
+          clientName: client.name,
           hasData: false,
           summary: {
             totalConversations: 0,
@@ -244,8 +242,8 @@ const getMedicalAnalysisSummary = catchAsync(async (req, res) => {
     res.status(httpStatus.OK).json({
       success: true,
       data: {
-        patientId,
-        patientName: `${patient.firstName} ${patient.lastName}`,
+        clientId,
+        clientName: client.name,
         hasData: true,
         summary,
         lastAnalysisDate: latestAnalysis.analysisDate,
@@ -268,10 +266,10 @@ const getMedicalAnalysisSummary = catchAsync(async (req, res) => {
  * Get baseline information for a patient
  */
 const getBaseline = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
 
   try {
-    const baseline = await baselineManager.getBaseline(patientId);
+    const baseline = await baselineManager.getBaseline(clientId);
 
     if (!baseline) {
       return res.status(httpStatus.NOT_FOUND).json({
@@ -299,16 +297,16 @@ const getBaseline = catchAsync(async (req, res) => {
  * Establish or update baseline for a patient
  */
 const establishBaseline = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { metrics } = req.body;
 
   try {
     // Validate patient exists
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
@@ -326,7 +324,7 @@ const establishBaseline = catchAsync(async (req, res) => {
     }
 
     // Establish or update baseline
-    const baseline = await baselineManager.establishBaseline(patientId, metrics);
+    const baseline = await baselineManager.establishBaseline(clientId, metrics);
 
     res.status(httpStatus.OK).json({
       success: true,
@@ -512,31 +510,31 @@ function calculateOverallHealthScore(analysis) {
  * Get medical analysis results for a patient
  */
 const getMedicalAnalysisResults = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { limit = 10 } = req.query;
   const caregiver = req.caregiver;
 
   try {
-    logger.info('[MedicalAnalysis] Fetching medical analysis results for patient', { patientId, limit, caregiverId: caregiver.id, role: caregiver.role });
+    logger.info('[MedicalAnalysis] Fetching medical analysis results for patient', { clientId, limit, caregiverId: caregiver.id, role: caregiver.role });
     
     // Validate patient exists and check access
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
     // For staff users with readOwn permission, verify they have access to this patient
     if (caregiver.role === 'staff') {
       const caregiverDoc = await require('../services').caregiverService.getCaregiverById(caregiver.id);
-      const hasAccess = caregiverDoc.patients.some(
+      const hasAccess = caregiverDoc.clients.some(
         (p) => {
           const pId = p._id ? p._id.toString() : p.toString();
-          return pId === patientId.toString();
+          return pId === clientId.toString();
         }
-      ) || (patient.caregivers && patient.caregivers.some(
+      ) || (client.caregivers && client.caregivers.some(
         (c) => {
           const cId = c._id ? c._id.toString() : c.toString();
           return cId === caregiver.id.toString();
@@ -552,9 +550,9 @@ const getMedicalAnalysisResults = catchAsync(async (req, res) => {
     }
     // For orgAdmin, verify patient belongs to their org
     else if (caregiver.role === 'orgAdmin') {
-      const patientOrgId = patient.org?._id ? patient.org._id.toString() : patient.org?.toString();
+      const clientOrgId = client.org?._id ? client.org._id.toString() : client.org?.toString();
       const caregiverOrgId = caregiver.org?._id ? caregiver.org._id.toString() : caregiver.org?.toString();
-      if (patientOrgId && caregiverOrgId && patientOrgId !== caregiverOrgId) {
+      if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
         return res.status(httpStatus.FORBIDDEN).json({
           success: false,
           message: 'You do not have access to this patient\'s medical analysis'
@@ -563,7 +561,7 @@ const getMedicalAnalysisResults = catchAsync(async (req, res) => {
     }
     // superAdmin has full access, no check needed
     
-    const results = await conversationService.getMedicalAnalysisResults(patientId, parseInt(limit));
+    const results = await conversationService.getMedicalAnalysisResults(clientId, parseInt(limit));
     
     res.status(httpStatus.OK).json({
       success: true,
@@ -584,30 +582,30 @@ const getMedicalAnalysisResults = catchAsync(async (req, res) => {
  * Trigger medical analysis for a specific patient (synchronous)
  */
 const triggerPatientAnalysis = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const caregiver = req.caregiver;
 
   try {
-    logger.info('[MedicalAnalysis] Running synchronous medical analysis for patient', { patientId, caregiverId: caregiver.id, role: caregiver.role });
+    logger.info('[MedicalAnalysis] Running synchronous medical analysis for patient', { clientId, caregiverId: caregiver.id, role: caregiver.role });
     
     // Validate patient exists and check access
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
     // For staff users with createOwn permission, verify they have access to this patient
     if (caregiver.role === 'staff') {
       const caregiverDoc = await require('../services').caregiverService.getCaregiverById(caregiver.id);
-      const hasAccess = caregiverDoc.patients.some(
+      const hasAccess = caregiverDoc.clients.some(
         (p) => {
           const pId = p._id ? p._id.toString() : p.toString();
-          return pId === patientId.toString();
+          return pId === clientId.toString();
         }
-      ) || (patient.caregivers && patient.caregivers.some(
+      ) || (client.caregivers && client.caregivers.some(
         (c) => {
           const cId = c._id ? c._id.toString() : c.toString();
           return cId === caregiver.id.toString();
@@ -623,9 +621,9 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
     }
     // For orgAdmin, verify patient belongs to their org
     else if (caregiver.role === 'orgAdmin') {
-      const patientOrgId = patient.org?._id ? patient.org._id.toString() : patient.org?.toString();
+      const clientOrgId = client.org?._id ? client.org._id.toString() : client.org?.toString();
       const caregiverOrgId = caregiver.org?._id ? caregiver.org._id.toString() : caregiver.org?.toString();
-      if (patientOrgId && caregiverOrgId && patientOrgId !== caregiverOrgId) {
+      if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
         return res.status(httpStatus.FORBIDDEN).json({
           success: false,
           message: 'You do not have access to trigger medical analysis for this patient'
@@ -636,7 +634,7 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
 
     // Get all patient conversations for comprehensive analysis
     // For manual triggers, analyze all available data to get the most complete picture
-    const conversations = await conversationService.getConversationsByPatient(patientId);
+    const conversations = await conversationService.getConversationsByClient(clientId);
 
     if (conversations.length === 0) {
       const analyzer = new MedicalPatternAnalyzer();
@@ -659,7 +657,7 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
     }
 
     // Get baseline analysis (previous month's result)
-    const baselineResults = await conversationService.getMedicalAnalysisResults(patientId, 1);
+    const baselineResults = await conversationService.getMedicalAnalysisResults(clientId, 1);
     const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
 
     // Perform medical pattern analysis synchronously
@@ -676,10 +674,10 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
       processingTime
     };
 
-    await conversationService.storeMedicalAnalysisResult(patientId, resultToStore);
+    await conversationService.storeMedicalAnalysisResult(clientId, resultToStore);
 
     logger.info('Synchronous medical analysis completed', {
-      patientId,
+      clientId,
       conversationCount: conversations.length,
       processingTime: `${processingTime}ms`,
       confidence: analysisResult.confidence
@@ -711,7 +709,7 @@ const triggerAllAnalysis = catchAsync(async (req, res) => {
     logger.info('[MedicalAnalysis] Triggering medical analysis for all patients');
     
     // Get all active patients
-    const patients = await conversationService.getActivePatients();
+    const patients = await conversationService.getActiveClients();
     
     if (!patients || patients.length === 0) {
       return res.status(httpStatus.OK).json({
@@ -768,31 +766,31 @@ const getSchedulerStatus = catchAsync(async (req, res) => {
  * Get medical analysis trend data for time series visualization
  */
 const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { timeRange = 'year' } = req.query;
   const caregiver = req.caregiver;
 
   try {
-    logger.info('[MedicalAnalysis] Fetching trend data for patient', { patientId, timeRange, caregiverId: caregiver.id, role: caregiver.role });
+    logger.info('[MedicalAnalysis] Fetching trend data for patient', { clientId, timeRange, caregiverId: caregiver.id, role: caregiver.role });
     
     // Validate patient exists and check access
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
     // For staff users with readOwn permission, verify they have access to this patient
     if (caregiver.role === 'staff') {
       const caregiverDoc = await require('../services').caregiverService.getCaregiverById(caregiver.id);
-      const hasAccess = caregiverDoc.patients.some(
+      const hasAccess = caregiverDoc.clients.some(
         (p) => {
           const pId = p._id ? p._id.toString() : p.toString();
-          return pId === patientId.toString();
+          return pId === clientId.toString();
         }
-      ) || (patient.caregivers && patient.caregivers.some(
+      ) || (client.caregivers && client.caregivers.some(
         (c) => {
           const cId = c._id ? c._id.toString() : c.toString();
           return cId === caregiver.id.toString();
@@ -808,9 +806,9 @@ const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
     }
     // For orgAdmin, verify patient belongs to their org
     else if (caregiver.role === 'orgAdmin') {
-      const patientOrgId = patient.org?._id ? patient.org._id.toString() : patient.org?.toString();
+      const clientOrgId = client.org?._id ? client.org._id.toString() : client.org?.toString();
       const caregiverOrgId = caregiver.org?._id ? caregiver.org._id.toString() : caregiver.org?.toString();
-      if (patientOrgId && caregiverOrgId && patientOrgId !== caregiverOrgId) {
+      if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
         return res.status(httpStatus.FORBIDDEN).json({
           success: false,
           message: 'You do not have access to this patient\'s medical analysis trends'
@@ -844,7 +842,7 @@ const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
 
     // Get all medical analysis results for the patient
     const timeSeriesResults = await MedicalAnalysis.find({ 
-      patientId,
+      clientId,
       analysisDate: { $gte: start, $lte: end }
     }).sort({ analysisDate: 1 });
 
@@ -852,7 +850,7 @@ const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
       return res.status(httpStatus.OK).json({
         success: true,
         trend: {
-          patientId,
+          clientId,
           timeRange,
           startDate: start.toISOString(),
           endDate: end.toISOString(),
@@ -895,7 +893,7 @@ const getMedicalAnalysisTrend = catchAsync(async (req, res) => {
     res.status(httpStatus.OK).json({
       success: true,
       trend: {
-        patientId,
+        clientId,
         timeRange,
         startDate: start.toISOString(),
         endDate: end.toISOString(),

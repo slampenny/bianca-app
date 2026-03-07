@@ -10,41 +10,35 @@ const { SentimentTrendDTO, SentimentSummaryDTO } = require('../dtos');
  * Get sentiment trend for a patient over time
  */
 const getSentimentTrend = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { timeRange = 'lastCall' } = req.query;
 
-  // Validate timeRange parameter
   if (!['lastCall', 'month', 'lifetime'].includes(timeRange)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid timeRange. Must be one of: lastCall, month, lifetime');
   }
 
-  // Check if the caregiver has access to this patient
   if (req.caregiver.role === 'staff') {
     const caregiver = await Caregiver.findById(req.caregiver.id);
-    if (!caregiver.patients.includes(patientId)) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient');
+    if (!caregiver.clients.some((id) => id.toString() === clientId)) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client');
     }
   }
 
-  const trendData = await sentimentService.getSentimentTrend(patientId, timeRange);
+  const trendData = await sentimentService.getSentimentTrend(clientId, timeRange);
   res.send(SentimentTrendDTO(trendData));
 });
 
-/**
- * Get sentiment summary for a patient
- */
 const getSentimentSummary = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
 
-  // Check if the caregiver has access to this patient
   if (req.caregiver.role === 'staff') {
     const caregiver = await Caregiver.findById(req.caregiver.id);
-    if (!caregiver.patients.includes(patientId)) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this patient');
+    if (!caregiver.clients.some((id) => id.toString() === clientId)) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client');
     }
   }
 
-  const summaryData = await sentimentService.getSentimentSummary(patientId);
+  const summaryData = await sentimentService.getSentimentSummary(clientId);
   res.send(SentimentSummaryDTO(summaryData));
 });
 
@@ -63,7 +57,7 @@ const getConversationSentiment = catchAsync(async (req, res) => {
   // Check if the caregiver has access to this conversation
   if (req.caregiver.role === 'staff') {
     const caregiver = await Caregiver.findById(req.caregiver.id);
-    if (!caregiver.patients.includes(conversation.patientId)) {
+    if (!caregiver.clients.includes(conversation.clientId)) {
       throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this conversation');
     }
   }
@@ -95,7 +89,7 @@ const analyzeConversationSentiment = catchAsync(async (req, res) => {
   // Check if the caregiver has access to this conversation
   if (req.caregiver.role === 'staff') {
     const caregiver = await Caregiver.findById(req.caregiver.id);
-    if (!caregiver.patients.includes(conversation.patientId)) {
+    if (!caregiver.clients.includes(conversation.clientId)) {
       throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this conversation');
     }
   }

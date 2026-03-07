@@ -239,22 +239,22 @@ describe('Medical Analysis Pipeline Integration', () => {
       };
 
       // Mock conversation service (using correct method name)
-      const originalGetConversations = conversationService.getConversationsByPatientAndDateRange;
-      conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue(conversations);
+      const originalGetConversations = conversationService.getConversationsByClientAndDateRange;
+      conversationService.getConversationsByClientAndDateRange = jest.fn().mockResolvedValue(conversations);
 
       try {
         // Execute patient analysis job
         await scheduler.handlePatientAnalysis(mockJob);
 
         // Verify conversation service was called with correct parameters
-        expect(conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
+        expect(conversationService.getConversationsByClientAndDateRange).toHaveBeenCalledWith(
           patientId,
           expect.any(Date),
           expect.any(Date)
         );
       } finally {
         // Restore original method
-        conversationService.getConversationsByPatientAndDateRange = originalGetConversations;
+        conversationService.getConversationsByClientAndDateRange = originalGetConversations;
       }
     });
 
@@ -276,23 +276,23 @@ describe('Medical Analysis Pipeline Integration', () => {
         }
       };
 
-      // Mock conversation service to return empty array (using correct method name)
-      const originalGetConversations = conversationService.getConversationsByPatientAndDateRange;
-      conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue([]);
+      // Mock conversation service to return empty array (scheduler calls getConversationsByClientAndDateRange)
+      const originalGetConversations = conversationService.getConversationsByClientAndDateRange;
+      conversationService.getConversationsByClientAndDateRange = jest.fn().mockResolvedValue([]);
 
       try {
         // Execute patient analysis job
         await scheduler.handlePatientAnalysis(mockJob);
 
         // Verify conversation service was called
-        expect(conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
+        expect(conversationService.getConversationsByClientAndDateRange).toHaveBeenCalledWith(
           patientId,
           expect.any(Date),
           expect.any(Date)
         );
       } finally {
         // Restore original method
-        conversationService.getConversationsByPatientAndDateRange = originalGetConversations;
+        conversationService.getConversationsByClientAndDateRange = originalGetConversations;
       }
     });
   });
@@ -317,7 +317,7 @@ describe('Medical Analysis Pipeline Integration', () => {
 
       // Step 3: Establish baseline
       const baseline = await baselineManager.establishBaseline(patientId, analysis);
-      expect(baseline.patientId).toBe(patientId);
+      expect(baseline.clientId).toBe(patientId);
 
       // Step 4: Compare with baseline
       const deviation = await baselineManager.getDeviation(patientId, analysis);

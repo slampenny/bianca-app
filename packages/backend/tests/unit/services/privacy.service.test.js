@@ -71,7 +71,7 @@ describe('Privacy Service', () => {
     patientId = patient._id;
 
     // Update caregiver with patient
-    caregiver.patients = [patientId];
+    caregiver.clients = [patientId];
     await caregiver.save();
   });
 
@@ -214,14 +214,14 @@ describe('Privacy Service', () => {
     it('should automatically gather and email all user data', async () => {
       // Create test data - first create a call (conversations require callId)
       const call = await Call.create({
-        patientId: patientId,
+        clientId: patientId,
         callSid: 'CA1234567890abcdef',
         status: 'completed',
         duration: 60
       });
 
       const conversation = await Conversation.create({
-        patientId: patientId,
+        clientId: patientId,
         callId: call._id,
         agentId: caregiverId,
         status: 'completed',
@@ -230,7 +230,7 @@ describe('Privacy Service', () => {
       });
 
       const medicalAnalysis = await MedicalAnalysis.create({
-        patientId: patientId,
+        clientId: patientId,
         analysisDate: new Date(),
         startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
         endDate: new Date(),

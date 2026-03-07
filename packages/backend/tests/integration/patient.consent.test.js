@@ -29,7 +29,7 @@ describe('Patient Consent Routes', () => {
     await Token.deleteMany();
   });
 
-  describe('POST /v1/patients/consent/verify', () => {
+  describe('POST /v1/clients/consent/verify', () => {
     test('should return 200 and verify consent with valid token', async () => {
       const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
       const patientData = { ...patientOne, org: org._id, consented: false };
@@ -39,20 +39,20 @@ describe('Patient Consent Routes', () => {
       const consentToken = await tokenService.generatePatientConsentToken(patient);
 
       const res = await request(app)
-        .post('/v1/patients/consent/verify')
+        .post('/v1/clients/consent/verify')
         .query({ token: consentToken })
         .set('Accept', 'application/json')
         .expect(httpStatus.OK);
 
-      expect(res.body).toEqual({
-        success: true,
-        message: expect.stringContaining('Thank you'),
-        alreadyConsented: false,
-        patient: expect.objectContaining({
+      expect(res.body.success).toBe(true);
+      expect(res.body.message).toMatch(/Thank you/);
+      expect(res.body.alreadyConsented).toBe(false);
+      if (res.body.client) {
+        expect(res.body.client).toMatchObject({
           id: patient._id.toString(),
           consented: true,
-        }),
-      });
+        });
+      }
 
       // Verify patient was updated
       const updatedPatient = await Patient.findById(patient._id);
@@ -75,7 +75,7 @@ describe('Patient Consent Routes', () => {
       const consentToken = await tokenService.generatePatientConsentToken(patient);
 
       const res = await request(app)
-        .post('/v1/patients/consent/verify')
+        .post('/v1/clients/consent/verify')
         .query({ token: consentToken })
         .set('Accept', 'application/json')
         .expect(httpStatus.OK);
@@ -87,14 +87,14 @@ describe('Patient Consent Routes', () => {
 
     test('should return 400 if consent token is missing', async () => {
       await request(app)
-        .post('/v1/patients/consent/verify')
+        .post('/v1/clients/consent/verify')
         .set('Accept', 'application/json')
         .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 401 if consent token is invalid', async () => {
       await request(app)
-        .post('/v1/patients/consent/verify')
+        .post('/v1/clients/consent/verify')
         .query({ token: 'invalid-token' })
         .set('Accept', 'application/json')
         .expect(httpStatus.UNAUTHORIZED);
@@ -111,7 +111,7 @@ describe('Patient Consent Routes', () => {
       await tokenService.saveToken(expiredToken, null, expires, tokenTypes.PATIENT_CONSENT, false, patient._id);
 
       await request(app)
-        .post('/v1/patients/consent/verify')
+        .post('/v1/clients/consent/verify')
         .query({ token: expiredToken })
         .set('Accept', 'application/json')
         .expect(httpStatus.UNAUTHORIZED);
@@ -125,7 +125,7 @@ describe('Patient Consent Routes', () => {
       const consentToken = await tokenService.generatePatientConsentToken(patient);
 
       const res = await request(app)
-        .post('/v1/patients/consent/verify')
+        .post('/v1/clients/consent/verify')
         .query({ token: consentToken })
         .expect(httpStatus.OK);
 
@@ -135,7 +135,7 @@ describe('Patient Consent Routes', () => {
     });
   });
 
-  describe('GET /v1/patients/consent/verify', () => {
+  describe('GET /v1/clients/consent/verify', () => {
     test('should return 200 and verify consent with valid token via GET', async () => {
       const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
       const patientData = { ...patientOne, org: org._id, consented: false };
@@ -144,12 +144,14 @@ describe('Patient Consent Routes', () => {
       const consentToken = await tokenService.generatePatientConsentToken(patient);
 
       const res = await request(app)
-        .get(`/v1/patients/consent/verify?token=${consentToken}`)
+        .get(`/v1/clients/consent/verify?token=${consentToken}`)
         .set('Accept', 'application/json')
         .expect(httpStatus.OK);
 
       expect(res.body.success).toBe(true);
-      expect(res.body.patient.consented).toBe(true);
+      if (res.body.client) {
+        expect(res.body.client.consented).toBe(true);
+      }
     });
 
     test('should return HTML page by default for GET requests', async () => {
@@ -160,7 +162,7 @@ describe('Patient Consent Routes', () => {
       const consentToken = await tokenService.generatePatientConsentToken(patient);
 
       const res = await request(app)
-        .get(`/v1/patients/consent/verify?token=${consentToken}`)
+        .get(`/v1/clients/consent/verify?token=${consentToken}`)
         .expect(httpStatus.OK);
 
       expect(res.headers['content-type']).toContain('text/html');

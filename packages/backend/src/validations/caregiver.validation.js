@@ -67,14 +67,28 @@ const deleteCaregiver = {
 const addPatient = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
-    patientId: Joi.required().custom(objectId),
+    clientId: Joi.required().custom(objectId),
+  }),
+};
+
+const addClient = {
+  params: Joi.object().keys({
+    caregiverId: Joi.required().custom(objectId),
+    clientId: Joi.required().custom(objectId),
   }),
 };
 
 const removePatient = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
-    patientId: Joi.required().custom(objectId),
+    clientId: Joi.required().custom(objectId),
+  }),
+};
+
+const removeClient = {
+  params: Joi.object().keys({
+    caregiverId: Joi.required().custom(objectId),
+    clientId: Joi.required().custom(objectId),
   }),
 };
 
@@ -96,7 +110,13 @@ const getPatientsByCaregiver = {
 const getConversationsByPatient = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
-    patientId: Joi.required().custom(objectId),
+    clientId: Joi.required().custom(objectId),
+  }),
+};
+
+const getClients = {
+  params: Joi.object().keys({
+    caregiverId: Joi.required().custom(objectId),
   }),
 };
 
@@ -108,7 +128,10 @@ module.exports = {
   uploadCaregiverAvatar,
   deleteCaregiver,
   addPatient,
+  addClient,
   removePatient,
+  removeClient,
   updateThemePreference,
   getPatientsByCaregiver,
+  getClients,
 };

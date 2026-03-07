@@ -67,7 +67,7 @@ async function deleteExpiredCallRecordings(country) {
   
   // Find expired calls for these patients
   const expiredCalls = await Call.find({
-    patientId: { $in: patientIds },
+    clientId: { $in: patientIds },
     startTime: { $lt: cutoffDate },
     // Only delete if no active billing references
     lineItemId: null
@@ -130,7 +130,7 @@ async function deleteExpiredConversations(country) {
   
   // Find expired conversations for these patients
   const expiredConversations = await Conversation.find({
-    patientId: { $in: patientIds },
+    clientId: { $in: patientIds },
     createdAt: { $lt: cutoffDate }
   });
   
@@ -190,7 +190,7 @@ async function deleteExpiredMedicalAnalysis(country) {
   
   // Find expired analyses for these patients
   const deletedCount = await MedicalAnalysis.deleteMany({
-    patientId: { $in: patientIds },
+    clientId: { $in: patientIds },
     analysisDate: { $lt: cutoffDate }
   });
   
@@ -380,36 +380,36 @@ async function handleDeletionRequest(userId, dataType = 'all') {
   if (dataType === 'all' || dataType === 'calls') {
     // Delete calls for user's patients
     const deletedCalls = await Call.deleteMany({
-      patientId: { $in: patientIds }
+      clientId: { $in: patientIds }
     });
     result.deleted.calls = deletedCalls.deletedCount;
     
     // Delete associated conversations
     const conversations = await Conversation.find({
-      patientId: { $in: patientIds }
+      clientId: { $in: patientIds }
     });
     const conversationIds = conversations.map(c => c._id);
     
     await Message.deleteMany({ conversationId: { $in: conversationIds } });
-    await Conversation.deleteMany({ patientId: { $in: patientIds } });
+    await Conversation.deleteMany({ clientId: { $in: patientIds } });
   }
   
   if (dataType === 'all' || dataType === 'conversations') {
     const conversations = await Conversation.find({
-      patientId: { $in: patientIds }
+      clientId: { $in: patientIds }
     });
     const conversationIds = conversations.map(c => c._id);
     
     await Message.deleteMany({ conversationId: { $in: conversationIds } });
     const deletedConversations = await Conversation.deleteMany({
-      patientId: { $in: patientIds }
+      clientId: { $in: patientIds }
     });
     result.deleted.conversations = deletedConversations.deletedCount;
   }
   
   if (dataType === 'all' || dataType === 'medicalAnalysis') {
     const deletedAnalysis = await MedicalAnalysis.deleteMany({
-      patientId: { $in: patientIds }
+      clientId: { $in: patientIds }
     });
     result.deleted.medicalAnalysis = deletedAnalysis.deletedCount;
   }

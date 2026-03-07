@@ -121,7 +121,7 @@ export class PatientWorkflow {
   }
 
   async whenIFillPatientForm(patientData: any) {
-    await this.page.getByTestId('patient-name-input').fill(patientData.name)
+    await this.page.getByTestId('client-name-input').fill(patientData.name)
     await this.page.getByTestId('patient-email-input').fill(patientData.email)
     await this.page.getByTestId('patient-phone-input').fill(patientData.phone)
   }

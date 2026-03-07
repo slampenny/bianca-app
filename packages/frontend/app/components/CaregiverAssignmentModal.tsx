@@ -15,21 +15,21 @@ import {
   useGetCaregiversQuery,
   useAssignCaregiverMutation,
   useUnassignCaregiverMutation,
-} from "../services/api/patientApi"
+} from "../services/api/clientApi"
 import { useGetAllCaregiversQuery } from "../services/api/caregiverApi"
-import { Patient, Caregiver } from "../services/api/api.types"
+import { Client, Caregiver } from "../services/api/api.types"
 import { RootState } from "../store/store"
 import { logger } from "../utils/logger"
 import { useTheme } from "../theme/ThemeContext"
 
 interface CaregiverAssignmentModalProps {
-  patient: Patient
+  client: Client
   isVisible: boolean
   onClose: () => void
 }
 
 export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> = ({
-  patient,
+  client,
   isVisible,
   onClose,
 }) => {
@@ -48,18 +48,14 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
   // Check if user has permission to manage caregivers
   const canManageCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
   
-  // Fetch current caregivers for this patient
-  // Skip if user doesn't have permission or patient doesn't have an ID
   const { data: currentCaregivers, isLoading: isLoadingCurrent } = useGetCaregiversQuery(
-    { patientId: patient.id! },
-    { skip: !patient.id || !canManageCaregivers }
+    { clientId: client.id! },
+    { skip: !client.id || !canManageCaregivers }
   )
   
-  // Fetch all caregivers in the organization
-  // Skip if user doesn't have permission or patient doesn't have an org
   const { data: allCaregivers, isLoading: isLoadingAll } = useGetAllCaregiversQuery(
-    { org: patient.org! },
-    { skip: !patient.org || !canManageCaregivers }
+    { org: client.org! },
+    { skip: !client.org || !canManageCaregivers }
   )
   
   // Mutations for assigning/unassigning caregivers
@@ -79,10 +75,10 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
     setIsLoading(true)
     try {
       if (isCurrentlyAssigned) {
-        await unassignCaregiver({ patientId: patient.id!, caregiverId }).unwrap()
+        await unassignCaregiver({ clientId: client.id!, caregiverId }).unwrap()
         setAssignedCaregiverIds(prev => prev.filter(id => id !== caregiverId))
       } else {
-        await assignCaregiver({ patientId: patient.id!, caregiverId }).unwrap()
+        await assignCaregiver({ clientId: client.id!, caregiverId }).unwrap()
         setAssignedCaregiverIds(prev => [...prev, caregiverId])
       }
     } catch (error) {
@@ -142,7 +138,7 @@ export const CaregiverAssignmentModal: React.FC<CaregiverAssignmentModalProps> =
         {/* Header */}
         <View style={styles.header} testID="caregiver-assignment-modal-header">
           <Text style={styles.title}>Manage Caregivers</Text>
-          <Text style={styles.subtitle}>for {patient.name || 'Unknown Patient'}</Text>
+          <Text style={styles.subtitle}>for {client.name || 'Unknown Client'}</Text>
         </View>
         
         {/* Caregiver List */}

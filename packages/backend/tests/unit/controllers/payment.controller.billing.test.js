@@ -90,7 +90,7 @@ describe('Payment Controller - Billing', () => {
 
     call1 = await Call.create({
       callSid: 'CA11111111111111111111111111111111',
-      patientId: patient1._id,
+      clientId: patient1._id,
       duration: 120, // 2 minutes
       cost: 0.20,
       status: 'completed',
@@ -101,7 +101,7 @@ describe('Payment Controller - Billing', () => {
 
     call2 = await Call.create({
       callSid: 'CA22222222222222222222222222222222',
-      patientId: patient1._id,
+      clientId: patient1._id,
       duration: 180, // 3 minutes
       cost: 0.30,
       status: 'completed',
@@ -112,7 +112,7 @@ describe('Payment Controller - Billing', () => {
 
     call3 = await Call.create({
       callSid: 'CA33333333333333333333333333333333',
-      patientId: patient2._id,
+      clientId: patient2._id,
       duration: 90, // 1.5 minutes
       cost: 0.15,
       status: 'completed',
@@ -149,7 +149,7 @@ describe('Payment Controller - Billing', () => {
       expect(res.body.patientCosts).toHaveLength(2);
       
       // Check patient 1 (John Doe)
-      const patient1Cost = res.body.patientCosts.find(p => p.patientId === patient1._id.toString());
+      const patient1Cost = res.body.patientCosts.find(p => p.clientId === patient1._id.toString());
       expect(patient1Cost).toBeDefined();
       expect(patient1Cost.patientName).toBe('John Doe');
       expect(patient1Cost.callCount).toBe(2);
@@ -157,7 +157,7 @@ describe('Payment Controller - Billing', () => {
       expect(patient1Cost.calls).toHaveLength(2);
       
       // Check patient 2 (Jane Smith)
-      const patient2Cost = res.body.patientCosts.find(p => p.patientId === patient2._id.toString());
+      const patient2Cost = res.body.patientCosts.find(p => p.clientId === patient2._id.toString());
       expect(patient2Cost).toBeDefined();
       expect(patient2Cost.patientName).toBe('Jane Smith');
       expect(patient2Cost.callCount).toBe(1);
@@ -231,10 +231,10 @@ describe('Payment Controller - Billing', () => {
     });
   });
 
-  describe('POST /payments/patients/:patientId/invoices', () => {
+  describe('POST /payments/clients/:clientId/invoices', () => {
     it('should create invoice from patient calls', async () => {
       const res = await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${patient1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(201);
 
@@ -248,7 +248,7 @@ describe('Payment Controller - Billing', () => {
       expect(res.body.invoiceNumber).toMatch(/^INV-\d{6}$/);
       if (res.body.lineItems) {
         expect(res.body.lineItems).toHaveLength(1);
-        expect(res.body.lineItems[0].patientId).toBe(patient1._id.toString());
+        expect(res.body.lineItems[0].clientId).toBe(patient1._id.toString());
         expect(res.body.lineItems[0].amount).toBe(0.50);
         if (res.body.lineItems[0].description) {
           expect(res.body.lineItems[0].description).toContain('Billing for 300 seconds');
@@ -259,44 +259,44 @@ describe('Payment Controller - Billing', () => {
 
     it('should mark calls as billed after creating invoice', async () => {
       // Reset calls to unbilled state
-      await Call.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
+      await Call.updateMany({ clientId: patient1._id }, { $unset: { lineItemId: 1 } });
 
       await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${patient1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(201);
 
-      const updatedCalls = await Call.find({ patientId: patient1._id });
+      const updatedCalls = await Call.find({ clientId: patient1._id });
       expect(updatedCalls.every(call => call.lineItemId !== null)).toBe(true);
     });
 
     it('should return 404 when no unbilled calls exist', async () => {
       // Mark all calls as billed
-      await Call.updateMany({ patientId: patient1._id }, { 
+      await Call.updateMany({ clientId: patient1._id }, { 
         lineItemId: new mongoose.Types.ObjectId() 
       });
 
       await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${patient1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(404);
 
       // Restore unbilled status
-      await Call.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
+      await Call.updateMany({ clientId: patient1._id }, { $unset: { lineItemId: 1 } });
     });
 
     it('should return 404 for non-existent patient', async () => {
       const nonExistentPatientId = new mongoose.Types.ObjectId();
       
       await request(app)
-        .post(`/v1/payments/patients/${nonExistentPatientId}/invoices`)
+        .post(`/v1/payments/clients/${nonExistentPatientId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(404);
     });
 
     it('should require authentication', async () => {
       await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${patient1._id}/invoices`)
         .expect(401);
     });
   });
@@ -318,14 +318,14 @@ describe('Payment Controller - Billing', () => {
       // Create line items
       await LineItem.create([
         {
-          patientId: patient1._id,
+          clientId: patient1._id,
           invoiceId: invoice._id,
           amount: 0.50,
           description: 'Billing for patient 1',
           quantity: 2
         },
         {
-          patientId: patient2._id,
+          clientId: patient2._id,
           invoiceId: invoice._id,
           amount: 0.15,
           description: 'Billing for patient 2',
@@ -407,7 +407,7 @@ describe('Payment Controller - Billing', () => {
     });
   });
 
-  describe('GET /payments/patients/:patientId/invoices', () => {
+  describe('GET /payments/clients/:clientId/invoices', () => {
     let invoice;
 
     beforeEach(async () => {
@@ -423,7 +423,7 @@ describe('Payment Controller - Billing', () => {
 
       // Create line item for patient1
       await LineItem.create({
-        patientId: patient1._id,
+        clientId: patient1._id,
         invoiceId: invoice._id,
         amount: 0.50,
         description: 'Billing for patient 1',
@@ -438,7 +438,7 @@ describe('Payment Controller - Billing', () => {
 
     it('should return invoices for patient', async () => {
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices`)
+        .get(`/v1/payments/clients/${patient1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -454,14 +454,14 @@ describe('Payment Controller - Billing', () => {
 
     it('should filter invoices by status', async () => {
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices?status=pending`)
+        .get(`/v1/payments/clients/${patient1._id}/invoices?status=pending`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
       expect(res.body).toHaveLength(1);
 
       const paidRes = await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices?status=paid`)
+        .get(`/v1/payments/clients/${patient1._id}/invoices?status=paid`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -470,7 +470,7 @@ describe('Payment Controller - Billing', () => {
 
     it('should return empty array for patient with no invoices', async () => {
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient2._id}/invoices`)
+        .get(`/v1/payments/clients/${patient2._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -479,7 +479,7 @@ describe('Payment Controller - Billing', () => {
 
     it('should require authentication', async () => {
       await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices`)
+        .get(`/v1/payments/clients/${patient1._id}/invoices`)
         .expect(401);
     });
   });

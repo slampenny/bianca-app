@@ -3,8 +3,10 @@ let Localization: any = null
 try {
   Localization = require("expo-localization")
 } catch (e) {
-  // expo-localization not available - use fallback
-  console.warn("expo-localization not available, using fallback")
+  // expo-localization not available - use fallback (silent in test)
+  if (!process.env.JEST_WORKER_ID) {
+    console.warn("expo-localization not available, using fallback")
+  }
   Localization = {
     locale: "en-US",
     locales: ["en-US"],
@@ -94,10 +96,11 @@ export const initializeLanguage = async () => {
     
     if (savedLanguage && savedLanguage !== "en" && savedLanguage !== "en-US") {
       // Load the saved language if it's not English
-      await loadLanguage(savedLanguage)
-      if (i18n.translations[savedLanguage]) {
-        logger.debug("Setting language from saved preference:", savedLanguage)
-        i18n.locale = savedLanguage
+      await loadLanguage(String(savedLanguage))
+      const lang = String(savedLanguage)
+      if (i18n.translations[lang]) {
+        logger.debug("Setting language from saved preference:", lang)
+        i18n.locale = lang
         return
       }
     } else if (savedLanguage === "en" || savedLanguage === "en-US") {

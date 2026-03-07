@@ -87,11 +87,12 @@ export class AuthWorkflow {
   }
 
   async givenIAmOnTheRegisterScreen() {
-    // Use data-testid for React Native Web
     const registerButton = this.page.locator('[data-testid="register-button"], button:has-text("Register"), button:has-text("Sign Up")').first()
     await registerButton.waitFor({ state: 'visible', timeout: 10000 })
     await registerButton.click()
-    await this.page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
+    // New flow: onboarding (About you → How Bianca works) before Register screen
+    const { goThroughOnboardingToRegister } = await import('../helpers/navigation')
+    await goThroughOnboardingToRegister(this.page, 'caregiver')
   }
 
   async givenIHaveRegistrationData() {
@@ -247,7 +248,7 @@ export class AuthWorkflow {
     // Check multiple indicators that we're on the home screen
     const homeHeader = await this.page.locator('[data-testid="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
     const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 5000 }).catch(() => false)
-    const addPatientButton = await this.page.getByTestId('add-patient-button').isVisible({ timeout: 5000 }).catch(() => false)
+    const addPatientButton = await this.page.getByTestId('add-client-button').isVisible({ timeout: 5000 }).catch(() => false)
     const homeScreen = await this.page.locator('[data-testid="home-screen"]').isVisible({ timeout: 5000 }).catch(() => false)
     const profileButton = await this.page.getByTestId('profile-button').isVisible({ timeout: 5000 }).catch(() => false)
     const homeTab = await this.page.locator('[data-testid="tab-home"], [aria-label="Home tab"]').isVisible({ timeout: 5000 }).catch(() => false)
@@ -278,7 +279,7 @@ export class AuthWorkflow {
       const pageContent = await this.page.content().catch(() => '')
       console.error('Failed to detect home screen. URL:', url)
       console.error('Page contains login form:', pageContent.includes('email-input'))
-      console.error('Page contains home elements:', pageContent.includes('home-header') || pageContent.includes('add-patient'))
+      console.error('Page contains home elements:', pageContent.includes('home-header') || pageContent.includes('add-client'))
     }
     
     // If not on home screen, wait a bit more and check again

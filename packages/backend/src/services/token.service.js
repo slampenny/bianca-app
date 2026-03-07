@@ -182,7 +182,7 @@ const saveToken = async (token, caregiverId, expires, type, blacklisted = false,
       if (!patientIdString) {
         throw new Error('Patient ID is required for PATIENT_CONSENT token type');
       }
-      tokenData.patient = patientIdString;
+      tokenData.client = patientIdString;
     } else {
       // For all other token types, use caregiver ID
       const caregiverIdString = extractCaregiverId(caregiverId);
@@ -200,7 +200,7 @@ const saveToken = async (token, caregiverId, expires, type, blacklisted = false,
       error: error.message,
       type,
       caregiverId: type !== tokenTypes.PATIENT_CONSENT ? caregiverId : null,
-      patientId: type === tokenTypes.PATIENT_CONSENT ? patientId : null,
+      client: type === tokenTypes.PATIENT_CONSENT ? patientId : null,
       hasToken: !!token
     });
     throw error;
@@ -228,7 +228,7 @@ const verifyToken = async (token, type) => {
   // Build query based on token type
   const query = { token, type, blacklisted: false };
   if (type === tokenTypes.PATIENT_CONSENT) {
-    query.patient = payload.sub;
+    query.client = payload.sub;
   } else {
     query.caregiver = payload.sub;
   }
@@ -241,7 +241,7 @@ const verifyToken = async (token, type) => {
     // Check if token exists but is blacklisted
     const blacklistedQuery = { token, type };
     if (type === tokenTypes.PATIENT_CONSENT) {
-      blacklistedQuery.patient = payload.sub;
+      blacklistedQuery.client = payload.sub;
     } else {
       blacklistedQuery.caregiver = payload.sub;
     }

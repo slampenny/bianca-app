@@ -17,11 +17,10 @@ const tokenSchema = mongoose.Schema(
         return this.type !== tokenTypes.PATIENT_CONSENT;
       },
     },
-    patient: {
+    client: {
       type: mongoose.SchemaTypes.ObjectId,
-      ref: 'Patient',
+      ref: 'Client',
       required: function() {
-        // Patient is required only for PATIENT_CONSENT token type
         return this.type === tokenTypes.PATIENT_CONSENT;
       },
     },

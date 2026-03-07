@@ -136,7 +136,7 @@ const router = express.Router();
  *         description: Internal server error
  */
 router.get(
-  '/:patientId',
+  '/:clientId',
   auth(),
   validate(medicalAnalysisValidation.getMedicalAnalysis),
   medicalAnalysisController.getMedicalAnalysis
@@ -232,7 +232,7 @@ router.get(
  *         description: Internal server error
  */
 router.get(
-  '/:patientId/summary',
+  '/:clientId/summary',
   auth(),
   validate(medicalAnalysisValidation.getMedicalAnalysisSummary),
   medicalAnalysisController.getMedicalAnalysisSummary
@@ -293,7 +293,7 @@ router.get(
  *         description: Internal server error
  */
 router.get(
-  '/:patientId/baseline',
+  '/:clientId/baseline',
   auth(),
   validate(medicalAnalysisValidation.getBaseline),
   medicalAnalysisController.getBaseline
@@ -370,7 +370,7 @@ router.get(
  *         description: Internal server error
  */
 router.post(
-  '/:patientId/baseline',
+  '/:clientId/baseline',
   auth(),
   validate(medicalAnalysisValidation.establishBaseline),
   medicalAnalysisController.establishBaseline
@@ -421,7 +421,7 @@ router.post(
  *         description: Internal server error
  */
 router.get(
-  '/results/:patientId',
+  '/results/:clientId',
   auth('readOwn:medicalAnalysis', 'readAny:medicalAnalysis'),
   medicalAnalysisController.getMedicalAnalysisResults
 );
@@ -464,7 +464,7 @@ router.get(
  *         description: Internal server error
  */
 router.post(
-  '/trigger-patient/:patientId',
+  '/trigger-client/:clientId',
   auth('createOwn:medicalAnalysis', 'createAny:medicalAnalysis'),
   medicalAnalysisController.triggerPatientAnalysis
 );
@@ -618,7 +618,7 @@ router.get(
  *         description: Internal server error
  */
 router.get(
-  '/trend/:patientId',
+  '/trend/:clientId',
   auth('readOwn:medicalAnalysis', 'readAny:medicalAnalysis'),
   medicalAnalysisController.getMedicalAnalysisTrend
 );

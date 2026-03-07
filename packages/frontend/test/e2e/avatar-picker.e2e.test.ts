@@ -41,7 +41,7 @@ test.describe.skip('Avatar Picker', () => {
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Check for avatar display
@@ -74,7 +74,7 @@ test.describe.skip('Avatar Picker', () => {
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Look for avatar picker or change avatar button
@@ -111,7 +111,7 @@ test.describe.skip('Avatar Picker', () => {
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Get initial avatar (if any)
@@ -148,7 +148,7 @@ test.describe.skip('Avatar Picker', () => {
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Check for error messages related to avatar upload

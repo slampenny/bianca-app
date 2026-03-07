@@ -5,12 +5,13 @@ import { useLogoutMutation } from "../services/api/authApi"
 import { getAuthTokens, clearAuth, isAuthenticated } from "../store/authSlice"
 import { clearOrg } from "../store/orgSlice"
 import { clearCaregivers } from "../store/caregiverSlice"
-import { clearPatients } from "../store/patientSlice"
+import { clearClients } from "../store/clientSlice"
 import { Button, Screen, Text } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
 import { navigationRef, resetRoot } from "app/navigators/navigationUtilities"
+import type { ThemeColors } from "../types"
 
 export const LogoutScreen = () => {
   const dispatch = useDispatch()
@@ -59,7 +60,7 @@ export const LogoutScreen = () => {
     // Note: Slices will auto-clear on logout via extraReducers, but we still call clearAuth
     // to ensure auth state is cleared immediately
     dispatch(clearAuth())
-    // Other slices (org, caregiver, patient) will auto-clear via extraReducers listening to logout events
+    // Other slices (org, caregiver, client) will auto-clear via extraReducers listening to logout events
     // Navigation to Login will be handled by AppNavigator when it switches to UnauthStack
   }
 

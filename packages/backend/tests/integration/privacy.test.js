@@ -66,7 +66,7 @@ describe('Privacy API routes', () => {
       // Create some test data
       const mongoose = require('mongoose');
       await Conversation.create({
-        patientId: patientId,
+        clientId: patientId,
         agentId: caregiverId,
         status: 'completed',
         startTime: new Date(),

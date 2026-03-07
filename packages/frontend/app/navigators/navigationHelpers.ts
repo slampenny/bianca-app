@@ -18,6 +18,6 @@ export const createThemeAwareHeaderOptions = (
   headerTitleStyle: {
     color: colors.palette.biancaHeader || colors.text,
   },
-  title: translate(titleKey),
+  title: translate(titleKey as import("../i18n").TxKeyPath),
 })
 

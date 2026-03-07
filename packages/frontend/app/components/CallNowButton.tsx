@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useRef } from "react"
 import { View, StyleSheet } from "react-native"
 import { Button } from "app/components/Button"
 import { Text } from "app/components/Text"
@@ -13,34 +13,35 @@ import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
 
 interface CallNowButtonProps {
-  patientId: string
-  patientName: string
+  clientId: string
+  clientName: string
   disabled?: boolean
   style?: any
 }
 
 export const CallNowButton: React.FC<CallNowButtonProps> = ({
-  patientId,
-  patientName,
+  clientId,
+  clientName,
   disabled = false,
   style
 }) => {
   const [isCalling, setIsCalling] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isCallingRef = useRef(false)
   const navigation = useNavigation()
   const dispatch = useAppDispatch()
   const [initiateCallMutation] = useInitiateCallMutation()
 
   const handleCallNow = async () => {
-    if (isCalling) return
-    
+    if (isCallingRef.current || isCalling) return
+    isCallingRef.current = true
     setIsCalling(true)
     setError(null)
     
     try {
       const response = await initiateCallMutation({
-        patientId,
-        callNotes: `Manual call initiated by agent to ${patientName}`
+        clientId,
+        callNotes: `Manual call initiated by agent to ${clientName}`
       }).unwrap()
       
       // Store call data in Redux
@@ -49,7 +50,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       
       dispatch(setActiveCall(response))
       // Conversation is now created immediately, so conversationId is always available
-      const callNotes = `Manual call initiated by agent to ${patientName}`
+      const callNotes = `Manual call initiated by agent to ${clientName}`
       dispatch(setCallStatus({
         conversationId: response.conversationId,
         status: response.status || 'initiated',
@@ -57,10 +58,10 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
         duration: 0,
         callOutcome: null,
         callNotes,
-        patient: {
-          _id: patientId,
-          name: patientName,
-          phone: response.patientPhone || "" // Will be populated by backend
+        client: {
+          _id: clientId,
+          name: clientName,
+          phone: response.clientPhone || "" // Will be populated by backend
         },
         agent: {
           _id: response.agentId,
@@ -80,6 +81,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
       setError(errorMessage)
       logger.error('Call initiation error:', err)
     } finally {
+      isCallingRef.current = false
       setIsCalling(false)
     }
   }
@@ -87,7 +89,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
   return (
     <View style={[styles.container, style]}>
       {error && (
-        <Text style={styles.errorText} testID={`call-error-${patientId}`}>
+        <Text style={styles.errorText} testID={`call-error-${clientId}`}>
           {error}
         </Text>
       )}
@@ -97,7 +99,7 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
         preset="primary"
         onPress={handleCallNow}
         disabled={disabled || isCalling}
-        testID={`call-now-${patientName}`}
+        testID={`call-now-${clientName}`}
         style={styles.button}
         textStyle={styles.buttonText}
       />

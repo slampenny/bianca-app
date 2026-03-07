@@ -3,7 +3,7 @@ const { objectId } = require('./custom.validation');
 
 const getSentimentTrend = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    clientId: Joi.string().custom(objectId),
   }),
   query: Joi.object().keys({
     timeRange: Joi.string().valid('lastCall', 'month', 'lifetime').default('lastCall'),
@@ -12,7 +12,7 @@ const getSentimentTrend = {
 
 const getSentimentSummary = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    clientId: Joi.string().custom(objectId),
   }),
 };
 

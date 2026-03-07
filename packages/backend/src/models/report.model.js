@@ -4,10 +4,10 @@ const { toJSON, paginate } = require('./plugins');
 // Report Schema
 const reportSchema = mongoose.Schema(
   {
-    patientId: {
+    clientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient',
+      ref: 'Client',
     },
     content: {
       type: String,

@@ -7,9 +7,9 @@ const mongoose = require('mongoose');
  * Stores comprehensive medical NLP analysis results for patients
  */
 const medicalAnalysisSchema = new mongoose.Schema({
-  patientId: {
+  clientId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Patient',
+    ref: 'Client',
     required: true,
     index: true
   },
@@ -490,8 +490,8 @@ const medicalAnalysisSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient querying
-medicalAnalysisSchema.index({ patientId: 1, analysisDate: -1 });
-medicalAnalysisSchema.index({ patientId: 1, timeRange: 1, startDate: -1 });
+medicalAnalysisSchema.index({ clientId: 1, analysisDate: -1 });
+medicalAnalysisSchema.index({ clientId: 1, timeRange: 1, startDate: -1 });
 medicalAnalysisSchema.index({ 'cognitiveMetrics.riskScore': 1 });
 medicalAnalysisSchema.index({ 'psychiatricMetrics.overallRiskScore': 1 });
 medicalAnalysisSchema.index({ 'psychiatricMetrics.crisisIndicators.hasCrisisIndicators': 1 });
@@ -536,7 +536,7 @@ medicalAnalysisSchema.virtual('riskLevel').get(function() {
 // Method to get analysis summary for dashboard
 medicalAnalysisSchema.methods.getSummary = function() {
   return {
-    patientId: this.patientId,
+    clientId: this.clientId,
     analysisDate: this.analysisDate,
     timeRange: this.timeRange,
     overallHealthScore: this.overallHealthScore,
@@ -554,14 +554,14 @@ medicalAnalysisSchema.methods.getSummary = function() {
 };
 
 // Static method to get latest analysis for a patient
-medicalAnalysisSchema.statics.getLatestAnalysis = function(patientId) {
-  return this.findOne({ patientId }).sort({ analysisDate: -1 });
+medicalAnalysisSchema.statics.getLatestAnalysis = function(clientId) {
+  return this.findOne({ clientId }).sort({ analysisDate: -1 });
 };
 
 // Static method to get analyses for date range
-medicalAnalysisSchema.statics.getAnalysesByDateRange = function(patientId, startDate, endDate) {
+medicalAnalysisSchema.statics.getAnalysesByDateRange = function(clientId, startDate, endDate) {
   return this.find({
-    patientId,
+    clientId,
     startDate: { $gte: startDate },
     endDate: { $lte: endDate }
   }).sort({ analysisDate: -1 });
@@ -578,15 +578,15 @@ medicalAnalysisSchema.statics.getHighRiskAnalyses = function(options = {}) {
     ]
   };
   
-  if (options.patientId) {
-    query.patientId = options.patientId;
+  if (options.clientId) {
+    query.clientId = options.clientId;
   }
   
   return this.find(query).sort({ analysisDate: -1 });
 };
 
 // Static method to get time series data for trend visualization
-medicalAnalysisSchema.statics.getTimeSeriesData = function(patientId, timeRange = 'year') {
+medicalAnalysisSchema.statics.getTimeSeriesData = function(clientId, timeRange = 'year') {
   let startDate;
   const endDate = new Date();
   
@@ -606,7 +606,7 @@ medicalAnalysisSchema.statics.getTimeSeriesData = function(patientId, timeRange 
   }
 
   return this.find({
-    patientId,
+    clientId,
     analysisDate: { $gte: startDate, $lte: endDate }
   })
   .select('analysisDate timeSeriesData trends conversationCount messageCount')

@@ -50,7 +50,7 @@ const getAlerts = async (caregiverId, showRead = false) => {
 
   const caregiver = await Caregiver.findById(caregiverId)
     .populate({ path: 'org', select: 'caregivers' })
-    .populate({ path: 'patients', select: '_id' });
+    .populate({ path: 'clients', select: '_id' });
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
@@ -72,7 +72,7 @@ const getAlerts = async (caregiverId, showRead = false) => {
         $or: [
           { createdBy: caregiver._id },
           { createdBy: { $in: caregiver.org.caregivers }, visibility: visibilityConditions },
-          { createdBy: { $in: caregiver.patients.map((pt) => pt._id) }, visibility: 'assignedCaregivers' },
+          { createdBy: { $in: caregiver.clients.map((pt) => pt._id) }, visibility: 'assignedCaregivers' },
         ],
       },
       { relevanceUntil: { $gte: new Date() } }, // ADDED RELEVANCE FILTER

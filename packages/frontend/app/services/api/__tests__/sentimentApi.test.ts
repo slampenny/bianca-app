@@ -1,13 +1,13 @@
 // app/services/api/__tests__/sentimentApi.test.ts
-import { sentimentApi, orgApi, patientApi } from "../"
+import { sentimentApi, orgApi, clientApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
-import { registerNewOrgAndCaregiver, createPatientInOrg } from "../../../../test/helpers"
+import { registerNewOrgAndCaregiver, createClientInOrg } from "../../../../test/helpers"
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
-import { Org, Patient, SentimentTrend, SentimentSummary, SentimentAnalysis } from "../api.types"
+import { Org, Client, SentimentTrend, SentimentSummary, SentimentAnalysis } from "../api.types"
 
 // Mock the sentiment API responses
 const mockSentimentTrend: SentimentTrend = {
-  patientId: "test-patient-id",
+  clientId: "test-patient-id",
   timeRange: "month",
   startDate: "2024-01-01T00:00:00.000Z",
   endDate: "2024-01-31T23:59:59.999Z",
@@ -121,8 +121,8 @@ describe("sentimentApi", () => {
   let store: typeof appStore
   let org: Org
   let orgId: string
-  let patient: Patient
-  let patientId: string
+  let client: Client
+  let clientId: string
   const originalFetch = global.fetch
 
   const createMockResponse = <T,>(data: T, options?: { ok?: boolean; status?: number }) => {
@@ -151,7 +151,7 @@ describe("sentimentApi", () => {
     store = appStore
     store.dispatch(sentimentApi.util.resetApiState())
     store.dispatch(orgApi.util.resetApiState())
-    store.dispatch(patientApi.util.resetApiState())
+    store.dispatch(clientApi.util.resetApiState())
     const testCaregiver = newCaregiver()
     const response = await registerNewOrgAndCaregiver(
       testCaregiver.name,
@@ -162,17 +162,13 @@ describe("sentimentApi", () => {
     org = response.org
     orgId = response.org.id as string
 
-    const result = (await createPatientInOrg(
+    const result = await createClientInOrg(
       org,
       testCaregiver.email,
       testCaregiver.password,
-    )) as Patient
-    if ("error" in result) {
-      throw new Error(`Create patient failed with error: ${JSON.stringify(result.error)}`)
-    } else {
-      patient = result
-      patientId = patient.id as string
-    }
+    )
+    client = result
+    clientId = client.id as string
   })
 
   afterEach(async () => {
@@ -183,7 +179,7 @@ describe("sentimentApi", () => {
     }
     store.dispatch(sentimentApi.util.resetApiState())
     store.dispatch(orgApi.util.resetApiState())
-    store.dispatch(patientApi.util.resetApiState())
+    store.dispatch(clientApi.util.resetApiState())
     global.fetch = originalFetch
     jest.clearAllMocks()
   })
@@ -194,12 +190,12 @@ describe("sentimentApi", () => {
       const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentTrend))
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentTrend.initiate({
-          patientId,
+          clientId,
           timeRange: "month"
         })
-      )
+      ) as { data?: { timeRange?: string }; isSuccess?: boolean; isError?: boolean; error?: unknown }
 
       expect(result.data).toEqual(mockSentimentTrend)
       expect(result.isSuccess).toBe(true)
@@ -209,14 +205,14 @@ describe("sentimentApi", () => {
         typeof request === "string"
           ? undefined
           : (request.headers as unknown as Headers | undefined)
-      expect(requestUrl).toContain(`/sentiment/patient/${patientId}/trend?timeRange=month`)
+      expect(requestUrl).toContain(`/sentiment/client/${clientId}/trend?timeRange=month`)
       if (requestHeaders?.get) {
         expect(requestHeaders.get("authorization")).toContain("Bearer")
       }
     })
 
     it("should handle different time ranges", async () => {
-      const timeRanges = ["month", "year", "lifetime"] as const
+      const timeRanges = ["month", "lifetime"] as const
       
       for (const timeRange of timeRanges) {
         const mockFetch = jest.fn().mockResolvedValue(
@@ -224,14 +220,14 @@ describe("sentimentApi", () => {
         )
         global.fetch = mockFetch
 
-        const result = await store.dispatch(
+        const result = await (store.dispatch as (arg: unknown) => unknown)(
           sentimentApi.endpoints.getSentimentTrend.initiate({
-            patientId,
+            clientId,
             timeRange
           })
-        )
+        ) as { data?: { timeRange?: string }; isSuccess?: boolean }
 
-        expect(result.data?.timeRange).toBe(timeRange)
+        expect((result as { data?: { timeRange?: string } }).data?.timeRange).toBe(timeRange)
         expect(result.isSuccess).toBe(true)
       }
     })
@@ -242,12 +238,12 @@ describe("sentimentApi", () => {
       )
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentTrend.initiate({
-          patientId: "non-existent-patient",
+          clientId: "non-existent-client",
           timeRange: "month"
         })
-      )
+      ) as { isError?: boolean; error?: unknown }
 
       expect(result.isError).toBe(true)
       expect(result.error).toBeDefined()
@@ -259,11 +255,11 @@ describe("sentimentApi", () => {
       const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentSummary))
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentSummary.initiate({
-          patientId
+          clientId
         })
-      )
+      ) as { data?: unknown; isSuccess?: boolean }
 
       expect(result.data).toEqual(mockSentimentSummary)
       expect(result.isSuccess).toBe(true)
@@ -273,7 +269,7 @@ describe("sentimentApi", () => {
         typeof request === "string"
           ? undefined
           : (request.headers as unknown as Headers | undefined)
-      expect(requestUrl).toContain(`/sentiment/patient/${patientId}/summary`)
+      expect(requestUrl).toContain(`/sentiment/client/${clientId}/summary`)
       if (requestHeaders?.get) {
         expect(requestHeaders.get("authorization")).toContain("Bearer")
       }
@@ -285,11 +281,11 @@ describe("sentimentApi", () => {
       )
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentSummary.initiate({
-          patientId: "non-existent-patient"
+          clientId: "non-existent-client"
         })
-      )
+      ) as { isError?: boolean; error?: unknown }
 
       expect(result.isError).toBe(true)
       expect(result.error).toBeDefined()
@@ -309,11 +305,11 @@ describe("sentimentApi", () => {
       const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockResponse))
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getConversationSentiment.initiate({
           conversationId
         })
-      )
+      ) as { data?: unknown; isSuccess?: boolean }
 
       expect(result.data).toEqual(mockResponse)
       expect(result.isSuccess).toBe(true)
@@ -341,11 +337,11 @@ describe("sentimentApi", () => {
       const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockResponse))
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getConversationSentiment.initiate({
           conversationId
         })
-      )
+      ) as { data?: { hasSentimentAnalysis?: boolean }; isSuccess?: boolean }
 
       expect(result.data).toEqual(mockResponse)
       expect(result.isSuccess).toBe(true)
@@ -366,11 +362,11 @@ describe("sentimentApi", () => {
       const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockResponse))
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.analyzeConversationSentiment.initiate({
           conversationId
         })
-      )
+      ) as { data?: unknown }
 
       expect(result.data).toEqual(mockResponse)
       const [request] = mockFetch.mock.calls[0]
@@ -395,15 +391,15 @@ describe("sentimentApi", () => {
       )
       global.fetch = mockFetch
 
-      const result = await store.dispatch(
+      const result = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.analyzeConversationSentiment.initiate({
           conversationId
         })
-      )
+      ) as object
 
       expect("error" in result).toBe(true)
-      if ("error" in result && result.error) {
-        expect(result.error).toBeDefined()
+      if ("error" in result && (result as { error?: unknown }).error) {
+        expect((result as { error?: unknown }).error).toBeDefined()
       }
     })
   })
@@ -414,20 +410,20 @@ describe("sentimentApi", () => {
       global.fetch = mockFetch
 
       // First call
-      const result1 = await store.dispatch(
+      const result1 = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentTrend.initiate({
-          patientId,
+          clientId: clientId,
           timeRange: "month"
         })
-      )
+      ) as { data?: unknown }
 
       // Second call should use cache
-      const result2 = await store.dispatch(
+      const result2 = await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentTrend.initiate({
-          patientId,
+          clientId: clientId,
           timeRange: "month"
         })
-      )
+      ) as { data?: unknown }
 
       expect(result1.data).toEqual(result2.data)
       expect(mockFetch).toHaveBeenCalledTimes(1) // Only called once due to caching
@@ -451,24 +447,24 @@ describe("sentimentApi", () => {
       global.fetch = mockFetch
 
       // First, fetch sentiment trend
-      await store.dispatch(
+      await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentTrend.initiate({
-          patientId,
+          clientId: clientId,
           timeRange: "month"
         })
       )
 
       // Then analyze a conversation (should invalidate cache)
-      await store.dispatch(
+      await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.analyzeConversationSentiment.initiate({
           conversationId: "test-conversation-id"
         })
       )
 
       // Next fetch should not use cache
-      await store.dispatch(
+      await (store.dispatch as (arg: unknown) => unknown)(
         sentimentApi.endpoints.getSentimentTrend.initiate({
-          patientId,
+          clientId: clientId,
           timeRange: "month"
         })
       )

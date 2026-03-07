@@ -202,7 +202,7 @@ class MedicalAnalysisScheduler {
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - 1);
 
-      const conversations = await conversationService.getConversationsByPatientAndDateRange(
+      const conversations = await conversationService.getConversationsByClientAndDateRange(
         patientId,
         startDate,
         endDate
@@ -335,7 +335,7 @@ class MedicalAnalysisScheduler {
         jobs.push(job);
       } catch (error) {
         logger.error(`Error scheduling analysis for patient ${patientId}:`, error);
-        jobs.push({ error: error.message, patientId });
+        jobs.push({ error: error.message, patientId, clientId: patientId });
       }
     }
 

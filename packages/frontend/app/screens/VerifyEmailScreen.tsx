@@ -11,7 +11,6 @@ import { spacing } from "app/theme"
 import { translate } from "app/i18n"
 import type { ThemeColors } from "../types"
 import type { Caregiver } from "app/services/api/api.types"
-import { navigationRef } from "app/navigators/navigationUtilities"
 import { useVerifyEmailMutation } from "app/services/api/authApi"
 import { logger } from "../utils/logger"
 
@@ -185,17 +184,9 @@ export const VerifyEmailScreen = () => {
               dispatch(setOrg(result.org))
             }
             
-            // Wait a moment for Redux state to update and stack to switch to AuthStack
-            // Then use resetRoot to navigate to EmailVerifiedScreen in AuthStack
-            // EmailVerifiedScreen will show for 3 seconds then navigate to MainTabs
-            setTimeout(() => {
-              if (navigationRef.isReady()) {
-                resetRoot({
-                  index: 0,
-                  routes: [{ name: "EmailVerified" as never }],
-                })
-              }
-            }, 100)
+            // Do not navigate to EmailVerified — let AppNavigator re-render.
+            // If onboardingComplete is false (e.g. after register), user will see
+            // the onboarding flow (About you → How Bianca works → etc.).
           } else if (result.caregiver) {
             dispatch(setCurrentUser(result.caregiver))
             dispatch(setCaregiver(result.caregiver))
@@ -221,20 +212,18 @@ export const VerifyEmailScreen = () => {
           }
         }
       } catch (error: unknown) {
+        const err = error as { data?: { html?: string; error?: string; message?: string }; status?: string; error?: string; message?: string }
         logger.error('Email verification error:', error)
         setStatus("error")
-        // RTK Query error handling
-        if (error?.data?.html) {
-          // Try to extract error from HTML response
-          const messageMatch = error.data.html.match(/<p[^>]*class="message"[^>]*>([^<]+)<\/p>/i) || 
-                               error.data.html.match(/<p[^>]*>([^<]+)<\/p>/i)
+        if (err?.data?.html) {
+          const messageMatch = err.data.html.match(/<p[^>]*class="message"[^>]*>([^<]+)<\/p>/i) || 
+                               err.data.html.match(/<p[^>]*>([^<]+)<\/p>/i)
           const errorMsg = messageMatch ? messageMatch[1].trim() : translate("emailVerificationScreen.verificationFailed")
           setErrorMessage(errorMsg)
-        } else if (error?.status === 'FETCH_ERROR' || error?.error === 'FETCH_ERROR') {
+        } else if (err?.status === 'FETCH_ERROR' || err?.error === 'FETCH_ERROR') {
           setErrorMessage(translate("emailVerificationScreen.errorNetwork") || "Unable to connect to server. Please check your internet connection and try again.")
         } else {
-          // Backend returns 'error' field in JSON response, but we also check 'message' for compatibility
-          setErrorMessage(error?.data?.error || error?.data?.message || error?.message || translate("emailVerificationScreen.errorVerificationFailed"))
+          setErrorMessage(err?.data?.error || err?.data?.message || err?.message || translate("emailVerificationScreen.errorVerificationFailed"))
         }
       }
     }

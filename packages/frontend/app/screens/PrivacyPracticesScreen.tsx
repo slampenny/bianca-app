@@ -66,7 +66,7 @@ export const PrivacyPracticesScreen = () => {
         alwaysBounceVertical={false}
       >
         <View style={styles.contentCard}>
-          <Markdown style={markdownStyles}>{policyContent}</Markdown>
+          <Markdown style={markdownStyles as React.ComponentProps<typeof Markdown>["style"]}>{policyContent}</Markdown>
         </View>
       </ScrollView>
     </View>

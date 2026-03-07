@@ -7,6 +7,7 @@ const auth = require('../../middlewares/auth');
 const router = express.Router();
 
 router.post('/register', validate(authValidation.register), authController.register);
+router.post('/onboarding/complete', auth('updateOwn:caregiver'), validate(authValidation.completeOnboarding), authController.completeOnboarding);
 router.get('/invite-info', authController.getInviteInfo);
 router.post('/registerWithInvite', validate(authValidation.registerWithInvite), authController.registerWithInvite);
 router.post('/login', validate(authValidation.login), authController.login);

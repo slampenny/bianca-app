@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const faker = require('faker');
-const { Patient, Schedule } = require('../../src/models');
+const { Client, Schedule } = require('../../src/models');
 
 // Example schedules for testing
 const scheduleOne = {
@@ -21,13 +21,11 @@ const insertSchedules = async (schedules) => {
   return await Schedule.insertMany(dbSchedules.map((schedule) => schedule.toObject()));
 };
 
-const insertScheduleAndAddToPatient = async (patient, scheduleParam) => {
-  // Create the schedule with the patient field
-  const [schedule] = await insertSchedules([{ patient: patient._id, ...scheduleParam }]);
+const insertScheduleAndAddToPatient = async (client, scheduleParam) => {
+  const [schedule] = await insertSchedules([{ client: client._id, ...scheduleParam }]);
 
-  // Update the patient document with the new schedule's _id
-  patient.schedules.push(schedule._id);
-  await patient.save();
+  client.schedules.push(schedule._id);
+  await client.save();
 
   return schedule;
 };

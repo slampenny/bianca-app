@@ -119,7 +119,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
       return
     }
     
-    await page.waitForSelector('[data-testid="patient-screen"], [aria-label*="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-screen"], [aria-label*="client-screen"]', { timeout: 10000 })
     
     // Find and click the call button (real backend will initiate the call)
     const callButton = page.locator('[data-testid="call-button"], [aria-label*="call-button"], [aria-label*="initiate-call"]')
@@ -328,7 +328,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
       return
     }
     
-    await page.waitForSelector('[data-testid="patient-screen"], [aria-label*="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-screen"], [aria-label*="client-screen"]', { timeout: 10000 })
     
     const callButton = page.locator('[data-testid="call-button"], [aria-label*="call-button"], [aria-label*="initiate-call"]')
     const hasCallButton = await callButton.isVisible({ timeout: 5000 }).catch(() => false)

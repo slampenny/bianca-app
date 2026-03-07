@@ -92,7 +92,7 @@ describe('OpenAI Realtime API Integration Tests', () => {
   describe('Call Workflow with OpenAI Realtime', () => {
     it('should initiate call and create conversation', async () => {
       const callData = {
-        patientId: patient.id,
+        clientId: patient.id,
         callNotes: `Test call with ${apiVersion} API`
       };
 
@@ -109,7 +109,7 @@ describe('OpenAI Realtime API Integration Tests', () => {
       // Verify conversation was created
       const conversation = await Conversation.findById(response.body.conversationId);
       expect(conversation).toBeTruthy();
-      expect(conversation.patientId.toString()).toBe(patient.id);
+      expect(conversation.clientId.toString()).toBe(patient.id);
     });
   });
 });

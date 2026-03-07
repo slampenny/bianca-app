@@ -9,7 +9,13 @@ const getConversation = {
 
 const createConversationForPatient = {
   params: Joi.object().keys({
-    patientId: Joi.string().custom(objectId),
+    clientId: Joi.string().custom(objectId),
+  }),
+};
+
+const createConversationForClient = {
+  params: Joi.object().keys({
+    clientId: Joi.string().custom(objectId),
   }),
 };
 
@@ -27,4 +33,5 @@ module.exports = {
   getConversation,
   addMessageToConversation,
   createConversationForPatient,
+  createConversationForClient,
 };

@@ -5,7 +5,7 @@ import { Screen, Text, Button } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { spacing } from "app/theme"
 import type { ThemeColors } from "../types"
-import { useVerifyConsentMutation } from "app/services/api/patientApi"
+import { useVerifyConsentMutation } from "app/services/api/clientApi"
 import { logger } from "../utils/logger"
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
@@ -58,7 +58,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 })
 
-export const PatientConsentScreen = () => {
+export const ClientConsentScreen = () => {
   const navigation = useNavigation()
   const route = useRoute()
   const { colors, isLoading: themeLoading } = useTheme()
