@@ -23,66 +23,66 @@ describe('ConversationContextWindow', () => {
 
   describe('addUtterance', () => {
     test('should add user utterance to context window', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       const text = 'I feel terrible';
       
-      contextWindow.addUtterance(patientId, text, 'user', Date.now());
+      contextWindow.addUtterance(clientId, text, 'user', Date.now());
       
-      const context = contextWindow.getRecentContext(patientId);
+      const context = contextWindow.getRecentContext(clientId);
       expect(context).toHaveLength(1);
       expect(context[0].text).toBe(text);
       expect(context[0].role).toBe('user');
     });
 
     test('should add assistant utterance to context window', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       const text = 'I understand how you feel';
       
-      contextWindow.addUtterance(patientId, text, 'assistant', Date.now());
+      contextWindow.addUtterance(clientId, text, 'assistant', Date.now());
       
-      const context = contextWindow.getRecentContext(patientId);
+      const context = contextWindow.getRecentContext(clientId);
       expect(context).toHaveLength(1);
       expect(context[0].text).toBe(text);
       expect(context[0].role).toBe('assistant');
     });
 
     test('should limit utterances to maxUtterances', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       
       // Add more than maxUtterances
       for (let i = 0; i < 15; i++) {
-        contextWindow.addUtterance(patientId, `Message ${i}`, 'user', Date.now() + i * 1000);
+        contextWindow.addUtterance(clientId, `Message ${i}`, 'user', Date.now() + i * 1000);
       }
       
-      const context = contextWindow.getRecentContext(patientId);
+      const context = contextWindow.getRecentContext(clientId);
       expect(context.length).toBeLessThanOrEqual(10);
       // Should have the most recent ones
       expect(context[context.length - 1].text).toContain('14');
     });
 
     test('should handle empty or invalid inputs gracefully', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       
-      contextWindow.addUtterance(patientId, '', 'user', Date.now());
+      contextWindow.addUtterance(clientId, '', 'user', Date.now());
       contextWindow.addUtterance(null, 'text', 'user', Date.now());
-      contextWindow.addUtterance(patientId, null, 'user', Date.now());
+      contextWindow.addUtterance(clientId, null, 'user', Date.now());
       
-      const context = contextWindow.getRecentContext(patientId);
+      const context = contextWindow.getRecentContext(clientId);
       expect(context).toHaveLength(0);
     });
   });
 
   describe('getRecentContext', () => {
     test('should return utterances within time window', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       const now = Date.now();
       
       // Add utterances at different times
-      contextWindow.addUtterance(patientId, 'Old message', 'user', now - 10 * 60 * 1000); // 10 minutes ago
-      contextWindow.addUtterance(patientId, 'Recent message', 'user', now - 2 * 60 * 1000); // 2 minutes ago
-      contextWindow.addUtterance(patientId, 'Very recent', 'user', now); // Now
+      contextWindow.addUtterance(clientId, 'Old message', 'user', now - 10 * 60 * 1000); // 10 minutes ago
+      contextWindow.addUtterance(clientId, 'Recent message', 'user', now - 2 * 60 * 1000); // 2 minutes ago
+      contextWindow.addUtterance(clientId, 'Very recent', 'user', now); // Now
       
-      const context = contextWindow.getRecentContext(patientId, 5); // Last 5 minutes
+      const context = contextWindow.getRecentContext(clientId, 5); // Last 5 minutes
       
       // Should only include utterances from last 5 minutes
       expect(context.length).toBe(2);
@@ -96,7 +96,7 @@ describe('ConversationContextWindow', () => {
     });
 
     test('should respect custom lookBackMinutes', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       const now = Date.now();
       
       // Create window with larger window size to accommodate both
@@ -105,14 +105,14 @@ describe('ConversationContextWindow', () => {
         maxUtterances: 10
       });
       
-      largeWindow.addUtterance(patientId, 'Old', 'user', now - 10 * 60 * 1000);
-      largeWindow.addUtterance(patientId, 'Recent', 'user', now - 1 * 60 * 1000);
+      largeWindow.addUtterance(clientId, 'Old', 'user', now - 10 * 60 * 1000);
+      largeWindow.addUtterance(clientId, 'Recent', 'user', now - 1 * 60 * 1000);
       
-      const context = largeWindow.getRecentContext(patientId, 15); // Last 15 minutes
+      const context = largeWindow.getRecentContext(clientId, 15); // Last 15 minutes
       // Both should be included (10 min and 1 min ago are within 15 min window)
       expect(context.length).toBe(2);
       
-      const shortContext = largeWindow.getRecentContext(patientId, 2); // Last 2 minutes
+      const shortContext = largeWindow.getRecentContext(clientId, 2); // Last 2 minutes
       // Only recent one should be included (1 min ago is within 2 min, 10 min is not)
       expect(shortContext.length).toBe(1);
       
@@ -123,17 +123,17 @@ describe('ConversationContextWindow', () => {
 
   describe('getContextText', () => {
     test('should return formatted context text', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       
-      contextWindow.addUtterance(patientId, 'Hello', 'user', Date.now());
-      contextWindow.addUtterance(patientId, 'Hi there', 'assistant', Date.now());
-      contextWindow.addUtterance(patientId, 'How are you?', 'user', Date.now());
+      contextWindow.addUtterance(clientId, 'Hello', 'user', Date.now());
+      contextWindow.addUtterance(clientId, 'Hi there', 'assistant', Date.now());
+      contextWindow.addUtterance(clientId, 'How are you?', 'user', Date.now());
       
-      const contextText = contextWindow.getContextText(patientId);
+      const contextText = contextWindow.getContextText(clientId);
       
-      expect(contextText).toContain('Patient: Hello');
+      expect(contextText).toContain('Client: Hello');
       expect(contextText).toContain('Bianca: Hi there');
-      expect(contextText).toContain('Patient: How are you?');
+      expect(contextText).toContain('Client: How are you?');
     });
 
     test('should return empty string if no context', () => {
@@ -144,15 +144,15 @@ describe('ConversationContextWindow', () => {
 
   describe('classifyNarrativeVsPresent', () => {
     test('should detect narrative context (past story)', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       const now = Date.now();
       
       // Add narrative context (past story)
-      contextWindow.addUtterance(patientId, 'Let me tell you about when I had a heart attack years ago', 'user', now - 2000);
-      contextWindow.addUtterance(patientId, 'It was terrible', 'user', now - 1000);
+      contextWindow.addUtterance(clientId, 'Let me tell you about when I had a heart attack years ago', 'user', now - 2000);
+      contextWindow.addUtterance(clientId, 'It was terrible', 'user', now - 1000);
       
       // Emergency phrase in narrative context
-      const result = contextWindow.classifyNarrativeVsPresent(patientId, 'I remember the heart attack');
+      const result = contextWindow.classifyNarrativeVsPresent(clientId, 'I remember the heart attack');
       
       expect(result.isNarrative).toBe(true);
       expect(result.confidence).toBeGreaterThan(0.5);
@@ -160,15 +160,15 @@ describe('ConversationContextWindow', () => {
     });
 
     test('should detect present-tense context (current emergency)', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       const now = Date.now();
       
       // Add present-tense context
-      contextWindow.addUtterance(patientId, 'I am having trouble right now', 'user', now - 2000);
-      contextWindow.addUtterance(patientId, 'I feel something happening', 'user', now - 1000);
+      contextWindow.addUtterance(clientId, 'I am having trouble right now', 'user', now - 2000);
+      contextWindow.addUtterance(clientId, 'I feel something happening', 'user', now - 1000);
       
       // Emergency phrase in present-tense
-      const result = contextWindow.classifyNarrativeVsPresent(patientId, 'I think I am having a heart attack');
+      const result = contextWindow.classifyNarrativeVsPresent(clientId, 'I think I am having a heart attack');
       
       expect(result.isNarrative).toBe(false);
       expect(result.confidence).toBeGreaterThan(0.5);
@@ -176,12 +176,12 @@ describe('ConversationContextWindow', () => {
     });
 
     test('should handle ambiguous context with low confidence', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       
       // Add neutral context
-      contextWindow.addUtterance(patientId, 'How is the weather?', 'user', Date.now() - 1000);
+      contextWindow.addUtterance(clientId, 'How is the weather?', 'user', Date.now() - 1000);
       
-      const result = contextWindow.classifyNarrativeVsPresent(patientId, 'I feel sick');
+      const result = contextWindow.classifyNarrativeVsPresent(clientId, 'I feel sick');
       
       // Should return false (not narrative) and confidence depends on indicators found
       // If no clear indicators, confidence might be higher (close to 1.0) or lower
@@ -199,23 +199,23 @@ describe('ConversationContextWindow', () => {
     });
 
     test('should detect past tense indicators', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       
-      contextWindow.addUtterance(patientId, 'My dad had a stroke last year', 'user', Date.now() - 1000);
+      contextWindow.addUtterance(clientId, 'My dad had a stroke last year', 'user', Date.now() - 1000);
       
-      const result = contextWindow.classifyNarrativeVsPresent(patientId, 'it was really scary');
+      const result = contextWindow.classifyNarrativeVsPresent(clientId, 'it was really scary');
       
       expect(result.isNarrative).toBe(true);
       expect(result.narrativeScore).toBeGreaterThan(0);
     });
 
     test('should detect present tense indicators', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       
       // Add some context first
-      contextWindow.addUtterance(patientId, 'I am having trouble', 'user', Date.now() - 1000);
+      contextWindow.addUtterance(clientId, 'I am having trouble', 'user', Date.now() - 1000);
       
-      const result = contextWindow.classifyNarrativeVsPresent(patientId, 'I am having a heart attack right now');
+      const result = contextWindow.classifyNarrativeVsPresent(clientId, 'I am having a heart attack right now');
       
       expect(result.isNarrative).toBe(false);
       // presentScore might be undefined if no context, check if it exists
@@ -229,59 +229,59 @@ describe('ConversationContextWindow', () => {
 
   describe('cleanup', () => {
     test('should clean up old contexts', () => {
-      const patientId = 'patient123';
+      const clientId = 'patient123';
       const oldTime = Date.now() - 10 * 60 * 1000; // 10 minutes ago
       
-      contextWindow.addUtterance(patientId, 'Old message', 'user', oldTime);
-      contextWindow.addUtterance(patientId, 'Recent message', 'user', Date.now());
+      contextWindow.addUtterance(clientId, 'Old message', 'user', oldTime);
+      contextWindow.addUtterance(clientId, 'Recent message', 'user', Date.now());
       
       contextWindow.cleanupOldContexts();
       
-      const context = contextWindow.getRecentContext(patientId, 5);
+      const context = contextWindow.getRecentContext(clientId, 5);
       // Should only have recent message (old one is outside 5-minute window)
       expect(context.length).toBe(1);
       expect(context[0].text).toBe('Recent message');
     });
 
-    test('should remove patient entry if all utterances are old', () => {
-      const patientId = 'patient123';
+    test('should remove client entry if all utterances are old', () => {
+      const clientId = 'patient123';
       const oldTime = Date.now() - 10 * 60 * 1000;
       
-      contextWindow.addUtterance(patientId, 'Old message', 'user', oldTime);
+      contextWindow.addUtterance(clientId, 'Old message', 'user', oldTime);
       
       contextWindow.cleanupOldContexts();
       
-      const context = contextWindow.getRecentContext(patientId);
+      const context = contextWindow.getRecentContext(clientId);
       expect(context).toHaveLength(0);
     });
   });
 
-  describe('clearPatientContext', () => {
-    test('should clear all context for a patient', () => {
-      const patientId = 'patient123';
+  describe('clearClientContext', () => {
+    test('should clear all context for a client', () => {
+      const clientId = 'patient123';
       
-      contextWindow.addUtterance(patientId, 'Message 1', 'user', Date.now());
-      contextWindow.addUtterance(patientId, 'Message 2', 'user', Date.now());
+      contextWindow.addUtterance(clientId, 'Message 1', 'user', Date.now());
+      contextWindow.addUtterance(clientId, 'Message 2', 'user', Date.now());
       
-      contextWindow.clearPatientContext(patientId);
+      contextWindow.clearClientContext(clientId);
       
-      const context = contextWindow.getRecentContext(patientId);
+      const context = contextWindow.getRecentContext(clientId);
       expect(context).toHaveLength(0);
     });
   });
 
   describe('getStats', () => {
     test('should return statistics', () => {
-      const patientId1 = 'patient1';
-      const patientId2 = 'patient2';
+      const clientId1 = 'patient1';
+      const clientId2 = 'patient2';
       
-      contextWindow.addUtterance(patientId1, 'Message 1', 'user', Date.now());
-      contextWindow.addUtterance(patientId1, 'Message 2', 'user', Date.now());
-      contextWindow.addUtterance(patientId2, 'Message 3', 'user', Date.now());
+      contextWindow.addUtterance(clientId1, 'Message 1', 'user', Date.now());
+      contextWindow.addUtterance(clientId1, 'Message 2', 'user', Date.now());
+      contextWindow.addUtterance(clientId2, 'Message 3', 'user', Date.now());
       
       const stats = contextWindow.getStats();
       
-      expect(stats.totalPatients).toBe(2);
+      expect(stats.totalClients).toBe(2);
       expect(stats.totalUtterances).toBe(3);
       expect(stats.config).toBeDefined();
     });

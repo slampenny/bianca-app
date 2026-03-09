@@ -22,12 +22,12 @@ const CaregiverDTO = (caregiver) => {
     return null;
   }
   
-  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, patients, ssoProvider, ssoProviderId, onboardingComplete, persona, mfaEnabled, accountLocked, failedLoginAttempts } = caregiverObj;
+  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, clients, ssoProvider, ssoProviderId, onboardingComplete, persona, mfaEnabled, accountLocked, failedLoginAttempts } = caregiverObj;
   
   const id = _id;
 
-  // Check if patients (clients) are ObjectIds, if so, convert them to strings. Schema field remains "patients" for DB.
-  const clientIds = (patients || []).map((p) => (p instanceof ObjectId ? p.toString() : (p?._id || p)));
+  // Client IDs (ObjectIds or populated refs) normalized to strings
+  const clientIds = (clients || []).map((p) => (p instanceof ObjectId ? p.toString() : (p?._id || p)));
 
   // Legacy: if onboardingComplete is not set (old record), treat as complete so existing users don't see onboarding
   const completed = Object.prototype.hasOwnProperty.call(caregiverObj, 'onboardingComplete')

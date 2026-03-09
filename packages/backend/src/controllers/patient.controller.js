@@ -74,7 +74,7 @@ const createPatient = catchAsync(async (req, res) => {
   let patient = await patientService.createPatient(patientData);
   
   logger.info('Patient created successfully', {
-    patientId: patient._id,
+    clientId: patient._id,
     patientName: patient.name,
     orgId: patient.org,
   });
@@ -104,7 +104,7 @@ const getPatients = catchAsync(async (req, res) => {
 });
 
 const getPatient = catchAsync(async (req, res) => {
-  const patient = await patientService.getPatientById(req.params.patientId);
+  const patient = await patientService.getPatientById(req.params.clientId);
   if (!patient) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
@@ -114,7 +114,7 @@ const getPatient = catchAsync(async (req, res) => {
 const updatePatient = catchAsync(async (req, res) => {
   const { schedules, ...patientData } = req.body;
 
-  const patient = await patientService.updatePatientById(req.params.patientId, patientData);
+  const patient = await patientService.updatePatientById(req.params.clientId, patientData);
   if (schedules) {
     for (const schedule of schedules) {
       await scheduleService.updateSchedule(schedule.id, { ...schedule });
@@ -143,25 +143,25 @@ const uploadPatientAvatar = catchAsync(async (req, res) => {
   const avatarUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
 
   // Update the caregiver with this URL
-  const patient = await patientService.updatePatientById(req.params.patientId, { avatar: avatarUrl });
+  const patient = await patientService.updatePatientById(req.params.clientId, { avatar: avatarUrl });
 
   res.send(patient);
 });
 
 const deletePatient = catchAsync(async (req, res) => {
-  await patientService.deletePatientById(req.params.patientId);
+  await patientService.deletePatientById(req.params.clientId);
   res.status(httpStatus.NO_CONTENT).send();
 });
 
 const assignCaregiver = catchAsync(async (req, res) => {
-  const { patientId, caregiverId } = req.params;
-  const updatedPatient = await patientService.assignCaregiver(caregiverId, patientId);
+  const { clientId, caregiverId } = req.params;
+  const updatedPatient = await patientService.assignCaregiver(caregiverId, clientId);
   res.status(httpStatus.OK).send(PatientDTO(updatedPatient));
 });
 
 const removeCaregiver = catchAsync(async (req, res) => {
-  const { patientId, caregiverId } = req.params;
-  const updatedPatient = await patientService.removeCaregiver(caregiverId, patientId);
+  const { clientId, caregiverId } = req.params;
+  const updatedPatient = await patientService.removeCaregiver(caregiverId, clientId);
   res.status(httpStatus.OK).send(PatientDTO(updatedPatient));
 });
 
@@ -172,28 +172,28 @@ const getPatientsByCaregiver = catchAsync(async (req, res) => {
 });
 
 const getConversationsByPatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
   const caregiver = req.caregiver;
 
-  const patient = await patientService.getPatientById(patientId);
-  logger.info(`Fetching conversations for patient: ${patientId}`, { patient });
+  const patient = await patientService.getPatientById(clientId);
+  logger.info(`Fetching conversations for client: ${clientId}`, { patient });
   if (!patient) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid patient ID');
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid client ID');
   }
 
-  // Check if the caregiver has access to this patient
-  // For staff users, they can only access conversations of their assigned patients OR conversations they initiated
+  // Check if the caregiver has access to this client
+  // For staff users, they can only access conversations of their assigned clients OR conversations they initiated
   // For orgAdmin users, they can access any conversation in their org
   // For superAdmin users, they have full access
   if (caregiver.role === 'staff') {
     const caregiverDoc = await caregiverService.getCaregiverById(caregiver.id);
     
-    // Check if caregiver is assigned to this patient (check both directions)
+    // Check if caregiver is assigned to this client (check both directions)
     const hasPatientAccess = caregiverDoc.clients.some(
       (p) => {
         const pId = p._id ? p._id.toString() : p.toString();
-        return pId === patientId.toString();
+        return pId === clientId.toString();
       }
     ) || (patient.caregivers && patient.caregivers.some(
       (c) => {
@@ -203,10 +203,10 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
     ));
     
     if (!hasPatientAccess) {
-      // Check if they initiated any conversations for this patient (agentId)
+      // Check if they initiated any conversations for this client (agentId)
       const { Conversation } = require('../models');
       const conversationCount = await Conversation.countDocuments({
-        patientId,
+        clientId,
         agentId: caregiver.id
       });
       
@@ -229,7 +229,7 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
     options.sortBy = 'startTime:desc';
   }
 
-  const result = await conversationService.queryConversationsByPatient(patientId, options);
+  const result = await conversationService.queryConversationsByPatient(clientId, options);
   
   // Apply DTO to each conversation in the results
   // Filter out any conversations that fail DTO transformation (missing IDs, etc.)
@@ -284,8 +284,8 @@ const getConversationsByPatient = catchAsync(async (req, res) => {
 });
 
 const getCaregivers = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
-  const caregivers = await patientService.getCaregivers(patientId);
+  const { clientId } = req.params;
+  const caregivers = await patientService.getCaregivers(clientId);
   if (!caregivers) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregivers not found');
   }

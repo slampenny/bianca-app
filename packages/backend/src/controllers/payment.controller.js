@@ -17,7 +17,7 @@ const listInvoicesByOrg = catchAsync(async (req, res) => {
   res.send(invoices);
 });
 
-const listInvoicesByPatient = catchAsync(async (req, res) => {
+const listInvoicesByClient = catchAsync(async (req, res) => {
   const filters = {
     status: req.query.status,
     dueDate: req.query.dueDate,
@@ -35,6 +35,6 @@ const getUnbilledCostsByOrg = catchAsync(async (req, res) => {
 module.exports = {
   createInvoiceFromConversations,
   listInvoicesByOrg,
-  listInvoicesByPatient,
+  listInvoicesByClient,
   getUnbilledCostsByOrg,
 };

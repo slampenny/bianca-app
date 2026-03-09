@@ -2,6 +2,22 @@
 
 // Only mock external dependencies
 jest.mock('agenda');
+jest.mock('../../src/services/client.service', () => ({
+  getActiveClients: jest.fn(),
+  createClient: jest.fn(),
+  queryClients: jest.fn(),
+  getClientById: jest.fn(),
+  getClientByEmail: jest.fn(),
+  updateClientById: jest.fn(),
+  deleteClientById: jest.fn(),
+  assignCaregiver: jest.fn(),
+  removeCaregiver: jest.fn(),
+  getCaregivers: jest.fn(),
+  getUnassignedClients: jest.fn(),
+  sendConsentEmailIfRequired: jest.fn(),
+  checkClientConsent: jest.fn(),
+  verifyConsentToken: jest.fn(),
+}));
 
 // Mock logger so intentional error-path tests don't log to console and confuse CI
 jest.mock('../../src/config/logger', () => ({
@@ -16,7 +32,7 @@ const mongoose = require('mongoose');
 const Agenda = require('agenda');
 const MedicalPatternAnalyzer = require('../../src/services/ai/medicalPatternAnalyzer.service');
 const conversationService = require('../../src/services/conversation.service');
-const patientService = require('../../src/services/patient.service');
+const clientService = require('../../src/services/client.service');
 
 // Mock Agenda constructor
 const mockAgenda = {
@@ -72,13 +88,14 @@ describe('Medical Analysis Scheduler', () => {
     scheduler.agenda = mockAgenda;
     scheduler.medicalAnalyzer = mockAnalyzer;
     scheduler.conversationService = conversationService;
-    scheduler.patientService = patientService;
+    // Scheduler uses client.service internally; override for tests that need to mock getActiveClients
+    if (!scheduler._clientService) scheduler._clientService = clientService;
     
     // Mock the methods that are called internally
     scheduler.getBaselineAnalysis = jest.fn();
     scheduler.storeAnalysisResult = jest.fn();
     scheduler.storeJobResults = jest.fn();
-    scheduler.schedulePatientAnalysis = jest.fn();
+    scheduler.scheduleClientAnalysis = jest.fn();
   });
 
   describe('Scheduler Initialization', () => {
@@ -98,7 +115,7 @@ describe('Medical Analysis Scheduler', () => {
       );
       
       expect(scheduler.agenda.define).toHaveBeenCalledWith(
-        'patient-medical-analysis',
+        'client-medical-analysis',
         expect.any(Object),
         expect.any(Function)
       );
@@ -115,13 +132,11 @@ describe('Medical Analysis Scheduler', () => {
         }
       };
 
-      // Mock the patient service to return active patients
-      scheduler.patientService.getActivePatients = jest.fn().mockResolvedValue([
-        { _id: 'patient1', name: 'Test Patient' }
-      ]);
+      // Mock client.service.getActiveClients
+      clientService.getActiveClients.mockResolvedValue([{ _id: 'client1', name: 'Test Client' }]);
 
-      // Mock the schedulePatientAnalysis method
-      scheduler.schedulePatientAnalysis = jest.fn().mockResolvedValue({
+      // Mock the scheduleClientAnalysis method
+      scheduler.scheduleClientAnalysis = jest.fn().mockResolvedValue({
         attrs: { _id: 'scheduled-job-id' }
       });
 
@@ -130,9 +145,9 @@ describe('Medical Analysis Scheduler', () => {
 
       await scheduler.handleMonthlyAnalysis(mockJob);
 
-      expect(scheduler.patientService.getActivePatients).toHaveBeenCalled();
-      expect(scheduler.schedulePatientAnalysis).toHaveBeenCalledWith(
-        'patient1',
+      expect(clientService.getActiveClients).toHaveBeenCalled();
+      expect(scheduler.scheduleClientAnalysis).toHaveBeenCalledWith(
+        'client1',
         {
           trigger: 'monthly',
           batchId: 'test-job-1'
@@ -141,20 +156,18 @@ describe('Medical Analysis Scheduler', () => {
       expect(scheduler.storeJobResults).toHaveBeenCalled();
     });
 
-    it('should handle monthly analysis job with no patients', async () => {
+    it('should handle monthly analysis job with no clients', async () => {
       const mockJob = {
         attrs: {
           _id: 'test-job-1'
         }
       };
 
-      // Mock the patient service to return no patients
-      scheduler.patientService.getActivePatients = jest.fn().mockResolvedValue([]);
+      clientService.getActiveClients.mockResolvedValue([]);
 
       await scheduler.handleMonthlyAnalysis(mockJob);
 
-      expect(scheduler.patientService.getActivePatients).toHaveBeenCalled();
-      // Should not schedule any patient analysis jobs
+      expect(clientService.getActiveClients).toHaveBeenCalled();
     });
 
     it('should handle monthly analysis job errors gracefully', async () => {
@@ -164,8 +177,7 @@ describe('Medical Analysis Scheduler', () => {
         }
       };
 
-      // Mock the patient service to throw error
-      scheduler.patientService.getActivePatients = jest.fn().mockRejectedValue(new Error('Database error'));
+      clientService.getActiveClients.mockRejectedValue(new Error('Database error'));
       scheduler.storeJobResults = jest.fn().mockResolvedValue();
 
       await expect(scheduler.handleMonthlyAnalysis(mockJob)).rejects.toThrow('Database error');
@@ -179,10 +191,10 @@ describe('Medical Analysis Scheduler', () => {
     });
   });
 
-  describe('Patient Analysis Job', () => {
+  describe('Client Analysis Job', () => {
     const validClientId = new mongoose.Types.ObjectId();
 
-    it('should handle patient analysis job with conversations', async () => {
+    it('should handle client analysis job with conversations', async () => {
       const mockJob = {
         attrs: {
           _id: 'test-job-2',
@@ -199,7 +211,7 @@ describe('Medical Analysis Scheduler', () => {
           _id: 'conv1',
           clientId: validClientId,
           messages: [
-            { role: 'patient', content: 'I have been feeling very sad and depressed lately. I cannot concentrate on anything and I feel hopeless about the future.' }
+            { role: 'client', content: 'I have been feeling very sad and depressed lately. I cannot concentrate on anything and I feel hopeless about the future.' }
           ]
         }
       ];
@@ -210,7 +222,7 @@ describe('Medical Analysis Scheduler', () => {
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
       scheduler.getBaselineAnalysis = jest.fn().mockResolvedValue(null);
 
-      await scheduler.handlePatientAnalysis(mockJob);
+      await scheduler.handleClientAnalysis(mockJob);
 
       expect(getConversationsByClientAndDateRange).toHaveBeenCalledWith(
         validClientId.toString(),
@@ -231,7 +243,7 @@ describe('Medical Analysis Scheduler', () => {
       );
     });
 
-    it('should handle patient analysis job with no conversations', async () => {
+    it('should handle client analysis job with no conversations', async () => {
       const mockJob = {
         attrs: {
           _id: 'test-job-3',
@@ -247,7 +259,7 @@ describe('Medical Analysis Scheduler', () => {
       scheduler.conversationService.getConversationsByClientAndDateRange = getConversationsByClientAndDateRange;
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
 
-      await scheduler.handlePatientAnalysis(mockJob);
+      await scheduler.handleClientAnalysis(mockJob);
 
       expect(getConversationsByClientAndDateRange).toHaveBeenCalledWith(
         validClientId.toString(),
@@ -270,7 +282,7 @@ describe('Medical Analysis Scheduler', () => {
       );
     });
 
-    it('should handle patient analysis job errors gracefully', async () => {
+    it('should handle client analysis job errors gracefully', async () => {
       const mockJob = {
         attrs: {
           _id: 'test-job-4',
@@ -285,7 +297,7 @@ describe('Medical Analysis Scheduler', () => {
       scheduler.conversationService.getConversationsByClientAndDateRange = jest.fn().mockRejectedValue(new Error('Database error'));
       scheduler.storeAnalysisResult = jest.fn().mockResolvedValue();
 
-      await expect(scheduler.handlePatientAnalysis(mockJob)).rejects.toThrow('Database error');
+      await expect(scheduler.handleClientAnalysis(mockJob)).rejects.toThrow('Database error');
       expect(scheduler.storeAnalysisResult).toHaveBeenCalledWith(
         validClientId.toString(),
         expect.objectContaining({
@@ -299,17 +311,17 @@ describe('Medical Analysis Scheduler', () => {
   });
 
   describe('Baseline Management', () => {
-    it('should get baseline analysis for patient', async () => {
+    it('should get baseline analysis for client', async () => {
       const mockBaseline = {
-        patientId: 'patient1',
+        clientId: 'patient1',
         cognitiveMetrics: { riskScore: 10 },
         psychiatricMetrics: { depressionScore: 15 },
         analysisDate: new Date()
       };
 
       // Mock the actual method implementation
-      scheduler.getBaselineAnalysis.mockImplementation(async (patientId) => {
-        const results = await scheduler.conversationService.getMedicalAnalysisResults(patientId, 1);
+      scheduler.getBaselineAnalysis.mockImplementation(async (clientId) => {
+        const results = await scheduler.conversationService.getMedicalAnalysisResults(clientId, 1);
         return results.length > 0 ? results[0] : null;
       });
       
@@ -323,8 +335,8 @@ describe('Medical Analysis Scheduler', () => {
 
     it('should handle missing baseline gracefully', async () => {
       // Mock the actual method implementation
-      scheduler.getBaselineAnalysis.mockImplementation(async (patientId) => {
-        const results = await scheduler.conversationService.getMedicalAnalysisResults(patientId, 1);
+      scheduler.getBaselineAnalysis.mockImplementation(async (clientId) => {
+        const results = await scheduler.conversationService.getMedicalAnalysisResults(clientId, 1);
         return results.length > 0 ? results[0] : null;
       });
       
@@ -352,8 +364,8 @@ describe('Medical Analysis Scheduler', () => {
       };
 
       // Mock the actual method implementation
-      scheduler.storeAnalysisResult.mockImplementation(async (patientId, result) => {
-        await scheduler.conversationService.storeMedicalAnalysisResult(patientId, result);
+      scheduler.storeAnalysisResult.mockImplementation(async (clientId, result) => {
+        await scheduler.conversationService.storeMedicalAnalysisResult(clientId, result);
       });
       
       scheduler.conversationService.storeMedicalAnalysisResult = jest.fn().mockResolvedValue();
@@ -378,8 +390,8 @@ describe('Medical Analysis Scheduler', () => {
       };
 
       // Mock the actual method implementation
-      scheduler.storeAnalysisResult.mockImplementation(async (patientId, result) => {
-        await scheduler.conversationService.storeMedicalAnalysisResult(patientId, result);
+      scheduler.storeAnalysisResult.mockImplementation(async (clientId, result) => {
+        await scheduler.conversationService.storeMedicalAnalysisResult(clientId, result);
       });
       
       scheduler.conversationService.storeMedicalAnalysisResult = jest.fn().mockRejectedValue(new Error('Storage error'));
@@ -421,24 +433,24 @@ describe('Medical Analysis Scheduler', () => {
   });
 
   describe('Job Scheduling', () => {
-    it('should schedule patient analysis job', async () => {
+    it('should schedule client analysis job', async () => {
       // Mock the actual method implementation
-      scheduler.schedulePatientAnalysis.mockImplementation(async (patientId, options = {}) => {
-        const job = await scheduler.agenda.now('patient-medical-analysis', {
-          patientId,
+      scheduler.scheduleClientAnalysis.mockImplementation(async (clientId, options = {}) => {
+        const job = await scheduler.agenda.now('client-medical-analysis', {
+          clientId,
           trigger: options.trigger || 'manual',
           batchId: options.batchId || null
         });
         return job;
       });
 
-      const job = await scheduler.schedulePatientAnalysis('patient1', {
+      const job = await scheduler.scheduleClientAnalysis('patient1', {
         trigger: 'manual',
         batchId: 'batch-1'
       });
 
-      expect(scheduler.agenda.now).toHaveBeenCalledWith('patient-medical-analysis', {
-        patientId: 'patient1',
+      expect(scheduler.agenda.now).toHaveBeenCalledWith('client-medical-analysis', {
+        clientId: 'patient1',
         trigger: 'manual',
         batchId: 'batch-1'
       });
@@ -447,19 +459,19 @@ describe('Medical Analysis Scheduler', () => {
 
     it('should schedule batch analysis', async () => {
       // Mock the actual method implementation
-      scheduler.schedulePatientAnalysis.mockImplementation(async (patientId, options = {}) => {
-        const job = await scheduler.agenda.now('patient-medical-analysis', {
-          patientId,
+      scheduler.scheduleClientAnalysis.mockImplementation(async (clientId, options = {}) => {
+        const job = await scheduler.agenda.now('client-medical-analysis', {
+          clientId,
           trigger: options.trigger || 'manual',
           batchId: options.batchId || null
         });
         return job;
       });
 
-      const patientIds = ['patient1', 'patient2'];
+      const clientIds = ['patient1', 'patient2'];
       const options = { trigger: 'manual', batchId: 'batch-1' };
 
-      const jobs = await scheduler.scheduleBatchAnalysis(patientIds, options);
+      const jobs = await scheduler.scheduleBatchAnalysis(clientIds, options);
 
       expect(scheduler.agenda.now).toHaveBeenCalledTimes(2);
       expect(jobs).toHaveLength(2);
@@ -467,9 +479,9 @@ describe('Medical Analysis Scheduler', () => {
 
     it('should handle batch analysis errors gracefully', async () => {
       // Mock the actual method implementation
-      scheduler.schedulePatientAnalysis.mockImplementation(async (patientId, options = {}) => {
-        const job = await scheduler.agenda.now('patient-medical-analysis', {
-          patientId,
+      scheduler.scheduleClientAnalysis.mockImplementation(async (clientId, options = {}) => {
+        const job = await scheduler.agenda.now('client-medical-analysis', {
+          clientId,
           trigger: options.trigger || 'manual',
           batchId: options.batchId || null
         });
@@ -480,8 +492,8 @@ describe('Medical Analysis Scheduler', () => {
         .mockResolvedValueOnce({ attrs: { _id: 'job1' } })
         .mockRejectedValueOnce(new Error('Scheduling error'));
 
-      const patientIds = ['patient1', 'patient2'];
-      const jobs = await scheduler.scheduleBatchAnalysis(patientIds);
+      const clientIds = ['patient1', 'patient2'];
+      const jobs = await scheduler.scheduleBatchAnalysis(clientIds);
 
       expect(jobs).toHaveLength(2);
       expect(jobs[0].attrs._id).toBe('job1');

@@ -363,7 +363,7 @@ describe('Medical Psychiatric Decline Detection', () => {
       const minimalConversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'Hello' },
             { role: 'patient', content: 'Goodbye' }

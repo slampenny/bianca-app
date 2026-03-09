@@ -3,7 +3,7 @@
 const Agenda = require('agenda');
 const MedicalPatternAnalyzer = require('./medicalPatternAnalyzer.service');
 const conversationService = require('../conversation.service');
-const patientService = require('../patient.service');
+const clientService = require('../client.service');
 const logger = require('../../config/logger');
 const config = require('../../config/config');
 
@@ -26,7 +26,7 @@ class MedicalAnalysisScheduler {
       analysisSchedule: '0 9 1 * *', // 1st day of every month at 9 AM
       retryAttempts: 3,
       retryDelay: 30000, // 30 seconds
-      batchSize: 50, // Process patients in batches
+      batchSize: 50, // Process clients in batches
       maxConcurrency: 5 // Maximum concurrent analysis jobs
     };
   }
@@ -51,15 +51,15 @@ class MedicalAnalysisScheduler {
         }
       }, this.handleMonthlyAnalysis.bind(this));
 
-      // Define individual patient analysis job
-      this.agenda.define('patient-medical-analysis', {
+      // Define individual client analysis job
+      this.agenda.define('client-medical-analysis', {
         concurrency: this.config.maxConcurrency,
         attempts: this.config.retryAttempts,
         backoff: {
           type: 'exponential',
           delay: this.config.retryDelay
         }
-      }, this.handlePatientAnalysis.bind(this));
+      }, this.handleClientAnalysis.bind(this));
 
       // Define cleanup job for old analysis results
       this.agenda.define('cleanup-old-analyses', {
@@ -89,7 +89,7 @@ class MedicalAnalysisScheduler {
       // Schedule monthly analysis (1st of every month at 9 AM)
       await this.agenda.every(this.config.analysisSchedule, 'monthly-medical-analysis', {
         type: 'monthly',
-        description: 'Monthly medical pattern analysis for all patients'
+        description: 'Monthly medical pattern analysis for all clients'
       });
 
       // Schedule cleanup job (1st of every month at 10 PM)
@@ -115,7 +115,7 @@ class MedicalAnalysisScheduler {
 
     try {
       // Get all active clients
-      const clients = await patientService.getActivePatients();
+      const clients = await clientService.getActiveClients();
       logger.info(`Found ${clients.length} active clients for analysis`);
 
       if (clients.length === 0) {
@@ -130,7 +130,7 @@ class MedicalAnalysisScheduler {
 
       for (const batch of batches) {
         const batchPromises = batch.map(client => 
-          this.schedulePatientAnalysis(client._id.toString(), {
+          this.scheduleClientAnalysis(client._id.toString(), {
             trigger: 'monthly',
             batchId: job.attrs._id.toString()
           })
@@ -184,12 +184,12 @@ class MedicalAnalysisScheduler {
   }
 
   /**
-   * Handle individual patient analysis job
+   * Handle individual client analysis job
    * @param {Object} job - Agenda job object
    */
-  async handlePatientAnalysis(job) {
+  async handleClientAnalysis(job) {
     const data = job.attrs.data || {};
-    const clientId = data.clientId || data.patientId; // support legacy job data
+    const clientId = data.clientId;
     const { trigger, batchId } = data;
     logger.info('Starting client medical analysis', { 
       jobId: job.attrs._id, 
@@ -301,9 +301,9 @@ class MedicalAnalysisScheduler {
    * @param {Object} options - Scheduling options
    * @returns {Promise} Job promise
    */
-  async schedulePatientAnalysis(clientId, options = {}) {
+  async scheduleClientAnalysis(clientId, options = {}) {
     try {
-      const job = await this.agenda.now('patient-medical-analysis', {
+      const job = await this.agenda.now('client-medical-analysis', {
         clientId,
         trigger: options.trigger || 'manual',
         batchId: options.batchId || null
@@ -333,7 +333,7 @@ class MedicalAnalysisScheduler {
     
     for (const clientId of clientIds) {
       try {
-        const job = await this.schedulePatientAnalysis(clientId, options);
+        const job = await this.scheduleClientAnalysis(clientId, options);
         jobs.push(job);
       } catch (error) {
         logger.error(`Error scheduling analysis for client ${clientId}:`, error);
@@ -350,7 +350,7 @@ class MedicalAnalysisScheduler {
    * @param {number} limit - Maximum number of results to return
    * @returns {Promise} Analysis results
    */
-  async getPatientAnalysisResults(clientId, limit = 10) {
+  async getClientAnalysisResults(clientId, limit = 10) {
     try {
       return await conversationService.getMedicalAnalysisResults(clientId, limit);
     } catch (error) {
@@ -376,12 +376,12 @@ class MedicalAnalysisScheduler {
 
   /**
    * Store analysis result
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {Object} result - Analysis result
    */
-  async storeAnalysisResult(patientId, result) {
+  async storeAnalysisResult(clientId, result) {
     try {
-      await conversationService.storeMedicalAnalysisResult(patientId, result);
+      await conversationService.storeMedicalAnalysisResult(clientId, result);
     } catch (error) {
       logger.error('Error storing analysis result:', error);
       throw error;

@@ -15,22 +15,22 @@ const router = express.Router();
 
 /**
  * @swagger
- * /fraud-abuse-analysis/{patientId}:
+ * /fraud-abuse-analysis/{clientId}:
  *   get:
- *     summary: Get fraud/abuse analysis for a patient
+ *     summary: Get fraud/abuse analysis for a client
  *     description: |
- *       Retrieves fraud and abuse analysis for a patient over a specified time period.
- *       **HIPAA Compliance**: This endpoint requires authentication, logs all access attempts, and only returns data for patients associated with the authenticated caregiver's organization.
+ *       Retrieves fraud and abuse analysis for a client over a specified time period.
+ *       **HIPAA Compliance**: This endpoint requires authentication, logs all access attempts, and only returns data for clients associated with the authenticated caregiver's organization.
  *     tags: [FraudAbuseAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *       - in: query
  *         name: timeRange
  *         schema:
@@ -64,9 +64,9 @@ const router = express.Router();
  *                 data:
  *                   type: object
  *                   properties:
- *                     patientId:
+ *                     clientId:
  *                       type: string
- *                     patientName:
+ *                     clientName:
  *                       type: string
  *                     timeRange:
  *                       type: string
@@ -162,32 +162,32 @@ const router = express.Router();
  *       403:
  *         description: Forbidden - Insufficient permissions
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       500:
  *         description: Internal server error
  */
 
-// Note: More specific routes must come before the generic /:patientId route
+// Note: More specific routes must come before the generic /:clientId route
 // to avoid route matching conflicts
 
 /**
  * @swagger
- * /fraud-abuse-analysis/results/{patientId}:
+ * /fraud-abuse-analysis/results/{clientId}:
  *   get:
- *     summary: Get stored fraud/abuse analysis results for a patient
+ *     summary: Get stored fraud/abuse analysis results for a client
  *     description: |
- *       Retrieves previously stored fraud and abuse analysis results for a patient.
- *       **HIPAA Compliance**: This endpoint requires authentication, logs all access attempts, and only returns data for patients associated with the authenticated caregiver's organization.
+ *       Retrieves previously stored fraud and abuse analysis results for a client.
+ *       **HIPAA Compliance**: This endpoint requires authentication, logs all access attempts, and only returns data for clients associated with the authenticated caregiver's organization.
  *     tags: [FraudAbuseAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *       - in: query
  *         name: limit
  *         schema:
@@ -236,7 +236,7 @@ const router = express.Router();
  *       401:
  *         description: Unauthorized - Authentication required
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       500:
  *         description: Internal server error
  */
@@ -248,22 +248,22 @@ router.get(
 
 /**
  * @swagger
- * /fraud-abuse-analysis/trigger-patient/{patientId}:
+ * /fraud-abuse-analysis/trigger-client/{clientId}:
  *   post:
- *     summary: Trigger fraud/abuse analysis for a patient
+ *     summary: Trigger fraud/abuse analysis for a client
  *     description: |
- *       Manually triggers a new fraud and abuse analysis for all patient conversations.
- *       **HIPAA Compliance**: This endpoint requires authentication, logs all access attempts and analysis triggers, and only processes data for patients associated with the authenticated caregiver's organization. All analysis results are stored with audit trails.
+ *       Manually triggers a new fraud and abuse analysis for all client conversations.
+ *       **HIPAA Compliance**: This endpoint requires authentication, logs all access attempts and analysis triggers, and only processes data for clients associated with the authenticated caregiver's organization. All analysis results are stored with audit trails.
  *     tags: [FraudAbuseAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     responses:
  *       200:
  *         description: Analysis completed successfully
@@ -299,7 +299,7 @@ router.get(
  *       401:
  *         description: Unauthorized - Authentication required
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       500:
  *         description: Internal server error
  */

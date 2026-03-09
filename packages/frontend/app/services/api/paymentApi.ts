@@ -39,18 +39,22 @@ export const paymentApi = createApi({
         orgId: string;
         orgName: string;
         totalUnbilledCost: number;
-        patientCosts: Array<{
+        /** Prefer clientCosts; backend returns this. patientCosts kept for legacy. */
+        clientCosts?: Array<{
           clientId: string;
           clientName: string;
-          conversationCount: number;
+          callCount?: number;
+          conversationCount?: number;
           totalCost: number;
-          conversations: Array<{
-            conversationId: string;
-            startTime: string;
-            duration: number;
-            cost: number;
-            status: string;
-          }>;
+          calls?: Array<{ callId: string; startTime: string; duration: number; cost: number; status: string }>;
+          conversations?: Array<{ conversationId: string; startTime: string; duration: number; cost: number; status: string }>;
+        }>;
+        patientCosts?: Array<{
+          clientId: string;
+          clientName: string;
+          conversationCount?: number;
+          callCount?: number;
+          totalCost: number;
         }>;
         period: {
           days: number;

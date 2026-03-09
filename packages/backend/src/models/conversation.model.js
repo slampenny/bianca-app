@@ -5,7 +5,7 @@ const messageSchema = mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['patient', 'assistant', 'system', 'debug-user'],
+    enum: ['patient', 'client', 'assistant', 'system', 'debug-user'], // 'patient' kept for legacy data
   },
   content: {
     type: String,

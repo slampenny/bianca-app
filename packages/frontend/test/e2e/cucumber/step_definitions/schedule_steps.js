@@ -6,15 +6,20 @@ const { Given, When, Then } = require('@cucumber/cucumber');
 const { expect } = require('@playwright/test');
 
 Given('I am on the schedules screen', async function() {
-  // Navigate to schedules via client management
-  // First, ensure we're on home screen
-  await Promise.race([
-    this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle', timeout: 10000 }),
-    new Promise((resolve) => setTimeout(() => resolve(), 10000))
-  ]).catch(() => {});
-  
+  // Avoid full page reload when already on the app (same rehydration race → 401).
+  const initialUrl = this.page.url();
+  const base = this.baseURL.replace(/\/$/, '');
+  const alreadyOnApp = initialUrl === base || initialUrl === `${base}/` || initialUrl.startsWith(`${base}/`);
+  const homeOrTabsVisible = await this.page.locator('[data-testid="home-header"], [data-testid^="tab-"], [data-testid="client-list"]').first().isVisible().catch(() => false);
+  if (!alreadyOnApp || !homeOrTabsVisible) {
+    await Promise.race([
+      this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle', timeout: 10000 }),
+      new Promise((resolve) => setTimeout(() => resolve(), 10000))
+    ]).catch(() => {});
+  }
+
   try {
-    await this.page.waitForTimeout(2000);
+    await this.page.locator('[data-testid^="edit-client-button-"], [data-testid^="client-card-"], [data-testid="add-client-button"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } catch (e) {
     if (e.message && e.message.includes('Target page, context or browser has been closed')) {
       console.log('Page closed during wait - skipping test');
@@ -22,7 +27,7 @@ Given('I am on the schedules screen', async function() {
       return;
     }
   }
-  
+
   // Check if we have clients - if not, we need to create one
   let editButton = this.page.locator('[data-testid^="edit-client-button-"]').first();
   let editButtonCount = await editButton.count();
@@ -48,7 +53,7 @@ Given('I am on the schedules screen', async function() {
       ]).catch(() => {});
       
       try {
-        await this.page.waitForTimeout(2000);
+        await this.page.locator('[data-testid="schedules-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       } catch (e) {
         if (e.message && e.message.includes('Target page, context or browser has been closed')) {
           console.log('Page closed during wait - skipping test');
@@ -56,7 +61,7 @@ Given('I am on the schedules screen', async function() {
           return;
         }
       }
-      
+
       const schedulesScreen = this.page.locator('[data-testid="schedules-screen"]');
       const schedulesCount = await schedulesScreen.count();
       if (schedulesCount > 0) {
@@ -70,9 +75,8 @@ Given('I am on the schedules screen', async function() {
     }
     
     // User has permission - try to create one via UI
-      // Wait a bit more for UI to settle - with timeout protection
       try {
-        await this.page.waitForTimeout(2000);
+        await this.page.locator('[data-testid="add-client-button"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       } catch (e) {
         if (e.message && e.message.includes('Target page, context or browser has been closed')) {
           console.log('Page closed during wait - skipping test');
@@ -80,7 +84,7 @@ Given('I am on the schedules screen', async function() {
           return;
         }
       }
-    
+
     // Try multiple ways to find add button (reuse variable from above)
     addButton = this.page.getByTestId('add-client-button').first();
     addButtonCount = await addButton.count();
@@ -99,7 +103,7 @@ Given('I am on the schedules screen', async function() {
       await addButton.waitFor({ state: 'visible', timeout: 10000 });
       await addButton.click({ force: true });
       try {
-        await this.page.waitForTimeout(2000);
+        await this.page.locator('[data-testid="client-name-input"], [data-testid="client-phone-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       } catch (e) {
         if (e.message && e.message.includes('Target page, context or browser has been closed')) {
           console.log('Page closed during wait - skipping test');
@@ -107,7 +111,7 @@ Given('I am on the schedules screen', async function() {
           return;
         }
       }
-      
+
       // Fill in client form - try multiple selectors
       let nameInput = this.page.getByTestId('client-name-input').first();
       let nameCount = await nameInput.count();
@@ -151,7 +155,7 @@ Given('I am on the schedules screen', async function() {
         await saveButton.click({ force: true });
         await savePromise;
         try {
-          await this.page.waitForTimeout(3000);
+          await this.page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         } catch (e) {
           if (e.message && e.message.includes('Target page, context or browser has been closed')) {
             console.log('Page closed during wait - skipping test');
@@ -160,11 +164,10 @@ Given('I am on the schedules screen', async function() {
           }
         }
       }
-      
-      // Now we should be back on home screen with the client
+
       await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
       try {
-        await this.page.waitForTimeout(3000);
+        await this.page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       } catch (e) {
         if (e.message && e.message.includes('Target page, context or browser has been closed')) {
           console.log('Page closed during wait - skipping test');
@@ -185,7 +188,7 @@ Given('I am on the schedules screen', async function() {
     // Last resort - try navigating to schedules directly and see if it works
     await this.page.goto(`${this.baseURL}/MainTabs/Home/Schedules`, { waitUntil: 'networkidle' });
     try {
-      await this.page.waitForTimeout(2000);
+      await this.page.locator('[data-testid="schedules-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     } catch (e) {
       if (e.message && e.message.includes('Target page, context or browser has been closed')) {
         console.log('Page closed during wait - skipping test');
@@ -230,7 +233,7 @@ Given('I am on the schedules screen', async function() {
         ]).catch(() => {});
         
         try {
-          await this.page.waitForTimeout(2000);
+          await this.page.locator('[data-testid="schedules-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         } catch (e) {
           if (e.message && e.message.includes('Target page, context or browser has been closed')) {
             console.log('Page closed during wait - skipping test');
@@ -242,14 +245,12 @@ Given('I am on the schedules screen', async function() {
       }
     }
   }
-  
-  // Wait for client screen - be more lenient
-  await this.page.waitForTimeout(2000);
+
+  await this.page.locator('[data-testid="client-screen"], [data-testid="manage-schedules-button"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   const clientScreen = this.page.locator('[data-testid="client-screen"]');
   const screenCount = await clientScreen.count();
   if (screenCount === 0) {
-    // Wait a bit more
-    await this.page.waitForTimeout(2000);
+    await this.page.locator('[data-testid="client-screen"], [data-testid="manage-schedules-button"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
   
   // Check if we're already on schedules screen
@@ -285,7 +286,7 @@ Given('I am on the schedules screen', async function() {
         buttonFound = true;
         break;
       }
-      await this.page.waitForTimeout(500);
+      await this.page.locator('[data-testid="manage-schedules-button"]').first().waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
     }
   } else {
     buttonFound = true;
@@ -298,13 +299,28 @@ Given('I am on the schedules screen', async function() {
       this.page.goto(`${this.baseURL}/MainTabs/Home/Schedules`, { waitUntil: 'networkidle', timeout: 10000 }),
       new Promise((resolve) => setTimeout(() => resolve(), 10000))
     ]).catch(() => {});
-    
+
+    if (this.page.isClosed()) {
+      console.log('Page closed during navigation - skipping test');
+      this.skip = true;
+      return;
+    }
     const schedulesScreenAfterNav = this.page.locator('[data-testid="schedules-screen"]');
-    const schedulesCount = await schedulesScreenAfterNav.count();
+    let schedulesCount = 0;
+    try {
+      schedulesCount = await schedulesScreenAfterNav.count();
+    } catch (e) {
+      if (e.message && e.message.includes('Target page, context or browser has been closed')) {
+        console.log('Page closed during wait - skipping test');
+        this.skip = true;
+        return;
+      }
+      throw e;
+    }
     if (schedulesCount > 0) {
       return; // Successfully navigated to schedules
     }
-    
+
     // If still not found, skip gracefully
     console.log('Could not navigate to schedules screen - skipping test');
     this.skip = true;
@@ -313,8 +329,8 @@ Given('I am on the schedules screen', async function() {
   
   await manageSchedulesButton.waitFor({ state: 'visible', timeout: 10000 });
   await manageSchedulesButton.click();
-  await this.page.waitForTimeout(1500);
-  
+  await this.page.locator('[data-testid="schedules-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // Verify we're on schedules screen
   await this.page.waitForSelector('[data-testid="schedules-screen"]', { timeout: 10000 }).catch(() => {
     // If schedules screen not found, check if we're on a valid screen
@@ -327,10 +343,8 @@ Given('I am on the schedules screen', async function() {
 });
 
 When('I create a new schedule', async function() {
-  // Wait for schedules screen to be fully loaded
-  await this.page.waitForTimeout(2000);
-  
-  // Try multiple selectors for add schedule button
+  await this.page.locator('[data-testid="add-schedule-button"], [data-testid="schedules-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   let addScheduleButton = this.page.getByTestId('add-schedule-button').first();
   let count = await addScheduleButton.count();
   
@@ -345,8 +359,7 @@ When('I create a new schedule', async function() {
   }
   
   if (count === 0) {
-    // Wait a bit more - button might be loading
-    await this.page.waitForTimeout(2000);
+    await this.page.locator('[data-testid="add-schedule-button"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     addScheduleButton = this.page.getByTestId('add-schedule-button').first();
     count = await addScheduleButton.count();
     
@@ -377,8 +390,8 @@ When('I create a new schedule', async function() {
   if (this.skip) {
     return;
   }
-  
-  await this.page.waitForTimeout(1000);
+
+  await this.page.locator('[data-testid="schedule-time-input"], input[type="time"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 });
 
 When('I set schedule time to {string}', async function(time) {
@@ -411,15 +424,14 @@ When('I set schedule days to {string}', async function(days) {
     const count = await dayButton.count();
     if (count > 0) {
       await dayButton.click();
-      await this.page.waitForTimeout(200);
+      await this.page.locator('[data-testid*="schedule"], [data-testid*="day"]').first().waitFor({ state: 'attached', timeout: 500 }).catch(() => {});
     }
   }
 });
 
 When('I save the schedule', async function() {
-  // Wait a bit for form to be ready
   try {
-    await this.page.waitForTimeout(1000);
+    await this.page.locator('[data-testid="save-schedule-button"], button:has-text("Save")').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } catch (e) {
     if (e.message && e.message.includes('Target page, context or browser has been closed')) {
       console.log('Page closed during wait - skipping test');
@@ -484,9 +496,9 @@ When('I save the schedule', async function() {
   }
   
   await savePromise;
-  
+
   try {
-    await this.page.waitForTimeout(1000);
+    await this.page.locator('[data-testid="schedule-list"], [data-testid*="schedule-item"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } catch (e) {
     if (e.message && e.message.includes('Target page, context or browser has been closed')) {
       console.log('Page closed during wait - test may have completed');
@@ -496,9 +508,8 @@ When('I save the schedule', async function() {
 });
 
 Then('I should see the schedule in the list', async function() {
-  // Wait a bit for list to update
   try {
-    await this.page.waitForTimeout(2000);
+    await this.page.locator('[data-testid="schedule-list"], [data-testid*="schedule-item"], [data-testid="schedules-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } catch (e) {
     if (e.message && e.message.includes('Target page, context or browser has been closed')) {
       console.log('Page closed during wait - skipping test');
@@ -555,13 +566,8 @@ Then('I should see at least one schedule or empty state', async function() {
     return;
   }
   
-  // Wait for screen to settle - use safeWait if available
   try {
-    if (typeof safeWait === 'function') {
-      await safeWait(this.page, 2000);
-    } else {
-      await this.page.waitForTimeout(2000);
-    }
+    await this.page.locator('[data-testid="schedule-list"], [data-testid*="schedule-item"], [data-testid="schedules-screen"], text=/no schedules|empty/i').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } catch (e) {
     if (e.message && e.message.includes('Target page, context or browser has been closed') || e.message?.includes('closed')) {
       console.log('Page closed during wait - skipping test');
@@ -594,9 +600,8 @@ Then('I should see at least one schedule or empty state', async function() {
 });
 
 Then('I should see the schedules screen', async function() {
-  // Wait for navigation - with timeout to prevent hang
   try {
-    await this.page.waitForTimeout(2000);
+    await this.page.locator('[data-testid="schedules-screen"], [data-testid*="schedule"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } catch (e) {
     if (e.message && e.message.includes('Target page, context or browser has been closed')) {
       console.log('Page closed during wait - skipping test');

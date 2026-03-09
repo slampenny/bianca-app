@@ -22,8 +22,7 @@ describe('Schedule DTO', () => {
 
       const dto = ScheduleDTO(schedule);
 
-      // Should convert UTC back to org timezone
-      expect(dto.time).toBe('09:00'); // or '10:00' depending on DST
+      // Should convert UTC back to org timezone (09:00 or 10:00 depending on DST)
       expect(['09:00', '10:00']).toContain(dto.time);
     });
 

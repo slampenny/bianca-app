@@ -14,7 +14,7 @@ describe('Medical NLP Analysis System', () => {
   const sampleConversations = [
     {
       _id: 'conv1',
-      patientId: 'patient1',
+      clientId: 'patient1',
       createdAt: new Date('2024-01-01'),
       messages: [
         {
@@ -39,7 +39,7 @@ describe('Medical NLP Analysis System', () => {
     },
     {
       _id: 'conv2',
-      patientId: 'patient1',
+      clientId: 'patient1',
       createdAt: new Date('2024-01-02'),
       messages: [
         {
@@ -347,7 +347,7 @@ describe('Medical NLP Analysis System', () => {
 
       const baseline = await baselineManager.establishBaseline('test-patient', initialMetrics);
 
-      expect(baseline).toHaveProperty('patientId', 'test-patient');
+      expect(baseline).toHaveProperty('clientId', 'test-patient');
       expect(baseline).toHaveProperty('type', 'initial');
       expect(baseline).toHaveProperty('metrics');
       expect(baseline).toHaveProperty('seasonalAdjustments');

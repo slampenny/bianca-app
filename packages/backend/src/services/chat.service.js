@@ -18,7 +18,7 @@ class ChatService {
       let openaiResponse;
 
       // Generate a response from OpenAI
-      //openaiResponse = await openaiAPI.generateResponseFromOpenAI(messages, conversation.patientId.name);
+      //openaiResponse = await openaiAPI.generateResponseFromOpenAI(messages, conversation.clientId?.name);
 
       return openaiResponse;
     } catch (err) {

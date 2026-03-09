@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Alert, Caregiver, Org, Patient } = require('../../../src/models');
+const { Alert, Caregiver, Org, Client } = require('../../../src/models');
 const alertService = require('../../../src/services/alert.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 const { caregiverOne, admin, insertCaregivers, insertCaregiversAndAddToOrg } = require('../../fixtures/caregiver.fixture');
 const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = require('../../fixtures/alert.fixture');
-const { patientOne, insertPatientsAndAddToCaregiver } = require('../../fixtures/patient.fixture');
+const { clientOne, insertClientsAndAddToCaregiver } = require('../../fixtures/client.fixture');
 
 let mongoServer;
 
@@ -24,21 +24,21 @@ afterAll(async () => {
 describe('alertService', () => {
   let org;
   let caregiver;
-  let patient;
+  let client;
   let alert1;
   let alert2;
 
   afterEach(async () => {
     await Alert.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Org.deleteMany();
   });
 
   beforeEach(async () => {
     [org] = await insertOrgs([orgOne]);
     [adminCargiver] = await insertCaregiversAndAddToOrg(org, [admin]);
-    [patient] = await insertPatientsAndAddToCaregiver(adminCargiver, [patientOne]);
+    [client] = await insertClientsAndAddToCaregiver(adminCargiver, [clientOne]);
     [alert1] = await insertAlerts(adminCargiver, 'Caregiver', [alertOne]);
     [alert2] = await insertAlerts(adminCargiver, 'Caregiver', [alertTwo]);
     [alert3] = await insertAlerts(adminCargiver, 'Caregiver', [alertThree]);

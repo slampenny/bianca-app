@@ -579,16 +579,16 @@ const getMedicalAnalysisResults = catchAsync(async (req, res) => {
 });
 
 /**
- * Trigger medical analysis for a specific patient (synchronous)
+ * Trigger medical analysis for a specific client (synchronous)
  */
-const triggerPatientAnalysis = catchAsync(async (req, res) => {
+const triggerClientAnalysis = catchAsync(async (req, res) => {
   const { clientId } = req.params;
   const caregiver = req.caregiver;
 
   try {
-    logger.info('[MedicalAnalysis] Running synchronous medical analysis for patient', { clientId, caregiverId: caregiver.id, role: caregiver.role });
+    logger.info('[MedicalAnalysis] Running synchronous medical analysis for client', { clientId, caregiverId: caregiver.id, role: caregiver.role });
     
-    // Validate patient exists and check access
+    // Validate client exists and check access
     const client = await clientService.getClientById(clientId);
     if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
@@ -597,7 +597,7 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
       });
     }
 
-    // For staff users with createOwn permission, verify they have access to this patient
+    // For staff users with createOwn permission, verify they have access to this client
     if (caregiver.role === 'staff') {
       const caregiverDoc = await require('../services').caregiverService.getCaregiverById(caregiver.id);
       const hasAccess = caregiverDoc.clients.some(
@@ -719,9 +719,9 @@ const triggerAllAnalysis = catchAsync(async (req, res) => {
       });
     }
 
-    // Schedule analysis for all patients
-    const patientIds = patients.map(p => p._id.toString());
-    const jobs = await medicalAnalysisScheduler.scheduleBatchAnalysis(patientIds, {
+    // Schedule analysis for all clients
+    const clientIds = patients.map(p => p._id.toString());
+    const jobs = await medicalAnalysisScheduler.scheduleBatchAnalysis(clientIds, {
       trigger: 'manual',
       batchId: `batch-manual-${Date.now()}`
     });
@@ -933,7 +933,7 @@ module.exports = {
   getBaseline,
   establishBaseline,
   getMedicalAnalysisResults,
-  triggerPatientAnalysis,
+  triggerClientAnalysis,
   triggerAllAnalysis,
   getSchedulerStatus,
   getMedicalAnalysisTrend

@@ -136,8 +136,8 @@ const updateThemePreference = catchAsync(async (req, res) => {
 });
 
 const addPatient = catchAsync(async (req, res) => {
-  const { caregiverId, patientId } = req.params;
-  const updatedCaregiver = await caregiverService.addPatient(caregiverId, patientId);
+  const { caregiverId, clientId } = req.params;
+  const updatedCaregiver = await caregiverService.addPatient(caregiverId, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
@@ -148,8 +148,8 @@ const addClient = catchAsync(async (req, res) => {
 });
 
 const removePatient = catchAsync(async (req, res) => {
-  const { caregiverId, patientId } = req.params;
-  const updatedCaregiver = await caregiverService.removePatient(caregiverId, patientId);
+  const { caregiverId, clientId } = req.params;
+  const updatedCaregiver = await caregiverService.removePatient(caregiverId, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
@@ -160,20 +160,20 @@ const removeClient = catchAsync(async (req, res) => {
 });
 
 const updatePatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
-  const updatedCaregiver = await caregiverService.removePatient(req.caregiver, patientId);
+  const { clientId } = req.params;
+  const updatedCaregiver = await caregiverService.removePatient(req.caregiver, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
 const deletePatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
-  const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, patientId);
+  const { clientId } = req.params;
+  const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
 const getPatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
-  const patients = await caregiverService.getPatient(req.caregiver, patientId);
+  const { clientId } = req.params;
+  const patients = await caregiverService.getPatient(req.caregiver, clientId);
   res.status(httpStatus.OK).send(patients);
 });
 

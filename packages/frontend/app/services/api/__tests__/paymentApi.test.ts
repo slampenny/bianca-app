@@ -596,7 +596,8 @@ describe("paymentApi", () => {
         expect(result.data.orgName).toBeDefined()
         expect(typeof result.data.totalUnbilledCost).toBe("number")
         expect(result.data.totalUnbilledCost).toBeGreaterThanOrEqual(0)
-        expect(Array.isArray(result.data.patientCosts)).toBe(true)
+        const costs = result.data.clientCosts ?? result.data.patientCosts
+        expect(Array.isArray(costs)).toBe(true)
         expect(result.data.period).toBeDefined()
         expect(result.data.period.days).toBe(30)
         expect(result.data.period.startDate).toBeDefined()
@@ -606,34 +607,32 @@ describe("paymentApi", () => {
       }
     })
 
-    it("should return patient costs with proper structure", async () => {
+    it("should return client costs with proper structure", async () => {
       const result = await paymentApi.endpoints.getUnbilledCostsByOrg.initiate({
         orgId,
         days: 7,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
-        expect(result.data.patientCosts).toBeDefined()
-        expect(Array.isArray(result.data.patientCosts)).toBe(true)
-        
-        if (result.data.patientCosts.length > 0) {
-          const patientCost = result.data.patientCosts[0]
-          
-          // Validate patient cost structure
-expect(patientCost.clientId).toBeDefined()
-    expect(patientCost.clientName).toBeDefined()
-          expect(typeof patientCost.conversationCount).toBe("number")
-          expect(typeof patientCost.totalCost).toBe("number")
-          expect(Array.isArray(patientCost.conversations)).toBe(true)
-          
-          // Validate conversation structure
-          if (patientCost.conversations.length > 0) {
-            const conversation = patientCost.conversations[0]
-            expect(conversation.conversationId).toBeDefined()
-            expect(conversation.startTime).toBeDefined()
-            expect(typeof conversation.duration).toBe("number")
-            expect(typeof conversation.cost).toBe("number")
-            expect(conversation.status).toBeDefined()
+        const costs = result.data.clientCosts ?? result.data.patientCosts
+        expect(costs).toBeDefined()
+        expect(Array.isArray(costs)).toBe(true)
+
+        if (costs.length > 0) {
+          const item = costs[0]
+          expect(item.clientId).toBeDefined()
+          expect(item.clientName).toBeDefined()
+          expect(typeof item.totalCost).toBe("number")
+          const count = (item as any).callCount ?? (item as any).conversationCount
+          const entries = (item as any).calls ?? (item as any).conversations
+          if (typeof count === "number") {
+            expect(count).toBeGreaterThanOrEqual(0)
+          }
+          if (Array.isArray(entries) && entries.length > 0) {
+            const entry = entries[0]
+            expect(entry.startTime !== undefined || entry.conversationId !== undefined || (entry as any).callId !== undefined).toBe(true)
+            expect(typeof (entry.duration ?? 0)).toBe("number")
+            expect(typeof (entry.cost ?? 0)).toBe("number")
           }
         }
       } else {

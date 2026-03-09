@@ -259,11 +259,11 @@ module.exports = router;
 
 /**
  * @swagger
- * /caregivers/{caregiverId}/patients/{patientId}:
+ * /caregivers/{caregiverId}/clients/{clientId}:
  *   post:
- *     summary: Assign a caregiver to a patient
+ *     summary: Assign a caregiver to a client
  *     description: Only admins can assign caregivers.
- *     tags: [Patients]
+ *     tags: [Clients]
  *     parameters:
  *       - in: path
  *         name: caregiverId
@@ -272,14 +272,14 @@ module.exports = router;
  *           type: string
  *         description: Caregiver ID
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     responses:
  *       "200":
- *         description: Patient added
+ *         description: Client added
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":
@@ -287,7 +287,7 @@ module.exports = router;
  *       "404":
  *         $ref: '#/components/responses/NotFound'
  *   delete:
- *     summary: Remove a patient from a caregiver
+ *     summary: Remove a client from a caregiver
  *     description: Only admins can remove caregivers.
  *     tags: [Caregivers]
  *     parameters:
@@ -298,14 +298,14 @@ module.exports = router;
  *           type: string
  *         description: Caregiver ID
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     responses:
  *       "200":
- *         description: Patient removed
+ *         description: Client removed
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":
@@ -449,10 +449,10 @@ module.exports = router;
 
 /**
  * @swagger
- * /caregivers/{caregiverId}/patients:
+ * /caregivers/{caregiverId}/clients:
  *   get:
- *     summary: Get patients for a caregiver
- *     description: Retrieve all patients assigned to a caregiver
+ *     summary: Get clients for a caregiver
+ *     description: Retrieve all clients assigned to a caregiver
  *     tags: [Caregivers]
  *     security:
  *       - bearerAuth: []
@@ -465,13 +465,13 @@ module.exports = router;
  *         description: Caregiver ID
  *     responses:
  *       "200":
- *         description: List of patients retrieved
+ *         description: List of clients retrieved
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/Patient'
+ *                 $ref: '#/components/schemas/Client'
  *       "401":
  *         $ref: '#/components/responses/Unauthorized'
  *       "403":

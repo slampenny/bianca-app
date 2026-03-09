@@ -1,6 +1,6 @@
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
-const { Org, Patient, Conversation, Call, Invoice, LineItem, Alert } = require('../../../src/models');
+const { Org, Client, Conversation, Call, Invoice, LineItem, Alert } = require('../../../src/models');
 
 // Mock the agenda module completely to avoid initialization issues
 jest.mock('../../../src/config/agenda', () => ({
@@ -40,7 +40,7 @@ const mockProcessOrgBilling = async (org) => {
   const logger = require('../../../src/config/logger');
   logger.info(`[Daily Billing] Processing billing for organization: ${org.name} (${org._id})`);
   
-  const patients = await Patient.find({ org: org._id });
+  const patients = await Client.find({ org: org._id });
   if (patients.length === 0) {
     logger.info(`[Daily Billing] No patients found for org ${org.name}, skipping`);
     return;
@@ -59,23 +59,23 @@ const mockProcessOrgBilling = async (org) => {
     return;
   }
   
-  const patientBilling = {};
+  const clientBilling = {};
   let totalCost = 0;
   
   for (const call of unchargedCalls) {
-    const patientId = call.clientId._id.toString();
-    if (!patientBilling[patientId]) {
-      patientBilling[patientId] = {
+    const clientId = call.clientId._id.toString();
+    if (!clientBilling[clientId]) {
+      clientBilling[clientId] = {
         client: call.clientId,
         calls: [],
         totalCost: 0
       };
     }
-    patientBilling[patientId].calls.push(call);
+    clientBilling[clientId].calls.push(call);
     // Calculate cost from duration (matching payment service logic)
     const { calculateAmount } = require('../../../src/services/payment.service');
     const cost = calculateAmount(call.duration);
-    patientBilling[patientId].totalCost += cost;
+    clientBilling[clientId].totalCost += cost;
     totalCost += cost;
   }
   
@@ -97,7 +97,7 @@ const mockProcessOrgBilling = async (org) => {
   }
   
   // Create invoice for the organization
-  const invoice = await mockCreateOrgInvoice(org, patientBilling, totalCost);
+  const invoice = await mockCreateOrgInvoice(org, clientBilling, totalCost);
   
   if (!invoice || !invoice._id) {
     logger.error(`[Daily Billing] Failed to create invoice for org ${org.name}`);
@@ -115,19 +115,18 @@ const mockProcessOrgBilling = async (org) => {
     return;
   }
   
-  // Create a mapping of patientId to lineItemId
-  const patientToLineItem = {};
+  // Create a mapping of clientId to lineItemId
+  const clientToLineItem = {};
   for (const lineItem of lineItems) {
-    const patientIdStr = lineItem.clientId.toString();
-    patientToLineItem[patientIdStr] = lineItem._id;
+    const clientIdStr = lineItem.clientId.toString();
+    clientToLineItem[clientIdStr] = lineItem._id;
   }
   
-  // Update each call with its patient's line item ID
+  // Update each call with its client's line item ID
   let updatedCount = 0;
   for (const call of stillUnchargedCalls) {
-    // patientId is an ObjectId, convert to string for matching
-    const patientId = call.clientId.toString();
-    const lineItemId = patientToLineItem[patientId];
+    const clientId = call.clientId.toString();
+    const lineItemId = clientToLineItem[clientId];
     
     if (lineItemId) {
       const result = await Call.updateOne(
@@ -138,7 +137,7 @@ const mockProcessOrgBilling = async (org) => {
         updatedCount++;
       }
     } else {
-      logger.warn(`[Daily Billing] No line item found for patient ${patientId} in call ${call._id}. Available patients: ${Object.keys(patientToLineItem).join(', ')}`);
+      logger.warn(`[Daily Billing] No line item found for client ${clientId} in call ${call._id}. Available clients: ${Object.keys(clientToLineItem).join(', ')}`);
     }
   }
   
@@ -183,7 +182,7 @@ const mockProcessOrgBilling = async (org) => {
   }
 };
 
-const mockCreateOrgInvoice = async (org, patientBilling, totalCost) => {
+const mockCreateOrgInvoice = async (org, clientBilling, totalCost) => {
   const config = require('../../../src/config/config');
   const lastInvoice = await Invoice.findOne({}, {}, { sort: { createdAt: -1 } });
   const nextNum = lastInvoice ? parseInt(lastInvoice.invoiceNumber.split('-')[1]) + 1 : 1;
@@ -196,13 +195,13 @@ const mockCreateOrgInvoice = async (org, patientBilling, totalCost) => {
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     status: 'pending',
     totalAmount: totalCost,
-    notes: `Daily billing for ${Object.keys(patientBilling).length} patients`
+    notes: `Daily billing for ${Object.keys(clientBilling).length} clients`
   }]);
   
   const createdInvoice = invoice[0];
   
   const lineItemData = [];
-  for (const [patientId, billing] of Object.entries(patientBilling)) {
+  for (const [clientId, billing] of Object.entries(clientBilling)) {
     // Calculate quantity as total duration in minutes
     const totalDuration = billing.calls.reduce((sum, call) => sum + call.duration, 0);
     lineItemData.push({
@@ -250,7 +249,7 @@ describe('Daily Billing Agenda Job', () => {
     // Clear the database before each test
     await Call.deleteMany({});
     await Conversation.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Org.deleteMany({});
     await Invoice.deleteMany({});
     await LineItem.deleteMany({});
@@ -272,21 +271,21 @@ describe('Daily Billing Agenda Job', () => {
     });
 
     // Create test patients
-    patient1 = await Patient.create({
+    patient1 = await Client.create({
       name: 'John Doe',
       email: 'john@test.com',
       phone: '+12345678901',
       org: org1._id
     });
 
-    patient2 = await Patient.create({
+    patient2 = await Client.create({
       name: 'Jane Smith',
       email: 'jane@test.com',
       phone: '+12345678902',
       org: org1._id
     });
 
-    patient3 = await Patient.create({
+    patient3 = await Client.create({
       name: 'Bob Johnson',
       email: 'bob@test.com',
       phone: '+12345678903',
@@ -345,7 +344,7 @@ describe('Daily Billing Agenda Job', () => {
   afterEach(async () => {
     await Call.deleteMany({});
     await Conversation.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Org.deleteMany({});
     await Invoice.deleteMany({});
     await LineItem.deleteMany({});
@@ -559,7 +558,7 @@ describe('Daily Billing Agenda Job', () => {
 
     it('should continue processing other orgs if one fails', async () => {
       // Mock a failure for one organization by corrupting its data
-      await Patient.updateOne({ _id: patient1._id }, { org: new mongoose.Types.ObjectId() });
+      await Client.updateOne({ _id: patient1._id }, { org: new mongoose.Types.ObjectId() });
 
       // Should not throw error and should still process org2
       await expect(mockProcessDailyBilling()).resolves.not.toThrow();

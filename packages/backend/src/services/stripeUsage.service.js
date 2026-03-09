@@ -13,7 +13,7 @@ const stripeMeterService = require('./stripeMeter.service');
  * Report usage event to Stripe
  * @param {string} subscriptionItemId - Stripe subscription item ID
  * @param {number} value - Usage value (e.g., number of API requests, minutes, etc.)
- * @param {Object} metadata - Additional metadata (e.g., patientId, conversationId)
+ * @param {Object} metadata - Additional metadata (e.g., clientId, conversationId)
  * @param {number} timestamp - Event timestamp in Unix seconds (defaults to now)
  * @returns {Promise<Object>} Stripe usage record
  */

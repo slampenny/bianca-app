@@ -10,7 +10,7 @@ const { Alert, Org, Caregiver, Patient, Schedule, Conversation, Call } = require
 const { caregiverOne, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { alertOne, insertAlerts } = require('../fixtures/alert.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
-const { patientOne, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
+const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
 const { scheduleOne, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
 const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
@@ -34,7 +34,7 @@ describe('Call Workflow Integration Tests', () => {
     // Setup test data
     [org] = await insertOrgs([orgOne]);
     [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
-    [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+    [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
     
     // Create auth token for caregiver
     caregiverToken = await tokenService.generateAuthTokens(caregiver);
@@ -54,7 +54,7 @@ describe('Call Workflow Integration Tests', () => {
   describe('POST /v1/calls/initiate', () => {
     it('should initiate a call to a patient successfully', async () => {
       const callData = {
-        clientId: patient.id,
+        clientId: client.id,
         callNotes: 'Test call for patient check-in'
       };
 
@@ -67,7 +67,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('conversationId');
       expect(response.body).toHaveProperty('callId');
       expect(response.body).toHaveProperty('callSid', 'mock-call-sid-12345');
-      expect(response.body.clientId.toString()).toBe(patient.id);
+      expect(response.body.clientId.toString()).toBe(client.id);
       expect(response.body.patientName).toBe(patient.name);
       expect(response.body.agentId.toString()).toBe(caregiver.id);
       expect(response.body.status).toBe('in-progress');
@@ -76,7 +76,7 @@ describe('Call Workflow Integration Tests', () => {
       // Verify conversation was created in database
       const conversation = await Conversation.findById(response.body.conversationId);
       expect(conversation).toBeTruthy();
-      expect(conversation.clientId.toString()).toBe(patient.id);
+      expect(conversation.clientId.toString()).toBe(client.id);
       expect(conversation.callId.toString()).toBe(response.body.callId);
 
       // Verify call was created and linked to conversation
@@ -95,7 +95,7 @@ describe('Call Workflow Integration Tests', () => {
       await patient.save({ validateBeforeSave: false });
 
       const callData = {
-        clientId: patient.id,
+        clientId: client.id,
         callNotes: 'Test call'
       };
 
@@ -126,7 +126,7 @@ describe('Call Workflow Integration Tests', () => {
 
     it('should return 401 without valid token', async () => {
       const callData = {
-        clientId: patient.id,
+        clientId: client.id,
         callNotes: 'Test call'
       };
 
@@ -145,7 +145,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        clientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -156,7 +156,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        clientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 
@@ -202,7 +202,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        clientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -213,7 +213,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        clientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 
@@ -292,7 +292,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        clientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -303,7 +303,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        clientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 
@@ -355,7 +355,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create multiple calls with different statuses and their conversations
       const call1 = await Call.create({
         callSid: 'CA1111111111111111',
-        clientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -366,7 +366,7 @@ describe('Call Workflow Integration Tests', () => {
 
       const call2 = await Call.create({
         callSid: 'CA2222222222222222',
-        clientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -376,12 +376,12 @@ describe('Call Workflow Integration Tests', () => {
       });
 
       const conversation1 = await Conversation.create({
-        clientId: patient.id,
+        clientId: client.id,
         callId: call1._id
       });
 
       const conversation2 = await Conversation.create({
-        clientId: patient.id,
+        clientId: client.id,
         callId: call2._id
       });
 
@@ -422,7 +422,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        clientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -434,7 +434,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        clientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 

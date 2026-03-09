@@ -13,7 +13,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I have been having trouble remembering things lately. I forget appointments and I cannot recall what I did yesterday.' },
             { role: 'patient', content: 'I am not sure where I put my keys this morning. I have been forgetting names of people I know well.' },
@@ -34,7 +34,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I keep forgetting where I put things. I cannot remember what I was supposed to do today.' },
             { role: 'patient', content: 'My memory is failing me. I forget appointments and important dates.' }
@@ -54,7 +54,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I was looking for the... um, what is it called? The thing you use to eat with.' },
             { role: 'patient', content: 'I need to find my... you know, the thing that opens doors. What is it called?' }
@@ -75,7 +75,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I have been feeling very sad and depressed lately. I cannot concentrate on anything.' },
             { role: 'patient', content: 'I feel hopeless about the future and I do not see any point in continuing.' },
@@ -101,7 +101,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I worry about everything constantly. I cannot stop thinking about all the things that could go wrong.' },
             { role: 'patient', content: 'My heart races and I feel tense all the time. I am always on edge.' },
@@ -122,7 +122,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I do not want to be here anymore. I think about ending my life every day.' },
             { role: 'patient', content: 'I have a plan and I am ready to do it. Everyone would be better off without me.' },
@@ -147,7 +147,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I have been experiencing significant difficulties with my cognitive functioning and overall mental well-being. The complexity of my thoughts has diminished considerably.' },
             { role: 'patient', content: 'My ability to articulate complex concepts has deteriorated substantially over the past several months.' }
@@ -168,7 +168,7 @@ describe('Medical Analysis Tests', () => {
       const month1Conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I have been experiencing significant difficulties with my cognitive functioning and overall mental well-being.' }
           ]
@@ -179,7 +179,7 @@ describe('Medical Analysis Tests', () => {
       const month6Conversations = [
         {
           _id: 'conv2',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I feel bad. I cannot think. I am confused. My mind is not working well. I forget things easily. I do not understand what is happening around me.' }
           ]
@@ -204,7 +204,7 @@ describe('Medical Analysis Tests', () => {
       const month1Conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'Good morning! I hope you are having a wonderful day. I wanted to discuss my medication schedule with you today.' },
             { role: 'patient', content: 'I take my blood pressure medication every morning at 8 AM, and I have been very consistent with it.' }
@@ -216,7 +216,7 @@ describe('Medical Analysis Tests', () => {
       const month3Conversations = [
         {
           _id: 'conv2',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'Hello, I was wondering if you could help me with something. I think I forgot something important but I am not sure what it was.' },
             { role: 'patient', content: 'I feel a bit confused today. I was supposed to do something important but I cannot remember what it was.' }
@@ -228,7 +228,7 @@ describe('Medical Analysis Tests', () => {
       const month6Conversations = [
         {
           _id: 'conv3',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'Um, I was wondering... um, what was I going to say? I forget what I was going to say. Can you help me remember what I was talking about? I think I already said this before but I am not sure. Um, let me think...' },
             { role: 'patient', content: 'I am having trouble with... um, what is it called? The word for when you cannot remember things. I forget appointments and I cannot recall what I did yesterday. What day is it today? I do not know what time it is. Um, I think I told you this already but I am not sure.' }
@@ -259,7 +259,7 @@ describe('Medical Analysis Tests', () => {
       const month1Conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'Hi, I wanted to talk about how I have been feeling lately. I have been having some ups and downs.' },
             { role: 'patient', content: 'Some days I feel okay, but other days I feel really down. I have been having trouble sleeping.' }
@@ -271,7 +271,7 @@ describe('Medical Analysis Tests', () => {
       const month3Conversations = [
         {
           _id: 'conv2',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I feel so sad and depressed. I am down and hopeless. I cannot take this pain anymore.' },
             { role: 'patient', content: 'I think about it all the time. I do not see any way out of this darkness. I feel worthless and empty.' }
@@ -283,7 +283,7 @@ describe('Medical Analysis Tests', () => {
       const month6Conversations = [
         {
           _id: 'conv3',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I do not know why I keep trying. Nothing ever gets better. I am completely hopeless and I see no future for myself. I am in constant emotional pain and I cannot escape it.' },
             { role: 'patient', content: 'I cannot function anymore. I just want the pain to stop. I have lost all hope and I feel like I am drowning in despair. I do not want to live like this anymore.' }
@@ -320,7 +320,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I have been feeling much better lately. My memory seems to be improving and I feel more alert.' },
             { role: 'patient', content: 'I have been taking my medication regularly and I think it is helping.' }
@@ -341,7 +341,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I feel muy triste today. Estoy muy depressed.' },
             { role: 'patient', content: 'Je suis très anxious. I am very worried.' }
@@ -365,7 +365,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I feel @#$% confused today!' },
             { role: 'patient', content: 'Everything is &*()%$#@! messed up.' }
@@ -391,7 +391,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: longMessage }
           ]
@@ -417,7 +417,7 @@ describe('Medical Analysis Tests', () => {
       const conversations = [
         {
           _id: 'conv1',
-          patientId: 'test-patient',
+          clientId: 'test-patient',
           messages: [
             { role: 'patient', content: 'I have been experiencing significant difficulties with my cognitive functioning and overall mental well-being.' },
             { role: 'patient', content: 'My ability to concentrate has diminished considerably over the past several months.' },

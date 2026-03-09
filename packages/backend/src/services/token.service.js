@@ -10,44 +10,41 @@ const { tokenTypes } = require('../config/tokens');
 const logger = require('../config/logger');
 
 /**
- * Extract patient ID from patient object or string
+ * Extract client ID from client object or string
  * Handles both Mongoose documents and plain objects
- * @param {Object|string} patient - Patient object or ID string
- * @returns {string} - Patient ID as string
+ * @param {Object|string} client - Client object or ID string
+ * @returns {string} - Client ID as string
  */
-const extractPatientId = (patient) => {
-  if (!patient) {
-    throw new Error('Patient is required');
+const extractClientId = (client) => {
+  if (!client) {
+    throw new Error('Client is required');
   }
   
   let id;
   
-  // If it's already a string, validate it's a valid ObjectId
-  if (typeof patient === 'string') {
-    if (!mongoose.Types.ObjectId.isValid(patient)) {
-      logger.error('[Token Service] Invalid ObjectId string:', patient);
-      throw new Error('Invalid patient ID format: not a valid ObjectId string');
+  if (typeof client === 'string') {
+    if (!mongoose.Types.ObjectId.isValid(client)) {
+      logger.error('[Token Service] Invalid ObjectId string:', client);
+      throw new Error('Invalid client ID format: not a valid ObjectId string');
     }
-    return patient;
+    return client;
   }
   
-  // If it's a Mongoose ObjectId directly, convert to string
-  if (patient instanceof mongoose.Types.ObjectId || 
-      (patient.constructor && patient.constructor.name === 'ObjectId')) {
-    return patient.toString();
+  if (client instanceof mongoose.Types.ObjectId || 
+      (client.constructor && client.constructor.name === 'ObjectId')) {
+    return client.toString();
   }
   
-  // Try to get ID from object (handles both .id and ._id)
-  id = patient.id || patient._id;
+  id = client.id || client._id;
   
   if (!id) {
-    logger.error('[Token Service] Cannot extract patient ID from:', {
-      hasId: !!patient.id,
-      has_id: !!patient._id,
-      patientType: typeof patient,
-      patientKeys: Object.keys(patient || {})
+    logger.error('[Token Service] Cannot extract client ID from:', {
+      hasId: !!client.id,
+      has_id: !!client._id,
+      clientType: typeof client,
+      clientKeys: Object.keys(client || {})
     });
-    throw new Error('Patient ID not found in patient object');
+    throw new Error('Client ID not found in client object');
   }
   
   // Convert to string
@@ -158,14 +155,14 @@ const generateToken = (
 /**
  * Save a token
  * @param {string} token
- * @param {ObjectId} caregiverId - Required for all token types except PATIENT_CONSENT
+ * @param {ObjectId} caregiverId - Required for all token types except CLIENT_CONSENT
  * @param {Moment} expires
  * @param {string} type
  * @param {boolean} [blacklisted]
- * @param {ObjectId} [patientId] - Required only for PATIENT_CONSENT token type
+ * @param {ObjectId} [clientId] - Required only for CLIENT_CONSENT token type
  * @returns {Promise<Token>}
  */
-const saveToken = async (token, caregiverId, expires, type, blacklisted = false, patientId = null) => {
+const saveToken = async (token, caregiverId, expires, type, blacklisted = false, clientId = null) => {
   logger.debug(`[Token Service] Saving token - type: ${type}`);
   
   try {
@@ -176,13 +173,13 @@ const saveToken = async (token, caregiverId, expires, type, blacklisted = false,
       blacklisted,
     };
     
-    // For patient consent tokens, use patient ID
-    if (type === tokenTypes.PATIENT_CONSENT) {
-      const patientIdString = extractPatientId(patientId);
-      if (!patientIdString) {
-        throw new Error('Patient ID is required for PATIENT_CONSENT token type');
+    // For patient consent tokens, use client ID
+    if (type === tokenTypes.CLIENT_CONSENT) {
+      const clientIdString = extractClientId(clientId);
+      if (!clientIdString) {
+        throw new Error('Client ID is required for CLIENT_CONSENT token type');
       }
-      tokenData.client = patientIdString;
+      tokenData.client = clientIdString;
     } else {
       // For all other token types, use caregiver ID
       const caregiverIdString = extractCaregiverId(caregiverId);
@@ -199,8 +196,8 @@ const saveToken = async (token, caregiverId, expires, type, blacklisted = false,
     logger.error('[Token Service] Failed to save token:', {
       error: error.message,
       type,
-      caregiverId: type !== tokenTypes.PATIENT_CONSENT ? caregiverId : null,
-      client: type === tokenTypes.PATIENT_CONSENT ? patientId : null,
+      caregiverId: type !== tokenTypes.CLIENT_CONSENT ? caregiverId : null,
+      client: type === tokenTypes.CLIENT_CONSENT ? clientId : null,
       hasToken: !!token
     });
     throw error;
@@ -227,20 +224,20 @@ const verifyToken = async (token, type) => {
 
   // Build query based on token type
   const query = { token, type, blacklisted: false };
-  if (type === tokenTypes.PATIENT_CONSENT) {
+  if (type === tokenTypes.CLIENT_CONSENT) {
     query.client = payload.sub;
   } else {
     query.caregiver = payload.sub;
   }
 
-  logger.debug(`[Token Service] Looking up token in database - token: ${token.substring(0, 20)}..., type: ${type}, ${type === tokenTypes.PATIENT_CONSENT ? 'patient' : 'caregiver'}: ${payload.sub}`);
+  logger.debug(`[Token Service] Looking up token in database - token: ${token.substring(0, 20)}..., type: ${type}, ${type === tokenTypes.CLIENT_CONSENT ? 'client' : 'caregiver'}: ${payload.sub}`);
   const tokenDoc = await Token.findOne(query);
   
   if (!tokenDoc) {
-    logger.warn(`[Token Service] Token not found in database - type: ${type}, ${type === tokenTypes.PATIENT_CONSENT ? 'patient' : 'caregiver'}: ${payload.sub}`);
+    logger.warn(`[Token Service] Token not found in database - type: ${type}, ${type === tokenTypes.CLIENT_CONSENT ? 'client' : 'caregiver'}: ${payload.sub}`);
     // Check if token exists but is blacklisted
     const blacklistedQuery = { token, type };
-    if (type === tokenTypes.PATIENT_CONSENT) {
+    if (type === tokenTypes.CLIENT_CONSENT) {
       blacklistedQuery.client = payload.sub;
     } else {
       blacklistedQuery.caregiver = payload.sub;
@@ -329,22 +326,21 @@ const generateVerifyEmailToken = async (caregiver) => {
 };
 
 /**
- * Generate patient consent token
- * @param {Patient} patient
+ * Generate client consent token
+ * @param {Client} client
  * @returns {Promise<string>}
  */
-const generatePatientConsentToken = async (patient) => {
-  logger.debug('[Token Service] Generating patient consent token');
-  const patientId = extractPatientId(patient);
-  logger.debug(`[Token Service] Extracted patient ID: ${patientId}`);
+const generateClientConsentToken = async (client) => {
+  logger.debug('[Token Service] Generating client consent token');
+  const clientId = extractClientId(client);
+  logger.debug(`[Token Service] Extracted client ID: ${clientId}`);
   
-  // Consent tokens expire in 30 days (same as email mentions)
   const expires = moment().add(30, 'days');
-  const consentToken = generateToken(patientId, expires, tokenTypes.PATIENT_CONSENT);
+  const consentToken = generateToken(clientId, expires, tokenTypes.CLIENT_CONSENT);
   logger.debug(`[Token Service] Generated token, saving to database...`);
   
-  await saveToken(consentToken, null, expires, tokenTypes.PATIENT_CONSENT, false, patientId);
-  logger.info(`[Token Service] Patient consent token created successfully for patient ${patientId}`);
+  await saveToken(consentToken, null, expires, tokenTypes.CLIENT_CONSENT, false, clientId);
+  logger.info(`[Token Service] Client consent token created successfully for client ${clientId}`);
   
   return consentToken;
 };
@@ -357,6 +353,8 @@ module.exports = {
   generateInviteToken,
   generateResetPasswordToken,
   generateVerifyEmailToken,
-  generatePatientConsentToken,
-  extractPatientId,
+  generatePatientConsentToken: generateClientConsentToken,
+  generateClientConsentToken,
+  extractPatientId: extractClientId,
+  extractClientId,
 };

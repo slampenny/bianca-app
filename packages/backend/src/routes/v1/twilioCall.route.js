@@ -11,7 +11,7 @@ const router = express.Router();
  * /twilio/initiate:
  *   post:
  *     summary: Initiate an outbound call to a patient via Twilio
- *     description: Called by your application backend/frontend to start a call. Requires patientId.
+ *     description: Called by your application backend/frontend to start a call. Requires clientId.
  *     tags: [TwilioCalls]
  *     requestBody:
  *       required: true
@@ -39,18 +39,18 @@ router.post('/initiate', validate(twilioCallValidation.initiate), twilioCallCont
 
 /**
  * @swagger
- * /twilio/start-call/{patientId}:
+ * /twilio/start-call/{clientId}:
  *   post:
  *     summary: Provides TwiML instructions to connect to Asterisk SIP
  *     description: Webhook called by Twilio when the outbound call connects. Responds with TwiML to connect to Asterisk.
  *     tags: [TwilioCalls]
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         schema:
  *           type: string
  *         required: true
- *         description: Patient ID
+ *         description: Client ID
  *     requestBody:
  *       description: Form-encoded data sent by Twilio (e.g., CallSid).
  *       content:
@@ -69,13 +69,13 @@ router.post('/initiate', validate(twilioCallValidation.initiate), twilioCallCont
  */
 // Handle both GET and POST for Twilio webhooks
 router.get(
-  '/start-call/:patientId',
+  '/start-call/:clientId',
   express.urlencoded({ extended: false }),
   bypassTwilioAuthMiddleware,
   twilioCallController.handleStartCall
 );
 router.post(
-  '/start-call/:patientId',
+  '/start-call/:clientId',
   express.urlencoded({ extended: false }),
   bypassTwilioAuthMiddleware,
   twilioCallController.handleStartCall
@@ -133,8 +133,8 @@ router.get('/test-sip', (req, res) => {
   const VoiceResponse = require('twilio').twiml.VoiceResponse;
   const twiml = new VoiceResponse();
 
-  // Accept testPatientId and testTwilioSid as query params
-  const testPatientId = req.query.testPatientId || 'direct-sip-test';
+  // Accept testClientId and testTwilioSid as query params
+  const testClientId = req.query.testClientId || req.query.testPatientId || 'direct-sip-test';
   const testTwilioSid = req.query.testTwilioSid || `TEST_SIP_${Date.now()}`;
 
   // Use environment-appropriate SIP endpoint from config
@@ -153,7 +153,7 @@ router.get('/test-sip', (req, res) => {
   twiml.dial({
     callerId: config.twilio.phone || '+19786256514',
     timeout: 15
-  }).sip(`sip:bianca@${sipHost}:${sipPort}?patientId=${testPatientId}&callSid=${testTwilioSid}`);
+  }).sip(`sip:bianca@${sipHost}:${sipPort}?clientId=${testClientId}&callSid=${testTwilioSid}`);
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');

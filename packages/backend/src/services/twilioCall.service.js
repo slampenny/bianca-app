@@ -161,9 +161,9 @@ class TwilioCallService {
    */
   generateCallTwiML(req) {
     const { CallSid, AnsweredBy } = req.body;
-    const { patientId } = req.params;
+    const clientId = req.params.clientId;
     
-    logger.info(`[Twilio Service] Generating Asterisk SIP TwiML for CallSid: ${CallSid}, AnsweredBy: ${AnsweredBy || 'null'}, PatientId: ${patientId}`);
+    logger.info(`[Twilio Service] Generating Asterisk SIP TwiML for CallSid: ${CallSid}, AnsweredBy: ${AnsweredBy || 'null'}, ClientId: ${clientId}`);
     
     // DEBUG: Log full request body to see all Twilio parameters
     logger.info(`[Twilio Service] Full TwiML request body:`, JSON.stringify(req.body, null, 2));
@@ -213,9 +213,9 @@ class TwilioCallService {
       }
       
       const sipUser = config.asterisk.sipUserName; // Or make dynamic if needed
-      const sipUri = `sip:${sipUser}@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};patientId=${encodeURIComponent(patientId)}`;
+      const sipUri = `sip:${sipUser}@${sipHost}:${sipPort};transport=tcp;callSid=${encodeURIComponent(CallSid)};clientId=${encodeURIComponent(clientId)}`;
 
-      // Connect to Asterisk SIP endpoint with patientId as a parameter
+      // Connect to Asterisk SIP endpoint with clientId as a parameter
       // CRITICAL FIX: Remove answerOnBridge to prevent initial audio cutoff
       const dialOptions = {
         callerId: config.twilio.phone, // Use configured Twilio number

@@ -5,7 +5,7 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Conversation, Message, Patient, Caregiver, Org } = require('../../src/models');
+const { Conversation, Message, Client, Caregiver, Org } = require('../../src/models');
 const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
@@ -13,7 +13,7 @@ const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = req
 
 let mongoServer;
 let accessToken;
-let patientId;
+let clientId;
 let conversationId;
 let orgId;
 let caregiverId;
@@ -45,8 +45,8 @@ beforeAll(async () => {
   await caregiver.save();
   caregiverId = caregiver._id;
 
-  const patient = new Patient({
-    name: 'Test Patient',
+  const patient = new Client({
+    name: 'Test Client',
     email: 'patient@example.com',
     phone: '+16045624265',
     org: orgId,
@@ -54,12 +54,12 @@ beforeAll(async () => {
     preferredLanguage: 'en'
   });
   await patient.save();
-  patientId = patient._id;
+  clientId = patient._id;
 
   // Create a call first (required for conversation)
   const { Call } = require('../../src/models');
   const call = new Call({
-    clientId: patientId,
+    clientId: clientId,
     callSid: 'test-call-sid',
     status: 'completed',
     startTime: new Date(),
@@ -70,7 +70,7 @@ beforeAll(async () => {
   
   // Create a conversation with sentiment data
   const conversation = new Conversation({
-    clientId: patientId,
+    clientId: clientId,
     callId: call._id,
     callSid: 'test-call-sid',
     lineItemId: null,
@@ -115,12 +115,12 @@ describe('Sentiment Analysis API', () => {
   describe('GET /sentiment/client/:clientId/trend', () => {
     it('should get sentiment trend for patient', async () => {
       const res = await request(app)
-        .get(`/v1/sentiment/client/${patientId}/trend`)
+        .get(`/v1/sentiment/client/${clientId}/trend`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ timeRange: 'month' })
         .expect(200);
 
-      expect(res.body).toHaveProperty('clientId', patientId.toString());
+      expect(res.body).toHaveProperty('clientId', clientId.toString());
       expect(res.body).toHaveProperty('timeRange', 'month');
       expect(res.body).toHaveProperty('dataPoints');
       expect(res.body).toHaveProperty('summary');
@@ -136,7 +136,7 @@ describe('Sentiment Analysis API', () => {
       
       for (const timeRange of timeRanges) {
         const res = await request(app)
-          .get(`/v1/sentiment/client/${patientId}/trend`)
+          .get(`/v1/sentiment/client/${clientId}/trend`)
           .set('Authorization', `Bearer ${accessToken}`)
           .query({ timeRange })
           .expect(200);
@@ -147,7 +147,7 @@ describe('Sentiment Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .get(`/v1/sentiment/client/${patientId}/trend`)
+        .get(`/v1/sentiment/client/${clientId}/trend`)
         .expect(401);
     });
 
@@ -167,7 +167,7 @@ describe('Sentiment Analysis API', () => {
   describe('GET /sentiment/client/:clientId/summary', () => {
     it('should get sentiment summary for patient', async () => {
       const res = await request(app)
-        .get(`/v1/sentiment/client/${patientId}/summary`)
+        .get(`/v1/sentiment/client/${clientId}/summary`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -183,7 +183,7 @@ describe('Sentiment Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .get(`/v1/sentiment/client/${patientId}/summary`)
+        .get(`/v1/sentiment/client/${clientId}/summary`)
         .expect(401);
     });
 
@@ -221,7 +221,7 @@ describe('Sentiment Analysis API', () => {
       // Create a call first
       const { Call } = require('../../src/models');
       const call2 = new Call({
-        clientId: patientId,
+        clientId: clientId,
         callSid: 'test-call-sid-2',
         status: 'completed',
         startTime: new Date(),
@@ -232,7 +232,7 @@ describe('Sentiment Analysis API', () => {
       
       // Create a conversation without sentiment data
       const conversationWithoutSentiment = new Conversation({
-        clientId: patientId,
+        clientId: clientId,
         callId: call2._id,
         callSid: 'test-call-sid-2',
         lineItemId: null,
@@ -296,7 +296,7 @@ describe('Sentiment Analysis API', () => {
       // Create a call first
       const { Call } = require('../../src/models');
       const call3 = new Call({
-        clientId: patientId,
+        clientId: clientId,
         callSid: 'test-call-sid-3',
         status: 'completed',
         startTime: new Date(),
@@ -307,7 +307,7 @@ describe('Sentiment Analysis API', () => {
       
       // Create a conversation with messages but no sentiment
       const conversationToAnalyze = new Conversation({
-        clientId: patientId,
+        clientId: clientId,
         callId: call3._id,
         callSid: 'test-call-sid-3',
         lineItemId: null,
@@ -363,7 +363,7 @@ describe('Sentiment Analysis API', () => {
     it('should handle conversation without messages gracefully', async () => {
       const { Call } = require('../../src/models');
       const call4 = new Call({
-        clientId: patientId,
+        clientId: clientId,
         callSid: 'test-call-sid-4',
         status: 'completed',
         startTime: new Date(),
@@ -373,7 +373,7 @@ describe('Sentiment Analysis API', () => {
       await call4.save();
       
       const conversationWithoutMessages = new Conversation({
-        clientId: patientId,
+        clientId: clientId,
         callId: call4._id,
         callSid: 'test-call-sid-4',
         lineItemId: null,
@@ -397,7 +397,7 @@ describe('Sentiment Analysis API', () => {
     it('should return 400 for incomplete conversation', async () => {
       const { Call } = require('../../src/models');
       const call5 = new Call({
-        clientId: patientId,
+        clientId: clientId,
         callSid: 'test-call-sid-5',
         status: 'in-progress',
         startTime: new Date(),
@@ -407,7 +407,7 @@ describe('Sentiment Analysis API', () => {
       await call5.save();
       
       const incompleteConversation = new Conversation({
-        clientId: patientId,
+        clientId: clientId,
         callId: call5._id,
         callSid: 'test-call-sid-5',
         lineItemId: null,

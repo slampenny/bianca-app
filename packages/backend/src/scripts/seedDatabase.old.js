@@ -1,13 +1,13 @@
 // seedDatabase.js
 const mongoose = require('mongoose');
 const faker = require('faker');
-const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
+const { Alert, Org, Caregiver, Client, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
 const config = require('../config/config');
 
 // Import test fixtures directly for production
 const orgFixture = require('../../tests/fixtures/org.fixture');
 const caregiverFixture = require('../../tests/fixtures/caregiver.fixture');
-const patientFixture = require('../../tests/fixtures/patient.fixture');
+const clientFixture = require('../../tests/fixtures/client.fixture');
 const alertFixture = require('../../tests/fixtures/alert.fixture');
 const scheduleFixture = require('../../tests/fixtures/schedule.fixture');
 const conversationFixture = require('../../tests/fixtures/conversation.fixture');
@@ -16,7 +16,7 @@ const paymentMethodFixture = require('../../tests/fixtures/paymentMethod.fixture
 // Extract the needed exports
 const { orgOne, insertOrgs } = orgFixture;
 const { caregiverOne, admin, playwrightTestUser, hashedPassword, insertCaregiversAndAddToOrg } = caregiverFixture;
-const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = patientFixture;
+const { clientOne, clientTwo, insertClientsAndAddToCaregiver } = clientFixture;
 const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = alertFixture;
 const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = scheduleFixture;
 const { conversationOne, conversationTwo, insertConversations } = conversationFixture;
@@ -533,7 +533,7 @@ async function seedDatabase() {
     // Clear the database
     await Org.deleteMany({});
     await Caregiver.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Alert.deleteMany({});
     await Conversation.deleteMany({});
     await Message.deleteMany({});
@@ -724,8 +724,8 @@ async function seedDatabase() {
     };
     
     // Insert the specific test patients - Agnes for admin, Barnaby for caregiverOne
-    const [patient1] = await insertPatientsAndAddToCaregiver(adminRecord, [agnesAlphabet]);
-    const [patient2] = await insertPatientsAndAddToCaregiver(caregiverOneRecord, [barnabyButton]);
+    const [patient1] = await insertClientsAndAddToCaregiver(adminRecord, [agnesAlphabet]);
+    const [patient2] = await insertClientsAndAddToCaregiver(caregiverOneRecord, [barnabyButton]);
     console.log('Inserted test patients:', patient1.name, 'for admin and', patient2.name, 'for caregiverOne');
     
     // Create additional patients for testing with predictable names
@@ -786,7 +786,7 @@ async function seedDatabase() {
     };
     
     const [patient3, patient4, patient5, patient6, patient7, patient8, patient9, patient10] = 
-      await insertPatientsAndAddToCaregiver(caregiverOneRecord, [
+      await insertClientsAndAddToCaregiver(caregiverOneRecord, [
         patientThree, patientFour, patientFive, patientSix, 
         patientSeven, patientEight, patientNine, patientTen
       ]);

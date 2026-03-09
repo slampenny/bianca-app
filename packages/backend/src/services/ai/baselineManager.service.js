@@ -66,16 +66,15 @@ class BaselineManager {
   }
 
   /**
-   * Establish initial baseline for a patient
-   * @param {string} patientId - Patient ID
+   * Establish initial baseline for a client
+   * @param {string} clientId - Client ID
    * @param {Object} initialMetrics - Initial metrics to establish baseline
    * @returns {Promise<Object>} Established baseline
    */
-  async establishBaseline(patientId, initialMetrics) {
+  async establishBaseline(clientId, initialMetrics) {
     try {
       const baseline = {
-        clientId: patientId,
-        patientId, // Legacy alias
+        clientId,
         type: 'initial',
         establishedDate: new Date(),
         lastUpdated: new Date(),
@@ -85,10 +84,10 @@ class BaselineManager {
         version: 1
       };
 
-      await this.storeBaseline(patientId, baseline);
+      await this.storeBaseline(clientId, baseline);
       
       logger.info('Initial baseline established', { 
-        patientId, 
+        clientId, 
         metricsCount: Object.keys(baseline.metrics).length 
       });
 
@@ -102,17 +101,17 @@ class BaselineManager {
 
   /**
    * Update baseline with new metrics
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {Object} newMetrics - New metrics to add
    * @returns {Promise<Object>} Updated baseline
    */
-  async updateBaseline(patientId, newMetrics) {
+  async updateBaseline(clientId, newMetrics) {
     try {
-      const existingBaseline = await this.getBaseline(patientId);
+      const existingBaseline = await this.getBaseline(clientId);
       
       if (!existingBaseline) {
         // No existing baseline, establish initial one
-        return await this.establishBaseline(patientId, newMetrics);
+        return await this.establishBaseline(clientId, newMetrics);
       }
 
       // Add new data point
@@ -147,10 +146,10 @@ class BaselineManager {
         version: existingBaseline.version + 1
       };
 
-      await this.storeBaseline(patientId, updatedBaseline);
+      await this.storeBaseline(clientId, updatedBaseline);
       
       logger.info('Baseline updated', { 
-        patientId, 
+        clientId, 
         dataPoints: filteredDataPoints.length,
         significantChanges: significantChanges.length
       });
@@ -165,13 +164,13 @@ class BaselineManager {
 
   /**
    * Get deviation from baseline for current metrics
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {Object} currentMetrics - Current metrics to compare (can be nested medical analysis result)
    * @returns {Promise<Object>} Deviation analysis
    */
-  async getDeviation(patientId, currentMetrics) {
+  async getDeviation(clientId, currentMetrics) {
     try {
-      const baseline = await this.getBaseline(patientId);
+      const baseline = await this.getBaseline(clientId);
       
       if (!baseline) {
         return {
@@ -466,13 +465,13 @@ class BaselineManager {
   }
 
   /**
-   * Get baseline for a patient
-   * @param {string} patientId - Patient ID
+   * Get baseline for a client
+   * @param {string} clientId - Client ID
    * @returns {Promise<Object|null>} Baseline data or null
    */
-  async getBaseline(patientId) {
+  async getBaseline(clientId) {
     try {
-      return await conversationService.getMedicalBaseline(patientId);
+      return await conversationService.getMedicalBaseline(clientId);
     } catch (error) {
       logger.error('Error getting baseline:', error);
       return null;
@@ -480,14 +479,14 @@ class BaselineManager {
   }
 
   /**
-   * Store baseline for a patient
-   * @param {string} patientId - Patient ID
+   * Store baseline for a client
+   * @param {string} clientId - Client ID
    * @param {Object} baseline - Baseline data
    * @returns {Promise<void>}
    */
-  async storeBaseline(patientId, baseline) {
+  async storeBaseline(clientId, baseline) {
     try {
-      await conversationService.storeMedicalBaseline(patientId, baseline);
+      await conversationService.storeMedicalBaseline(clientId, baseline);
     } catch (error) {
       logger.error('Error storing baseline:', error);
       throw error;

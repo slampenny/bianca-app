@@ -287,7 +287,8 @@ function CurrentChargesScreen() {
     )
   }
 
-  if (!unbilledCosts || unbilledCosts.patientCosts.length === 0) {
+  const clientCosts = unbilledCosts?.clientCosts ?? unbilledCosts?.patientCosts ?? []
+  if (!unbilledCosts || clientCosts.length === 0) {
     return (
       <View style={styles.screenContainer} testID="current-charges-container">
         <Card
@@ -338,47 +339,51 @@ function CurrentChargesScreen() {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{translate("paymentScreen.clientsWithCharges" as import("../i18n").TxKeyPath)}</Text>
               <Text style={styles.summaryValue}>
-                {unbilledCosts.patientCosts.length} {unbilledCosts.patientCosts.length !== 1 ? translate("paymentScreen.patients") : translate("paymentScreen.patient")}
+                {clientCosts.length} {clientCosts.length !== 1 ? translate("paymentScreen.patients") : translate("paymentScreen.patient")}
               </Text>
             </View>
           </View>
         }
       />
 
-      {/* Patient Charges List */}
+      {/* Client charges list */}
       <View style={styles.patientChargesSection}>
         <Text preset="subheading" style={styles.patientChargesTitle}>
           {translate("paymentScreen.chargesByClient" as import("../i18n").TxKeyPath)}
         </Text>
         <FlatList
-          data={unbilledCosts.patientCosts}
-          keyExtractor={(item) => (item as any).clientId ?? (item as any).patientId}
-          renderItem={({ item }) => (
-            <Card
-              preset="default"
-              style={styles.patientChargeCard}
-              ContentComponent={
-                <View style={styles.patientChargeContent}>
-                  <View style={styles.patientChargeHeader}>
-                    <Text preset="bold" style={styles.patientName}>
-                      {(item as any).clientName ?? (item as any).patientName}
-                    </Text>
-                    <Text preset="bold" style={styles.patientTotalCost}>
-                      {formatCurrency(item.totalCost)}
-                    </Text>
+          data={clientCosts}
+          keyExtractor={(item) => (item as any).clientId ?? (item as any).patientId ?? ''}
+          renderItem={({ item }) => {
+            const count = (item as any).callCount ?? (item as any).conversationCount ?? 0
+            const totalCost = item.totalCost ?? 0
+            return (
+              <Card
+                preset="default"
+                style={styles.patientChargeCard}
+                ContentComponent={
+                  <View style={styles.patientChargeContent}>
+                    <View style={styles.patientChargeHeader}>
+                      <Text preset="bold" style={styles.patientName}>
+                        {(item as any).clientName ?? (item as any).patientName}
+                      </Text>
+                      <Text preset="bold" style={styles.patientTotalCost}>
+                        {formatCurrency(totalCost)}
+                      </Text>
+                    </View>
+                    <View style={styles.patientChargeDetails}>
+                      <Text style={styles.patientChargeDetail}>
+                        {count} {count !== 1 ? translate("paymentScreen.conversations") : translate("paymentScreen.conversation")}
+                      </Text>
+                      <Text style={styles.patientChargeDetail}>
+                        {translate("paymentScreen.average")} {formatCurrency(count > 0 ? totalCost / count : 0)}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.patientChargeDetails}>
-                    <Text style={styles.patientChargeDetail}>
-                      {item.conversationCount} {item.conversationCount !== 1 ? translate("paymentScreen.conversations") : translate("paymentScreen.conversation")}
-                    </Text>
-                    <Text style={styles.patientChargeDetail}>
-                      {translate("paymentScreen.average")} {formatCurrency(item.totalCost / item.conversationCount)}
-                    </Text>
-                  </View>
-                </View>
-              }
-            />
-          )}
+                }
+              />
+            )
+          }}
           contentContainerStyle={styles.patientChargesList}
           testID="patient-charges-list"
           showsVerticalScrollIndicator={false}

@@ -95,7 +95,7 @@ Given('I am logged in as {string}', async function(username) {
         attempts++;
         if (attempts < maxAttempts) {
           console.log(`Frontend not ready, waiting... (attempt ${attempts}/${maxAttempts})`);
-          await safeWait(this.page, 3000); // Increased wait time
+          await this.page.locator('body').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         } else {
           throw new Error(`Frontend not available at ${this.baseURL} after ${maxAttempts} attempts. Is it running?`);
         }
@@ -104,9 +104,9 @@ Given('I am logged in as {string}', async function(username) {
       }
     }
   }
-  
-  await safeWait(this.page, 1000);
-  
+
+  await this.page.locator('[data-testid="email-input"], [data-testid="home-header"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // Check if already logged in
   const loginInput = this.page.getByTestId('email-input');
   const loginCount = await loginInput.count();
@@ -119,10 +119,10 @@ Given('I am logged in as {string}', async function(username) {
     }
     // Might be logged in but on different screen - navigate to home
     await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load' });
-    await safeWait(this.page, 1000);
+    await this.page.locator('[data-testid="home-header"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     return;
   }
-  
+
   // Fill in login form
   await loginInput.waitFor({ state: 'visible', timeout: 10000 });
   await loginInput.fill(credentials.email);
@@ -149,9 +149,8 @@ Given('I am logged in as {string}', async function(username) {
   
   // If login failed, check for error messages
   if (!loginResponse) {
-    // Wait a bit to see if there's an error message
-    await safeWait(this.page, 2000);
-    
+    await this.page.locator('[data-testid*="error"], .error, [role="alert"], [data-testid="email-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
     // Check for error messages
     const errorMessage = await this.page.locator('[data-testid*="error"], .error, [role="alert"]').first().textContent().catch(() => null);
     if (errorMessage) {
@@ -165,12 +164,9 @@ Given('I am logged in as {string}', async function(username) {
     }
   }
   
-  // Wait for navigation to home screen after successful login
-  // The app should navigate to MainTabs/Home after login
   console.log('[DEBUG] Waiting for navigation to home screen after login...');
-  await safeWait(this.page, 2000);
-  
-  // Wait for home screen to appear
+  await this.page.locator('[data-testid="home-header"], [data-testid="client-list"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
   let homeScreenFound = false;
   let navAttempts = 0;
   const maxNavAttempts = 20;
@@ -190,22 +186,20 @@ Given('I am logged in as {string}', async function(username) {
       console.log(`[DEBUG] Home screen found after login (header: ${headerCount}, list: ${listCount}, button: ${buttonCount})`);
       break;
     }
-    
-    await safeWait(this.page, 500);
+
+    await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').first().waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
     navAttempts++;
   }
-  
+
   if (!homeScreenFound) {
     const currentUrl = this.page.url();
     console.log(`[DEBUG] Home screen not found after login. URL: ${currentUrl}`);
     // Don't throw - let the test continue, it might appear later
   }
   
-  // Wait for navigation after login
   try {
-    await safeWait(this.page, 2000);
-    
-    // Wait for the page to navigate away from login (up to 10 seconds)
+    await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
     let loginPageVisible = true;
     for (let i = 0; i < 10; i++) {
       const loginInputCheck = await this.page.getByTestId('email-input').count().catch(() => 0);
@@ -213,7 +207,7 @@ Given('I am logged in as {string}', async function(username) {
         loginPageVisible = false;
         break;
       }
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="home-header"]').waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
     }
     
     if (loginPageVisible) {
@@ -243,10 +237,9 @@ Given('I am logged in as {string}', async function(username) {
 });
 
 Given('I am not logged in', async function() {
-  // Navigate to login page first
   await this.page.goto(this.baseURL, { waitUntil: 'load' });
-  await safeWait(this.page, 1000);
-  
+  await this.page.locator('body').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+
   // Clear any existing session (after navigation)
   try {
     await this.page.evaluate(() => {
@@ -267,24 +260,22 @@ Given('I am not logged in', async function() {
     try {
       // Navigate to profile and logout
       await this.page.goto(`${this.baseURL}/MainTabs/Home/Profile`, { waitUntil: 'load' });
-      await safeWait(this.page, 1000);
-      
+      await this.page.locator('[data-testid="profile-logout-button"], [data-testid="email-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
       const logoutButton = this.page.getByTestId('profile-logout-button')
         .or(this.page.getByText(/logout/i).first());
       
       const logoutCount = await logoutButton.count();
       if (logoutCount > 0) {
         await logoutButton.click();
-        await safeWait(this.page, 2000);
+        await this.page.locator('[data-testid="email-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       }
-      
-      // Navigate back to login
+
       await this.page.goto(this.baseURL, { waitUntil: 'load' });
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="email-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     } catch (e) {
-      // Logout might not be available, that's okay - just navigate to root
       await this.page.goto(this.baseURL, { waitUntil: 'load' });
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="email-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
   
@@ -322,34 +313,28 @@ Given('I am not logged in', async function() {
     
     if (!emailInputFound) {
       try {
-        // Try any input with email type
         await this.page.waitForSelector('input[type="email"]', { timeout: 10000 });
         emailInputFound = true;
         break;
       } catch (e) {
-        // Wait a bit and retry
         if (retry < 3) {
-          await safeWait(this.page, 2000);
-          // Reload page if still not found (but not on last retry)
+          await this.page.locator('input[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
           if (retry < 2) {
             await this.page.reload({ waitUntil: 'load' });
-            await safeWait(this.page, 2000);
+            await this.page.locator('input[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
           }
         }
       }
     }
   }
-  
+
   if (!emailInputFound) {
-    // Check if we're on a valid page (not an error page) - maybe the login form just hasn't rendered yet
     const currentUrl = this.page.url();
     const isOnRoot = currentUrl === this.baseURL || currentUrl === `${this.baseURL}/`;
     const hasError = await this.page.locator('text=/error|404|not found/i').count().catch(() => 0);
-    
+
     if (isOnRoot && hasError === 0) {
-      // We're on the root page with no errors - the login form might just be slow to render
-      // Wait one more time and check again
-      await safeWait(this.page, 3000);
+      await this.page.locator('input[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       
       // Try one final check with locator
       const finalCheck = await this.page.locator('input[data-testid="email-input"]').count().catch(() => 0);
@@ -382,8 +367,8 @@ Given('I am not logged in', async function() {
 
 When('I navigate to the login page', async function() {
   await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load', timeout: 15000 });
-  await safeWait(this.page, 2000); // Give React Native Web time to render
-  
+  await this.page.locator('[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // Check if browser is closed
   if (this.page.isClosed()) {
     throw new Error('Browser was closed during navigation');
@@ -421,16 +406,14 @@ When('I navigate to the login page', async function() {
         emailInputFound = true;
         break;
       } catch (e) {
-        // Wait a bit and retry
         if (retry < 2) {
-          await safeWait(this.page, 2000);
+          await this.page.locator('[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         }
       }
     }
   }
-  
+
   if (!emailInputFound) {
-    // Take screenshot for debugging
     try {
       await this.takeScreenshot('login-page-not-found');
     } catch (e) {
@@ -442,13 +425,12 @@ When('I navigate to the login page', async function() {
 
 When('I navigate to the registration page', async function() {
   await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load', timeout: 15000 });
-  await safeWait(this.page, 2000); // Give React Native Web time to render
-  
-  // Check if browser is closed
+  await this.page.locator('[data-testid="email-input"], input[type="email"], [data-testid*="register"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   if (this.page.isClosed()) {
     throw new Error('Browser was closed during navigation');
   }
-  
+
   // Wait for login screen to load - try multiple selectors with retries
   // Use locator pattern for React Native Web (TextField renders as input[data-testid="..."])
   let emailInputFound = false;
@@ -489,26 +471,23 @@ When('I navigate to the registration page', async function() {
       } catch (e) {
         // Wait a bit and retry
         if (retry < 3) {
-          await safeWait(this.page, 2000);
-          // Reload page if still not found (but not on last retry)
+          await this.page.locator('input[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
           if (retry < 2) {
             await this.page.reload({ waitUntil: 'load' });
-            await safeWait(this.page, 2000);
+            await this.page.locator('input[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
           }
         }
       }
     }
   }
-  
+
   if (!emailInputFound) {
-    // Check if we're on a valid page (not an error page)
     const currentUrl = this.page.url();
     const isOnRoot = currentUrl === this.baseURL || currentUrl === `${this.baseURL}/`;
     const hasError = await this.page.locator('text=/error|404|not found/i').count().catch(() => 0);
-    
+
     if (isOnRoot && hasError === 0) {
-      // Wait one more time and check again
-      await safeWait(this.page, 3000);
+      await this.page.locator('input[data-testid="email-input"], input[type="email"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       const finalCheck = await this.page.locator('input[data-testid="email-input"]').count().catch(() => 0);
       if (finalCheck === 0) {
         const finalCheck2 = await this.page.getByTestId('email-input').count().catch(() => 0);
@@ -634,9 +613,8 @@ When('I click the login button', async function() {
   
   await loginButton.click();
   await loginPromise;
-  
-  // Wait for navigation after login
-  await safeWait(this.page, 2000);
+
+  await this.page.locator('[data-testid="home-header"], [data-testid="client-list"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 });
 
 When('I submit the registration form', async function() {
@@ -653,18 +631,16 @@ When('I submit the registration form', async function() {
   
   await submitButton.click();
   await registerPromise;
-  
-  // Wait for navigation after registration
-  await safeWait(this.page, 3000);
-  
+
+  await this.page.locator('[data-testid="email-verification"], [data-testid="home-header"], text=/verify|check your email/i').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
   // Store registration success for later checks
   this.registrationSubmitted = true;
 });
 
 Then('I should be logged in', async function() {
-  // Wait for navigation after login
-  await safeWait(this.page, 3000);
-  
+  await this.page.locator('[data-testid="home-header"], [data-testid="client-list"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
   // Check that login screen is gone
   const loginInput = this.page.getByTestId('email-input');
   const loginCount = await loginInput.count();
@@ -774,8 +750,8 @@ Then('my account should be created', async function() {
 
 Given('I am on the registration page', async function() {
   await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load' });
-  await safeWait(this.page, 2000); // Give React Native Web time to render
-  
+  await this.page.locator('[data-testid="email-input"], input[type="email"], [data-testid*="register"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // Wait for login screen to load - try multiple selectors
   let emailInputFound = false;
   try {

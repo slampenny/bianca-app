@@ -35,7 +35,7 @@ router
   );
 
 router
-  .route('/:patientId')
+  .route('/:clientId')
   .get(
     auth('readOwn:patient', 'readAny:patient'),
     minimumNecessaryMiddleware('patient'), // HIPAA: Minimum necessary data access
@@ -54,17 +54,17 @@ router
   );
 
 router
-  .route('/:patientId/avatar')
+  .route('/:clientId/avatar')
   .post(auth('updateOwn:patient', 'updateAny:patient'), upload.single('avatar'), patientController.uploadPatientAvatar)
   .patch(auth('updateOwn:patient', 'updateAny:patient'), upload.single('avatar'), patientController.uploadPatientAvatar);
 
 router
-  .route('/:patientId/caregivers/:caregiverId')
+  .route('/:clientId/caregivers/:caregiverId')
   .post(auth('updateOwn:patient', 'updateAny:patient'), patientController.assignCaregiver)
   .delete(auth('deleteOwn:patient', 'deleteAny:patient'), patientController.removeCaregiver);
 
 router
-  .route('/:patientId/conversations')
+  .route('/:clientId/conversations')
   .get(
     auth('readOwn:patient', 'readAny:patient'),
     minimumNecessaryMiddleware('conversation'), // HIPAA: Minimum necessary data access
@@ -73,7 +73,7 @@ router
   );
 
 router
-  .route('/:patientId/caregivers')
+  .route('/:clientId/caregivers')
   .get(auth('readAny:caregiver'), validate(patientValidation.getCaregivers), patientController.getCaregivers);
 
 // Consent verification route - public endpoint (no auth required)
@@ -238,7 +238,7 @@ module.exports = router;
 
 /**
  * @swagger
- * /clients/{patientId}:
+ * /clients/{clientId}:
  *   get:
  *     summary: Get a patient
  *     description: Logged in Patients can fetch only their own patient information. Only admins can fetch other Patients.
@@ -247,7 +247,7 @@ module.exports = router;
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -274,7 +274,7 @@ module.exports = router;
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -354,7 +354,7 @@ module.exports = router;
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -372,14 +372,14 @@ module.exports = router;
 
 /**
  * @swagger
- * /patients/{patientId}/caregivers/{caregiverId}:
+ * /clients/{clientId}/caregivers/{caregiverId}:
  *   post:
  *     summary: Assign a caregiver to a patient
  *     description: Only admins can assign caregivers.
  *     tags: [Patients]
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -406,7 +406,7 @@ module.exports = router;
  *     tags: [Patients]
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -430,7 +430,7 @@ module.exports = router;
 
 /**
  * @swagger
- * /patients/{patientId}/conversations:
+ * /clients/{clientId}/conversations:
  *   get:
  *     summary: Get conversations by patient
  *     description: Logged in Patients can fetch only their own conversation information. Only admins can fetch other Patients' conversations.
@@ -439,7 +439,7 @@ module.exports = router;
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -463,14 +463,14 @@ module.exports = router;
 
 /**
  * @swagger
- * /patients/{patientId}/caregivers:
+ * /clients/{clientId}/caregivers:
  *   get:
  *     summary: Retrieve caregivers of a patient
  *     description: Retrieve caregivers of a patient by the patient's ID
  *     tags: [Patients]
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         description: Patient ID
  *         schema:

@@ -23,20 +23,20 @@ afterAll(async () => {
 describe('Localized Emergency Detection', () => {
   beforeEach(async () => {
     // Clear emergency phrases, users, and patients before each test
-    const { Org, Caregiver, Patient } = require('../../src/models');
+    const { Org, Caregiver, Client } = require('../../src/models');
     await EmergencyPhrase.deleteMany();
     await Org.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
   });
 
   afterEach(async () => {
     // Clean up after each test
-    const { Org, Caregiver, Patient } = require('../../src/models');
+    const { Org, Caregiver, Client } = require('../../src/models');
     await EmergencyPhrase.deleteMany();
     await Org.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
   });
 
   describe('Emergency Phrase Management API', () => {
@@ -338,7 +338,7 @@ describe('Localized Emergency Detection', () => {
   });
 
   describe('Integration with Emergency Processor', () => {
-    let patientId;
+    let clientId;
 
     beforeEach(async () => {
       // Create test user ID for phrases
@@ -371,7 +371,7 @@ describe('Localized Emergency Detection', () => {
       await localizedEmergencyDetector.loadPhrases();
 
       // Create a test org first (required for patient)
-      const { Patient, Org } = require('../../src/models');
+      const { Client, Org } = require('../../src/models');
       const testOrg = new Org({
         name: 'Test Org',
         email: 'testorg@example.com',
@@ -381,20 +381,20 @@ describe('Localized Emergency Detection', () => {
       await testOrg.save();
 
       // Create a test patient
-      const patient = new Patient({
-        name: 'Test Patient',
+      const client = new Client({
+        name: 'Test Client',
         email: 'test@example.com',
         phone: '1234567890',
         preferredLanguage: 'es',
         org: testOrg._id
       });
-      await patient.save();
-      patientId = patient._id;
+      await client.save();
+      clientId = client._id;
     });
 
     test('should process utterance with patient language preference', async () => {
       const result = await emergencyProcessor.processUtterance(
-        patientId,
+        clientId,
         'Creo que estoy teniendo un ataque al corazón'
       );
 

@@ -9,7 +9,7 @@ const httpStatus = require('http-status');
 const app = require('../utils/integration-app');
 const { Org, Patient, Token, Caregiver } = require('../../src/models');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
-const { patientOne, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
+const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
 
 const {
   caregiverOne,
@@ -45,15 +45,15 @@ describe('Client routes', () => {
       const res = await request(app)
         .post('/v1/clients')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ ...patientOne, org: org._id })
+        .send({ ...clientOne, org: org._id })
         .expect(httpStatus.CREATED);
 
       expect(res.body).toEqual({
         id: expect.any(String),
         org: org.id.toString(),
-        name: patientOne.name,
-        email: patientOne.email,
-        phone: patientOne.phone,
+        name: clientOne.name,
+        email: clientOne.email,
+        phone: clientOne.phone,
         isEmailVerified: false,
         preferredLanguage: 'en',
         consented: true,
@@ -81,7 +81,7 @@ describe('Client routes', () => {
 
         for (const phoneNumber of validPhoneNumbers) {
           const clientData = {
-            ...patientOne,
+            ...clientOne,
             org: org._id,
             phone: phoneNumber,
             email: faker.internet.email()
@@ -106,7 +106,7 @@ describe('Client routes', () => {
 
         for (const phoneNumber of validInternationalPhones) {
           const clientData = {
-            ...patientOne,
+            ...clientOne,
             org: org._id,
             phone: phoneNumber,
             email: faker.internet.email()
@@ -145,7 +145,7 @@ describe('Client routes', () => {
 
         for (const phoneNumber of invalidPhoneNumbers) {
           const clientData = {
-            ...patientOne,
+            ...clientOne,
             org: org._id,
             phone: phoneNumber,
             email: faker.internet.email()
@@ -161,7 +161,7 @@ describe('Client routes', () => {
 
       test('should return 400 for phone number validation error message in creation', async () => {
         const clientData = {
-          ...patientOne,
+          ...clientOne,
           org: org._id,
           phone: 'invalid-phone',
           email: faker.internet.email()
@@ -178,7 +178,7 @@ describe('Client routes', () => {
 
       test('should require phone number for client creation', async () => {
         const clientDataWithoutPhone = {
-          name: patientOne.name,
+          name: clientOne.name,
           email: faker.internet.email(),
           org: org._id,
         };
@@ -196,7 +196,7 @@ describe('Client routes', () => {
     test('should return 200 and a client if data is ok', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [client] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
 
       const res = await request(app)
         .get(`/v1/clients/${client.id}`)
@@ -215,7 +215,7 @@ describe('Client routes', () => {
     test('should update a client and return 200', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [client] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
 
       const updateBody = {
         name: 'Updated Name',
@@ -247,7 +247,7 @@ describe('Client routes', () => {
         const result = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
         caregiver = result.caregiver;
         accessToken = result.accessToken;
-        [client] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+        [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
       });
 
       test('should accept valid US phone number formats', async () => {
@@ -427,7 +427,7 @@ describe('Client routes', () => {
     test('should delete a client and return 204', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [client] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
 
       await request(app)
         .delete(`/v1/clients/${client.id}`)
@@ -442,7 +442,7 @@ describe('Client routes', () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const [caregiver1] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
-      const [client] = await insertPatientsAndAddToCaregiver(caregiver1, [patientOne]);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver1, [clientOne]);
 
       const res = await request(app)
         .post(`/v1/clients/${client.id}/caregivers/${caregiver.id}`)
@@ -461,7 +461,7 @@ describe('Client routes', () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const [caregiver1] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
-      const [client] = await insertPatientsAndAddToCaregiver(caregiver1, [patientOne]);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver1, [clientOne]);
 
       const res = await request(app)
         .delete(`/v1/clients/${client.id}/caregivers/${caregiver1.id}`)

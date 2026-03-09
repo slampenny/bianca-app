@@ -206,7 +206,7 @@ Please provide your analysis in the following JSON format:`;
       
       // Get the conversation and its messages
       const conversation = await Conversation.findById(conversationId)
-        .populate('patientId', 'name age')
+        .populate('clientId', 'name age')
         .lean();
 
       if (!conversation) {
@@ -226,7 +226,7 @@ Please provide your analysis in the following JSON format:`;
       // Format conversation text
       const conversationText = messages
         .map(msg => {
-          const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+          const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
           return `${speaker}: ${msg.content}`;
         })
         .join('\n');

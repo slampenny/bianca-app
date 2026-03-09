@@ -1,14 +1,14 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const privacyService = require('../../../src/services/privacy.service');
-const { PrivacyRequest, ConsentRecord, Caregiver, Patient, Org, Conversation, MedicalAnalysis, Call } = require('../../../src/models');
+const { PrivacyRequest, ConsentRecord, Caregiver, Client, Org, Conversation, MedicalAnalysis, Call } = require('../../../src/models');
 const ApiError = require('../../../src/utils/ApiError');
 const emailService = require('../../../src/services/email.service');
 
 describe('Privacy Service', () => {
   let mongoServer;
   let caregiverId;
-  let patientId;
+  let clientId;
   let orgId;
 
   beforeAll(async () => {
@@ -33,7 +33,7 @@ describe('Privacy Service', () => {
     await PrivacyRequest.deleteMany({});
     await ConsentRecord.deleteMany({});
     await Caregiver.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Org.deleteMany({});
     await Conversation.deleteMany({});
     await Call.deleteMany({});
@@ -59,19 +59,19 @@ describe('Privacy Service', () => {
     });
     caregiverId = caregiver._id;
 
-    // Create test patient
+    // Create test client
     
-    const patient = await Patient.create({
-      name: 'Test Patient',
-      email: 'patient@test.com',
+    const client = await Client.create({
+      name: 'Test Client',
+      email: 'client@test.com',
       phone: '+16045624264', // Valid phone format
       org: org._id,
       caregivers: [caregiverId],
     });
-    patientId = patient._id;
+    clientId = client._id;
 
-    // Update caregiver with patient
-    caregiver.clients = [patientId];
+    // Update caregiver with client
+    caregiver.clients = [clientId];
     await caregiver.save();
   });
 
@@ -214,14 +214,14 @@ describe('Privacy Service', () => {
     it('should automatically gather and email all user data', async () => {
       // Create test data - first create a call (conversations require callId)
       const call = await Call.create({
-        clientId: patientId,
+        clientId,
         callSid: 'CA1234567890abcdef',
         status: 'completed',
         duration: 60
       });
 
       const conversation = await Conversation.create({
-        clientId: patientId,
+        clientId,
         callId: call._id,
         agentId: caregiverId,
         status: 'completed',
@@ -230,7 +230,7 @@ describe('Privacy Service', () => {
       });
 
       const medicalAnalysis = await MedicalAnalysis.create({
-        clientId: patientId,
+        clientId,
         analysisDate: new Date(),
         startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
         endDate: new Date(),
@@ -305,9 +305,9 @@ describe('Privacy Service', () => {
     it('should only process caregiver requests', async () => {
       const request = await PrivacyRequest.create({
         requestType: 'access',
-        requestorType: 'patient',
-        requestorId: patientId,
-        requestorModel: 'Patient',
+        requestorType: 'client',
+        requestorId: clientId,
+        requestorModel: 'Client',
         informationRequested: 'Test',
       });
 

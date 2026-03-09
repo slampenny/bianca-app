@@ -687,7 +687,7 @@ const stablePatientConversations = {
 /**
  * Helper function to create conversation objects from the fixture data
  */
-const createConversationsFromFixture = async (patientId, conversationData) => {
+const createConversationsFromFixture = async (clientId, conversationData) => {
   const conversations = [];
   
   for (const monthData of Object.values(conversationData)) {
@@ -695,7 +695,7 @@ const createConversationsFromFixture = async (patientId, conversationData) => {
       // Create a Call first (Conversation requires callId)
       const call = await Call.create({
         callSid: `CA${new mongoose.Types.ObjectId().toString()}`,
-        clientId: patientId,
+        clientId,
         duration: 30 * 60, // 30 minutes in seconds
         status: 'completed',
         startTime: convData.date,
@@ -706,7 +706,7 @@ const createConversationsFromFixture = async (patientId, conversationData) => {
       // Note: Conversation model uses createdAt (from timestamps), not startTime
       // We'll set createdAt explicitly to match the conversation date
       const conversation = new Conversation({
-        clientId: patientId,
+        clientId,
         callId: call._id,
         messages: []
       });

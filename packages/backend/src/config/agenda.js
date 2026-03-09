@@ -96,8 +96,8 @@ agenda.define('checkClientsWithoutSchedules', { concurrency: 1, lockLifetime: 60
 // Retry missed call job definition
 agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async (job, done) => {
   try {
-    const { callId, clientId: jobClientId, patientId: jobPatientId, retryAttempt, originalCallId } = job.attrs.data;
-    const clientId = jobClientId || jobPatientId;
+    const { callId, clientId: jobClientId, retryAttempt, originalCallId } = job.attrs.data;
+    const clientId = jobClientId;
     
     logger.info(`[Agenda] Executing retry missed call job: callId=${callId}, retryAttempt=${retryAttempt}`);
     
@@ -109,7 +109,7 @@ agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async
       return done(new Error('Original call not found'));
     }
     
-    // Get client and org (support both clientId and legacy patientId in job data)
+    // Get client and org
     const client = await Client.findById(clientId).populate('org');
     if (!client) {
       logger.error(`[Agenda] Client not found: ${clientId}`);
@@ -251,7 +251,7 @@ async function runSchedules() {
       await alertService.createAlert({
         message: `Called ${client.name} for their scheduled check-in at ${now.toISOString()}`,
         importance: 'low',
-        alertType: 'patient',
+        alertType: 'client',
         relatedClient: schedule.client,
         createdBy: schedule.id,
         createdModel: 'Schedule',
@@ -354,22 +354,22 @@ async function processOrgBilling(org) {
     billingSessionId: billingSessionId
   }).populate('clientId');
   
-  // Group calls by patient for itemized billing
-  const patientBilling = {};
+  // Group calls by client for itemized billing
+  const clientBilling = {};
   let totalCost = 0;
   
   for (const call of unbilledCalls) {
-    const patientId = call.clientId._id.toString();
-    if (!patientBilling[patientId]) {
-      patientBilling[patientId] = {
+    const clientId = call.clientId._id.toString();
+    if (!clientBilling[clientId]) {
+      clientBilling[clientId] = {
         client: call.clientId,
         calls: [],
         totalCost: 0
       };
     }
     
-    patientBilling[patientId].calls.push(call);
-    patientBilling[patientId].totalCost += call.cost;
+    clientBilling[clientId].calls.push(call);
+    clientBilling[clientId].totalCost += call.cost;
     totalCost += call.cost;
   }
   
@@ -385,18 +385,18 @@ async function processOrgBilling(org) {
   
   try {
     // Create invoice for the organization
-    const invoice = await createOrgInvoice(org, patientBilling, totalCost);
+    const invoice = await createOrgInvoice(org, clientBilling, totalCost);
     
-    // Create a mapping of patientId to lineItemId
-    const patientToLineItem = {};
+    // Create a mapping of clientId to lineItemId
+    const clientToLineItem = {};
     for (const lineItem of invoice.lineItems) {
-      patientToLineItem[lineItem.clientId.toString()] = lineItem._id;
+      clientToLineItem[lineItem.clientId.toString()] = lineItem._id;
     }
     
-    // Update each call with its patient's line item ID and clear session marker
+    // Update each call with its client's line item ID and clear session marker
     for (const call of unbilledCalls) {
-      const patientId = call.clientId._id.toString();
-      const lineItemId = patientToLineItem[patientId];
+      const clientId = call.clientId._id.toString();
+      const lineItemId = clientToLineItem[clientId];
       
       if (lineItemId) {
         await Call.updateOne(
@@ -456,7 +456,7 @@ async function processOrgBilling(org) {
   }
 }
 
-async function createOrgInvoice(org, patientBilling, totalCost) {
+async function createOrgInvoice(org, clientBilling, totalCost) {
   // Generate invoice number
   const lastInvoice = await require('../models').Invoice.findOne({}, {}, { sort: { createdAt: -1 } });
   let nextNum = 1;
@@ -479,12 +479,12 @@ async function createOrgInvoice(org, patientBilling, totalCost) {
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
     status: 'pending',
     totalAmount: totalCost,
-    notes: `Daily billing for ${Object.keys(patientBilling).length} patients`
+    notes: `Daily billing for ${Object.keys(clientBilling).length} clients`
   });
   
-  // Create line items for each patient
+  // Create line items for each client
   const lineItemData = [];
-  for (const [patientId, billing] of Object.entries(patientBilling)) {
+  for (const [clientId, billing] of Object.entries(clientBilling)) {
     lineItemData.push({
       clientId: billing.client._id,
       invoiceId: invoice._id,

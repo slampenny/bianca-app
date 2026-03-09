@@ -34,8 +34,8 @@ const insertScheduleAndAddToPatient = async (client, scheduleParam) => {
 //   const [patient1, patient2] = await insertPatients([patientOne, patientTwo]);
 
 //   // Assign patient IDs to the schedules
-//   scheduleOne.patientId = patient1._id;
-//   scheduleTwo.patientId = patient2._id;
+//   scheduleOne.client = patient1._id;
+//   scheduleTwo.client = patient2._id;
 
 //   // Insert the schedules
 //   const insertedSchedules = await insertSchedules([scheduleOne, scheduleTwo]);

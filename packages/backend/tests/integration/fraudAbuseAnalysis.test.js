@@ -7,12 +7,12 @@ const httpStatus = require('http-status');
 const mongoose = require('mongoose');
 
 const app = require('../utils/integration-app');
-const { Patient, Caregiver, Org, Conversation, Message, FraudAbuseAnalysis } = require('../../src/models');
+const { Client, Caregiver, Org, Conversation, Message, FraudAbuseAnalysis } = require('../../src/models');
 const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer } = require('../utils/mongodb-memory-server');
 
 let accessToken;
-let patientId;
+let clientId;
 let orgId;
 let caregiverId;
 
@@ -43,8 +43,8 @@ beforeAll(async () => {
   await caregiver.save();
   caregiverId = caregiver._id;
 
-  const patient = new Patient({
-    name: 'Vulnerable Test Patient',
+  const patient = new Client({
+    name: 'Vulnerable Test Client',
     email: 'vulnerable.patient@example.com',
     phone: '+16045624265',
     org: orgId,
@@ -52,13 +52,13 @@ beforeAll(async () => {
     isActive: true
   });
   await patient.save();
-  patientId = patient._id;
+  clientId = patient._id;
 
   // Create a Call first (Conversation requires callId)
   const { Call } = require('../../src/models');
   const call1 = new Call({
     callSid: 'fraud-test-call-1',
-    clientId: patientId,
+    clientId,
     startTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
     callStartTime: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
     callType: 'wellness-check',
@@ -71,7 +71,7 @@ beforeAll(async () => {
 
   // Create conversations with fraud/abuse patterns
   const conversation1 = new Conversation({
-    clientId: patientId,
+    clientId,
     callId: call1._id,
     callSid: 'fraud-test-call-1',
     messages: [],
@@ -95,7 +95,7 @@ beforeAll(async () => {
 
   const call2 = new Call({
     callSid: 'abuse-test-call-1',
-    clientId: patientId,
+    clientId,
     startTime: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
     callStartTime: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
     callType: 'wellness-check',
@@ -107,7 +107,7 @@ beforeAll(async () => {
   await call2.save();
 
   const conversation2 = new Conversation({
-    clientId: patientId,
+    clientId,
     callId: call2._id,
     callSid: 'abuse-test-call-1',
     messages: [],
@@ -131,7 +131,7 @@ beforeAll(async () => {
 
   const call3 = new Call({
     callSid: 'neglect-test-call-1',
-    clientId: patientId,
+    clientId,
     startTime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
     callStartTime: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
     callType: 'wellness-check',
@@ -143,7 +143,7 @@ beforeAll(async () => {
   await call3.save();
 
   const conversation3 = new Conversation({
-    clientId: patientId,
+    clientId,
     callId: call3._id,
     callSid: 'neglect-test-call-1',
     messages: [],
@@ -174,10 +174,10 @@ afterAll(async () => {
 });
 
 describe('Fraud Abuse Analysis API', () => {
-  describe('GET /fraud-abuse-analysis/:patientId', () => {
+  describe('GET /fraud-abuse-analysis/:clientId', () => {
     it('should return 200 and fraud/abuse analysis for a patient', async () => {
       const res = await request(app)
-        .get(`/v1/fraud-abuse-analysis/${patientId}`)
+        .get(`/v1/fraud-abuse-analysis/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ timeRange: 'month' })
         .expect(httpStatus.OK);
@@ -193,7 +193,7 @@ describe('Fraud Abuse Analysis API', () => {
 
     it('should detect financial exploitation patterns', async () => {
       const res = await request(app)
-        .get(`/v1/fraud-abuse-analysis/${patientId}`)
+        .get(`/v1/fraud-abuse-analysis/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ timeRange: 'month' })
         .expect(httpStatus.OK);
@@ -204,7 +204,7 @@ describe('Fraud Abuse Analysis API', () => {
 
     it('should detect abuse patterns', async () => {
       const res = await request(app)
-        .get(`/v1/fraud-abuse-analysis/${patientId}`)
+        .get(`/v1/fraud-abuse-analysis/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ timeRange: 'month' })
         .expect(httpStatus.OK);
@@ -215,7 +215,7 @@ describe('Fraud Abuse Analysis API', () => {
 
     it('should generate warnings for high risk', async () => {
       const res = await request(app)
-        .get(`/v1/fraud-abuse-analysis/${patientId}`)
+        .get(`/v1/fraud-abuse-analysis/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ timeRange: 'month' })
         .expect(httpStatus.OK);
@@ -227,16 +227,16 @@ describe('Fraud Abuse Analysis API', () => {
     });
   });
 
-  describe('GET /fraud-abuse-analysis/results/:patientId', () => {
+  describe('GET /fraud-abuse-analysis/results/:clientId', () => {
     it('should return 200 and stored analysis results', async () => {
       // First trigger an analysis to create stored results
       await request(app)
-        .post(`/v1/fraud-abuse-analysis/trigger-client/${patientId}`)
+        .post(`/v1/fraud-abuse-analysis/trigger-client/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.OK);
 
       const res = await request(app)
-        .get(`/v1/fraud-abuse-analysis/results/${patientId}`)
+        .get(`/v1/fraud-abuse-analysis/results/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ limit: 10 })
         .expect(httpStatus.OK);
@@ -247,10 +247,10 @@ describe('Fraud Abuse Analysis API', () => {
     });
   });
 
-  describe('POST /fraud-abuse-analysis/trigger-client/:patientId', () => {
+  describe('POST /fraud-abuse-analysis/trigger-client/:clientId', () => {
     it('should trigger analysis and return results', async () => {
       const res = await request(app)
-        .post(`/v1/fraud-abuse-analysis/trigger-client/${patientId}`)
+        .post(`/v1/fraud-abuse-analysis/trigger-client/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.OK);
 
@@ -262,11 +262,11 @@ describe('Fraud Abuse Analysis API', () => {
 
     it('should store analysis results in database', async () => {
       await request(app)
-        .post(`/v1/fraud-abuse-analysis/trigger-client/${patientId}`)
+        .post(`/v1/fraud-abuse-analysis/trigger-client/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.OK);
 
-      const storedAnalysis = await FraudAbuseAnalysis.findOne({ clientId: patientId });
+      const storedAnalysis = await FraudAbuseAnalysis.findOne({ clientId });
       expect(storedAnalysis).toBeTruthy();
       expect(storedAnalysis.overallRiskScore).toBeGreaterThan(0);
     });
@@ -285,7 +285,7 @@ describe('Fraud Abuse Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .get(`/v1/fraud-abuse-analysis/${patientId}`)
+        .get(`/v1/fraud-abuse-analysis/${clientId}`)
         .expect(httpStatus.UNAUTHORIZED);
     });
   });

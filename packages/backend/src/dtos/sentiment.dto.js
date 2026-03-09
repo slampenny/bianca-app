@@ -50,7 +50,6 @@ const SentimentTrendPointDTO = (conversation) => {
 const SentimentTrendDTO = (trendData) => {
   const {
     clientId,
-    patientId, // Legacy alias from service
     timeRange,
     startDate,
     endDate,
@@ -60,7 +59,7 @@ const SentimentTrendDTO = (trendData) => {
     summary
   } = trendData;
 
-  const id = clientId || patientId;
+  const id = clientId != null ? clientId : trendData.clientId;
   return {
     clientId: id,
     timeRange,

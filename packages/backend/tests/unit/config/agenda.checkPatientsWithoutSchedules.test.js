@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Patient, Org, Schedule, Alert } = require('../../../src/models');
+const { Client, Org, Schedule, Alert } = require('../../../src/models');
 
 // Mock config and logger before requiring agenda
 jest.mock('../../../src/config/config', () => ({
@@ -100,7 +100,7 @@ beforeAll(async () => {
       const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000);
       
       // Find patients created in this window who don't have schedules yet
-      const patients = await Patient.find({
+      const patients = await Client.find({
         createdAt: { 
           $gte: sixtyMinutesAgo,  // Created after 60 minutes ago
           $lte: thirtyMinutesAgo   // Created before 30 minutes ago
@@ -123,7 +123,7 @@ beforeAll(async () => {
           // Create alert for patient without schedule
           logger.info(`[Patient Schedule Check] Creating alert for patient ${patient.name} (${patient._id}) with no schedule`);
           
-          const alertMessage = `Patient ${patient.name} has no schedule configured`;
+          const alertMessage = `Client ${patient.name} has no schedule configured`;
           const relevanceUntil = moment().add(30, 'days').toISOString();
           
           await alertService.createAlert({
@@ -132,7 +132,7 @@ beforeAll(async () => {
             alertType: 'patient',
             relatedClient: patient._id,
             createdBy: patient._id,
-            createdModel: 'Patient',
+            createdModel: 'Client',
             visibility: 'assignedCaregivers',
             relevanceUntil
           });
@@ -161,7 +161,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
 
   beforeEach(async () => {
     await Org.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Schedule.deleteMany({});
     await Alert.deleteMany({});
     jest.clearAllMocks();
@@ -203,8 +203,8 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       
       const OriginalDate = mockDate(mockTimestamp);
 
-      const patient = await Patient.create({
-        name: 'Test Patient',
+      const patient = await Client.create({
+        name: 'Test Client',
         email: 'testpatient@example.com',
         phone: '1234567890',
         org: org._id,
@@ -222,12 +222,12 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       expect(mockAlertService.createAlert).toHaveBeenCalledTimes(1);
       expect(mockAlertService.createAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: `Patient ${patient.name} has no schedule configured`,
+          message: `Client ${patient.name} has no schedule configured`,
           importance: 'medium',
           alertType: 'patient',
           relatedClient: patient._id,
           createdBy: patient._id,
-          createdModel: 'Patient',
+          createdModel: 'Client',
           visibility: 'assignedCaregivers',
         })
       );
@@ -243,7 +243,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       
       const OriginalDate = mockDate(mockTimestamp);
 
-      await Patient.create({
+      await Client.create({
         name: 'Recent Patient',
         email: 'recent@example.com',
         phone: '1234567890',
@@ -270,7 +270,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       
       const OriginalDate = mockDate(mockTimestamp);
 
-      await Patient.create({
+      await Client.create({
         name: 'Old Patient',
         email: 'old@example.com',
         phone: '1234567890',
@@ -297,7 +297,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       
       const OriginalDate = mockDate(mockTimestamp);
 
-      const patient = await Patient.create({
+      const patient = await Client.create({
         name: 'Patient With Schedule',
         email: 'withschedule@example.com',
         phone: '1234567890',
@@ -330,7 +330,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       const OriginalDate = mockDate(mockTimestamp);
 
       // Patient 1: 45 minutes old without schedule (should get alert)
-      const patient1 = await Patient.create({
+      const patient1 = await Client.create({
         name: 'Patient 1',
         email: 'patient1@example.com',
         phone: '1111111111',
@@ -339,7 +339,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       });
 
       // Patient 2: 45 minutes old with schedule (should not get alert)
-      const patient2 = await Patient.create({
+      const patient2 = await Client.create({
         name: 'Patient 2',
         email: 'patient2@example.com',
         phone: '2222222222',
@@ -354,7 +354,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       });
 
       // Patient 3: 29 minutes old without schedule (too recent, should not get alert)
-      await Patient.create({
+      await Client.create({
         name: 'Patient 3',
         email: 'patient3@example.com',
         phone: '3333333333',
@@ -363,7 +363,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       });
 
       // Patient 4: 65 minutes old without schedule (too old, outside window, should not get alert)
-      await Patient.create({
+      await Client.create({
         name: 'Patient 4',
         email: 'patient4@example.com',
         phone: '4444444444',
@@ -380,7 +380,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       expect(mockAlertService.createAlert).toHaveBeenCalledTimes(1);
       expect(mockAlertService.createAlert).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: `Patient ${patient1.name} has no schedule configured`,
+          message: `Client ${patient1.name} has no schedule configured`,
         })
       );
     });
@@ -397,7 +397,7 @@ describe('Agenda - checkPatientsWithoutSchedules', () => {
       const OriginalDate = mockDate(mockTimestamp);
 
       // Create patient without org (edge case)
-      await Patient.create({
+      await Client.create({
         name: 'Patient No Org',
         email: 'noorg@example.com',
         phone: '1234567890',

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Conversation, Patient, Org, Call } = require('../../../src/models');
+const { Conversation, Client, Org, Call } = require('../../../src/models');
 
 // Mock config and logger before requiring agenda
 jest.mock('../../../src/config/config', () => ({
@@ -87,12 +87,12 @@ afterAll(async () => {
 
 describe('Agenda - Retry Missed Call Job', () => {
   let org;
-  let patient;
+  let client;
   let conversation;
 
   beforeEach(async () => {
     await Org.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Conversation.deleteMany({});
     jest.clearAllMocks();
 
@@ -108,10 +108,10 @@ describe('Agenda - Retry Missed Call Job', () => {
       },
     });
 
-    // Create patient
-    patient = await Patient.create({
-      name: 'Test Patient',
-      email: 'patient@example.com',
+    // Create client
+    client = await Client.create({
+      name: 'Test Client',
+      email: 'client@example.com',
       phone: '5551234567',
       org: org._id,
     });
@@ -119,7 +119,7 @@ describe('Agenda - Retry Missed Call Job', () => {
     // Create a Call first (Conversation requires callId)
     const call = await Call.create({
       callSid: 'CA1234567890',
-      clientId: patient._id,
+      clientId: client._id,
       org: org._id,
       status: 'failed',
       duration: 0
@@ -128,7 +128,7 @@ describe('Agenda - Retry Missed Call Job', () => {
     // Create failed conversation
     conversation = await Conversation.create({
       callId: call._id,
-      clientId: patient._id,
+      clientId: client._id,
       status: 'failed',
     });
   });
@@ -146,27 +146,27 @@ describe('Agenda - Retry Missed Call Job', () => {
       // This simulates what agenda would do
       const jobData = {
         conversationId: conversation._id.toString(),
-        clientId: patient._id.toString(),
+        clientId: client._id.toString(),
         retryAttempt: 1,
         originalCallId: conversation._id.toString(),
       };
 
       // Manually execute the retry logic
       const retryConversation = await Conversation.findById(conversation._id);
-      const retryPatient = await Patient.findById(patient._id).populate('org');
-      const retryOrg = retryPatient.org;
+      const retryClient = await Client.findById(client._id).populate('org');
+      const retryOrg = retryClient.org;
       const maxRetries = retryOrg.callRetrySettings.retryCount || 2;
 
       expect(jobData.retryAttempt).toBeLessThanOrEqual(maxRetries);
 
-      const newCallSid = await twilioCallService.initiateCall(patient._id);
+      const newCallSid = await twilioCallService.initiateCall(client._id);
       
       // Create a Call first (Conversation requires callId)
       // Retry fields are on Call, not Conversation
       const originalCall = await Call.findOne({ callSid: 'CA1234567890' });
       const newCall = await Call.create({
         callSid: newCallSid,
-        clientId: patient._id,
+        clientId: client._id,
         org: org._id,
         status: 'initiated',
         duration: 0,
@@ -177,11 +177,11 @@ describe('Agenda - Retry Missed Call Job', () => {
       
       const newConversation = await Conversation.create({
         callId: newCall._id,
-        clientId: patient._id,
+        clientId: client._id,
         status: 'initiated',
       });
 
-      expect(twilioCallService.initiateCall).toHaveBeenCalledWith(patient._id);
+      expect(twilioCallService.initiateCall).toHaveBeenCalledWith(client._id);
       expect(newCall.retryAttempt).toBe(1);
       expect(newCall.originalCallId.toString()).toBe(originalCall._id.toString());
     }
@@ -193,13 +193,13 @@ describe('Agenda - Retry Missed Call Job', () => {
 
     const jobData = {
       conversationId: conversation._id.toString(),
-      clientId: patient._id.toString(),
+      clientId: client._id.toString(),
       retryAttempt: 3,
       originalCallId: conversation._id.toString(),
     };
 
-    const retryPatient = await Patient.findById(patient._id).populate('org');
-    const retryOrg = retryPatient.org;
+    const retryClient = await Client.findById(client._id).populate('org');
+    const retryOrg = retryClient.org;
     const maxRetries = retryOrg.callRetrySettings.retryCount || 2;
 
     expect(jobData.retryAttempt).toBeGreaterThan(maxRetries);
@@ -210,7 +210,7 @@ describe('Agenda - Retry Missed Call Job', () => {
     const fakeConversationId = new mongoose.Types.ObjectId();
     const jobData = {
       conversationId: fakeConversationId.toString(),
-      clientId: patient._id.toString(),
+      clientId: client._id.toString(),
       retryAttempt: 1,
       originalCallId: fakeConversationId.toString(),
     };
@@ -220,17 +220,17 @@ describe('Agenda - Retry Missed Call Job', () => {
     // Job should handle this error gracefully
   });
 
-  it('should handle missing patient gracefully', async () => {
-    const fakePatientId = new mongoose.Types.ObjectId();
+  it('should handle missing client gracefully', async () => {
+    const fakeClientId = new mongoose.Types.ObjectId();
     const jobData = {
       conversationId: conversation._id.toString(),
-      clientId: fakePatientId.toString(),
+      clientId: fakeClientId.toString(),
       retryAttempt: 1,
       originalCallId: conversation._id.toString(),
     };
 
-    const retryPatient = await Patient.findById(fakePatientId).populate('org');
-    expect(retryPatient).toBeNull();
+    const retryClient = await Client.findById(fakeClientId).populate('org');
+    expect(retryClient).toBeNull();
     // Job should handle this error gracefully
   });
 });

@@ -4,7 +4,7 @@ const tokenTypes = {
   RESET_PASSWORD: 'resetPassword',
   VERIFY_EMAIL: 'verifyEmail',
   INVITE: 'invite',
-  PATIENT_CONSENT: 'patientConsent',
+  CLIENT_CONSENT: 'patientConsent', // DB value kept for backward compat
 };
 
 module.exports = {

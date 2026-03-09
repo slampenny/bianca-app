@@ -103,7 +103,7 @@ class BreachDetectionService {
         {
           $match: {
             action: 'READ',
-            resource: { $in: ['patient', 'conversation', 'medicalAnalysis'] },
+            resource: { $in: ['client', 'conversation', 'medicalAnalysis'] },
             timestamp: { $gte: windowStart },
             outcome: 'SUCCESS'
           }
@@ -165,7 +165,7 @@ class BreachDetectionService {
     try {
       const offHoursAccess = await AuditLog.find({
         action: { $in: ['READ', 'UPDATE', 'DELETE'] },
-        resource: { $in: ['patient', 'conversation', 'medicalAnalysis'] },
+        resource: { $in: ['client', 'conversation', 'medicalAnalysis'] },
         timestamp: { $gte: last10Minutes },
         outcome: 'SUCCESS',
         'complianceFlags.phiAccessed': true
@@ -214,7 +214,7 @@ class BreachDetectionService {
         {
           $match: {
             action: 'READ',
-            resource: { $in: ['patient', 'conversation'] },
+            resource: { $in: ['client', 'conversation'] },
             timestamp: { $gte: windowStart },
             outcome: 'SUCCESS'
           }

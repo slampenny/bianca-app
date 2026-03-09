@@ -34,12 +34,12 @@ const createConversationForClient = catchAsync(async (req, res) => {
 });
 
 const createConversationForPatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { callId } = req.body;
   if (!callId) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'callId is required in request body');
   }
-  const conversation = await conversationService.createConversationForPatient(patientId, callId); // legacy route
+  const conversation = await conversationService.createConversationForPatient(clientId, callId); // legacy route
   
   // Populate callId to get call data for DTO
   await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes agentId callSid');

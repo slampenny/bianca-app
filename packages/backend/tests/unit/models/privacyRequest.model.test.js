@@ -5,7 +5,7 @@ const { PrivacyRequest } = require('../../../src/models');
 describe('PrivacyRequest Model', () => {
   let mongoServer;
   let caregiverId;
-  let patientId;
+  let clientId;
 
   beforeAll(async () => {
     mongoServer = new MongoMemoryServer();
@@ -24,7 +24,7 @@ describe('PrivacyRequest Model', () => {
   beforeEach(async () => {
     await PrivacyRequest.deleteMany({});
     caregiverId = new mongoose.Types.ObjectId();
-    patientId = new mongoose.Types.ObjectId();
+    clientId = new mongoose.Types.ObjectId();
   });
 
   describe('Schema Validation', () => {

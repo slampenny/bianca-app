@@ -713,7 +713,7 @@ router.post('/send-sms-patient-0', auth(), async (req, res) => {
     // Send SMS using Twilio
     const response = await twilioSmsService.sendSMS(patient0Phone, testMessage, {
       category: 'test',
-      patientId: 'patient-0'
+      clientId: 'patient-0'
     });
     
     logger.info(`[Test Route] SMS sent successfully to ${patient0Phone}, MessageSid: ${response.messageSid}`);
@@ -756,14 +756,14 @@ router.post('/clean', async (req, res) => {
       return res.status(403).json({ error: 'Database cleaning is not allowed in production' });
     }
 
-    const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../../models');
+    const { Alert, Org, Caregiver, Client, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../../models');
     
     logger.info('Cleaning test database...');
     
     // Clear all collections
     await Org.deleteMany({});
     await Caregiver.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Alert.deleteMany({});
     await Conversation.deleteMany({});
     await Message.deleteMany({});
@@ -940,9 +940,9 @@ router.post('/reset-mfa', async (req, res) => {
  *             required:
  *               - text
  *             properties:
- *               patientId:
+ *               clientId:
  *                 type: string
- *                 description: Patient ID to test emergency detection for (optional - will use first patient if not provided)
+ *                 description: Client ID to test emergency detection for (optional - will use first client if not provided)
  *                 example: "507f1f77bcf86cd799439011"
  *               text:
  *                 type: string
@@ -1004,7 +1004,7 @@ router.post('/reset-mfa', async (req, res) => {
  */
 router.post('/emergency-processor', async (req, res) => {
   try {
-    const { patientId, text } = req.body;
+    const { clientId, text } = req.body;
     
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return res.status(400).json({ error: 'text is required and must be a non-empty string' });
@@ -1012,14 +1012,14 @@ router.post('/emergency-processor', async (req, res) => {
 
     // Import emergency processor
     const { emergencyProcessor } = require('../../services/emergencyProcessor.service');
-    const { Patient } = require('../../models');
+    const { Client } = require('../../models');
     const { snsService } = require('../../services/sns.service');
     const { twilioSmsService } = require('../../services/twilioSms.service');
     const { config: emergencyConfig } = require('../../config/emergency.config');
 
     // Gather diagnostic information
     const diagnostics = {
-      patientFound: false,
+      clientFound: false,
       caregiversFound: false,
       caregiverCount: 0,
       smsEnabled: emergencyConfig.enableSNSPushNotifications,
@@ -1031,36 +1031,36 @@ router.post('/emergency-processor', async (req, res) => {
       }
     };
 
-    // Find patient - use provided patientId or get first patient
-    let patient;
-    let actualPatientId = patientId;
+    // Find client - use provided clientId or get first client
+    let client;
+    let actualClientId = clientId;
     
-    if (patientId) {
-      patient = await Patient.findById(patientId).populate('caregivers');
-      if (!patient) {
+    if (clientId) {
+      client = await Client.findById(clientId).populate('caregivers');
+      if (!client) {
         return res.status(404).json({ 
-          error: 'Patient not found',
+          error: 'Client not found',
           diagnostics 
         });
       }
     } else {
-      // Get first patient from database
-      patient = await Patient.findOne().populate('caregivers');
-      if (!patient) {
+      // Get first client from database
+      client = await Client.findOne().populate('caregivers');
+      if (!client) {
         return res.status(404).json({ 
-          error: 'No patients found in database',
+          error: 'No clients found in database',
           diagnostics 
         });
       }
-      actualPatientId = patient._id.toString();
-      logger.info(`[Test Route] No patientId provided, using first patient: ${actualPatientId}`);
+      actualClientId = client._id.toString();
+      logger.info(`[Test Route] No clientId provided, using first client: ${actualClientId}`);
     }
     
-    diagnostics.patientFound = true;
+    diagnostics.clientFound = true;
 
     // Check caregivers
-    if (patient.caregivers && patient.caregivers.length > 0) {
-      const caregiversWithPhone = patient.caregivers.filter(cg => cg && cg.phone);
+    if (client.caregivers && client.caregivers.length > 0) {
+      const caregiversWithPhone = client.caregivers.filter(cg => cg && cg.phone);
       diagnostics.caregiversFound = caregiversWithPhone.length > 0;
       diagnostics.caregiverCount = caregiversWithPhone.length;
       
@@ -1070,17 +1070,17 @@ router.post('/emergency-processor', async (req, res) => {
       });
       
       if (caregiversWithPhone.length === 0) {
-        logger.warn(`[Test Route] Patient ${actualPatientId} has ${patient.caregivers.length} caregiver(s) but none have phone numbers`);
+        logger.warn(`[Test Route] Client ${actualClientId} has ${client.caregivers.length} caregiver(s) but none have phone numbers`);
       }
     } else {
-      logger.warn(`[Test Route] Patient ${actualPatientId} has no caregivers assigned`);
+      logger.warn(`[Test Route] Client ${actualClientId} has no caregivers assigned`);
     }
 
-    logger.info(`[Test Route] Testing emergency processor for patient ${actualPatientId} (${patient.name || patient.preferredName || 'Unknown'}) with text: "${text.substring(0, 100)}"`);
+    logger.info(`[Test Route] Testing emergency processor for client ${actualClientId} (${client.name || client.preferredName || 'Unknown'}) with text: "${text.substring(0, 100)}"`);
 
     // Step 1: Process utterance through emergency detection
     const processingResult = await emergencyProcessor.processUtterance(
-      actualPatientId,
+      actualClientId,
       text,
       Date.now()
     );
@@ -1096,7 +1096,7 @@ router.post('/emergency-processor', async (req, res) => {
     if (processingResult.shouldAlert && processingResult.alertData) {
       logger.info(`[Test Route] Emergency detected, creating alert...`);
       alertResult = await emergencyProcessor.createAlert(
-        actualPatientId,
+        actualClientId,
         processingResult.alertData,
         text
       );
@@ -1117,10 +1117,10 @@ router.post('/emergency-processor', async (req, res) => {
     // Prepare response with full diagnostic information
     const response = {
       success: true,
-      patient: {
-        id: actualPatientId,
-        name: patient.name,
-        preferredName: patient.preferredName
+      client: {
+        id: actualClientId,
+        name: client.name,
+        preferredName: client.preferredName
       },
       processing: processingResult.processing,
       shouldAlert: processingResult.shouldAlert,
@@ -1660,7 +1660,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     // We need to modify the script to return data instead of just logging
     // Let's create a wrapper that captures the result
-    const { Org, Caregiver, Patient, Conversation, Message, Schedule } = require('../../models');
+    const { Org, Caregiver, Client, Conversation, Message, Schedule } = require('../../models');
     const bcrypt = require('bcryptjs');
     
     // Check if account already exists
@@ -1693,7 +1693,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
       password: hashedPassword,
       role: 'orgAdmin',
       org: org._id,
-      patients: [],
+      clients: [],
       isEmailVerified: true,
       isPhoneVerified: true,
     });
@@ -1702,9 +1702,9 @@ router.post('/create-app-store-review-account', async (req, res) => {
     org.caregivers.push(caregiver._id);
     await org.save();
     
-    // Create sample patients
-    const patient1 = await Patient.create({
-      name: 'Sample Patient One',
+    // Create sample clients
+    const client1 = await Client.create({
+      name: 'Sample Client One',
       email: 'sample.patient1@example.com',
       phone: '+16045624264',
       caregivers: [caregiver._id],
@@ -1713,8 +1713,8 @@ router.post('/create-app-store-review-account', async (req, res) => {
       isActive: true,
     });
     
-    const patient2 = await Patient.create({
-      name: 'Sample Patient Two',
+    const client2 = await Client.create({
+      name: 'Sample Client Two',
       email: 'sample.patient2@example.com',
       phone: '+16045624265',
       caregivers: [caregiver._id],
@@ -1723,13 +1723,13 @@ router.post('/create-app-store-review-account', async (req, res) => {
       isActive: true,
     });
     
-    // Add patients to caregiver
-    caregiver.clients.push(patient1._id, patient2._id);
+    // Add clients to caregiver
+    caregiver.clients.push(client1._id, client2._id);
     await caregiver.save();
     
     // Create sample conversations
     const conversation1 = await Conversation.create({
-      client: patient1._id,
+      client: client1._id,
       startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
       endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000),
       duration: 5 * 60,
@@ -1742,7 +1742,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     await Message.create({
       conversation: conversation1._id,
-      client: patient1._id,
+      client: client1._id,
       content: 'Hello, how are you feeling today?',
       role: 'system',
       timestamp: conversation1.startTime,
@@ -1750,14 +1750,14 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     await Message.create({
       conversation: conversation1._id,
-      client: patient1._id,
+      client: client1._id,
       content: 'I\'m doing well, thank you for checking in.',
       role: 'user',
       timestamp: new Date(conversation1.startTime.getTime() + 30 * 1000),
     });
     
     const conversation2 = await Conversation.create({
-      client: patient1._id,
+      client: client1._id,
       startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
       endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3 * 60 * 1000),
       duration: 3 * 60,
@@ -1769,7 +1769,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     });
     
     const conversation3 = await Conversation.create({
-      client: patient2._id,
+      client: client2._id,
       startTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
       endTime: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 1000),
       duration: 4 * 60,
@@ -1782,7 +1782,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     
     // Create sample schedules
     const schedule1 = await Schedule.create({
-      client: patient1._id,
+      client: client1._id,
       caregiver: caregiver._id,
       type: 'daily',
       time: '09:00',
@@ -1792,7 +1792,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     });
     
     const schedule2 = await Schedule.create({
-      client: patient1._id,
+      client: client1._id,
       caregiver: caregiver._id,
       type: 'weekly',
       dayOfWeek: 1,
@@ -1803,7 +1803,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
     });
     
     const schedule3 = await Schedule.create({
-      client: patient2._id,
+      client: client2._id,
       caregiver: caregiver._id,
       type: 'daily',
       time: '10:00',
@@ -1812,11 +1812,11 @@ router.post('/create-app-store-review-account', async (req, res) => {
       enabled: true,
     });
     
-    // Add schedules to patients
-    patient1.schedules.push(schedule1._id, schedule2._id);
-    patient2.schedules.push(schedule3._id);
-    await patient1.save();
-    await patient2.save();
+    // Add schedules to clients
+    client1.schedules.push(schedule1._id, schedule2._id);
+    client2.schedules.push(schedule3._id);
+    await client1.save();
+    await client2.save();
     
     logger.info('App Store review account created successfully via API');
     
@@ -1830,7 +1830,7 @@ router.post('/create-app-store-review-account', async (req, res) => {
       account: {
         organization: org.name,
         caregiver: caregiver.email,
-        patients: 2,
+        clients: 2,
         conversations: 3,
         schedules: 3,
       },

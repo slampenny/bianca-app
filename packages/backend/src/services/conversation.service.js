@@ -165,7 +165,7 @@ const queryConversationsByClient = async (clientId, options) => {
 /**
  * Get conversation history formatted for context
  */
-const getConversationHistory = async (patientId, limit = 5) => {
+const getConversationHistory = async (clientId, limit = 5) => {
   try {
     const recentConversations = await Conversation.find({
       clientId,
@@ -252,49 +252,49 @@ const getLanguageName = (languageCode) => {
 };
 
 /**
- * Build enhanced prompt using your existing Bianca system prompt + patient context
+ * Build enhanced prompt using your existing Bianca system prompt + client context
  */
-const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
+const buildEnhancedPrompt = async (clientId, callType = 'inbound') => {
   try {
-    // Get patient info
-    const patient = await Patient.findById(patientId)
+    // Get client info
+    const client = await Client.findById(clientId)
       .select('name preferredName medicalConditions allergies currentMedications age preferredLanguage')
       .lean();
 
-    if (!patient) {
-      throw new ApiError(httpStatus.NOT_FOUND, `Patient ${patientId} not found`);
+    if (!client) {
+      throw new ApiError(httpStatus.NOT_FOUND, `Client ${clientId} not found`);
     }
 
     // Get conversation history
-    const conversationHistory = await getConversationHistory(patientId);
+    const conversationHistory = await getConversationHistory(clientId);
     
     // Get last contact time to avoid repetition
     const { callService } = require('.');
-    const lastContactTime = await callService.getLastContactTime(patientId);
+    const lastContactTime = await callService.getLastContactTime(clientId);
     const lastContactHumanized = lastContactTime ? humanizeTimeDelta(lastContactTime) : null;
 
     // Start with refined Bianca system prompt (voice-first, healthcare-aware)
     let enhancedPrompt = refinedPrompts.system.content;
 
-    // Add patient-specific context section
-    enhancedPrompt += `\n\nCurrent Patient Context:
-- Patient Name: ${patient.name}
-- Preferred Name: ${patient.preferredName || patient.name}`;
+    // Add client-specific context section
+    enhancedPrompt += `\n\nCurrent Client Context:
+- Client Name: ${client.name}
+- Preferred Name: ${client.preferredName || client.name}`;
 
-    if (patient.age) {
-      enhancedPrompt += `\n- Age: ${patient.age}`;
+    if (client.age) {
+      enhancedPrompt += `\n- Age: ${client.age}`;
     }
 
-    // Add language instruction based on patient's preferred language
-    const preferredLanguage = patient.preferredLanguage || 'en';
+    // Add language instruction based on client's preferred language
+    const preferredLanguage = client.preferredLanguage || 'en';
     const languageName = getLanguageName(preferredLanguage);
     
     if (preferredLanguage !== 'en') {
       enhancedPrompt += `\n\nIMPORTANT LANGUAGE INSTRUCTION:
-- The patient's preferred language is: ${languageName}
+- The client's preferred language is: ${languageName}
 - You MUST communicate exclusively in ${languageName} throughout this entire conversation
-- Do not switch to English unless the patient explicitly asks you to
-- Use natural, conversational ${languageName} appropriate for the patient's age and context
+- Do not switch to English unless the client explicitly asks you to
+- Use natural, conversational ${languageName} appropriate for the client's age and context
 - Remember that your responses should be culturally appropriate for ${languageName} speakers`;
     } else {
       enhancedPrompt += `\n\nLanguage: Communicate in English as usual.`;
@@ -302,9 +302,9 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
 
     // Add last contact time to avoid repetition
     if (lastContactHumanized) {
-      enhancedPrompt += `\n\nLast Contact Time: You last spoke with this patient ${lastContactHumanized}.\n- Avoid repeating questions you asked recently (especially if within the last hour).\n- If they told you something important recently, you remember it - don't ask them to repeat it.\n- Use this time gap to vary your questions naturally.`;
+      enhancedPrompt += `\n\nLast Contact Time: You last spoke with this client ${lastContactHumanized}.\n- Avoid repeating questions you asked recently (especially if within the last hour).\n- If they told you something important recently, you remember it - don't ask them to repeat it.\n- Use this time gap to vary your questions naturally.`;
     } else {
-      enhancedPrompt += `\n\nLast Contact Time: This appears to be your first conversation with this patient, or no recent completed conversations found.`;
+      enhancedPrompt += `\n\nLast Contact Time: This appears to be your first conversation with this client, or no recent completed conversations found.`;
     }
 
     // Add conversation history context if available
@@ -312,11 +312,11 @@ const buildEnhancedPrompt = async (patientId, callType = 'inbound') => {
       enhancedPrompt += `\n\nPrevious Conversation Context:
 ${conversationHistory}
 
-Note: Use this context naturally to provide continuity, but don't explicitly mention "previous calls" unless the patient brings them up first.`;
+Note: Use this context naturally to provide continuity, but don't explicitly mention "previous calls" unless the client brings them up first.`;
     }
 
-    // Add call context - Bianca always initiates calls, patients cannot call Bianca
-    enhancedPrompt += `\n\nCall Context: You initiated this call to the patient for a wellness check. Wait for them to speak first when they answer, then introduce yourself with "This is Bianca" and ask about their general well-being. Keep it conversational and friendly. Listen to what they need and provide appropriate support while maintaining your warm, empathetic personality.`;
+    // Add call context - Bianca always initiates calls, clients cannot call Bianca
+    enhancedPrompt += `\n\nCall Context: You initiated this call to the client for a wellness check. Wait for them to speak first when they answer, then introduce yourself with "This is Bianca" and ask about their general well-being. Keep it conversational and friendly. Listen to what they need and provide appropriate support while maintaining your warm, empathetic personality.`;
     
     // Add subtle health metric nudge (one at a time, gently)
     const healthMetrics = ['sleep', 'appetite', 'pain', 'energy', 'medication adherence', 'social connection'];
@@ -325,7 +325,7 @@ Note: Use this context naturally to provide continuity, but don't explicitly men
     const suggestedMetric = healthMetrics[metricIndex];
     enhancedPrompt += `\n\nHealth Metrics: If the conversation flows naturally, consider gently asking about their ${suggestedMetric}. Don't force it - only if it feels natural. One metric per conversation, not a checklist.`;
 
-    logger.info(`[Enhanced Prompt] Built prompt for patient ${patient.name} (${callType} call)`);
+    logger.info(`[Enhanced Prompt] Built prompt for client ${client.name} (${callType} call)`);
     return enhancedPrompt;
 
   } catch (err) {
@@ -350,7 +350,7 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
 
     // Create and save the message to the database FIRST
     const message = await Message.create({
-      role: role, // Use the role as-is (supports 'assistant', 'patient', 'system', 'debug-user')
+      role: role, // Use the role as-is (supports 'assistant', 'client', 'system', 'debug-user')
       content: content.trim(),
       conversationId,
       messageType: normalizedType,
@@ -550,32 +550,31 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
 };
 
 /**
- * Get formatted patient context for other services
+ * Get formatted client context for other services
  */
-const getPatientContext = async (patientId) => {
+const getClientContext = async (clientId) => {
   try {
-    const patient = await Patient.findById(patientId)
-      .select('name email phone preferredName notes age') // Include age if you add it
+    const client = await Client.findById(clientId)
+      .select('name email phone preferredName notes age')
       .lean();
 
-    if (!patient) {
-      throw new ApiError(httpStatus.NOT_FOUND, `Patient ${patientId} not found`);
+    if (!client) {
+      throw new ApiError(httpStatus.NOT_FOUND, `Client ${clientId} not found`);
     }
 
     return {
-      name: patient.name,
-      preferredName: patient.preferredName || patient.name,
-      email: patient.email,
-      phone: patient.phone,
-      age: patient.age || null,
-      notes: patient.notes || null,
-      // Simple wellness indicator based on notes content
-      hasWellnessNotes: !!(patient.notes && patient.notes.trim().length > 0)
+      name: client.name,
+      preferredName: client.preferredName || client.name,
+      email: client.email,
+      phone: client.phone,
+      age: client.age || null,
+      notes: client.notes || null,
+      hasWellnessNotes: !!(client.notes && client.notes.trim().length > 0)
     };
 
   } catch (err) {
-    logger.error(`[Patient Context] Error getting context for client ${clientId}: ${err.message}`);
-    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to get patient context: ${err.message}`);
+    logger.error(`[Client Context] Error getting context for client ${clientId}: ${err.message}`);
+    throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Failed to get client context: ${err.message}`);
   }
 };
 
@@ -585,21 +584,21 @@ const getPatientContext = async (patientId) => {
 // In-memory storage for medical baselines (for testing purposes)
 const medicalBaselines = new Map();
 
-const getMedicalBaseline = async (patientId) => {
+const getMedicalBaseline = async (clientId) => {
   try {
     // Return stored baseline if it exists
-    return medicalBaselines.get(patientId) || null;
+    return medicalBaselines.get(clientId) || null;
   } catch (error) {
     logger.error('Error getting medical baseline:', error);
     throw error;
   }
 };
 
-const storeMedicalBaseline = async (patientId, baseline) => {
+const storeMedicalBaseline = async (clientId, baseline) => {
   try {
     // Store baseline in memory
-    medicalBaselines.set(patientId, baseline);
-    logger.info('Medical baseline stored', { patientId, baselineVersion: baseline.version });
+    medicalBaselines.set(clientId, baseline);
+    logger.info('Medical baseline stored', { clientId, baselineVersion: baseline.version });
   } catch (error) {
     logger.error('Error storing medical baseline:', error);
     throw error;
@@ -611,17 +610,17 @@ const clearMedicalBaselines = () => {
   medicalBaselines.clear();
 };
 
-const getMedicalAnalysisResults = async (patientId, limit = 10) => {
+const getMedicalAnalysisResults = async (clientId, limit = 10) => {
   try {
     const MedicalAnalysis = require('../models/medicalAnalysis.model');
     
-    const results = await MedicalAnalysis.find({ clientId: patientId })
+    const results = await MedicalAnalysis.find({ clientId })
       .sort({ analysisDate: -1 })
       .limit(limit)
       .lean(); // Use lean() for better performance since we don't need Mongoose documents
     
     logger.info('Retrieved medical analysis results', { 
-      patientId, 
+      clientId, 
       count: results.length,
       limit 
     });
@@ -633,20 +632,20 @@ const getMedicalAnalysisResults = async (patientId, limit = 10) => {
   }
 };
 
-const storeMedicalAnalysisResult = async (patientId, result) => {
+const storeMedicalAnalysisResult = async (clientId, result) => {
   try {
     const MedicalAnalysis = require('../models/medicalAnalysis.model');
     
     // Calculate time series data and trends
     const timeSeriesData = calculateTimeSeriesData(result);
-    const trends = await calculateTrends(patientId, timeSeriesData);
+    const trends = await calculateTrends(clientId, timeSeriesData);
     
     // Clean and validate the analysis data before storing
     const cleanedResult = cleanAnalysisData(result);
     
     // Create medical analysis document
     const medicalAnalysis = new MedicalAnalysis({
-      clientId: patientId,
+      clientId,
       analysisDate: result.analysisDate || new Date(),
       timeRange: 'month', // Default to monthly analysis
       startDate: result.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
@@ -701,7 +700,7 @@ const storeMedicalAnalysisResult = async (patientId, result) => {
 
     await medicalAnalysis.save();
     logger.info('Medical analysis result stored with time series data', { 
-      patientId, 
+      clientId, 
       analysisId: medicalAnalysis._id,
       analysisDate: medicalAnalysis.analysisDate,
       timeSeriesData,
@@ -873,16 +872,16 @@ const calculateOverallHealthScore = (result) => {
 
 /**
  * Calculate trends by comparing with previous analyses
- * @param {string} patientId - Patient ID
+ * @param {string} clientId - Client ID
  * @param {Object} currentTimeSeriesData - Current time series data
  * @returns {Object} Trend indicators
  */
-const calculateTrends = async (patientId, currentTimeSeriesData) => {
+const calculateTrends = async (clientId, currentTimeSeriesData) => {
   try {
     const MedicalAnalysis = require('../models/medicalAnalysis.model');
     
     // Get the last 3 analyses for trend calculation
-    const previousAnalyses = await MedicalAnalysis.find({ clientId: patientId })
+    const previousAnalyses = await MedicalAnalysis.find({ clientId })
       .select('timeSeriesData')
       .sort({ analysisDate: -1 })
       .limit(3)
@@ -1100,7 +1099,8 @@ module.exports = {
   buildEnhancedPrompt,
   saveRealtimeMessage,
   finalizeConversation,
-  getPatientContext,
+  getPatientContext: getClientContext,
+  getClientContext,
   getMedicalBaseline,
   storeMedicalBaseline,
   clearMedicalBaselines,

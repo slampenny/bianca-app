@@ -10,7 +10,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Sentiment Analysis
- *   description: Sentiment analysis for patient conversations
+ *   description: Sentiment analysis for client conversations
  */
 
 /**
@@ -34,9 +34,9 @@ const router = express.Router();
  *           minimum: 0
  *           maximum: 1
  *           description: Confidence level of the analysis
- *         patientMood:
+ *         clientMood:
  *           type: string
- *           description: Description of patient's emotional state
+ *           description: Description of client's emotional state
  *         keyEmotions:
  *           type: array
  *           items:
@@ -90,9 +90,9 @@ const router = express.Router();
  *     SentimentTrend:
  *       type: object
  *       properties:
- *         patientId:
+ *         clientId:
  *           type: string
- *           description: ID of the patient
+ *           description: ID of the client
  *         timeRange:
  *           type: string
  *           enum: [lastCall, month, lifetime]
@@ -177,16 +177,16 @@ const router = express.Router();
 
 /**
  * @swagger
- * /sentiment/patient/{patientId}/trend:
+ * /sentiment/client/{clientId}/trend:
  *   get:
- *     summary: Get sentiment trend for a patient over time
- *     description: Returns sentiment analysis data points for a patient over a specified time range, suitable for displaying in graphs and charts.
+ *     summary: Get sentiment trend for a client over time
+ *     description: Returns sentiment analysis data points for a client over a specified time range, suitable for displaying in graphs and charts.
  *     tags: [Sentiment Analysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -213,7 +213,7 @@ const router = express.Router();
  *       "403":
  *         $ref: '#/components/responses/Forbidden'
  *       "404":
- *         description: Patient not found
+ *         description: Client not found
  */
 router
   .route('/client/:clientId/trend')
@@ -225,16 +225,16 @@ router
 
 /**
  * @swagger
- * /sentiment/patient/{patientId}/summary:
+ * /sentiment/client/{clientId}/summary:
  *   get:
- *     summary: Get sentiment summary for a patient
- *     description: Returns a summary of recent sentiment analysis for a patient, including key insights and trends.
+ *     summary: Get sentiment summary for a client
+ *     description: Returns a summary of recent sentiment analysis for a client, including key insights and trends.
  *     tags: [Sentiment Analysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
@@ -251,7 +251,7 @@ router
  *       "403":
  *         $ref: '#/components/responses/Forbidden'
  *       "404":
- *         description: Patient not found
+ *         description: Client not found
  */
 router
   .route('/client/:clientId/summary')

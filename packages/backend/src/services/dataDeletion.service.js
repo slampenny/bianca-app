@@ -8,23 +8,23 @@
  */
 
 const { getJurisdiction, getDataRetentionPeriod, shouldAutoDeleteData } = require('../utils/jurisdiction.utils');
-const { Org, Patient, Call, Conversation, Message, MedicalAnalysis, ConsentRecord } = require('../models');
+const { Org, Client, Call, Conversation, Message, MedicalAnalysis, ConsentRecord } = require('../models');
 const logger = require('../config/logger');
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 
 /**
- * Get organization country from patient or user
- * @param {ObjectId} patientId - Patient ID
+ * Get organization country from client or user
+ * @param {ObjectId} clientId - Client ID
  * @param {ObjectId} userId - User ID (caregiver)
  * @returns {Promise<string>} - Country code
  */
-async function getOrganizationCountry(patientId = null, userId = null) {
+async function getOrganizationCountry(clientId = null, userId = null) {
   let org = null;
   
-  if (patientId) {
-    const patient = await Patient.findById(patientId).populate('org');
-    org = patient?.org;
+  if (clientId) {
+    const client = await Client.findById(clientId).populate('org');
+    org = client?.org;
   } else if (userId) {
     const Caregiver = require('../models/caregiver.model');
     const caregiver = await Caregiver.findById(userId).populate('org');
@@ -58,16 +58,16 @@ async function deleteExpiredCallRecordings(country) {
   const orgIds = orgs.map(o => o._id);
   
   // Get patients for these orgs
-  const patients = await Patient.find({ org: { $in: orgIds } });
-  const patientIds = patients.map(p => p._id);
+  const patients = await Client.find({ org: { $in: orgIds } });
+  const clientIds = patients.map(p => p._id);
   
-  if (patientIds.length === 0) {
+  if (clientIds.length === 0) {
     return 0;
   }
   
   // Find expired calls for these patients
   const expiredCalls = await Call.find({
-    clientId: { $in: patientIds },
+    clientId: { $in: clientIds },
     startTime: { $lt: cutoffDate },
     // Only delete if no active billing references
     lineItemId: null
@@ -121,16 +121,16 @@ async function deleteExpiredConversations(country) {
   const orgIds = orgs.map(o => o._id);
   
   // Get patients for these orgs
-  const patients = await Patient.find({ org: { $in: orgIds } });
-  const patientIds = patients.map(p => p._id);
+  const patients = await Client.find({ org: { $in: orgIds } });
+  const clientIds = patients.map(p => p._id);
   
-  if (patientIds.length === 0) {
+  if (clientIds.length === 0) {
     return 0;
   }
   
   // Find expired conversations for these patients
   const expiredConversations = await Conversation.find({
-    clientId: { $in: patientIds },
+    clientId: { $in: clientIds },
     createdAt: { $lt: cutoffDate }
   });
   
@@ -181,16 +181,16 @@ async function deleteExpiredMedicalAnalysis(country) {
   const orgIds = orgs.map(o => o._id);
   
   // Get patients for these orgs
-  const patients = await Patient.find({ org: { $in: orgIds } });
-  const patientIds = patients.map(p => p._id);
+  const patients = await Client.find({ org: { $in: orgIds } });
+  const clientIds = patients.map(p => p._id);
   
-  if (patientIds.length === 0) {
+  if (clientIds.length === 0) {
     return 0;
   }
   
   // Find expired analyses for these patients
   const deletedCount = await MedicalAnalysis.deleteMany({
-    clientId: { $in: patientIds },
+    clientId: { $in: clientIds },
     analysisDate: { $lt: cutoffDate }
   });
   
@@ -227,15 +227,15 @@ async function deleteExpiredConsentRecords(country) {
   const caregiverIds = caregivers.map(c => c._id);
   
   // Get patients for these orgs
-  const patients = await Patient.find({ org: { $in: orgIds } });
-  const patientIds = patients.map(p => p._id);
+  const patients = await Client.find({ org: { $in: orgIds } });
+  const clientIds = patients.map(p => p._id);
   
   // Only delete withdrawn consent records that are expired
   // Keep active consent records regardless of age
   const deletedCount = await ConsentRecord.deleteMany({
     $or: [
       { userId: { $in: caregiverIds }, userModel: 'Caregiver' },
-      { userId: { $in: patientIds }, userModel: 'Patient' }
+      { userId: { $in: clientIds }, userModel: 'Client' }
     ],
     withdrawn: true,
     withdrawnAt: { $lt: cutoffDate }
@@ -373,43 +373,43 @@ async function handleDeletionRequest(userId, dataType = 'all') {
     deleted: {}
   };
   
-  // Get patient IDs associated with this caregiver
-  const patients = await Patient.find({ caregivers: userId });
-  const patientIds = patients.map(p => p._id);
+  // Get client IDs associated with this caregiver
+  const patients = await Client.find({ caregivers: userId });
+  const clientIds = patients.map(p => p._id);
   
   if (dataType === 'all' || dataType === 'calls') {
     // Delete calls for user's patients
     const deletedCalls = await Call.deleteMany({
-      clientId: { $in: patientIds }
+      clientId: { $in: clientIds }
     });
     result.deleted.calls = deletedCalls.deletedCount;
     
     // Delete associated conversations
     const conversations = await Conversation.find({
-      clientId: { $in: patientIds }
+      clientId: { $in: clientIds }
     });
     const conversationIds = conversations.map(c => c._id);
     
     await Message.deleteMany({ conversationId: { $in: conversationIds } });
-    await Conversation.deleteMany({ clientId: { $in: patientIds } });
+    await Conversation.deleteMany({ clientId: { $in: clientIds } });
   }
   
   if (dataType === 'all' || dataType === 'conversations') {
     const conversations = await Conversation.find({
-      clientId: { $in: patientIds }
+      clientId: { $in: clientIds }
     });
     const conversationIds = conversations.map(c => c._id);
     
     await Message.deleteMany({ conversationId: { $in: conversationIds } });
     const deletedConversations = await Conversation.deleteMany({
-      clientId: { $in: patientIds }
+      clientId: { $in: clientIds }
     });
     result.deleted.conversations = deletedConversations.deletedCount;
   }
   
   if (dataType === 'all' || dataType === 'medicalAnalysis') {
     const deletedAnalysis = await MedicalAnalysis.deleteMany({
-      clientId: { $in: patientIds }
+      clientId: { $in: clientIds }
     });
     result.deleted.medicalAnalysis = deletedAnalysis.deletedCount;
   }

@@ -109,7 +109,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
   let req;
   let res;
   let next;
-  let patientId;
+  let clientId;
   let agentId;
   let patient;
   let agent;
@@ -120,18 +120,18 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     // Clear database
     await Call.deleteMany({});
     await Conversation.deleteMany({});
-    const { Patient, Caregiver } = require('../../../src/models');
-    await Patient.deleteMany({});
+    const { Client, Caregiver } = require('../../../src/models');
+    await Client.deleteMany({});
     await Caregiver.deleteMany({});
 
-    patientId = new mongoose.Types.ObjectId();
+    clientId = new mongoose.Types.ObjectId();
     agentId = new mongoose.Types.ObjectId();
 
     // Create mock patient with all required fields (use unique email per test)
-    const uniqueId = patientId.toString().slice(-6);
-    patient = await Patient.create({
-      _id: patientId,
-      name: 'Test Patient',
+    const uniqueId = clientId.toString().slice(-6);
+    patient = await Client.create({
+      _id: clientId,
+      name: 'Test Client',
       email: `patient-${uniqueId}@test.com`,
       phone: '15551234567', // Valid mobile phone format (validator accepts this without +)
       org: new mongoose.Types.ObjectId()
@@ -154,7 +154,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     // Mock request and response
     req = {
       body: {
-        clientId: patientId.toString(),
+        clientId: clientId.toString(),
         callNotes: 'Test call notes'
       },
       caregiver: {
@@ -183,13 +183,13 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       expect(responseData).toHaveProperty('conversationId');
       expect(responseData).toHaveProperty('callId');
       expect(responseData).toHaveProperty('callSid', 'CA1234567890abcdef');
-      expect(responseData.clientId.toString()).toBe(patientId.toString());
+      expect(responseData.clientId.toString()).toBe(clientId.toString());
       expect(responseData.agentId.toString()).toBe(agentId.toString());
 
       // Verify conversation was created in database
       const conversation = await Conversation.findOne({ callId: responseData.callId });
       expect(conversation).toBeTruthy();
-      expect(conversation.clientId.toString()).toBe(patientId.toString());
+      expect(conversation.clientId.toString()).toBe(clientId.toString());
 
       // Verify call was created and linked to conversation
       const call = await Call.findById(responseData.callId);
@@ -240,14 +240,14 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       // First, create a call and conversation
       const existingCall = await Call.create({
         callSid: 'CA1234567890abcdef',
-        clientId: patientId,
+        clientId,
         agentId: agentId,
         status: 'initiated',
         callStatus: 'initiating'
       });
 
       const existingConversation = await Conversation.create({
-        clientId: patientId,
+        clientId,
         callId: existingCall._id
       });
 
@@ -298,14 +298,14 @@ describe('CallWorkflow Controller - End Call', () => {
     await Call.deleteMany({});
     await Conversation.deleteMany({});
 
-    const patientId = new mongoose.Types.ObjectId();
+    const clientId = new mongoose.Types.ObjectId();
     const agentId = new mongoose.Types.ObjectId();
     const conversationId = new mongoose.Types.ObjectId();
 
     // Create a real Call record in the database
     const call = await Call.create({
       callSid: 'CA1234567890abcdef',
-      clientId: patientId,
+      clientId,
       agentId: agentId,
       asteriskChannelId: 'asterisk-channel-123',
       status: 'in-progress',
@@ -316,7 +316,7 @@ describe('CallWorkflow Controller - End Call', () => {
     // Create a real Conversation record linked to the Call
     const realConversation = await Conversation.create({
       _id: conversationId,
-      clientId: patientId,
+      clientId,
       agentId: agentId,
       callId: call._id,
       status: 'in-progress',

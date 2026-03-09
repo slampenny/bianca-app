@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Call, Conversation, Patient, Org, Caregiver } = require('../../../src/models');
+const { Call, Conversation, Client, Org, Caregiver } = require('../../../src/models');
 
 // Mock Twilio library (external service)
 jest.mock('twilio', () => {
@@ -76,7 +76,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
   beforeEach(async () => {
     // Clean up
     await Org.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Caregiver.deleteMany({});
@@ -95,8 +95,8 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     });
 
     // Create patient
-    patient = await Patient.create({
-      name: 'Test Patient',
+    patient = await Client.create({
+      name: 'Test Client',
       email: 'patient@example.com',
       phone: '5551234567',
       org: org._id,
@@ -302,8 +302,8 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       expect(alertService.createAlert).toHaveBeenCalled();
     });
 
-    it('should correctly use populated patientId and retrieve org settings', async () => {
-      // This test verifies that we're correctly using the already-populated patientId
+    it('should correctly use populated clientId and retrieve org settings', async () => {
+      // This test verifies that we're correctly using the already-populated clientId
       // and that org settings are properly retrieved for alert logic
       org.callRetrySettings.alertOnAllMissedCalls = true;
       org.callRetrySettings.retryCount = 3;

@@ -8,7 +8,7 @@ const { config } = require('../config/emergency.config');
 const { snsService } = require('./sns.service');
 const alertService = require('./alert.service');
 const mongoose = require('mongoose');
-const { Patient, Caregiver } = require('../models');
+const { Client, Caregiver } = require('../models');
 const logger = require('../config/logger');
 
 /**
@@ -65,7 +65,7 @@ class EmergencyProcessor {
       // Get client information to determine language
       let clientLanguage = 'en'; // Default to English
       try {
-        const client = await Patient.findById(clientId).select('preferredLanguage');
+        const client = await Client.findById(clientId).select('preferredLanguage');
         if (client && client.preferredLanguage) {
           clientLanguage = client.preferredLanguage;
         }
@@ -232,7 +232,7 @@ class EmergencyProcessor {
         return { success: false, error: 'Invalid client ID' };
       }
       // Get client information
-      const client = await Patient.findById(clientId);
+      const client = await Client.findById(clientId);
       if (!client) {
         return { success: false, error: 'Client not found' };
       }
@@ -305,7 +305,7 @@ class EmergencyProcessor {
    */
   async getClientCaregivers(clientId) {
     try {
-      const client = await Patient.findById(clientId).populate('caregivers');
+      const client = await Client.findById(clientId).populate('caregivers');
       if (!client || !client.caregivers) {
         return [];
       }

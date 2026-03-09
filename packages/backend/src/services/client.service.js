@@ -130,7 +130,7 @@ const sendConsentEmailIfRequired = async (client) => {
     if (client.consented === true) {
       return;
     }
-    const consentToken = await tokenService.generatePatientConsentToken(client);
+    const consentToken = await tokenService.generateClientConsentToken(client);
     const consentLink = `${config.frontendUrl}/client/consent?token=${consentToken}`;
     const consentEmailVersion = '1.0';
     await emailService.sendPatientConsentRequestEmail(
@@ -166,7 +166,7 @@ const checkClientConsent = async (clientId) => {
 
 const verifyConsentToken = async (consentToken) => {
   try {
-    const consentTokenDoc = await tokenService.verifyToken(consentToken, tokenTypes.PATIENT_CONSENT);
+    const consentTokenDoc = await tokenService.verifyToken(consentToken, tokenTypes.CLIENT_CONSENT);
     const clientRef = consentTokenDoc.client;
     const clientId = (clientRef && clientRef._id) ? clientRef._id : clientRef;
     if (!clientId) {
@@ -177,7 +177,7 @@ const verifyConsentToken = async (consentToken) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
     }
     if (client.consented === true) {
-      await Token.deleteMany({ client: client._id, type: tokenTypes.PATIENT_CONSENT });
+      await Token.deleteMany({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
       return {
         success: true,
         alreadyConsented: true,
@@ -186,7 +186,7 @@ const verifyConsentToken = async (consentToken) => {
       };
     }
     const idForFetch = client._id.toString ? client._id.toString() : client._id;
-    await Token.deleteMany({ client: client._id, type: tokenTypes.PATIENT_CONSENT });
+    await Token.deleteMany({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
     await updateClientById(idForFetch, {
       consented: true,
       consentedAt: new Date(),

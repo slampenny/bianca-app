@@ -47,7 +47,7 @@ class ChannelTracker {
     /**
      * Adds a new call (main channel) to the tracker.
      * @param {string} asteriskChannelId - The main Asterisk Channel ID.
-     * @param {object} initialData - Initial data including channel object, twilioCallSid, patientId.
+     * @param {object} initialData - Initial data including channel object, twilioCallSid, clientId.
      */
     addCall(asteriskChannelId, initialData) {
         if (this.calls.has(asteriskChannelId)) {
@@ -60,7 +60,7 @@ class ChannelTracker {
             asteriskChannelId: asteriskChannelId,
             mainChannel: initialData.channel || null,
             twilioCallSid: initialData.twilioCallSid || null, // Primary external identifier
-            clientId: initialData.clientId || initialData.patientId || null,
+            clientId: initialData.clientId || null,
             startTime: new Date(),
             state: initialData.state || 'init', // Initial state
             mainBridge: null,

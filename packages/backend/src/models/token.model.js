@@ -13,20 +13,20 @@ const tokenSchema = mongoose.Schema(
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Caregiver',
       required: function() {
-        // Caregiver is required for all token types except PATIENT_CONSENT
-        return this.type !== tokenTypes.PATIENT_CONSENT;
+        // Caregiver is required for all token types except CLIENT_CONSENT
+        return this.type !== tokenTypes.CLIENT_CONSENT;
       },
     },
     client: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Client',
       required: function() {
-        return this.type === tokenTypes.PATIENT_CONSENT;
+        return this.type === tokenTypes.CLIENT_CONSENT;
       },
     },
     type: {
       type: String,
-      enum: [tokenTypes.REFRESH, tokenTypes.RESET_PASSWORD, tokenTypes.VERIFY_EMAIL, tokenTypes.INVITE, tokenTypes.PATIENT_CONSENT],
+      enum: [tokenTypes.REFRESH, tokenTypes.RESET_PASSWORD, tokenTypes.VERIFY_EMAIL, tokenTypes.INVITE, tokenTypes.CLIENT_CONSENT],
       required: true,
     },
     expires: {

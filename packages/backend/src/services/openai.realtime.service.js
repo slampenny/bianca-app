@@ -351,7 +351,7 @@ class OpenAIRealtimeService {
   /**
    * Initialize a connection to OpenAI for a call. Uses callSid as the primary key.
    */
-  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt, patientId = null) {
+  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt, clientId = null) {
     const callId = callSid || initialAsteriskChannelId; // Prefer callSid if available
     if (!callId) {
       logger.error('[OpenAI Realtime] Initialize: Critical - Missing call identifier.');
@@ -373,8 +373,8 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28')}`);
     logger.info(`[OpenAI Realtime] Transcription: ${config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe'}`);
     logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);
-    if (patientId) {
-      logger.info(`[OpenAI Realtime] Emergency detection enabled for patient: ${patientId}`);
+    if (clientId) {
+      logger.info(`[OpenAI Realtime] Emergency detection enabled for client: ${clientId}`);
     }
 
     // Ensure Conversation exists (for outbound calls, it might not exist yet)
@@ -416,8 +416,7 @@ class OpenAIRealtimeService {
       conversationId: finalConversationId,
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
-      clientId: patientId, // Client ID for emergency detection and context
-      patientId, // Legacy alias
+      clientId,
       preferredLanguage: null, // Will be loaded when needed
       webSocket: null,
       sessionReady: false,
@@ -1226,20 +1225,20 @@ class OpenAIRealtimeService {
               if (currentConn.pendingUserTranscript && currentConn.pendingUserTranscript.trim()) {
                 const transcript = currentConn.pendingUserTranscript.trim();
                 
-                // Get patient's preferred language for filler word detection (cache in connection)
+                // Get client's preferred language for filler word detection (cache in connection)
                 let preferredLanguage = currentConn.preferredLanguage || 'en'; // default to English
                 if (!currentConn.preferredLanguage && currentConn.clientId) {
                   try {
-                    const { Patient } = require('../models');
-                    const patient = await Patient.findById(currentConn.clientId).select('preferredLanguage').lean();
-                    if (patient?.preferredLanguage) {
-                      preferredLanguage = patient.preferredLanguage;
+                    const { Client } = require('../models');
+                    const client = await Client.findById(currentConn.clientId).select('preferredLanguage').lean();
+                    if (client?.preferredLanguage) {
+                      preferredLanguage = client.preferredLanguage;
                       currentConn.preferredLanguage = preferredLanguage; // Cache it
                     } else {
                       currentConn.preferredLanguage = 'en'; // Cache default
                     }
                   } catch (err) {
-                    logger.warn(`[OpenAI Realtime] Could not get patient language for filler word detection: ${err.message}`);
+                    logger.warn(`[OpenAI Realtime] Could not get client language for filler word detection: ${err.message}`);
                     currentConn.preferredLanguage = 'en'; // Cache default on error
                   }
                 }
@@ -1286,7 +1285,7 @@ class OpenAIRealtimeService {
                 } else {
                   // No placeholder exists - this shouldn't happen, but create new message as fallback
                   logger.warn(`[OpenAI Realtime] No active user message ID - creating new message (this may break queue order)`);
-                  await this.saveCompleteMessage(callId, 'patient', transcript);
+                  await this.saveCompleteMessage(callId, 'client', transcript);
                   userMessageFinalized = true;
                 }
                 
@@ -1382,20 +1381,20 @@ class OpenAIRealtimeService {
 
               // Check if pending transcript is only filler words - if so, wait for more substantial speech
               if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
-                // Get patient's preferred language for filler word detection (cache in connection)
+                // Get client's preferred language for filler word detection (cache in connection)
                 let preferredLanguage = conn.preferredLanguage || 'en'; // default to English
                 if (!conn.preferredLanguage && conn.clientId) {
                   try {
-                    const { Patient } = require('../models');
-                    const patient = await Patient.findById(conn.clientId).select('preferredLanguage').lean();
-                    if (patient?.preferredLanguage) {
-                      preferredLanguage = patient.preferredLanguage;
+                    const { Client } = require('../models');
+                    const client = await Client.findById(conn.clientId).select('preferredLanguage').lean();
+                    if (client?.preferredLanguage) {
+                      preferredLanguage = client.preferredLanguage;
                       conn.preferredLanguage = preferredLanguage; // Cache it
                     } else {
                       conn.preferredLanguage = 'en'; // Cache default
                     }
                   } catch (err) {
-                    logger.warn(`[OpenAI Realtime] Could not get patient language for filler word detection: ${err.message}`);
+                    logger.warn(`[OpenAI Realtime] Could not get client language for filler word detection: ${err.message}`);
                     conn.preferredLanguage = 'en'; // Cache default on error
                   }
                 }
@@ -1846,7 +1845,7 @@ class OpenAIRealtimeService {
               } else {
                 // No placeholder - create new message (shouldn't happen, but fallback)
                 logger.warn(`[Transcript Cleanup] No placeholder exists - creating new message (may break queue order)`);
-                await this.saveCompleteMessage(callId, 'patient', transcriptToSave);
+                await this.saveCompleteMessage(callId, 'client', transcriptToSave);
               }
               
               // Only clear if it hasn't changed
@@ -1919,7 +1918,7 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Successfully saved ${role} message (${content.length} chars) to conversation ${conn.conversationId}`);
 
       // EMERGENCY DETECTION: Post-message analysis for user messages
-      if ((role === 'user' || role === 'patient') && conn.clientId && content && content.trim().length > 10) {
+      if ((role === 'user' || role === 'patient' || role === 'client') && conn.clientId && content && content.trim().length > 10) {
         try {
           logger.info(`[Emergency Detection] Processing utterance for emergency detection`, {
             clientId: conn.clientId,
@@ -1992,7 +1991,7 @@ class OpenAIRealtimeService {
       const conversationService = require('./conversation.service');
       const message = await conversationService.saveRealtimeMessage(
         conn.conversationId,
-        'patient', // Use 'patient' not 'user' - Message model enum only accepts 'patient', 'assistant', 'system', 'debug-user'
+        'client', // Message model enum: 'client', 'assistant', 'system', 'debug-user'
         '[Speaking...]', // Placeholder content
         'user_message'
       );
@@ -2131,7 +2130,7 @@ class OpenAIRealtimeService {
       }
     } else {
       if (!conn.clientId) {
-        logger.debug(`[Emergency Detection] Skipping - no patientId in connection for ${callId}`);
+        logger.debug(`[Emergency Detection] Skipping - no clientId in connection for ${callId}`);
       }
       if (!message.transcript || message.transcript.trim().length <= 10) {
         logger.debug(`[Emergency Detection] Skipping - transcript too short (${message.transcript?.trim().length || 0} chars) for ${callId}`);
@@ -3740,7 +3739,7 @@ class OpenAIRealtimeService {
             conn.activeUserMessageId = null;
           } else {
             // No placeholder - create new message
-            await this.saveCompleteMessage(callId, 'patient', conn.pendingUserTranscript);
+            await this.saveCompleteMessage(callId, 'client', conn.pendingUserTranscript);
           }
           
           conn.pendingUserTranscript = '';
@@ -3757,7 +3756,7 @@ class OpenAIRealtimeService {
         if (conn.clientId) {
           try {
             const contextWindow = getConversationContextWindow();
-            contextWindow.clearPatientContext(conn.clientId);
+            contextWindow.clearClientContext(conn.clientId);
             logger.debug(`[Context Window] Cleared context for patient ${conn.clientId} at call end`);
           } catch (error) {
             logger.warn(`[Context Window] Failed to clear context: ${error.message}`);

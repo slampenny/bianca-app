@@ -34,7 +34,7 @@ jest.mock('../../../src/models', () => ({
     findByIdAndUpdate: jest.fn(),
     findByIdAndDelete: jest.fn()
   },
-  Patient: {
+  Client: {
     findById: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn()
@@ -194,7 +194,7 @@ describe('OpenAI Realtime Service', () => {
     const mockCallSid = 'test-call-sid';
     const mockConversationId = 'test-conversation-id';
     const mockPrompt = 'Hello, how can I help you?';
-    const mockPatientId = 'test-patient-id';
+    const mockClientId = 'test-client-id';
 
     beforeEach(() => {
       // Mock successful WebSocket connection
@@ -215,7 +215,7 @@ describe('OpenAI Realtime Service', () => {
         mockCallSid,
         mockConversationId,
         mockPrompt,
-        mockPatientId
+        mockClientId
       );
 
       expect(result).toBe(true);
@@ -225,7 +225,7 @@ describe('OpenAI Realtime Service', () => {
       expect(connection).toBeDefined();
       expect(connection.callSid).toBe(mockCallSid);
       expect(connection.conversationId).toBe(mockConversationId);
-      expect(connection.clientId).toBe(mockPatientId);
+      expect(connection.clientId).toBe(mockClientId);
     });
 
     it('should handle missing call identifier', async () => {

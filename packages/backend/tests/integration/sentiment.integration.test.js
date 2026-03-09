@@ -4,7 +4,7 @@ require('../utils/integration-setup');
 const conversationService = require('../../src/services/conversation.service');
 const sentimentAnalysisService = require('../../src/services/sentiment.service');
 const { getOpenAISentimentServiceInstance } = require('../../src/services/openai.sentiment.service');
-const { Conversation, Message, Patient, Org, Call } = require('../../src/models');
+const { Conversation, Message, Client, Org, Call } = require('../../src/models');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 // All mocks are now centralized in integration-setup.js
@@ -20,7 +20,7 @@ afterAll(async () => {
 });
 
 describe('Sentiment Analysis Integration', () => {
-  let patient;
+  let client;
   let conversation;
   let sentimentService;
 
@@ -29,12 +29,12 @@ describe('Sentiment Analysis Integration', () => {
     sentimentService = getOpenAISentimentServiceInstance();
     // Clear all collections
     await Org.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Call.deleteMany();
     await Conversation.deleteMany();
     await Message.deleteMany();
 
-    // Create a test org first (required for patient)
+    // Create a test org first (required for client)
     const testOrg = new Org({
       name: 'Test Org',
       email: 'testorg@example.com',
@@ -43,19 +43,19 @@ describe('Sentiment Analysis Integration', () => {
     });
     await testOrg.save();
 
-    // Create a test patient
-    patient = new Patient({
-      name: 'Test Patient',
+    // Create a test client
+    client = new Client({
+      name: 'Test Client',
       email: 'test@example.com',
       phone: '+16045624263',
       preferredLanguage: 'en',
       org: testOrg._id
     });
-    await patient.save();
+    await client.save();
 
     // Create a test call first (required for conversation)
     const testCall = new Call({
-      clientId: patient._id,
+      clientId: client._id,
       callSid: 'test-call-sid',
       status: 'in-progress',
       direction: 'outbound'
@@ -64,7 +64,7 @@ describe('Sentiment Analysis Integration', () => {
 
     // Create a test conversation
     conversation = new Conversation({
-      clientId: patient._id,
+      clientId: client._id,
       callId: testCall._id,
       callSid: 'test-call-sid',
       lineItemId: null,
@@ -83,7 +83,7 @@ describe('Sentiment Analysis Integration', () => {
     const messages = [
       new Message({
         conversationId: conversation._id,
-        role: 'patient',
+        role: 'client',
         content: 'Hi Bianca, I am feeling really good today!',
         createdAt: new Date()
       }),
@@ -95,7 +95,7 @@ describe('Sentiment Analysis Integration', () => {
       }),
       new Message({
         conversationId: conversation._id,
-        role: 'patient',
+        role: 'client',
         content: 'I had a great walk this morning and my medication seems to be working well.',
         createdAt: new Date()
       })
@@ -122,7 +122,7 @@ describe('Sentiment Analysis Integration', () => {
               overallSentiment: 'positive',
               sentimentScore: 0.7,
               confidence: 0.9,
-              patientMood: 'cheerful and optimistic',
+              clientMood: 'cheerful and optimistic',
               keyEmotions: ['happiness', 'satisfaction'],
               concernLevel: 'low',
               satisfactionIndicators: {
@@ -185,9 +185,9 @@ describe('Sentiment Analysis Integration', () => {
 
   describe('Sentiment Trend Analysis', () => {
     beforeEach(async () => {
-      // Clean up any existing conversations for this patient first
-      await Conversation.deleteMany({ clientId: patient._id });
-      await Call.deleteMany({ clientId: patient._id });
+      // Clean up any existing conversations for this client first
+      await Conversation.deleteMany({ clientId: client._id });
+      await Call.deleteMany({ clientId: client._id });
       
       // Create multiple conversations with sentiment data
       const conversations = [];
@@ -203,7 +203,7 @@ describe('Sentiment Analysis Integration', () => {
         
         // Create a call for this conversation with endTime set
         const testCallForConv = new Call({
-          clientId: patient._id,
+          clientId: client._id,
           callSid: `test-call-sid-${i}`,
           status: 'completed',
           direction: 'outbound',
@@ -214,7 +214,7 @@ describe('Sentiment Analysis Integration', () => {
         await testCallForConv.save();
         
         const conv = new Conversation({
-          clientId: patient._id,
+          clientId: client._id,
           callId: testCallForConv._id,
           callSid: `test-call-sid-${i}`,
           lineItemId: null,
@@ -225,7 +225,7 @@ describe('Sentiment Analysis Integration', () => {
               overallSentiment: i % 2 === 0 ? 'positive' : 'negative',
               sentimentScore: i % 2 === 0 ? 0.6 : -0.4,
               confidence: 0.8,
-              patientMood: i % 2 === 0 ? 'happy' : 'frustrated',
+              clientMood: i % 2 === 0 ? 'happy' : 'frustrated',
               keyEmotions: i % 2 === 0 ? ['happiness'] : ['frustration'],
               concernLevel: 'low',
               summary: `Test summary ${i}`,
@@ -240,10 +240,10 @@ describe('Sentiment Analysis Integration', () => {
       }
     });
 
-    it('should get sentiment trend for patient', async () => {
+    it('should get sentiment trend for client', async () => {
       // Verify conversations were created with sentiment data
       const createdConversations = await Conversation.find({ 
-        clientId: patient._id,
+        clientId: client._id,
         'analyzedData.sentiment': { $exists: true }
       });
       expect(createdConversations.length).toBe(5);
@@ -253,7 +253,7 @@ describe('Sentiment Analysis Integration', () => {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
       // The service now uses Call's endTime, so we need to populate and filter
       const conversationsInRange = await Conversation.find({
-        clientId: patient._id,
+        clientId: client._id,
         'analyzedData.sentiment': { $exists: true }
       })
         .populate('callId', 'endTime')
@@ -264,8 +264,8 @@ describe('Sentiment Analysis Integration', () => {
         }));
       // Debug: log what we found
       if (conversationsInRange.length === 0) {
-        const allConvs = await Conversation.find({ clientId: patient._id });
-        console.log('All conversations for patient:', allConvs.length);
+        const allConvs = await Conversation.find({ clientId: client._id });
+        console.log('All conversations for client:', allConvs.length);
         console.log('Month start:', monthStart);
         console.log('Now:', now);
         if (allConvs.length > 0) {
@@ -276,9 +276,9 @@ describe('Sentiment Analysis Integration', () => {
       // Conversations should be found - they were created 0-20 days ago, all within the month range
       expect(conversationsInRange.length).toBeGreaterThan(0);
       
-      const trend = await sentimentAnalysisService.getSentimentTrend(patient._id, 'month');
+      const trend = await sentimentAnalysisService.getSentimentTrend(client._id, 'month');
 
-      expect(trend.clientId.toString()).toBe(patient._id.toString());
+      expect(trend.clientId.toString()).toBe(client._id.toString());
       expect(trend).toHaveProperty('timeRange', 'month');
       expect(trend).toHaveProperty('dataPoints');
       // Should have at least some data points since we created 5 conversations within the month range
@@ -304,12 +304,12 @@ describe('Sentiment Analysis Integration', () => {
       expect(trend.dataPoints[0].analyzedData.sentiment).toHaveProperty('sentimentScore');
     });
 
-    it('should get sentiment summary for patient', async () => {
+    it('should get sentiment summary for client', async () => {
       // Verify conversations were created
-      const createdConversations = await Conversation.find({ clientId: patient._id });
+      const createdConversations = await Conversation.find({ clientId: client._id });
       expect(createdConversations.length).toBeGreaterThan(0);
       
-      const summary = await sentimentAnalysisService.getSentimentSummary(patient._id);
+      const summary = await sentimentAnalysisService.getSentimentSummary(client._id);
 
       expect(summary).toHaveProperty('totalConversations');
       expect(summary).toHaveProperty('analyzedConversations');
@@ -328,8 +328,8 @@ describe('Sentiment Analysis Integration', () => {
       }
     });
 
-    it('should handle patient with no sentiment data', async () => {
-      // Create a new patient with no conversations (need org field)
+    it('should handle client with no sentiment data', async () => {
+      // Create a new client with no conversations (need org field)
       // Use a completely separate org to avoid any data contamination
       const { Org } = require('../../src/models');
       const newOrg = new Org({
@@ -340,27 +340,27 @@ describe('Sentiment Analysis Integration', () => {
       });
       await newOrg.save();
       
-      const newPatient = new Patient({
-        name: 'Isolated Patient',
+      const newClient = new Client({
+        name: 'Isolated Client',
         email: 'isolated@example.com',
         phone: '+16045624267',
         preferredLanguage: 'en',
         org: newOrg._id
       });
-      await newPatient.save();
+      await newClient.save();
 
-      // Verify no conversations exist for this patient
-      const patientConversations = await Conversation.find({ clientId: newPatient._id });
-      expect(patientConversations.length).toBe(0);
+      // Verify no conversations exist for this client
+      const clientConversations = await Conversation.find({ clientId: newClient._id });
+      expect(clientConversations.length).toBe(0);
       
       // Also verify no conversations with sentiment exist
       const conversationsWithSentiment = await Conversation.find({ 
-        patientId: newPatient._id,
+        clientId: newClient._id,
         'analyzedData.sentiment': { $exists: true }
       });
       expect(conversationsWithSentiment.length).toBe(0);
 
-      const trend = await sentimentAnalysisService.getSentimentTrend(newPatient._id, 'month');
+      const trend = await sentimentAnalysisService.getSentimentTrend(newClient._id, 'month');
       // If no conversations are found, dataPoints should be empty
       // But if the service finds 1 conversation (maybe from a previous test), confidence will be 0.2
       // So we need to check if dataPoints is 0 OR if it's 1 with confidence 0.2
@@ -368,16 +368,16 @@ describe('Sentiment Analysis Integration', () => {
         expect(trend.summary.averageSentiment).toBe(0);
         expect(trend.summary.confidence).toBe(0);
       } else {
-        // If somehow a conversation was found, verify it's from this patient
-        const foundConvs = await Conversation.find({ clientId: newPatient._id });
-        // If no conversations exist for this patient, the service shouldn't find any
+        // If somehow a conversation was found, verify it's from this client
+        const foundConvs = await Conversation.find({ clientId: newClient._id });
+        // If no conversations exist for this client, the service shouldn't find any
         expect(foundConvs.length).toBe(0);
         // But if it did find one, confidence would be 0.2 for a single data point
         // This is a bug in the service or test isolation, but let's handle it
         expect(trend.dataPoints.length).toBe(0);
       }
 
-      const summary = await sentimentAnalysisService.getSentimentSummary(newPatient._id);
+      const summary = await sentimentAnalysisService.getSentimentSummary(newClient._id);
       expect(summary.analyzedConversations).toBe(0);
       expect(summary.totalConversations).toBe(0);
     });
@@ -389,7 +389,7 @@ describe('Sentiment Analysis Integration', () => {
         overallSentiment: 'positive',
         sentimentScore: 0.7,
         confidence: 0.9,
-        patientMood: 'cheerful',
+        clientMood: 'cheerful',
         keyEmotions: ['happiness'],
         concernLevel: 'low',
         summary: 'Patient is doing well',

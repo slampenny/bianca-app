@@ -10,7 +10,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const app = require('../utils/integration-app');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 const { tokenService } = require('../../src/services');
-const { PrivacyRequest, ConsentRecord, Caregiver, Patient, Conversation, MedicalAnalysis, Org } = require('../../src/models');
+const { PrivacyRequest, ConsentRecord, Caregiver, Client, Conversation, MedicalAnalysis, Org } = require('../../src/models');
 const { caregiverOneWithPassword, insertCaregivertoOrgAndReturnToken } = require('../fixtures/caregiver.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 
@@ -32,7 +32,7 @@ afterAll(async () => {
 describe('Privacy API routes', () => {
   let accessToken;
   let caregiverId;
-  let patientId;
+  let clientId;
 
   beforeEach(async () => {
     await clearDatabase();
@@ -45,19 +45,19 @@ describe('Privacy API routes', () => {
     // caregiver should be a full Mongoose document now, so it should have both _id and id
     caregiverId = caregiver._id ? caregiver._id.toString() : (caregiver.id ? caregiver.id.toString() : caregiver.id);
 
-    // Create patient
-    const patient = await Patient.create({
-      name: 'Test Patient',
-      email: 'patient@test.com',
+    // Create client
+    const client = await Client.create({
+      name: 'Test Client',
+      email: 'client@test.com',
       phone: '+16045624269',
       org: org.id,
       caregivers: [caregiverId],
     });
-    patientId = patient._id;
+    clientId = client._id;
 
-    // Update caregiver with patient
+    // Update caregiver with client
     await Caregiver.findByIdAndUpdate(caregiverId, {
-      $push: { patients: patientId }
+      $push: { clients: clientId }
     });
   });
 
@@ -66,7 +66,7 @@ describe('Privacy API routes', () => {
       // Create some test data
       const mongoose = require('mongoose');
       await Conversation.create({
-        clientId: patientId,
+        clientId,
         agentId: caregiverId,
         status: 'completed',
         startTime: new Date(),

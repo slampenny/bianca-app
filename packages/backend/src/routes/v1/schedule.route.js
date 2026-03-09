@@ -15,20 +15,20 @@ const router = express.Router();
 
 /**
  * @swagger
- * /schedules/patients/{patientId}:
+ * /schedules/clients/{clientId}:
  *   post:
- *     summary: Create a schedule for a patient
- *     description: Only authorized patients can create schedules.
+ *     summary: Create a schedule for a client
+ *     description: Only authorized clients can create schedules.
  *     tags: [Schedules]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     requestBody:
  *       required: true
  *       content:

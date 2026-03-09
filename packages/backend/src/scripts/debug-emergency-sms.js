@@ -12,7 +12,7 @@ const config = require('../config/config');
 const { emergencyProcessor } = require('../services/emergencyProcessor.service');
 const { snsService } = require('../services/sns.service');
 const { twilioSmsService } = require('../services/twilioSms.service');
-const { Patient, Caregiver } = require('../models');
+const { Client, Caregiver } = require('../models');
 const logger = require('../config/logger');
 
 async function debugEmergencySMS(clientId) {
@@ -21,7 +21,7 @@ async function debugEmergencySMS(clientId) {
   try {
     // 1. Check client exists
     console.log('1. Checking client...');
-    const client = await Patient.findById(clientId).populate('caregivers');
+    const client = await Client.findById(clientId).populate('caregivers');
     if (!client) {
       console.log('❌ Client not found:', clientId);
       return;
