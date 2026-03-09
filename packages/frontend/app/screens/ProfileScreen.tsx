@@ -262,11 +262,11 @@ function ProfileScreen() {
       // Get current language preference from i18n
       const currentLanguage = i18n.locale || 'en'
       
-      // Create updated user object
+      // Create updated user object (SSO users cannot change email - it must match their provider)
       const updatedCaregiver = {
         ...currentUser,
         name,
-        email,
+        email: isSsoUser ? (currentUser.email ?? email) : email,
         phone,
         preferredLanguage: currentLanguage,
       }
@@ -416,11 +416,12 @@ function ProfileScreen() {
                 onChangeText={validateEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!isSsoUser}
                 containerStyle={styles.inputContainer}
-                inputWrapperStyle={styles.inputWrapper}
-                style={styles.input}
+                inputWrapperStyle={isSsoUser ? styles.readonlyInputWrapper : styles.inputWrapper}
+                style={isSsoUser ? styles.readonlyInput : styles.input}
                 status={emailError ? "error" : undefined}
-                helper={emailError || undefined}
+                helper={emailError || (isSsoUser ? translate("profileScreen.emailManagedBySSO") : undefined)}
               />
               {isEmailVerified ? (
                 <View style={styles.verificationStatus}>
@@ -628,6 +629,12 @@ const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
   },
   input: {
     // TextField handles text color automatically via theme
+  },
+  readonlyInputWrapper: {
+    backgroundColor: (colors.palette as any)?.neutral200 || "#e5e7eb",
+  },
+  readonlyInput: {
+    opacity: 0.7,
   },
   logoutButton: {
     alignItems: "center",

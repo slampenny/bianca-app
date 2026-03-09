@@ -124,6 +124,16 @@ const fr: LocaleTranslations = {
     reports: "Rapports",
     alerts: "Alertes",
   },
+  onboarding: {
+    howItWorks: {
+      title: "Comment fonctionne Bianca",
+      next: "Suivant",
+      getStarted: "Commencer",
+      organization: "Ajoutez vos clients, programmez quand Bianca doit les appeler, et consultez les conversations et les rapports en un seul endroit. Bianca gère les appels pour que vous puissiez vous concentrer sur les soins.",
+      caregiver: "Ajoutez les personnes dont vous prenez soin, choisissez quand Bianca les appelle, et suivez leur état via les conversations et rapports. Vous restez informé sans être à chaque appel.",
+      agingInPlace: "Bianca vous appelle selon votre emploi du temps pour des points réguliers. Vous pouvez consulter votre bien-être et vos rapports à tout moment. C'est comme avoir une compagne toujours là quand vous en avez besoin.",
+    },
+  },
   headers: {
     home: "Accueil",
     patient: "Patient",

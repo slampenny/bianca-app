@@ -599,6 +599,16 @@ const ja: LocaleTranslations = {
     reports: "レポート",
     alerts: "アラート",
   },
+  onboarding: {
+    howItWorks: {
+      title: "Biancaの使い方",
+      next: "次へ",
+      getStarted: "始める",
+      organization: "クライアントを追加し、Biancaがいつ彼らに電話するかをスケジュールし、会話とレポートを一箇所で確認できます。Biancaが電話を担当するので、ケアに集中できます。",
+      caregiver: "お世話している方を追加し、Biancaがいつ電話するか選び、会話とレポートで様子を確認できます。毎回の電話に同席しなくても把握できます。",
+      agingInPlace: "Biancaがあなたのスケジュールに合わせてフレンドリーなチェックインの電話をします。いつでも自分のウェルネスやレポートを確認できます。必要な時にいつでもそばにいてくれる伴侶のような存在です。",
+    },
+  },
   orgScreen: {
     namePlaceholder: "名前",
     emailPlaceholder: "メール",

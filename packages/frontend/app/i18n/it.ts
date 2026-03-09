@@ -126,6 +126,16 @@ const it: LocaleTranslations = {
     reports: "Rapporti",
     alerts: "Avvisi",
   },
+  onboarding: {
+    howItWorks: {
+      title: "Come funziona Bianca",
+      next: "Avanti",
+      getStarted: "Inizia",
+      organization: "Aggiungi i tuoi clienti, programma quando Bianca deve chiamarli e consulta conversazioni e report in un unico posto. Bianca gestisce le chiamate così puoi concentrarti sulle cure.",
+      caregiver: "Aggiungi le persone di cui ti prendi cura, scegli quando Bianca le chiama e segui il loro stato attraverso conversazioni e report. Resti aggiornato senza essere in ogni chiamata.",
+      agingInPlace: "Bianca ti chiama in base al tuo programma per check-in amichevoli. Puoi consultare il tuo benessere e i report in qualsiasi momento. È come avere una compagna sempre presente quando ne hai bisogno.",
+    },
+  },
   headers: {
     home: "Home",
     patient: "Paziente",

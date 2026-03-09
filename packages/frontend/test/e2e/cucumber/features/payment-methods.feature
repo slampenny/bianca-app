@@ -5,7 +5,7 @@ Feature: Payment Methods Management
   So that I can pay for services
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
     And I am an organization admin
 

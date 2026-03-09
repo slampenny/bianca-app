@@ -196,6 +196,13 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
+  // SSO users cannot change email - it must match their identity provider
+  if (caregiver.ssoProvider && updateBody.email !== undefined && updateBody.email !== caregiver.email) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'SSO users cannot change their email address');
+  }
+  if (caregiver.ssoProvider && updateBody.email !== undefined) {
+    delete updateBody.email; // Ignore email updates for SSO users
+  }
   if (updateBody.email && (await Caregiver.isEmailTaken(updateBody.email, caregiverId))) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }

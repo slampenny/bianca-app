@@ -126,6 +126,16 @@ const de: LocaleTranslations = {
     reports: "Berichte",
     alerts: "Benachrichtigungen",
   },
+  onboarding: {
+    howItWorks: {
+      title: "So funktioniert Bianca",
+      next: "Weiter",
+      getStarted: "Loslegen",
+      organization: "Fügen Sie Ihre Klienten hinzu, planen Sie, wann Bianca sie anrufen soll, und sehen Sie Gespräche und Berichte an einem Ort. Bianca übernimmt die Anrufe, damit Sie sich auf die Betreuung konzentrieren können.",
+      caregiver: "Fügen Sie die Menschen hinzu, die Sie betreuen, wählen Sie, wann Bianca sie anruft, und erfahren Sie durch Gespräche und Berichte, wie es ihnen geht. Sie bleiben auf dem Laufenden, ohne bei jedem Anruf dabei zu sein.",
+      agingInPlace: "Bianca ruft Sie nach Ihrem Zeitplan für freundliche Check-ins an. Sie können Ihr Wohlbefinden und Berichte jederzeit einsehen. Wie ein Begleiter, der immer da ist, wenn Sie ihn brauchen.",
+    },
+  },
   headers: {
     home: "Start",
     patient: "Patient",

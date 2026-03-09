@@ -396,6 +396,16 @@ const ko: LocaleTranslations = {
     reports: "보고서",
     alerts: "알림",
   },
+  onboarding: {
+    howItWorks: {
+      title: "Bianca 사용 방법",
+      next: "다음",
+      getStarted: "시작하기",
+      organization: "클라이언트를 추가하고, Bianca가 그들에게 전화할 시간을 예약하고, 대화와 보고서를 한곳에서 검토하세요. Bianca가 통화를 처리하여 귀하는 돌봄에 집중할 수 있습니다.",
+      caregiver: "돌보는 분들을 추가하고, Bianca가 언제 전화할지 선택하고, 대화와 보고서로 그들의 상태를 확인하세요. 매 통화에 참여하지 않아도 상황을 파악할 수 있습니다.",
+      agingInPlace: "Bianca가 귀하의 일정에 맞춰 친근한 체크인 전화를 합니다. 언제든 자신의 웰니스와 보고서를 확인할 수 있습니다. 필요할 때 항상 곁에 있는 동반자와 같습니다.",
+    },
+  },
   legalLinks: {
     privacyPolicy: "개인정보 보호정책",
     privacyPractices: "HIPAA 개인정보 보호 관행",

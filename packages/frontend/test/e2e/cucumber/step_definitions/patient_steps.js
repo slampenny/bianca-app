@@ -373,16 +373,13 @@ Given(/a client exists with name "([^"]*)"/, async function(patientName) {
       await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
     
-    // Wait for patients API call to refresh the list
     try {
-      await this.page.waitForResponse(response => 
+      await this.page.waitForResponse(response =>
         response.url().includes('/v1/clients') && response.status() === 200,
-        { timeout: 5000 }
-      ).catch(() => {
-        console.log('[DEBUG] Clients API call not detected, continuing...');
-      });
-    } catch (e) {
-      // API call might have already happened
+        { timeout: 2000 }
+      );
+    } catch (_) {
+      // Response may have already completed; rely on UI wait below.
     }
   }
   
@@ -501,51 +498,39 @@ Given(/a client exists with name "([^"]*)"/, async function(patientName) {
 });
 
 When(/I navigate to the clients screen/, async function() {
-  // The client list is on the Home screen, not a separate screen
-  // Navigate to home screen and wait for client list to load
   const currentUrl = this.page.url();
-  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === `${this.baseURL}/`;
-  
+  const base = (this.baseURL || '').replace(/\/$/, '');
+  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === base || currentUrl === `${base}/`;
+
   if (!isOnHomeScreen) {
-    // Navigate to home screen
-    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-  }
-  
-  // Wait for client list API call to ensure data is loaded
-  try {
-    await this.page.waitForResponse(response => 
-      response.url().includes('/v1/clients') && response.request().method() === 'GET' && response.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => {
-      console.log('Clients API response not detected, continuing...');
-    });
-  } catch (e) {
-    // API call might have already happened
-  }
-  
-  // Wait for client list to be visible
-  await this.page.getByTestId('client-list').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
-    // List might be empty, that's okay
-  });
-  
-  try {
-      if (this.page && !this.page.isClosed()) {
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
+    // Avoid full page reload when already on app (same rehydration race → 401 as billing/alerts).
+    const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
+    const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
+    if (!alreadyOnApp || !listOrHomeVisible) {
+      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
     }
-  
-  // Wait for patients API call to complete
+  }
+
+  // Optionally wait for in-flight GET /clients (short timeout: request often already completed when we're on home).
   try {
-    await this.page.waitForResponse(response => 
-      response.url().includes('/v1/clients') && response.status() === 200,
-      { timeout: 15000 }
+    await this.page.waitForResponse(response =>
+      response.url().includes('/v1/clients') && response.request().method() === 'GET' && response.status() === 200,
+      { timeout: 2000 }
     );
+  } catch (_) {
+    // Response may have already completed before we started listening; rely on UI wait below.
+  }
+
+  await this.page.getByTestId('client-list').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+  try {
+    if (this.page && !this.page.isClosed()) {
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    }
   } catch (e) {
-    console.log('Clients API response not detected, continuing...');
+    if (e.message && e.message.includes('closed')) {
+      throw new Error('Browser was closed during test execution');
+    }
   }
 });
 
@@ -810,120 +795,76 @@ When(/I submit the client form/, async function() {
   
   await submitButton.waitFor({ state: 'visible', timeout: 10000 });
   
-  // Wait for API call
-  const submitPromise = this.page.waitForResponse(response => 
-    (response.url().includes('/v1/clients') && 
-     (response.status() === 201 || response.status() === 200)),
-    { timeout: 10000 }
-  ).catch(() => null);
+  const submitPromise = this.page.waitForResponse(response => {
+    if (!response.url().includes('/v1/clients')) return false;
+    if (response.status() === 401) {
+      throw new Error('Create client returned 401 Unauthorized - session may have been lost');
+    }
+    return response.status() === 201 || response.status() === 200;
+  }, { timeout: 15000 });
   
   await submitButton.click();
   await submitPromise;
   
-  // Wait for form submission
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
 });
 
 Then(/I should see the new client in the list/, async function() {
-  // After creating a patient, check if we're already on home screen
   const currentUrl = this.page.url();
-  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === `${this.baseURL}/`;
-  
-  if (!isOnHomeScreen) {
-    // Navigate back to home screen to see the list
-    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-    
-    // Check if we got redirected to login (session lost)
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-    const newUrl = this.page.url();
-    if (newUrl.includes('/login') || newUrl.includes('/auth')) {
-    // Session was lost - re-login
-    const credentials = this.getCredentials('orgAdmin');
+  const base = (this.baseURL || '').replace(/\/$/, '');
+  const isOnLogin = currentUrl.includes('/login') || currentUrl.includes('/auth');
+  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === base || currentUrl === `${base}/`;
+
+  if (isOnLogin) {
+    // Already on login (e.g. create client returned 401). Re-login in place - no full reload to avoid rehydration race.
+    const credentials = this.credentials || this.getCredentials('caregiver');
     const loginInput = this.page.getByTestId('email-input');
+    await loginInput.waitFor({ state: 'visible', timeout: 10000 });
     await loginInput.fill(credentials.email);
     const passwordInput = this.page.getByTestId('password-input')
       .or(this.page.locator('input[type="password"]').first());
     await passwordInput.fill(credentials.password);
     const loginButton = this.page.getByTestId('login-button')
       .or(this.page.getByRole('button', { name: /login/i }).first());
-    
-    // Wait for login API call
-    const loginPromise = this.page.waitForResponse(response => 
-      response.url().includes('/v1/auth/login') && response.status() === 200,
-      { timeout: 10000 }
-    ).catch(() => null);
-    
+    const loginPromise = this.page.waitForResponse(response => {
+      if (!response.url().includes('/auth/login')) return false;
+      if (response.status() === 401) throw new Error('Re-login after session lost returned 401');
+      return response.status() === 200;
+    }, { timeout: 15000 });
     await loginButton.click();
     await loginPromise;
-    
-    // Wait for navigation after login
-    try {
-      if (this.page && !this.page.isClosed()) {
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
-    }
-    
-    // Check if we're still on login screen
-    const stillOnLogin = this.page.url().includes('/login') || this.page.url().includes('/auth');
-    if (stillOnLogin) {
-      // Navigate to home manually
+    await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  } else if (!isOnHomeScreen) {
+    // Not on home and not on login. Only do full reload if we're not already on the app (avoids rehydration → 401).
+    const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
+    const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
+    if (!alreadyOnApp || !listOrHomeVisible) {
       await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-      try {
-      if (this.page && !this.page.isClosed()) {
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
     }
-    }
-    }
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } else {
-    // Already on home screen - just wait for it to load
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   }
-  
-  // Wait for home screen to load
+
   try {
     await this.page.waitForSelector('[data-testid="home-header"]', { timeout: 15000 });
   } catch (e) {
-    // Check if we're still on login screen
     const loginInput = await this.page.getByTestId('email-input').count();
     if (loginInput > 0) {
-      // Try one more time to navigate to home
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-      try {
-      if (this.page && !this.page.isClosed()) {
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
+      throw new Error('Session lost - still on login page after navigation. Create client may have returned 401.');
     }
-      const loginInput2 = await this.page.getByTestId('email-input').count();
-      if (loginInput2 > 0) {
-        throw new Error('Session lost - redirected to login page instead of home screen.');
-      }
-    }
-    // Home header might not be found, continue anyway
   }
   
-  // Wait for patients API call to complete
+  // Optionally wait for in-flight GET /clients (short timeout: list may already be loaded).
   try {
-    await this.page.waitForResponse(response => 
+    await this.page.waitForResponse(response =>
       response.url().includes('/v1/clients') && response.status() === 200,
-      { timeout: 15000 }
+      { timeout: 2000 }
     );
-  } catch (e) {
-    console.log('Clients API response not detected, continuing...');
+  } catch (_) {
+    // Response often already completed; rely on UI below.
   }
-  
+
   // Wait briefly for list to update
   try {
     if (this.page && !this.page.isClosed()) {
@@ -1011,69 +952,60 @@ Then(/I should see the new client in the list/, async function() {
 });
 
 Then(/the client should have name "([^"]*)"/, async function(expectedName) {
-  const patientItem = this.page.getByText(expectedName).first();
-  const count = await patientItem.count();
+  // After save we may be on client detail (name in input) or list (name in card). Wait for UI to update.
+  await this.page.waitForTimeout(1500).catch(() => {});
+  let count = await this.page.getByTestId(`client-name-${expectedName}`).count();
+  if (count === 0) {
+    count = await this.page.getByText(expectedName, { exact: false }).first().count();
+  }
+  if (count === 0) {
+    const wrapper = this.page.getByTestId('client-name-input');
+    const inInput = await wrapper.inputValue().catch(() => '') ||
+      await wrapper.locator('input').first().inputValue().catch(() => '') ||
+      (await wrapper.textContent().catch(() => '') || '').trim();
+    if (inInput && inInput.trim() === expectedName) {
+      count = 1;
+    }
+  }
+  if (count === 0) {
+    count = await this.page.getByDisplayValue(expectedName).count().catch(() => 0);
+  }
   expect(count).toBeGreaterThan(0);
 });
 
 When(/I click on the client "([^"]*)"/, async function(patientName) {
-  // First, ensure we navigate to the clients screen (home screen where client list is)
-  // This is important because the patient might have been created via API and we need to see the updated list
-  // Also, after creating a patient, the app navigates to the schedules screen, so we need to navigate back
   const currentUrl = this.page.url();
-  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === `${this.baseURL}/`;
+  const base = (this.baseURL || '').replace(/\/$/, '');
+  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === base || currentUrl === `${base}/`;
   const isOnSchedulesScreen = currentUrl.includes('/Schedules') || currentUrl.includes('/schedules');
-  
+
   if (!isOnHomeScreen || isOnSchedulesScreen) {
-    // Navigate to home screen (patients list)
-    // If we're on schedules screen, we need to go back to home to see the client list
-    console.log(`[DEBUG] Not on home screen (URL: ${currentUrl}), navigating to home...`);
-    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-    
-    // Check if we got redirected to login (session lost)
-    try {
-      if (this.page && !this.page.isClosed()) {
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
+    const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
+    const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
+    if (!alreadyOnApp || !listOrHomeVisible) {
+      console.log(`[DEBUG] Not on home screen (URL: ${currentUrl}), navigating to home...`);
+      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
     }
-    
     const newUrl = this.page.url();
     if (newUrl.includes('/login') || newUrl.includes('/auth')) {
-      // Session was lost - re-login
-      const credentials = this.getCredentials('orgAdmin');
+      const credentials = this.credentials || this.getCredentials('orgAdmin');
       const loginInput = this.page.getByTestId('email-input');
+      await loginInput.waitFor({ state: 'visible', timeout: 10000 });
       await loginInput.fill(credentials.email);
       const passwordInput = this.page.getByTestId('password-input')
         .or(this.page.locator('input[type="password"]').first());
       await passwordInput.fill(credentials.password);
       const loginButton = this.page.getByTestId('login-button')
         .or(this.page.getByRole('button', { name: /login/i }).first());
-      
-      const loginPromise = this.page.waitForResponse(response => 
-        response.url().includes('/v1/auth/login') && response.status() === 200,
-        { timeout: 10000 }
-      ).catch(() => null);
-      
+      const loginPromise = this.page.waitForResponse(response =>
+        response.url().includes('/auth/login') && response.status() === 200,
+        { timeout: 15000 }
+      );
       await loginButton.click();
       await loginPromise;
-      
-      // Wait for navigation after login
-      try {
-        if (this.page && !this.page.isClosed()) {
-          await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-        }
-      } catch (e) {
-        if (e.message && e.message.includes('closed')) {
-          throw new Error('Browser was closed during test execution');
-        }
-      }
-      
-      // Navigate to home again
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    } else {
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
   
@@ -1180,19 +1112,13 @@ When(/I click on the client "([^"]*)"/, async function(patientName) {
         await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
       }
       
-      // Wait for patients API call to ensure list is loaded
       try {
-        await this.page.waitForResponse(response => 
+        await this.page.waitForResponse(response =>
           response.url().includes('/v1/clients') && response.status() === 200,
-          { timeout: 15000 }
+          { timeout: 2000 }
         );
-        // Wait a bit more for UI to update
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      } catch (e) {
-        console.log('Clients API response not detected, continuing...');
-        // Still wait a bit for UI to render
-        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      }
+      } catch (_) {}
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   } catch (e) {
     if (e.message && e.message.includes('closed') || (this.page && this.page.isClosed())) {
@@ -1212,16 +1138,13 @@ When(/I click on the client "([^"]*)"/, async function(patientName) {
     await this.page.waitForSelector('[data-testid="home-header"], [data-testid="client-list"], [data-testid="add-client-button"]', { timeout: 10000 }).catch(() => {});
     await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     
-    // Also wait for patients API to reload the list
     try {
-      await this.page.waitForResponse(response => 
+      await this.page.waitForResponse(response =>
         response.url().includes('/v1/clients') && response.status() === 200,
-        { timeout: 15000 }
+        { timeout: 2000 }
       );
-      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    } catch (e) {
-      console.log('[DEBUG] Clients API response not detected after navigating from schedules, continuing...');
-    }
+    } catch (_) {}
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
   
   // Wait briefly for client list to render

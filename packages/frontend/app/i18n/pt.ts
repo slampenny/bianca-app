@@ -599,6 +599,16 @@ const pt: LocaleTranslations = {
     reports: "Relatórios",
     alerts: "Alertas",
   },
+  onboarding: {
+    howItWorks: {
+      title: "Como a Bianca funciona",
+      next: "Próximo",
+      getStarted: "Começar",
+      organization: "Adicione seus clientes, agende quando a Bianca deve ligar para eles e consulte conversas e relatórios em um só lugar. A Bianca cuida das ligações para que você possa focar no cuidado.",
+      caregiver: "Adicione as pessoas de quem você cuida, escolha quando a Bianca liga para elas e acompanhe como estão por conversas e relatórios. Você fica informado sem precisar estar em cada ligação.",
+      agingInPlace: "A Bianca liga para você no seu horário para check-ins amigáveis. Você pode consultar seu bem-estar e relatórios a qualquer momento. É como ter uma companheira sempre presente quando precisar.",
+    },
+  },
   orgScreen: {
     namePlaceholder: "Nome",
     emailPlaceholder: "Email",

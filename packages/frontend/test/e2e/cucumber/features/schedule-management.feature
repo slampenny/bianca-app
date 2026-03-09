@@ -4,7 +4,7 @@ Feature: Schedule Management
   So that I can coordinate wellness calls
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
     And I am logged in as "caregiver"
 

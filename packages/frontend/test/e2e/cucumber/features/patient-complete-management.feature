@@ -4,7 +4,7 @@ Feature: Complete Client Management
   So that I can coordinate complete care
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
     And I am logged in as "orgAdmin"
 

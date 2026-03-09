@@ -599,6 +599,16 @@ const zh: LocaleTranslations = {
     reports: "报告",
     alerts: "提醒",
   },
+  onboarding: {
+    howItWorks: {
+      title: "Bianca 如何运作",
+      next: "下一步",
+      getStarted: "开始使用",
+      organization: "添加您的客户，安排 Bianca 何时给他们打电话，并在一处查看对话和报告。Bianca 负责处理通话，让您专注于护理。",
+      caregiver: "添加您照顾的人，选择 Bianca 何时给他们打电话，通过对话和报告了解他们的近况。您无需参与每次通话也能掌握情况。",
+      agingInPlace: "Bianca 按您的日程致电进行友好问候。您可随时查看自己的健康和报告。就像有一位在您需要时总在身边的伙伴。",
+    },
+  },
   themes: {
     healthcare: {
       name: "医疗保健",

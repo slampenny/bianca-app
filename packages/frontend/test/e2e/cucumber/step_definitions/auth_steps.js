@@ -55,22 +55,15 @@ async function goThroughOnboardingToRegister(page, persona = 'caregiver', orgNam
   await registerName.waitFor({ state: 'visible', timeout: 10000 });
 }
 
-Given('the frontend is running on {string}', async function(baseURL) {
-  // Ignore the hardcoded port in feature files - use centralized config instead
-  // This ensures all tests use the same port configuration
-  // The baseURL is already set from worldParameters in cucumber.config.js
-  // We only override if FRONTEND_URL environment variable is explicitly set
-  if (process.env.FRONTEND_URL) {
-    this.baseURL = process.env.FRONTEND_URL;
-  } else if (process.env.BASE_URL) {
-    this.baseURL = process.env.BASE_URL;
-  }
-  // Otherwise, keep the baseURL from worldParameters (centralized config)
-  // This ensures consistency - if port is wrong, ALL tests fail, not just some
+Given('the frontend is running on {string}', async function(_ignoredURL) {
+  // Always use centralized config - ignore the URL in the feature file so all scenarios use the same port.
+  // Source: cucumber.config.js worldParameters, or FRONTEND_URL / BASE_URL env (see README-PORT-CONFIG.md).
+  this.baseURL = this.parameters?.baseURL || process.env.FRONTEND_URL || process.env.BASE_URL || 'http://localhost:8084';
 });
 
-Given('the backend is running on {string}', async function(apiURL) {
-  this.apiURL = apiURL;
+Given('the backend is running on {string}', async function(_ignoredURL) {
+  // Always use centralized config - ignore the URL in the feature file so all scenarios use the same backend.
+  this.apiURL = this.parameters?.apiURL || process.env.API_URL || 'http://localhost:3000';
 });
 
 // Common login step - reusable across all test suites

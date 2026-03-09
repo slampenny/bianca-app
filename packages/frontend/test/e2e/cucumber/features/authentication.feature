@@ -4,7 +4,7 @@ Feature: Authentication Workflow
   So that I can access protected features
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
 
   Scenario: Login with valid credentials
