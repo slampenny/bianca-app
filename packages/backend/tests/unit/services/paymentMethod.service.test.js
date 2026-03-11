@@ -8,6 +8,18 @@ const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = require('..
 // Mock Stripe SDK (external dependency)
 jest.mock('stripe');
 
+// Mock logger so expected error paths (Stripe API errors, not found, etc.) don't flood test output
+jest.mock('../../../src/config/logger', () => {
+  const noop = () => {};
+  return {
+    info: jest.fn(noop),
+    warn: jest.fn(noop),
+    error: jest.fn(noop),
+    debug: jest.fn(noop),
+    child: jest.fn(function () { return this; }),
+  };
+});
+
 let mongoServer;
 
 beforeAll(async () => {

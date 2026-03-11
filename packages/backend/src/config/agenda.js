@@ -433,7 +433,12 @@ async function processOrgBilling(org) {
         });
       }
     } else {
-      logger.warn(`[Daily Billing] No payment method found for org ${org.name}, invoice created but not charged`);
+      const msg = `[Daily Billing] No payment method found for org ${org.name}, invoice created but not charged`;
+      if (process.env.NODE_ENV === 'test') {
+        logger.debug(msg);
+      } else {
+        logger.warn(msg);
+      }
       // Create alert for missing payment method
       await alertService.createAlert({
         message: `No payment method configured for daily billing. Invoice ${invoice.invoiceNumber} created but not charged.`,
@@ -456,21 +461,28 @@ async function processOrgBilling(org) {
   }
 }
 
-async function createOrgInvoice(org, clientBilling, totalCost) {
-  // Generate invoice number
-  const lastInvoice = await require('../models').Invoice.findOne({}, {}, { sort: { createdAt: -1 } });
-  let nextNum = 1;
-  if (lastInvoice && lastInvoice.invoiceNumber) {
-    const parts = lastInvoice.invoiceNumber.split('-');
-    if (parts.length >= 2) {
-      const parsed = parseInt(parts[1]);
-      if (!isNaN(parsed)) {
-        nextNum = parsed + 1;
-      }
-    }
+/**
+ * Get next invoice number atomically to avoid E11000 duplicate key when processDailyBilling runs concurrently.
+ */
+async function getNextInvoiceNumber() {
+  const mongoose = require('mongoose');
+  const db = mongoose.connection?.db;
+  if (!db) {
+    // Fallback when no connection (e.g. some tests): use timestamp-based to avoid duplicates
+    return `INV-${Date.now().toString().slice(-9)}`;
   }
-  const invoiceNumber = `INV-${nextNum.toString().padStart(6, '0')}`;
-  
+  const result = await db.collection('counters').findOneAndUpdate(
+    { _id: 'invoiceNumber' },
+    { $inc: { value: 1 } },
+    { upsert: true, returnDocument: 'after' }
+  );
+  const nextNum = result?.value ?? 1;
+  return `INV-${nextNum.toString().padStart(6, '0')}`;
+}
+
+async function createOrgInvoice(org, clientBilling, totalCost) {
+  const invoiceNumber = await getNextInvoiceNumber();
+
   // Create invoice
   const invoice = await require('../models').Invoice.create({
     org: org._id,

@@ -1,6 +1,18 @@
 // Import integration setup first to ensure proper mocking
 require('../../utils/integration-setup');
 
+// Mock logger so expected error paths (e.g. 404 Organization not found) don't flood test output
+jest.mock('../../../src/config/logger', () => {
+  const noop = () => {};
+  return {
+    info: jest.fn(noop),
+    warn: jest.fn(noop),
+    error: jest.fn(noop),
+    debug: jest.fn(noop),
+    child: jest.fn(function () { return this; }),
+  };
+});
+
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const request = require('supertest');
 const mongoose = require('mongoose');

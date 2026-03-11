@@ -32,7 +32,11 @@ class EmergencyProcessor {
         if (snsWorking) {
           logger.info('SNS service connectivity verified');
         } else {
-          logger.warn('SNS service connectivity test failed, push notifications may not work');
+          if (process.env.NODE_ENV === 'test') {
+            logger.debug('SNS service connectivity test failed, push notifications may not work');
+          } else {
+            logger.warn('SNS service connectivity test failed, push notifications may not work');
+          }
         }
       }
 

@@ -193,7 +193,7 @@ describe("conversationApi", () => {
       
       const result = await conversationApi.endpoints.addMessageToConversation.initiate({
         conversationId,
-        role: "patient",
+        role: "client",
         content: messageContent,
       })(store.dispatch, store.getState, {})
 
@@ -208,7 +208,7 @@ describe("conversationApi", () => {
         // Check that the new message was added
         const lastMessage = updatedConversation.messages[updatedConversation.messages.length - 1]
         expect(lastMessage.content).toBe(messageContent)
-        expect(lastMessage.role).toBe("patient")
+        expect(lastMessage.role).toBe("client")
       } else {
         throw new Error(`Add message failed with error: ${JSON.stringify(result.error)}`)
       }
@@ -220,7 +220,7 @@ describe("conversationApi", () => {
       
       const result = await conversationApi.endpoints.addMessageToConversation.initiate({
         conversationId: nonExistentConversationId,
-        role: "patient",
+        role: "client",
         content: messageContent,
       })(store.dispatch, store.getState, {})
 
@@ -236,7 +236,7 @@ describe("conversationApi", () => {
     it("should return 400 when message content is missing", async () => {
       const result = await conversationApi.endpoints.addMessageToConversation.initiate({
         conversationId,
-        role: "patient",
+        role: "client",
         content: "", // Empty message
       })(store.dispatch, store.getState, {})
 
@@ -295,10 +295,10 @@ describe("conversationApi", () => {
         if (error.status) {
           expect(error.status).toBe(403)
         } else {
-          throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+          throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
         }
       } else {
-        throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+        throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
       }
     })
 
@@ -339,10 +339,10 @@ describe("conversationApi", () => {
         if (error.status) {
           expect(error.status).toBe(403)
         } else {
-          throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+          throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
         }
       } else {
-        throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+        throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
       }
     })
   })

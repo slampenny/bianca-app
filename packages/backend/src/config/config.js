@@ -246,10 +246,14 @@ const baselineConfig = {
 };
 
 // CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation
-// This prevents issues where .env file or Docker image build-time values override runtime env vars
-if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
-  logger.warn(`Initial config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
-  baselineConfig.env = process.env.NODE_ENV;
+// (baselineConfig.env is undefined here because the getter is defined later via defineProperty)
+if (process.env.NODE_ENV) {
+  _envOverride = process.env.NODE_ENV;
+}
+// Only warn when we had a defined env that mismatched. Never warn in test or when env was undefined (getter not yet defined).
+const initialEnv = baselineConfig.env;
+if (process.env.NODE_ENV !== 'test' && initialEnv !== undefined && initialEnv !== process.env.NODE_ENV) {
+  logger.warn(`Initial config env (${initialEnv}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
 }
 
 // Set production-specific overrides (Restored and updated)
