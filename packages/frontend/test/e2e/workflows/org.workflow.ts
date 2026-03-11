@@ -73,36 +73,36 @@ export class OrgWorkflow {
   }
 
   // WHEN steps - Actions
-  async whenIAddNewPatient(patientData: any) {
-    // Navigate to home and click Add Patient
+  async whenIAddNewClient(clientData: any) {
+    // Navigate to home and click Add Client
     await this.page.locator('[data-testid="tab-home"], [aria-label*="home"], [aria-label*="Home"]').first().click()
     await this.page.waitForTimeout(1000)
     
-    const addPatientButton = this.page.getByText('Add Patient', { exact: true })
-    const isEnabled = await addPatientButton.isEnabled()
+    const addClientButton = this.page.getByTestId('add-client-button')
+    const isEnabled = await addClientButton.isEnabled()
     
     if (isEnabled) {
-      await addPatientButton.click()
+      await addClientButton.click()
       await this.page.waitForTimeout(2000)
       
-      // Fill patient form if it appears
-      const patientForm = await this.page.getByTestId('patient-form').count()
+      // Fill client form if it appears
+      const clientForm = await this.page.getByTestId('client-screen').count()
       const nameInput = await this.page.getByTestId('client-name-input').count()
       
-      if (patientForm > 0 || nameInput > 0) {
-        await this.whenIFillPatientForm(patientData)
+      if (clientForm > 0 || nameInput > 0) {
+        await this.whenIFillClientForm(clientData)
       }
     } else {
-      console.log('Add Patient button is disabled (insufficient permissions)')
+      console.log('Add Client button is disabled (insufficient permissions)')
     }
   }
 
-  async whenIFillPatientForm(patientData: any) {
-    // Fill patient creation form
+  async whenIFillClientForm(clientData: any) {
+    // Fill client creation form
     const formFields = [
-      { testId: 'client-name-input', value: patientData.name },
-      { testId: 'patient-email-input', value: patientData.email },
-      { testId: 'patient-phone-input', value: patientData.phone }
+      { testId: 'client-name-input', value: clientData.name },
+      { testId: 'client-email-input', value: clientData.email },
+      { testId: 'client-phone-input', value: clientData.phone }
     ]
     
     for (const field of formFields) {
@@ -113,36 +113,33 @@ export class OrgWorkflow {
     }
   }
 
-  async whenIRemovePatient(patientName: string) {
-    // Find patient and attempt to remove
+  async whenIRemoveClient(clientName: string) {
+    // Find client and attempt to remove
     await this.page.locator('[data-testid="tab-home"], [aria-label*="home"], [aria-label*="Home"]').first().click()
     
-    const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName })
-    const patientExists = await patientCard.count() > 0
+    const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+    const clientExists = await clientCard.count() > 0
     
-    if (patientExists) {
-      // Try to find delete/remove button
-      const deleteButton = this.page.getByTestId(`delete-patient-${patientName}`)
-      const editButton = this.page.getByTestId(`edit-patient-button-${patientName}`)
-      
+    if (clientExists) {
+      // Open client (click edit on card) then delete on client screen
+      const editButton = clientCard.locator('[data-testid^="edit-client-button-"]').first()
+      if (await editButton.count() > 0) {
+        await editButton.click()
+      } else {
+        await clientCard.first().click()
+      }
+      await this.page.waitForTimeout(1000)
+      const deleteButton = this.page.getByTestId('delete-client-button')
       if (await deleteButton.count() > 0) {
         await deleteButton.click()
-      } else if (await editButton.count() > 0) {
-        await editButton.click()
-        await this.page.waitForTimeout(2000)
-        // Look for delete option in edit screen
-        const deleteInEdit = this.page.getByText(/delete|remove/i)
-        if (await deleteInEdit.count() > 0) {
-          await deleteInEdit.first().click()
-        }
       }
     }
     
-    return patientExists
+    return clientExists
   }
 
-  async whenIAssignCaregiverToPatient(caregiverName: string, patientName: string) {
-    // Navigate to patient and assign caregiver
+  async whenIAssignCaregiverToClient(caregiverName: string, clientName: string) {
+    // Navigate to client and assign caregiver
     const homeTab = this.page.locator('[data-testid="tab-home"]').first()
     const homeTabExists = await homeTab.count() > 0
     if (homeTabExists) {
@@ -152,11 +149,11 @@ export class OrgWorkflow {
       await this.page.waitForTimeout(1000)
     }
     
-    const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName })
-    const patientCardCount = await patientCard.count()
-    if (patientCardCount > 0) {
-      await patientCard.first().click({ timeout: 10000 }).catch(() => {
-        console.log('⚠️ Could not click patient card')
+    const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+    const clientCardCount = await clientCard.count()
+    if (clientCardCount > 0) {
+      await clientCard.first().click({ timeout: 10000 }).catch(() => {
+        console.log('⚠️ Could not click client card')
         return // Exit early if click fails
       })
       await this.page.waitForTimeout(2000)
@@ -279,21 +276,21 @@ export class OrgWorkflow {
     expect(orgDashboardFound).toBe(true)
   }
 
-  async thenIShouldSeePatientInList(patientName: string) {
+  async thenIShouldSeeClientInList(clientName: string) {
     await this.page.locator('[data-testid="tab-home"], [aria-label*="home"], [aria-label*="Home"]').first().click()
-    const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName })
-    await expect(patientCard).toBeVisible()
+    const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+    await expect(clientCard).toBeVisible()
   }
 
-  async thenPatientShouldBeRemoved(patientName: string) {
+  async thenClientShouldBeRemoved(clientName: string) {
     await this.page.locator('[data-testid="tab-home"], [aria-label*="home"], [aria-label*="Home"]').first().click()
     await this.page.waitForTimeout(2000)
     
-    const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName })
-    const patientExists = await patientCard.count() > 0
+    const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+    const clientExists = await clientCard.count() > 0
     
-    // Patient should either be removed or removal should be attempted
-    console.log(`Patient ${patientName} removal status: ${patientExists ? 'still exists' : 'removed'}`)
+    // Client should either be removed or removal should be attempted
+    console.log(`Client ${clientName} removal status: ${clientExists ? 'still exists' : 'removed'}`)
   }
 
   async thenIShouldSeeCaregiverManagement() {

@@ -153,7 +153,7 @@ describe("paymentApi", () => {
       })(store.dispatch, store.getState, {})
     })
 
-    it("should get invoices for a patient successfully", async () => {
+    it("should get invoices for a client successfully", async () => {
       // First try to create an invoice if none exist
       try {
         await paymentApi.endpoints.createInvoiceFromConversations.initiate({
@@ -181,7 +181,7 @@ describe("paymentApi", () => {
           // Note: totalAmount can be 0 for zero-duration conversations
           expect(invoice.totalAmount).toBeGreaterThanOrEqual(0)
         } else {
-          console.log('No invoices found for patient - test passes with empty array')
+          console.log('No invoices found for client - test passes with empty array')
         }
       } else {
         throw new Error(`Get invoices failed with error: ${JSON.stringify(result.error)}`)
@@ -253,7 +253,7 @@ describe("paymentApi", () => {
       }
     })
 
-    it("should handle patient not found", async () => {
+    it("should handle client not found", async () => {
       const nonExistentPatientId = "507f1f77bcf86cd799439011"
 
       const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
@@ -287,7 +287,7 @@ describe("paymentApi", () => {
 
   describe("getInvoicesByOrg", () => {
     beforeEach(async () => {
-      // Create invoices for the patient
+      // Create invoices for the client
       await paymentApi.endpoints.createInvoiceFromConversations.initiate({
         clientId: clientId,
         payload: {},
@@ -556,7 +556,7 @@ describe("paymentApi", () => {
       // This test would require more complex mocking of the fetch function
       // For now, we'll test that the API handles errors properly
       const result = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        clientId: "invalid-patient-id",
+        clientId: "invalid-client-id",
         payload: {},
       })(store.dispatch, store.getState, {})
 

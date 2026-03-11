@@ -67,7 +67,7 @@ export function OrgScreen() {
   const [retryIntervalMinutes, setRetryIntervalMinutes] = useState("15")
   const [retriesEnabled, setRetriesEnabled] = useState(true)
   const [alertOnAllMissedCalls, setAlertOnAllMissedCalls] = useState(false)
-  const [requirePatientConsent, setRequirePatientConsent] = useState(false)
+  const [requireClientConsent, setRequireClientConsent] = useState(false)
   const [timezone, setTimezone] = useState("America/New_York")
   const [country, setCountry] = useState<string>("CA")
 
@@ -106,8 +106,8 @@ export function OrgScreen() {
           setRetryIntervalMinutes("15")
           setAlertOnAllMissedCalls(false)
         }
-        // Initialize requirePatientConsent
-        setRequirePatientConsent(currentOrg.requirePatientConsent ?? false)
+        // Initialize requireClientConsent
+        setRequireClientConsent(currentOrg.requireClientConsent ?? false)
         setIsLoading(false)
         return
       }
@@ -161,7 +161,7 @@ export function OrgScreen() {
             logo,
             timezone,
             country,
-            requirePatientConsent,
+            requireClientConsent,
             callRetrySettings: {
               retryCount: validRetryCount,
               retryIntervalMinutes: validRetryMinutes,
@@ -368,12 +368,13 @@ export function OrgScreen() {
           
           <Toggle
             variant="switch"
-            label="Require Patient Consent"
-            helper="When enabled, consent requests will be automatically sent to patients via email."
-            value={requirePatientConsent}
-            onValueChange={setRequirePatientConsent}
+            label="Require Client Consent"
+            helper="When enabled, consent requests will be automatically sent to clients via email."
+            value={requireClientConsent}
+            onValueChange={setRequireClientConsent}
             editable={canEditOrg}
             containerStyle={styles.inputContainer}
+            testID="require-client-consent-toggle"
           />
         </View>
 

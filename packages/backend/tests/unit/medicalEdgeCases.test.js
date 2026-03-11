@@ -20,9 +20,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'a' },
-            { role: 'patient', content: 'b' },
-            { role: 'patient', content: 'c' }
+            { role: 'client', content: 'a' },
+            { role: 'client', content: 'b' },
+            { role: 'client', content: 'c' }
           ]
         }
       ];
@@ -39,9 +39,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: '   ' },
-            { role: 'patient', content: '\n\t' },
-            { role: 'patient', content: '    ' }
+            { role: 'client', content: '   ' },
+            { role: 'client', content: '\n\t' },
+            { role: 'client', content: '    ' }
           ]
         }
       ];
@@ -58,9 +58,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: '...' },
-            { role: 'patient', content: '!!!' },
-            { role: 'patient', content: '???' }
+            { role: 'client', content: '...' },
+            { role: 'client', content: '!!!' },
+            { role: 'client', content: '???' }
           ]
         }
       ];
@@ -77,9 +77,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: '123' },
-            { role: 'patient', content: '456' },
-            { role: 'patient', content: '789' }
+            { role: 'client', content: '123' },
+            { role: 'client', content: '456' },
+            { role: 'client', content: '789' }
           ]
         }
       ];
@@ -98,9 +98,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel muy triste today. Estoy muy depressed.' },
-            { role: 'patient', content: 'Je suis très anxious. I am very worried.' },
-            { role: 'patient', content: 'Ich bin so confused. I don\'t understand anything.' }
+            { role: 'client', content: 'I feel muy triste today. Estoy muy depressed.' },
+            { role: 'client', content: 'Je suis très anxious. I am very worried.' },
+            { role: 'client', content: 'Ich bin so confused. I don\'t understand anything.' }
           ]
         }
       ];
@@ -119,9 +119,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I have a heavy heart and my soul is weary.' },
-            { role: 'patient', content: 'The darkness surrounds me and I cannot find light.' },
-            { role: 'patient', content: 'My spirit is broken and I feel lost in this world.' }
+            { role: 'client', content: 'I have a heavy heart and my soul is weary.' },
+            { role: 'client', content: 'The darkness surrounds me and I cannot find light.' },
+            { role: 'client', content: 'My spirit is broken and I feel lost in this world.' }
           ]
         }
       ];
@@ -138,9 +138,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I pray for peace but God seems to have abandoned me.' },
-            { role: 'patient', content: 'I feel like I\'m being tested by the universe.' },
-            { role: 'patient', content: 'My faith is wavering and I don\'t know what to believe anymore.' }
+            { role: 'client', content: 'I pray for peace but God seems to have abandoned me.' },
+            { role: 'client', content: 'I feel like I\'m being tested by the universe.' },
+            { role: 'client', content: 'My faith is wavering and I don\'t know what to believe anymore.' }
           ]
         }
       ];
@@ -160,9 +160,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel <strong>very sad</strong> today.' },
-            { role: 'patient', content: 'I am <em>anxious</em> about everything.' },
-            { role: 'patient', content: 'I don\'t know what to do <br> anymore.' }
+            { role: 'client', content: 'I feel <strong>very sad</strong> today.' },
+            { role: 'client', content: 'I am <em>anxious</em> about everything.' },
+            { role: 'client', content: 'I don\'t know what to do <br> anymore.' }
           ]
         }
       ];
@@ -180,9 +180,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I found this website https://example.com that might help.' },
-            { role: 'patient', content: 'You can email me at patient@example.com if needed.' },
-            { role: 'patient', content: 'I feel confused about everything.' }
+            { role: 'client', content: 'I found this website https://example.com that might help.' },
+            { role: 'client', content: 'You can email me at patient@example.com if needed.' },
+            { role: 'client', content: 'I feel confused about everything.' }
           ]
         }
       ];
@@ -200,9 +200,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel @#$% confused today!' },
-            { role: 'patient', content: 'Everything is &*()%$#@! messed up.' },
-            { role: 'patient', content: 'I don\'t know what to do anymore...' }
+            { role: 'client', content: 'I feel @#$% confused today!' },
+            { role: 'client', content: 'Everything is &*()%$#@! messed up.' },
+            { role: 'client', content: 'I don\'t know what to do anymore...' }
           ]
         }
       ];
@@ -222,9 +222,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel very sad today but I can\'t explain why.' },
-            { role: 'patient', content: 'I am anxious about everything and I don\'t know what to do.' },
-            { role: 'patient', content: 'I feel confused and lost and I need help.' }
+            { role: 'client', content: 'I feel very sad today but I can\'t explain why.' },
+            { role: 'client', content: 'I am anxious about everything and I don\'t know what to do.' },
+            { role: 'client', content: 'I feel confused and lost and I need help.' }
           ]
         }
       ];
@@ -242,9 +242,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel [unclear] sad today.' },
-            { role: 'patient', content: 'I am [background noise] anxious about everything.' },
-            { role: 'patient', content: 'I don\'t [static] know what to do.' }
+            { role: 'client', content: 'I feel [unclear] sad today.' },
+            { role: 'client', content: 'I am [background noise] anxious about everything.' },
+            { role: 'client', content: 'I don\'t [static] know what to do.' }
           ]
         }
       ];
@@ -262,9 +262,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel very sa... sad today.' },
-            { role: 'patient', content: 'I am anx... anxious about everything.' },
-            { role: 'patient', content: 'I don\'t know what to do anym... anymore.' }
+            { role: 'client', content: 'I feel very sa... sad today.' },
+            { role: 'client', content: 'I am anx... anxious about everything.' },
+            { role: 'client', content: 'I don\'t know what to do anym... anymore.' }
           ]
         }
       ];
@@ -284,9 +284,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I take my medication every day but I still feel depressed.' },
-            { role: 'patient', content: 'The side effects of my medication are making me anxious.' },
-            { role: 'patient', content: 'I forgot to take my medication and now I feel confused.' }
+            { role: 'client', content: 'I take my medication every day but I still feel depressed.' },
+            { role: 'client', content: 'The side effects of my medication are making me anxious.' },
+            { role: 'client', content: 'I forgot to take my medication and now I feel confused.' }
           ]
         }
       ];
@@ -304,9 +304,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I have been diagnosed with major depressive disorder.' },
-            { role: 'patient', content: 'My anxiety disorder is getting worse.' },
-            { role: 'patient', content: 'I think I might have early onset dementia.' }
+            { role: 'client', content: 'I have been diagnosed with major depressive disorder.' },
+            { role: 'client', content: 'My anxiety disorder is getting worse.' },
+            { role: 'client', content: 'I think I might have early onset dementia.' }
           ]
         }
       ];
@@ -324,9 +324,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I have been experiencing persistent sadness and loss of interest.' },
-            { role: 'patient', content: 'I feel constant worry and restlessness.' },
-            { role: 'patient', content: 'I have been having memory problems and confusion.' }
+            { role: 'client', content: 'I have been experiencing persistent sadness and loss of interest.' },
+            { role: 'client', content: 'I feel constant worry and restlessness.' },
+            { role: 'client', content: 'I have been having memory problems and confusion.' }
           ]
         }
       ];
@@ -348,7 +348,7 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: longMessage }
+            { role: 'client', content: longMessage }
           ]
         }
       ];
@@ -367,11 +367,11 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'Yes' },
-            { role: 'patient', content: 'No' },
-            { role: 'patient', content: 'Maybe' },
-            { role: 'patient', content: 'I don\'t know' },
-            { role: 'patient', content: 'Help' }
+            { role: 'client', content: 'Yes' },
+            { role: 'client', content: 'No' },
+            { role: 'client', content: 'Maybe' },
+            { role: 'client', content: 'I don\'t know' },
+            { role: 'client', content: 'Help' }
           ]
         }
       ];
@@ -393,9 +393,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I am sad. I am sad. I am sad. I am sad. I am sad.' },
-            { role: 'patient', content: 'I am anxious. I am anxious. I am anxious. I am anxious.' },
-            { role: 'patient', content: 'I am confused. I am confused. I am confused. I am confused.' }
+            { role: 'client', content: 'I am sad. I am sad. I am sad. I am sad. I am sad.' },
+            { role: 'client', content: 'I am anxious. I am anxious. I am anxious. I am anxious.' },
+            { role: 'client', content: 'I am confused. I am confused. I am confused. I am confused.' }
           ]
         }
       ];
@@ -416,10 +416,10 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel sad today.' },
-            { role: 'patient', content: null },
-            { role: 'patient', content: undefined },
-            { role: 'patient', content: '' }
+            { role: 'client', content: 'I feel sad today.' },
+            { role: 'client', content: null },
+            { role: 'client', content: undefined },
+            { role: 'client', content: '' }
           ]
         }
       ];
@@ -457,9 +457,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel sad today.' },
+            { role: 'client', content: 'I feel sad today.' },
             'This is not a message object',
-            { role: 'patient' }, // Missing content
+            { role: 'client' }, // Missing content
             { content: 'I am anxious.' }, // Missing role
             null,
             undefined
@@ -470,6 +470,25 @@ describe('Medical Analysis Edge Cases', () => {
       const result = await analyzer.analyzeMonth(conversations);
 
       expect(result).toBeDefined();
+      expect(result.cognitiveMetrics).toBeDefined();
+      expect(result.psychiatricMetrics).toBeDefined();
+    });
+
+    it('treats document-shaped messages (e.g. content-only) as in-memory docs, not DB IDs', async () => {
+      // When the first message is an object with content but no role, the service must NOT
+      // pass it to Message.find({ _id: { $in: ... } }). This test would fail with a CastError if we did.
+      const conversations = [
+        {
+          _id: 'conv1',
+          clientId: 'test-patient',
+          messages: [{ content: 'Only content, no role.' }]
+        }
+      ];
+
+      const result = await analyzer.analyzeMonth(conversations);
+
+      expect(result).toBeDefined();
+      expect(result.warnings).toBeDefined();
       expect(result.cognitiveMetrics).toBeDefined();
       expect(result.psychiatricMetrics).toBeDefined();
     });
@@ -484,9 +503,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: `conv${i}`,
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: `I feel sad today in conversation ${i}.` },
-            { role: 'patient', content: `I am anxious about everything in conversation ${i}.` },
-            { role: 'patient', content: `I am confused and lost in conversation ${i}.` }
+            { role: 'client', content: `I feel sad today in conversation ${i}.` },
+            { role: 'client', content: `I am anxious about everything in conversation ${i}.` },
+            { role: 'client', content: `I am confused and lost in conversation ${i}.` }
           ]
         });
       }
@@ -508,9 +527,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel sad today.' },
-            { role: 'patient', content: 'I am anxious about everything.' },
-            { role: 'patient', content: 'I am confused and lost.' }
+            { role: 'client', content: 'I feel sad today.' },
+            { role: 'client', content: 'I am anxious about everything.' },
+            { role: 'client', content: 'I am confused and lost.' }
           ]
         }
       ];
@@ -533,9 +552,9 @@ describe('Medical Analysis Edge Cases', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'I feel sad today.' },
-            { role: 'patient', content: 'I am anxious about everything.' },
-            { role: 'patient', content: 'I am confused and lost.' }
+            { role: 'client', content: 'I feel sad today.' },
+            { role: 'client', content: 'I am anxious about everything.' },
+            { role: 'client', content: 'I am confused and lost.' }
           ]
         }
       ];

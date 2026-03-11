@@ -28,7 +28,7 @@ jest.mock("../SentimentSummaryCard", () => ({
 
 describe("SentimentDashboard", () => {
   const mockTrend: SentimentTrend = {
-    clientId: "test-patient-id",
+    clientId: "test-client-id",
     timeRange: "month",
     startDate: "2024-01-01T00:00:00.000Z",
     endDate: "2024-01-31T23:59:59.999Z",
@@ -89,7 +89,7 @@ describe("SentimentDashboard", () => {
   }
 
   const defaultProps = {
-    clientId: "test-patient-id"
+    clientId: "test-client-id"
   }
 
   it("should render with trend and summary data", () => {

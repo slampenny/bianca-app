@@ -268,8 +268,8 @@ describe('Medical Psychiatric Decline Detection', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'I feel so alone. I don\'t know what to do. I am worthless.' },
-            { role: 'patient', content: 'I think I am a failure. I can\'t do anything right.' }
+            { role: 'client', content: 'I feel so alone. I don\'t know what to do. I am worthless.' },
+            { role: 'client', content: 'I think I am a failure. I can\'t do anything right.' }
           ]
         }
       ];
@@ -286,8 +286,8 @@ describe('Medical Psychiatric Decline Detection', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'I used to be happy but now I am miserable.' },
-            { role: 'patient', content: 'I will never be happy again. I am doomed to suffer forever.' }
+            { role: 'client', content: 'I used to be happy but now I am miserable.' },
+            { role: 'client', content: 'I will never be happy again. I am doomed to suffer forever.' }
           ]
         }
       ];
@@ -304,8 +304,8 @@ describe('Medical Psychiatric Decline Detection', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'I never feel good anymore. Everything is terrible. I always fail.' },
-            { role: 'patient', content: 'Nobody cares about me. I am completely alone.' }
+            { role: 'client', content: 'I never feel good anymore. Everything is terrible. I always fail.' },
+            { role: 'client', content: 'Nobody cares about me. I am completely alone.' }
           ]
         }
       ];
@@ -365,8 +365,8 @@ describe('Medical Psychiatric Decline Detection', () => {
           _id: 'conv1',
           clientId: 'test-patient',
           messages: [
-            { role: 'patient', content: 'Hello' },
-            { role: 'patient', content: 'Goodbye' }
+            { role: 'client', content: 'Hello' },
+            { role: 'client', content: 'Goodbye' }
           ]
         }
       ];

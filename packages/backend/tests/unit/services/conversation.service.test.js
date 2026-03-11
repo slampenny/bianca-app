@@ -87,7 +87,7 @@ describe('conversationService', () => {
     const messageContent = 'Hello, world!';
     const updatedConversation = await conversationService.addMessageToConversation(
       conversation._id,
-      'patient',
+      'client',
       messageContent
     );
     expect(updatedConversation.messages).toHaveLength(1);

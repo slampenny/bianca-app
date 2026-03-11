@@ -12,7 +12,7 @@ const { alertOne, insertAlerts } = require('../fixtures/alert.fixture');
 const { tokenService, twilioCallService } = require('../../src/services');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
-const { scheduleOne, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
+const { scheduleOne, insertScheduleAndAddToClient } = require('../fixtures/schedule.fixture');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
@@ -36,7 +36,7 @@ describe('Call routes', () => {
     [org] = await insertOrgs([orgOne]);
     [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
     [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
-    const schedules = await insertScheduleAndAddToPatient(client, scheduleOne);
+    const schedules = await insertScheduleAndAddToClient(client, scheduleOne);
     const alerts = await insertAlerts(caregiver, 'Caregiver', [alertOne]);
   });
 

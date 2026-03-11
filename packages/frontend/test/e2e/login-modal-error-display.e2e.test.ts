@@ -76,11 +76,11 @@ test.describe('Login Modal Error Display', () => {
     
     // WHEN: I navigate to a screen that makes API calls
     // This should trigger 401 and show the login modal
-    // Note: edit-patient-button uses data-testid, but we'll use a more generic selector
-    await page.waitForSelector('[data-testid*="edit-patient-button"]', { timeout: 15000 })
-    await page.locator('[data-testid*="edit-patient-button"]').first().click()
+    // Note: edit-client-button uses data-testid, but we'll use a more generic selector
+    await page.waitForSelector('[data-testid*="edit-client-button"]', { timeout: 15000 })
+    await page.locator('[data-testid*="edit-client-button"]').first().click()
     
-    // Wait for patient screen to load and make API call
+    // Wait for client screen to load and make API call
     await page.waitForTimeout(2000)
     
     // The modal should appear when the API call returns 401

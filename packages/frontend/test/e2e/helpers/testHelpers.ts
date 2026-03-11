@@ -461,14 +461,14 @@ export async function goToPaymentTab(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="payment-info-container"]', { timeout: 10000 })
 }
 
-export async function createAlertViaUI(page: Page, message: string, importance: string, alertType: string, patientName?: string) {
+export async function createAlertViaUI(page: Page, message: string, importance: string, alertType: string, clientName?: string) {
   await goToAlertTab(page)
   await page.click('[data-testid="create-alert-button"]')
   await page.fill('[data-testid="alert-message-input"]', message)
   await page.selectOption('[data-testid="alert-importance-select"]', importance)
   await page.selectOption('[data-testid="alert-type-select"]', alertType)
-  if (patientName) {
-    await page.selectOption('[data-testid="alert-patient-select"]', { label: patientName })
+  if (clientName) {
+    await page.selectOption('[data-testid="alert-client-select"]', { label: clientName })
   }
   await page.click('[data-testid="save-alert-button"]')
   await page.waitForSelector(`text=${message}`, { timeout: 10000 })
@@ -600,11 +600,6 @@ export async function editClientViaUI(page: Page, clientName: string, newName: s
   await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 }
 
-/** @deprecated Use editClientViaUI */
-export async function editPatientViaUI(page: Page, patientName: string, newName: string, newEmail: string, newPhone: string): Promise<void> {
-  return editClientViaUI(page, patientName, newName, newEmail, newPhone)
-}
-
 export async function deleteClientViaUI(page: Page, clientName: string): Promise<void> {
   // Find the client card by name and click the edit button to open details
   const card = page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
@@ -626,11 +621,6 @@ export async function deleteClientViaUI(page: Page, clientName: string): Promise
   await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 }
 
-/** @deprecated Use deleteClientViaUI */
-export async function deletePatientViaUI(page: Page, patientName: string): Promise<void> {
-  return deleteClientViaUI(page, patientName)
-}
-
 export async function checkClientExists(page: Page, clientName: string): Promise<boolean> {
   try {
     await page.waitForSelector(`[data-testid="client-name-${clientName}"], [data-testid^="client-card-"]:has-text("${clientName}")`, { timeout: 3000 })
@@ -640,20 +630,11 @@ export async function checkClientExists(page: Page, clientName: string): Promise
   }
 }
 
-/** @deprecated Use checkClientExists */
-export async function checkPatientExists(page: Page, patientName: string): Promise<boolean> {
-  return checkClientExists(page, patientName)
-}
-
 export async function getClientCount(page: Page): Promise<number> {
   const clientCards = page.locator('[data-testid^="client-card-"]')
   return await clientCards.count()
 }
 
-/** @deprecated Use getClientCount */
-export async function getPatientCount(page: Page): Promise<number> {
-  return getClientCount(page)
-}
 
 export async function navigateToPrivacyRequestScreen(page: Page): Promise<void> {
   // Navigate directly via URL (fastest method)

@@ -139,14 +139,14 @@ test.describe('All Screens Crash Check', () => {
     page.on('pageerror', (error) => errors.push(error.message))
     
     await loginIfNeeded(page)
-    // Navigate to patient first, then schedules
-    // Schedules can only be accessed through patient screen
+    // Navigate to client first, then schedules
+    // Schedules can only be accessed through client screen
     await navigateToHomeTab(page).catch(() => {})
     await page.waitForTimeout(1000)
     
-    // Try to click first patient card or edit button if available
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
-    const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+    // Try to click first client card or edit button if available
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
+    const patientCard = page.locator('[data-testid^="client-card-"]').first()
     
     let navigatedToPatient = false
     if (await editButton.count() > 0) {
@@ -154,7 +154,7 @@ test.describe('All Screens Crash Check', () => {
         await editButton.click({ timeout: 10000, force: true })
         navigatedToPatient = true
       } catch {
-        // Try patient card as fallback
+        // Try client card as fallback
       }
     }
     
@@ -169,7 +169,7 @@ test.describe('All Screens Crash Check', () => {
     
     if (navigatedToPatient) {
       await page.waitForTimeout(2000)
-      // Look for the "Manage Schedules" button on patient screen
+      // Look for the "Manage Schedules" button on client screen
       const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
       if (await manageSchedulesButton.count() > 0) {
         try {

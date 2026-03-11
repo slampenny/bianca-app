@@ -397,8 +397,8 @@ const resetPassword = catchAsync(async (req, res) => {
  * Allows SSO users to set a password so they can login with email/password
  */
 /**
- * Complete onboarding: set persona, optionally update org requirePatientConsent (for organization/caregiver).
- * Requires acceptTerms: true. singleConsentState: true => requirePatientConsent false (one-party consent).
+ * Complete onboarding: set persona, optionally update org requireClientConsent (for organization/caregiver).
+ * Requires acceptTerms: true. singleConsentState: true => requireClientConsent false (one-party consent).
  */
 const completeOnboarding = catchAsync(async (req, res) => {
   const caregiverId = req.caregiver?.id || req.caregiver?._id;
@@ -423,7 +423,7 @@ const completeOnboarding = catchAsync(async (req, res) => {
   if ((persona === 'organization' || persona === 'caregiver') && caregiver.org) {
     const orgId = caregiver.org._id || caregiver.org;
     await orgService.updateOrgById(orgId, {
-      requirePatientConsent: singleConsentState === false,
+      requireClientConsent: singleConsentState === false,
     });
   }
 

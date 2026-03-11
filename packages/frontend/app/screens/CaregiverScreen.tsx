@@ -561,7 +561,7 @@ function CaregiverScreen() {
               style={styles.panelBackdrop} 
               onPress={closeUnassignedPanel}
             />
-            <View style={styles.panelContent} testID="assign-unassigned-patients-modal">
+            <View style={styles.panelContent} testID="assign-unassigned-clients-modal">
               <View style={styles.panelHeader}>
                 <Text style={styles.panelTitle}>{translate("caregiverScreen.assignUnassignedClientsTitle")}</Text>
                 <Pressable
@@ -573,18 +573,18 @@ function CaregiverScreen() {
               </View>
               
               {isLoadingUnassigned ? (
-                <Text style={styles.loadingText} testID="unassigned-patients-loading">{translate("caregiverScreen.loadingUnassignedClients")}</Text>
+                <Text style={styles.loadingText} testID="unassigned-clients-loading">{translate("caregiverScreen.loadingUnassignedClients")}</Text>
               ) : isAssigning ? (
                 <Text style={styles.loadingText}>{translate("caregiverScreen.assigningClients")}</Text>
               ) : assignmentSuccess ? (
-                <Text style={styles.successText} testID="patients-assigned-success-message">{translate("caregiverScreen.clientsAssignedSuccess")}</Text>
+                <Text style={styles.successText} testID="clients-assigned-success-message">{translate("caregiverScreen.clientsAssignedSuccess")}</Text>
               ) : unassignedClients && unassignedClients.length > 0 ? (
                 <>
                   <View style={styles.selectionControls}>
                     <Button
                       text={translate("caregiverScreen.selectAll")}
                       onPress={handleSelectAll}
-                      testID="select-all-patients-button"
+                      testID="select-all-clients-button"
                       style={styles.selectionButton}
                       textStyle={styles.selectionButtonText}
                       preset="default"
@@ -592,7 +592,7 @@ function CaregiverScreen() {
                     <Button
                       text={translate("caregiverScreen.deselectAll")}
                       onPress={handleDeselectAll}
-                      testID="deselect-all-patients-button"
+                      testID="deselect-all-clients-button"
                       style={styles.selectionButton}
                       textStyle={styles.selectionButtonText}
                       preset="default"

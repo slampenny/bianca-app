@@ -1918,7 +1918,7 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Successfully saved ${role} message (${content.length} chars) to conversation ${conn.conversationId}`);
 
       // EMERGENCY DETECTION: Post-message analysis for user messages
-      if ((role === 'user' || role === 'patient' || role === 'client') && conn.clientId && content && content.trim().length > 10) {
+      if ((role === 'user' || role === 'client') && conn.clientId && content && content.trim().length > 10) {
         try {
           logger.info(`[Emergency Detection] Processing utterance for emergency detection`, {
             clientId: conn.clientId,

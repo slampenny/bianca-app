@@ -83,7 +83,7 @@ beforeAll(async () => {
   await conversation1.save();
 
   const message1 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I met someone new online and they asked me to send them five thousand dollars through Western Union. They said it was urgent and I need to act now. They told me not to tell anyone about it.',
     messageType: 'text',
     conversationId: conversation1._id
@@ -119,7 +119,7 @@ beforeAll(async () => {
   await conversation2.save();
 
   const message2 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'Someone hit me and I have a black eye. They said I deserved it. I am scared of them and I don\'t want to tell anyone because they said they would hurt me more.',
     messageType: 'text',
     conversationId: conversation2._id
@@ -155,7 +155,7 @@ beforeAll(async () => {
   await conversation3.save();
 
   const message3 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I haven\'t eaten in two days. There is no food in the house. I am hungry and I don\'t know what to do. No one visits me anymore.',
     messageType: 'text',
     conversationId: conversation3._id

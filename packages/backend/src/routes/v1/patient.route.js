@@ -20,7 +20,7 @@ router
   )
   .get(
     auth('readOwn:patient', 'readAny:patient'),
-    minimumNecessaryMiddleware('patient'), // HIPAA: Minimum necessary data access
+    minimumNecessaryMiddleware('client'), // HIPAA: Minimum necessary data access
     validate(patientValidation.getPatients),
     patientController.getPatients
   );
@@ -29,7 +29,7 @@ router
   .route('/unassigned')
   .get(
     auth('readOwn:patient', 'readAny:patient'),
-    minimumNecessaryMiddleware('patient'), // HIPAA: Minimum necessary data access
+    minimumNecessaryMiddleware('client'), // HIPAA: Minimum necessary data access
     validate(patientValidation.getUnassignedPatients),
     patientController.getUnassignedPatients
   );
@@ -38,7 +38,7 @@ router
   .route('/:clientId')
   .get(
     auth('readOwn:patient', 'readAny:patient'),
-    minimumNecessaryMiddleware('patient'), // HIPAA: Minimum necessary data access
+    minimumNecessaryMiddleware('client'), // HIPAA: Minimum necessary data access
     validate(patientValidation.getPatient),
     patientController.getPatient
   )

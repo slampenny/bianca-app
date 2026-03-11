@@ -1,23 +1,23 @@
 import { test, expect } from './helpers/testHelpers'
 import { AuthWorkflow } from './workflows/auth.workflow'
-import { PatientDetailedWorkflow } from './workflows/patient-detailed.workflow'
+import { ClientDetailedWorkflow } from './workflows/patient-detailed.workflow'
 import { TEST_USERS } from './fixtures/testData'
 import { Page } from '@playwright/test'
 
 /**
  * Helper function to navigate to conversations screen
  */
-async function navigateToConversationsScreen(page: Page, patientWorkflow: PatientDetailedWorkflow) {
-  // Select patient and navigate to patient screen
-  const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-  expect(patientSelected).toBe(true)
+async function navigateToConversationsScreen(page: Page, clientWorkflow: ClientDetailedWorkflow) {
+  // Select client and navigate to client screen
+  const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+  expect(clientSelected).toBe(true)
   
-  const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+  const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
   if (await editButton.count() > 0) {
     await editButton.click()
     await page.waitForTimeout(2000)
   } else {
-    const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+    const patientCard = page.locator('[data-testid^="client-card-"]').first()
     await patientCard.click()
     await page.waitForTimeout(2000)
   }
@@ -56,10 +56,10 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   })
 
   test('should support pull-to-refresh', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000) // Wait for conversations to load
     
     // Get initial conversation count
@@ -90,10 +90,10 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   })
 
   test('should display sentiment indicators on conversations', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000)
     
     const conversationCards = page.locator('[data-testid^="conversation-card-"]')
@@ -128,10 +128,10 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   })
 
   test('should format dates correctly (today, yesterday, date)', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000)
     
     const conversationCards = page.locator('[data-testid^="conversation-card-"]')
@@ -164,10 +164,10 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   })
 
   test('should show loading state when loading more conversations', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000)
     
     // Scroll to bottom to trigger load more
@@ -192,10 +192,10 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   })
 
   test('should handle pagination correctly', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000) // Wait for initial load
     
     const conversationCards = page.locator('[data-testid^="conversation-card-"]')
@@ -217,19 +217,19 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   })
 
   test('should show initial loading state', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
     // During initial load, we should see a loading indicator
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(1000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(1000)
     }
@@ -254,10 +254,10 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   })
 
   test('should handle error states gracefully', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000)
     
     const conversationsScreen = page.locator('[data-testid="conversations-screen"]')

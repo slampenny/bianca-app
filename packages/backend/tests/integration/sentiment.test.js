@@ -322,7 +322,7 @@ describe('Sentiment Analysis API', () => {
       const messages = [
         new Message({
           conversationId: conversationToAnalyze._id,
-          role: 'patient',
+          role: 'client',
           content: 'I am feeling really frustrated today.',
           createdAt: new Date()
         }),

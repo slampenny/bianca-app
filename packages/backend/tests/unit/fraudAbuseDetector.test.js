@@ -136,7 +136,7 @@ describe('Relationship Pattern Analyzer', () => {
       const conversations = [{
         _id: new mongoose.Types.ObjectId(),
         messages: [{
-          role: 'patient',
+          role: 'client',
           content: 'I met someone new online',
           createdAt: new Date()
         }],
@@ -153,7 +153,7 @@ describe('Relationship Pattern Analyzer', () => {
       const conversations = [{
         _id: new mongoose.Types.ObjectId(),
         messages: [{
-          role: 'patient',
+          role: 'client',
           content: 'I am not allowed to talk to my friends',
           createdAt: new Date()
         }],
@@ -170,7 +170,7 @@ describe('Relationship Pattern Analyzer', () => {
       const conversations = [{
         _id: new mongoose.Types.ObjectId(),
         messages: [{
-          role: 'patient',
+          role: 'client',
           content: 'They tell me what to do. They make decisions for me. They won\'t let me do anything. I have to ask permission for everything.',
           createdAt: new Date()
         }],
@@ -187,7 +187,7 @@ describe('Relationship Pattern Analyzer', () => {
       const conversations = [{
         _id: new mongoose.Types.ObjectId(),
         messages: [{
-          role: 'patient',
+          role: 'client',
           content: 'This new person I met asks for money',
           createdAt: new Date()
         }],
@@ -221,7 +221,7 @@ describe('Fraud Abuse Analyzer', () => {
       const conversations = [{
         _id: new mongoose.Types.ObjectId(),
         messages: [{
-          role: 'patient',
+          role: 'client',
           content: 'I sent five thousand dollars through Western Union to someone. They said it was urgent and I need to act now. They told me not to tell anyone about it.',
           createdAt: new Date()
         }],
@@ -239,7 +239,7 @@ describe('Fraud Abuse Analyzer', () => {
       const conversations = [{
         _id: new mongoose.Types.ObjectId(),
         messages: [{
-          role: 'patient',
+          role: 'client',
           content: 'Someone hit me and I have a black eye. They said I deserved it because I did something wrong. I am scared of them and I don\'t want to tell anyone because they said they would hurt me more if I did.',
           createdAt: new Date()
         }],
@@ -259,7 +259,7 @@ describe('Fraud Abuse Analyzer', () => {
         {
           _id: new mongoose.Types.ObjectId(),
           messages: [{
-            role: 'patient',
+            role: 'client',
             content: 'I got a call from someone saying I won a prize and I need to send them money for taxes. They said I need to send ten thousand dollars immediately or I will lose the prize. This is urgent!',
             createdAt: new Date()
           }],
@@ -268,7 +268,7 @@ describe('Fraud Abuse Analyzer', () => {
         {
           _id: new mongoose.Types.ObjectId(),
           messages: [{
-            role: 'patient',
+            role: 'client',
             content: 'I sent the money through Western Union. They told me not to tell anyone about this. I need to send more money for gift cards to verify my identity.',
             createdAt: new Date()
           }],
@@ -288,17 +288,17 @@ describe('Fraud Abuse Analyzer', () => {
         _id: new mongoose.Types.ObjectId(),
         messages: [
           {
-            role: 'patient',
+            role: 'client',
             content: 'I met someone new online and they asked me to send them money. I sent five thousand dollars to this new friend through Western Union.',
             createdAt: new Date()
           },
           {
-            role: 'patient',
+            role: 'client',
             content: 'I am not allowed to talk to my friends anymore. They said I can\'t see my family. I feel isolated and alone.',
             createdAt: new Date()
           },
           {
-            role: 'patient',
+            role: 'client',
             content: 'I haven\'t eaten in two days. There is no food in the house. I am hungry and I don\'t know what to do.',
             createdAt: new Date()
           }
@@ -319,7 +319,7 @@ describe('Fraud Abuse Analyzer', () => {
       const conversations = [{
         _id: new mongoose.Types.ObjectId(),
         messages: [{
-          role: 'patient',
+          role: 'client',
           content: 'Hi',
           createdAt: new Date()
         }],

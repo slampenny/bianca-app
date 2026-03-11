@@ -385,7 +385,7 @@ function CurrentChargesScreen() {
             )
           }}
           contentContainerStyle={styles.patientChargesList}
-          testID="patient-charges-list"
+          testID="client-charges-list"
           showsVerticalScrollIndicator={false}
         />
       </View>

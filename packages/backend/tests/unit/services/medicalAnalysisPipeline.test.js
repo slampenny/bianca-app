@@ -3,6 +3,7 @@
 // require('../../utils/integration-setup');
 
 // tests/unit/services/medicalAnalysisPipeline.test.js
+const logger = require('../../../src/config/logger');
 const MedicalPatternAnalyzer = require('../../../src/services/ai/medicalPatternAnalyzer.service');
 const medicalAnalysisScheduler = require('../../../src/services/ai/medicalAnalysisScheduler.service');
 const baselineManager = require('../../../src/services/ai/baselineManager.service');
@@ -411,10 +412,13 @@ describe('Medical Analysis Pipeline Integration', () => {
       // Test error handling by passing invalid data that will cause internal error
       // The analyzer should catch errors and return error result instead of throwing
       const originalAnalyzeMonth = analyzer.analyzeMonth.bind(analyzer);
-      
+
       // Temporarily break the extractPatientMessages method to simulate an internal error
       const originalExtract = analyzer.extractPatientMessages;
       analyzer.extractPatientMessages = jest.fn().mockRejectedValue(new Error('Analysis service unavailable'));
+
+      // Suppress expected error log so test output is not confusing
+      const logErrorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
 
       try {
         // Attempt analysis - should catch error and return error result
@@ -426,8 +430,8 @@ describe('Medical Analysis Pipeline Integration', () => {
         expect(errorWarningsText).toMatch(/Analysis failed/i);
         expect(result.confidence).toBe('none');
       } finally {
-        // Restore original method
         analyzer.extractPatientMessages = originalExtract;
+        logErrorSpy.mockRestore();
       }
     });
 

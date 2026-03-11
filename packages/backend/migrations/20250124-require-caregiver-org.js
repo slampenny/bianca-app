@@ -73,16 +73,16 @@ module.exports = {
           }
         }
 
-        // Strategy 2: If still no org, check if caregiver has patients with orgs
+        // Strategy 2: If still no org, check if caregiver has clients with orgs
         if (!assignedOrg) {
-          const { Patient } = require('../src/models');
-          const patientsWithOrg = await Patient.find({ 
+          const { Client } = require('../src/models');
+          const clientsWithOrg = await Client.find({
             caregivers: caregiver._id,
-            org: { $exists: true, $ne: null }
+            org: { $exists: true, $ne: null },
           }).limit(1);
-          
-          if (patientsWithOrg.length > 0 && patientsWithOrg[0].org) {
-            assignedOrg = await Org.findById(patientsWithOrg[0].org);
+
+          if (clientsWithOrg.length > 0 && clientsWithOrg[0].org) {
+            assignedOrg = await Org.findById(clientsWithOrg[0].org);
           }
         }
 

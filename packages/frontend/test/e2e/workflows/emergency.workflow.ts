@@ -53,7 +53,7 @@ export class EmergencyWorkflow {
   }
 
   async whenIClickCallPatientImmediately() {
-    await this.page.getByTestId('call-patient-immediately-button').click()
+    await this.page.getByTestId('call-client-immediately-button').click()
   }
 
   async whenIAddEmergencyNotes(notes: string) {
@@ -89,7 +89,7 @@ export class EmergencyWorkflow {
   }
 
   async thenIShouldSeeCallPatientButton() {
-    await expect(this.page.getByTestId('call-patient-immediately-button')).toBeVisible()
+    await expect(this.page.getByTestId('call-client-immediately-button')).toBeVisible()
   }
 
   async thenCallShouldBeHighPriority() {
@@ -119,7 +119,7 @@ export class EmergencyWorkflow {
   }
 
   async thenResponseShouldBeDocumented() {
-    await this.page.getByTestId('patient-record-link').click()
+    await this.page.getByTestId('client-record-link').click()
     await expect(this.page.getByTestId('emergency-response-log')).toBeVisible()
   }
 

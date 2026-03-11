@@ -55,7 +55,7 @@ describe('Payment routes', () => {
 
       // Create messages first
       const message1 = await Message.create({
-        role: 'patient',
+        role: 'client',
         content: 'Test patient message',
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
@@ -109,7 +109,7 @@ describe('Payment routes', () => {
 
       // Create messages for the conversation
       const message1 = await Message.create({
-        role: 'patient',
+        role: 'client',
         content: 'Test patient message for unassigned patient',
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
@@ -172,7 +172,7 @@ describe('Payment routes', () => {
 
       // Create a conversation that is already charged (has lineItemId)
       const message1 = await Message.create({
-        role: 'patient',
+        role: 'client',
         content: 'Test patient message',
         conversationId: new mongoose.Types.ObjectId(),
       });
@@ -232,7 +232,7 @@ describe('Payment routes', () => {
       const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
 
       const message1 = await Message.create({
-        role: 'patient',
+        role: 'client',
         content: 'Test patient message',
         conversationId: new mongoose.Types.ObjectId(),
       });
@@ -562,7 +562,7 @@ describe('Payment routes', () => {
       const conversations = [];
       for (let i = 0; i < 3; i++) {
         const message1 = await Message.create({
-          role: 'patient',
+          role: 'client',
           content: `Test patient message ${i}`,
           conversationId: new mongoose.Types.ObjectId(),
         });
@@ -611,7 +611,7 @@ describe('Payment routes', () => {
 
       // Create first conversation and invoice
       const message1 = await Message.create({
-        role: 'patient',
+        role: 'client',
         content: 'Test patient message 1',
         conversationId: new mongoose.Types.ObjectId(),
       });
@@ -642,7 +642,7 @@ describe('Payment routes', () => {
 
       // Create second conversation and invoice
       const message3 = await Message.create({
-        role: 'patient',
+        role: 'client',
         content: 'Test patient message 2',
         conversationId: new mongoose.Types.ObjectId(),
       });

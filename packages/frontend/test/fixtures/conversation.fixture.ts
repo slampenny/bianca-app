@@ -16,7 +16,7 @@ export function newConversation(clientId: string): Partial<Conversation> {
 
   // Create some default messages
   const messages: Message[] = [
-    { role: 'patient', content: 'Hello, I need some assistance.' },
+    { role: 'client', content: 'Hello, I need some assistance.' },
     { role: 'assistant', content: 'Sure, how can I help you today?' },
   ];
 

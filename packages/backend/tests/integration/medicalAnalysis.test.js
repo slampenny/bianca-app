@@ -96,7 +96,7 @@ beforeAll(async () => {
 
   // Create messages for conversation1
   const message1 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I have been feeling dizzy and having headaches lately',
     messageType: 'text',
     conversationId: conversation1._id
@@ -133,7 +133,7 @@ beforeAll(async () => {
 
   // Create messages for conversation2
   const message3 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'My memory has been getting worse, I keep forgetting things',
     messageType: 'text',
     conversationId: conversation2._id

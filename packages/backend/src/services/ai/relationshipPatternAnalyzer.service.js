@@ -138,7 +138,7 @@ class RelationshipPatternAnalyzer {
       }
       
       conversationMessages.forEach(message => {
-        if (message.role === 'patient' && message.content && message.content.trim()) {
+        if (message.role === 'client' && message.content && message.content.trim()) {
           messages.push({
             content: message.content.trim(),
             timestamp: message.createdAt || conversation.createdAt || new Date(),

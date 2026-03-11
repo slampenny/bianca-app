@@ -222,7 +222,7 @@ async function runSchedules() {
     const hasConsent = await clientService.checkClientConsent(schedule.client);
 
     // If org requires consent but client hasn't consented, skip the call and alert caregivers
-    if (org.requirePatientConsent && !hasConsent) {
+    if (org.requireClientConsent && !hasConsent) {
       logger.warn(`Skipping scheduled call for client ${schedule.client} - consent required but not given`);
       
       await alertService.createAlert({

@@ -50,7 +50,7 @@ export function HomeScreen() {
   const isOrgAdmin = currentUser?.role === "orgAdmin"
   const isSuperAdmin = currentUser?.role === "superAdmin"
   
-  // Role-based access control for patient creation
+  // Role-based access control for client creation
   // Only org admins and super admins can create clients
   // Staff users can only view clients
   const shouldDisableButton = isStaff
@@ -142,7 +142,7 @@ export function HomeScreen() {
               onPress={() => handleCallNow(item)}
               testID={`call-now-${item.name}`}
               accessibilityLabel={`Call ${item.name}`}
-              accessibilityHint="Initiates a phone call to this patient"
+              accessibilityHint="Initiates a phone call to this client"
               style={styles.callButton}
               textStyle={styles.callButtonText}
               LeftAccessory={(props) => (
@@ -159,7 +159,7 @@ export function HomeScreen() {
               onPress={() => handleClientPress(item)}
               testID={`edit-client-button-${item.id}`}
               accessibilityLabel={`Edit ${item.name}`}
-              accessibilityHint="Opens patient details for editing"
+              accessibilityHint="Opens client details for editing"
               style={styles.editButton}
               textStyle={styles.editButtonText}
               LeftAccessory={(props) => (

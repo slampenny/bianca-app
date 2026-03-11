@@ -1,10 +1,18 @@
 // src/services/ai/medicalPatternAnalyzer.service.js
 
 const natural = require('natural');
+const mongoose = require('mongoose');
 const logger = require('../../config/logger');
 const { calculateVocabularyMetrics } = require('./vocabularyAnalyzer.service');
 const { detectCognitiveDecline } = require('./cognitiveDeclineDetector.service');
 const { analyzePsychiatricMarkers } = require('./psychiatricMarkerAnalyzer.service');
+
+/** True if value looks like a MongoDB ObjectId (string or ObjectId), not a document object */
+function isMessageId(value) {
+  if (value == null) return false;
+  if (typeof value === 'string' && value.length === 24 && mongoose.Types.ObjectId.isValid(value)) return true;
+  return typeof value === 'object' && value.constructor && value.constructor.name === 'ObjectId';
+}
 
 /**
  * Medical Pattern Analyzer
@@ -99,35 +107,38 @@ class MedicalPatternAnalyzer {
   }
 
   /**
-   * Extract patient messages from conversations
+   * Extract patient messages from conversations.
+   * Contract: each conversation.messages is either (a) an array of MongoDB ObjectIds, or
+   * (b) an array of document-like objects (may have role, content; malformed entries are skipped).
+   * We treat as IDs only when the first element looks like an ObjectId; otherwise we use in-memory.
    * @param {Array} conversations - Array of conversation objects
    * @returns {Array} Array of patient message strings
    */
   async extractPatientMessages(conversations) {
     const messages = [];
     const { Message } = require('../../models');
-    
+
+    const addPatientContent = (message) => {
+      if (message && message.role === 'client' && message.content && message.content.trim()) {
+        messages.push(message.content.trim());
+      }
+    };
+
     for (const conversation of conversations) {
       if (conversation.messages && Array.isArray(conversation.messages)) {
-        // Check if messages are populated objects or just IDs/ObjectIds
         const firstMessage = conversation.messages[0];
-        const isPopulated = firstMessage && firstMessage.role !== undefined && firstMessage.content !== undefined;
-        
-        if (!isPopulated && conversation.messages.length > 0) {
-          // Messages are IDs/ObjectIds, need to populate them
-          const populatedMessages = await Message.find({ _id: { $in: conversation.messages } });
-          populatedMessages.forEach(message => {
-            if (message.role === 'patient' && message.content && message.content.trim()) {
-              messages.push(message.content.trim());
-            }
-          });
+        // Treat as IDs only when the first element looks like a MongoDB ObjectId, not a document
+        const messagesAreIds = firstMessage != null && isMessageId(firstMessage);
+
+        if (messagesAreIds) {
+          const validIds = conversation.messages.filter((m) => m != null && isMessageId(m));
+          if (validIds.length > 0) {
+            const populatedMessages = await Message.find({ _id: { $in: validIds } });
+            populatedMessages.forEach(addPatientContent);
+          }
         } else {
-          // Messages are already populated objects
-          conversation.messages.forEach(message => {
-            if (message.role === 'patient' && message.content && message.content.trim()) {
-              messages.push(message.content.trim());
-            }
-          });
+          // Messages are already populated (or plain objects in tests); guard against null/undefined
+          conversation.messages.forEach(addPatientContent);
         }
       }
     }

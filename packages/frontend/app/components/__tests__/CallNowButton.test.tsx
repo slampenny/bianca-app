@@ -49,7 +49,7 @@ const renderWithProvider = (component: React.ReactElement) => {
 
 describe('CallNowButton', () => {
   const defaultProps = {
-    clientId: 'patient-123',
+    clientId: 'client-123',
     clientName: 'John Doe',
     disabled: false,
   }
@@ -58,7 +58,7 @@ describe('CallNowButton', () => {
       conversationId: 'conv-123',
       status: 'initiated',
       callSid: 'call-456',
-      clientId: 'patient-123',
+      clientId: 'client-123',
       clientName: 'John Doe',
       clientPhone: '+1234567890',
       agentId: 'agent-123',
@@ -80,12 +80,12 @@ describe('CallNowButton', () => {
     expect(getByText('Call Now')).toBeTruthy()
   })
 
-  it('shows patient name in call notes when initiating call', async () => {
+  it('shows client name in call notes when initiating call', async () => {
     const mockResponse = {
       data: {
         conversationId: 'conv-123',
         callSid: 'call-456',
-        clientId: 'patient-123',
+        clientId: 'client-123',
         clientName: 'John Doe',
         clientPhone: '+1234567890',
         agentId: 'agent-123',
@@ -107,7 +107,7 @@ describe('CallNowButton', () => {
 
     await waitFor(() => {
       expect(mockInitiateCallMutation).toHaveBeenCalledWith({
-        clientId: 'patient-123',
+        clientId: 'client-123',
         callNotes: 'Manual call initiated by agent to John Doe'
       })
     })
@@ -118,7 +118,7 @@ describe('CallNowButton', () => {
       data: {
         conversationId: 'conv-123',
         callSid: 'call-456',
-        clientId: 'patient-123',
+        clientId: 'client-123',
         clientName: 'John Doe',
         clientPhone: '+1234567890',
         agentId: 'agent-123',

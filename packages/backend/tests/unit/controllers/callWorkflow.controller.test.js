@@ -11,6 +11,7 @@ const { Call, Conversation } = require('../../../src/models');
 jest.mock('twilio', () => {
   const mockTwilioClient = {
     calls: jest.fn().mockReturnValue({
+      fetch: jest.fn().mockResolvedValue({ sid: 'test-call-sid', status: 'in-progress' }),
       update: jest.fn().mockResolvedValue({ sid: 'test-call-sid', status: 'completed' })
     }),
     messages: jest.fn().mockReturnValue({

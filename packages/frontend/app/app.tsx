@@ -57,8 +57,8 @@ const config = {
     },
     Signup: "signup",
     ConfirmReset: "reset-password",
-    PatientConsent: {
-      path: "patient/consent/:token?",
+    ClientConsent: {
+      path: "client/consent/:token?",
       parse: {
         token: (value: string) => value || undefined,
       },

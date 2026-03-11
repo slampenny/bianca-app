@@ -18,7 +18,7 @@ describe('Privacy Service', () => {
     await mongoose.connect(mongoUri, {});
 
     // Initialize email service with Ethereal for testing
-    await emailService.initializeEmailTransport();
+    // In test, sendEmail only captures; retriever uses captured emails. No real Ethereal needed.
   });
 
   afterAll(async () => {

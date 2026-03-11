@@ -554,7 +554,7 @@ class PsychiatricPatternDetector {
     conversations.forEach(conversation => {
       if (conversation.messages && Array.isArray(conversation.messages)) {
         conversation.messages.forEach(message => {
-          if (message.role === 'patient' && message.content && message.content.trim()) {
+          if (message.role === 'client' && message.content && message.content.trim()) {
             messages.push(message.content.trim());
           }
         });

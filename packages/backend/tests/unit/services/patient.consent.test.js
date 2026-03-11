@@ -33,7 +33,7 @@ describe('patientService - Consent Functionality', () => {
 
   describe('sendConsentEmailIfRequired', () => {
     it('should send consent email when org requires patient consent and patient has not consented', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -61,7 +61,7 @@ describe('patientService - Consent Functionality', () => {
     });
 
     it('should not send consent email when org does not require patient consent', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: false }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: false }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -75,7 +75,7 @@ describe('patientService - Consent Functionality', () => {
     });
 
     it('should not send consent email when patient has already consented', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: true };
       const client = await Client.create(clientData);
 
@@ -89,7 +89,7 @@ describe('patientService - Consent Functionality', () => {
     });
 
     it('should handle email sending errors gracefully', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -104,7 +104,7 @@ describe('patientService - Consent Functionality', () => {
 
   describe('checkPatientConsent', () => {
     it('should return true when org does not require consent', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: false }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: false }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -113,7 +113,7 @@ describe('patientService - Consent Functionality', () => {
     });
 
     it('should return true when org requires consent and patient has consented', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: true };
       const client = await Client.create(clientData);
 
@@ -122,7 +122,7 @@ describe('patientService - Consent Functionality', () => {
     });
 
     it('should return false when org requires consent and patient has not consented', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -139,7 +139,7 @@ describe('patientService - Consent Functionality', () => {
 
   describe('verifyConsentToken', () => {
     it('should verify consent token and update patient consent status', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -165,7 +165,7 @@ describe('patientService - Consent Functionality', () => {
     });
 
     it('should handle already consented clients gracefully', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { 
         ...clientOne, 
         org: org._id, 
@@ -195,7 +195,7 @@ describe('patientService - Consent Functionality', () => {
     });
 
     it('should throw error for expired token', async () => {
-      const [org] = await insertOrgs([{ ...orgOne, requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 

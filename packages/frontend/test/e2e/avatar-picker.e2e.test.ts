@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/testHelpers'
 import { AuthWorkflow } from './workflows/auth.workflow'
-import { PatientDetailedWorkflow } from './workflows/patient-detailed.workflow'
+import { ClientDetailedWorkflow } from './workflows/patient-detailed.workflow'
 import { TEST_USERS } from './fixtures/testData'
 import { Page } from '@playwright/test'
 
@@ -23,19 +23,19 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should display default avatar when no avatar is set', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
@@ -56,19 +56,19 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should allow avatar upload', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
@@ -93,19 +93,19 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should update avatar after upload', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
@@ -130,19 +130,19 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should handle avatar upload errors gracefully', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }

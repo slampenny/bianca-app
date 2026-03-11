@@ -91,7 +91,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
 
     // WHEN: I initiate a call for a patient (using real backend for call initiation, OpenAI mocked)
     // First check if we have patients - if not, skip the test
-    const patientCards = page.locator('[data-testid="patient-card"], [aria-label*="patient-card"]')
+    const patientCards = page.locator('[data-testid="client-card"], [aria-label*="client-card"]')
     const patientCount = await patientCards.count()
     
     if (patientCount === 0) {
@@ -106,7 +106,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
     }
     
     // Wait for patient cards or edit buttons to appear
-    const editButton = page.locator('[aria-label*="edit-patient-button-"], [data-testid*="edit-patient"]').first()
+    const editButton = page.locator('[aria-label*="edit-client-button-"], [data-testid*="edit-client"]').first()
     const hasEditButton = await editButton.isVisible({ timeout: 10000 }).catch(() => false)
     
     if (!hasEditButton && patientCount > 0) {
@@ -300,7 +300,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
 
     // WHEN: I initiate a call (using real backend for call initiation, OpenAI mocked)
     // First check if we have patients - if not, skip the test
-    const patientCards = page.locator('[data-testid="patient-card"], [aria-label*="patient-card"]')
+    const patientCards = page.locator('[data-testid="client-card"], [aria-label*="client-card"]')
     const patientCount = await patientCards.count()
     
     if (patientCount === 0) {
@@ -315,7 +315,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
     }
     
     // Wait for patient cards or edit buttons to appear
-    const editButton = page.locator('[aria-label*="edit-patient-button-"], [data-testid*="edit-patient"]').first()
+    const editButton = page.locator('[aria-label*="edit-client-button-"], [data-testid*="edit-client"]').first()
     const hasEditButton = await editButton.isVisible({ timeout: 10000 }).catch(() => false)
     
     if (!hasEditButton && patientCount > 0) {

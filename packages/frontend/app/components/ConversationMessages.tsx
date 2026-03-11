@@ -33,7 +33,7 @@ export function ConversationMessages({ messages, style, 'data-testid': testId }:
   }
 
   const renderMessage = (message: Message, index: number) => {
-    const isUser = message.role === "patient"
+    const isUser = message.role === "client"
     
     return (
       <View key={`${message.id || index}`} style={styles.messageContainer}>

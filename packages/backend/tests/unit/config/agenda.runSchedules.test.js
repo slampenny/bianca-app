@@ -512,7 +512,7 @@ describe('Agenda - runSchedules', () => {
         name: 'Consent Required Org',
         email: 'consent@example.com',
         country: 'US',
-        requirePatientConsent: true,
+        requireClientConsent: true,
       });
 
       // Create client without consent
@@ -586,7 +586,7 @@ describe('Agenda - runSchedules', () => {
         name: 'Consent Required Org',
         email: 'consent@example.com',
         country: 'US',
-        requirePatientConsent: true,
+        requireClientConsent: true,
       });
 
       // Create client with consent
@@ -659,7 +659,7 @@ describe('Agenda - runSchedules', () => {
         name: 'No Consent Required Org',
         email: 'noconsent@example.com',
         country: 'US',
-        requirePatientConsent: false,
+        requireClientConsent: false,
       });
 
       // Create client without consent (but org doesn't require it)

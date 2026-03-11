@@ -7,6 +7,7 @@ const SentimentAnalysisDTO = (sentimentData) => {
     overallSentiment,
     sentimentScore,
     confidence,
+    clientMood,
     patientMood,
     keyEmotions,
     concernLevel,
@@ -15,12 +16,14 @@ const SentimentAnalysisDTO = (sentimentData) => {
     recommendations,
     fallback
   } = sentimentData;
+  const mood = clientMood ?? patientMood;
 
   return {
     overallSentiment,
     sentimentScore,
     confidence,
-    patientMood,
+    clientMood: mood,
+    patientMood: mood, // legacy alias
     keyEmotions,
     concernLevel,
     satisfactionIndicators,

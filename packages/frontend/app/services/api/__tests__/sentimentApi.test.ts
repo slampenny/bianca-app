@@ -7,7 +7,7 @@ import { Org, Client, SentimentTrend, SentimentSummary, SentimentAnalysis } from
 
 // Mock the sentiment API responses
 const mockSentimentTrend: SentimentTrend = {
-  clientId: "test-patient-id",
+  clientId: "test-client-id",
   timeRange: "month",
   startDate: "2024-01-01T00:00:00.000Z",
   endDate: "2024-01-31T23:59:59.999Z",
@@ -185,7 +185,7 @@ describe("sentimentApi", () => {
   })
 
   describe("getSentimentTrend", () => {
-    it("should fetch sentiment trend for patient", async () => {
+    it("should fetch sentiment trend for client", async () => {
       // Mock the API response
       const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentTrend))
       global.fetch = mockFetch
@@ -251,7 +251,7 @@ describe("sentimentApi", () => {
   })
 
   describe("getSentimentSummary", () => {
-    it("should fetch sentiment summary for patient", async () => {
+    it("should fetch sentiment summary for client", async () => {
       const mockFetch = jest.fn().mockResolvedValue(createMockResponse(mockSentimentSummary))
       global.fetch = mockFetch
 

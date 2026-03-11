@@ -6,12 +6,12 @@ const httpStatus = require('http-status');
 const mongoose = require('mongoose');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Alert, Org, Caregiver, Patient, Schedule, Conversation, Call } = require('../../src/models');
+const { Alert, Org, Caregiver, Client, Schedule, Conversation, Call } = require('../../src/models');
 const { caregiverOne, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { alertOne, insertAlerts } = require('../fixtures/alert.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
-const { scheduleOne, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
+const { scheduleOne, insertScheduleAndAddToClient } = require('../fixtures/schedule.fixture');
 const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
@@ -19,7 +19,7 @@ let mongoServer;
 let caregiverToken;
 let org;
 let caregiver;
-let patient;
+let client;
 
 describe('Call Workflow Integration Tests', () => {
   beforeAll(async () => {
@@ -44,7 +44,7 @@ describe('Call Workflow Integration Tests', () => {
     // Clean up test data
     await Alert.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Org.deleteMany();
     await Schedule.deleteMany();
     await Conversation.deleteMany();
@@ -52,10 +52,10 @@ describe('Call Workflow Integration Tests', () => {
   });
 
   describe('POST /v1/calls/initiate', () => {
-    it('should initiate a call to a patient successfully', async () => {
+    it('should initiate a call to a client successfully', async () => {
       const callData = {
         clientId: client.id,
-        callNotes: 'Test call for patient check-in'
+        callNotes: 'Test call for client check-in'
       };
 
       const response = await request(app)
@@ -68,7 +68,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('callId');
       expect(response.body).toHaveProperty('callSid', 'mock-call-sid-12345');
       expect(response.body.clientId.toString()).toBe(client.id);
-      expect(response.body.patientName).toBe(patient.name);
+      expect(response.body.clientName ?? response.body.patientName).toBe(client.name);
       expect(response.body.agentId.toString()).toBe(caregiver.id);
       expect(response.body.status).toBe('in-progress');
       expect(response.body.callStatus).toBe('ringing');
@@ -90,9 +90,9 @@ describe('Call Workflow Integration Tests', () => {
     });
 
     it('should return 400 if client does not have phone number', async () => {
-      // Update patient to remove phone number
-      patient.phone = undefined;
-      await patient.save({ validateBeforeSave: false });
+      // Update client to remove phone number
+      client.phone = undefined;
+      await client.save({ validateBeforeSave: false });
 
       const callData = {
         clientId: client.id,

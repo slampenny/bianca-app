@@ -213,10 +213,10 @@ export function AlertScreen() {
     }
   }
 
-  // Helper function to get client name by ID (alerts may reference patientId from backend)
-  const getPatientName = (patientId: string) => {
+  // Helper function to get client name by ID (alerts may reference clientId or legacy patientId from backend)
+  const getClientName = (clientId: string) => {
     if (!clientsData?.results) return "Unknown Client"
-    const client = clientsData.results.find(c => c.id === patientId)
+    const client = clientsData.results.find(c => c.id === clientId)
     return client?.name || "Unknown Client"
   }
 
@@ -225,8 +225,10 @@ export function AlertScreen() {
     switch (alertType) {
       case 'conversation':
         return 'Conversation Alert'
+      case 'client':
+        return 'Client Alert'
       case 'patient':
-        return 'Patient Alert'
+        return 'Client Alert' // legacy
       case 'system':
         return 'System Alert'
       case 'schedule':
@@ -260,10 +262,10 @@ export function AlertScreen() {
           </View>
         </View>
         
-        {/* Show patient information if alert is related to a patient */}
+        {/* Show client information if alert is related to a client */}
         {(item.relatedClient ?? (item as { relatedPatient?: string }).relatedPatient) && (
           <Text style={styles.alertDetails}>
-            {translate("alertScreen.client")} {getPatientName(item.relatedClient ?? (item as { relatedPatient?: string }).relatedPatient)}
+            {translate("alertScreen.client")} {getClientName(item.relatedClient ?? (item as { relatedPatient?: string }).relatedPatient)}
           </Text>
         )}
         

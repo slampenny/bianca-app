@@ -66,7 +66,7 @@ const cognitiveDeclineConversations = {
       date: new Date('2024-01-15T10:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Good morning! I hope you\'re having a wonderful day. I wanted to discuss my medication schedule with you today.',
           timestamp: new Date('2024-01-15T10:00:00')
         },
@@ -76,7 +76,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-01-15T10:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I take my blood pressure medication every morning at 8 AM, and I\'ve been very consistent with it. I also take my arthritis medication twice daily as prescribed.',
           timestamp: new Date('2024-01-15T10:01:00')
         },
@@ -86,7 +86,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-01-15T10:01:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'No, everything seems to be working well. I feel quite good and I\'m able to maintain my daily activities without any issues.',
           timestamp: new Date('2024-01-15T10:02:00')
         }
@@ -96,7 +96,7 @@ const cognitiveDeclineConversations = {
       date: new Date('2024-01-22T14:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hello there! I wanted to share some good news with you today.',
           timestamp: new Date('2024-01-22T14:00:00')
         },
@@ -106,7 +106,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-01-22T14:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'My daughter came to visit last weekend, and we had a lovely time together. We went for a walk in the park and had lunch at my favorite restaurant.',
           timestamp: new Date('2024-01-22T14:01:00')
         },
@@ -116,7 +116,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-01-22T14:01:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I felt great! The weather was perfect, and it was so nice to be outside. I think regular walks are really helping with my arthritis.',
           timestamp: new Date('2024-01-22T14:02:00')
         }
@@ -130,7 +130,7 @@ const cognitiveDeclineConversations = {
       date: new Date('2024-02-10T09:30:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Good morning... um, I think I need to talk about my medications again.',
           timestamp: new Date('2024-02-10T09:30:00')
         },
@@ -140,7 +140,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-02-10T09:30:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'Well, I... I think I might have missed a dose yesterday. I\'m not entirely sure, but I feel like I might have forgotten to take something.',
           timestamp: new Date('2024-02-10T09:31:00')
         },
@@ -150,7 +150,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-02-10T09:31:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'Yes, I did take that one this morning. I remember that clearly. It\'s just the... the other one that I\'m not sure about.',
           timestamp: new Date('2024-02-10T09:32:00')
         }
@@ -164,7 +164,7 @@ const cognitiveDeclineConversations = {
       date: new Date('2024-03-05T11:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hello, I\'m... I\'m not sure why I called today. Can you help me remember?',
           timestamp: new Date('2024-03-05T11:00:00')
         },
@@ -174,7 +174,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-03-05T11:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I feel... um, I feel a bit confused today. I was supposed to do something important, but I can\'t remember what it was.',
           timestamp: new Date('2024-03-05T11:01:00')
         },
@@ -184,7 +184,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-03-05T11:01:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I think... I think it might have been about my... my medicine? But I\'m not sure. Everything feels a bit fuzzy today.',
           timestamp: new Date('2024-03-05T11:02:00')
         }
@@ -198,7 +198,7 @@ const cognitiveDeclineConversations = {
       date: new Date('2024-04-12T15:30:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hi there... um, I don\'t know... I don\'t know why I\'m here.',
           timestamp: new Date('2024-04-12T15:30:00')
         },
@@ -208,7 +208,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-04-12T15:30:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I feel... I feel lost. I can\'t remember what I\'m supposed to do. The thing is... the thing is...',
           timestamp: new Date('2024-04-12T15:31:00')
         },
@@ -218,7 +218,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-04-12T15:31:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I... I don\'t know. Everything is so confusing. I used to know what to do, but now... now I don\'t.',
           timestamp: new Date('2024-04-12T15:32:00')
         }
@@ -232,7 +232,7 @@ const cognitiveDeclineConversations = {
       date: new Date('2024-05-08T10:15:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hello... um... who are you again?',
           timestamp: new Date('2024-05-08T10:15:00')
         },
@@ -242,7 +242,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-05-08T10:15:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'Oh... oh yes. I think I remember now. You help me with... with the things I need to take.',
           timestamp: new Date('2024-05-08T10:16:00')
         },
@@ -252,7 +252,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-05-08T10:16:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I feel... I feel confused. I can\'t remember if I took my... my pills today. Did I take them?',
           timestamp: new Date('2024-05-08T10:17:00')
         }
@@ -266,7 +266,7 @@ const cognitiveDeclineConversations = {
       date: new Date('2024-06-15T09:45:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hello... hello... is anyone there?',
           timestamp: new Date('2024-06-15T09:45:00')
         },
@@ -276,7 +276,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-06-15T09:45:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'Oh... oh good. I was... I was worried. I don\'t know what\'s happening to me.',
           timestamp: new Date('2024-06-15T09:46:00')
         },
@@ -286,7 +286,7 @@ const cognitiveDeclineConversations = {
           timestamp: new Date('2024-06-15T09:46:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I feel... I feel scared. Everything is so... so strange. I don\'t understand what\'s happening.',
           timestamp: new Date('2024-06-15T09:47:00')
         }
@@ -306,7 +306,7 @@ const psychiatricDeclineConversations = {
       date: new Date('2024-01-10T14:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hi, I wanted to talk about how I\'ve been feeling lately. I\'ve been having some ups and downs.',
           timestamp: new Date('2024-01-10T14:00:00')
         },
@@ -316,7 +316,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-01-10T14:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'Some days I feel okay, but other days I feel really down. I\'ve been having trouble sleeping and I worry a lot about work.',
           timestamp: new Date('2024-01-10T14:01:00')
         },
@@ -326,7 +326,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-01-10T14:01:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'For about a month now. I wake up in the middle of the night and can\'t get back to sleep. Then I\'m exhausted the next day.',
           timestamp: new Date('2024-01-10T14:02:00')
         }
@@ -340,7 +340,7 @@ const psychiatricDeclineConversations = {
       date: new Date('2024-02-08T16:30:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'I\'m not doing well today. I feel really hopeless and I don\'t see the point in anything.',
           timestamp: new Date('2024-02-08T16:30:00')
         },
@@ -350,7 +350,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-02-08T16:30:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'Everything feels pointless. Work is overwhelming, I can\'t concentrate, and I feel like I\'m letting everyone down.',
           timestamp: new Date('2024-02-08T16:31:00')
         },
@@ -360,7 +360,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-02-08T16:31:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I don\'t feel like eating much, and I\'ve stopped doing things I used to like. I just want to stay in bed all day.',
           timestamp: new Date('2024-02-08T16:32:00')
         }
@@ -374,7 +374,7 @@ const psychiatricDeclineConversations = {
       date: new Date('2024-03-12T13:15:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'I don\'t want to be here anymore. I can\'t take this pain anymore.',
           timestamp: new Date('2024-03-12T13:15:00')
         },
@@ -384,7 +384,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-03-12T13:15:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I think about it all the time. I don\'t see any way out of this darkness. Everyone would be better off without me.',
           timestamp: new Date('2024-03-12T13:16:00')
         },
@@ -394,7 +394,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-03-12T13:16:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'No, I don\'t want to burden anyone. I feel like such a failure. I can\'t even function normally anymore.',
           timestamp: new Date('2024-03-12T13:17:00')
         }
@@ -408,7 +408,7 @@ const psychiatricDeclineConversations = {
       date: new Date('2024-04-20T11:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'I\'ve made up my mind. I can\'t live like this anymore. I have a plan.',
           timestamp: new Date('2024-04-20T11:00:00')
         },
@@ -418,7 +418,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-04-20T11:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I\'ve been thinking about it for weeks. I know exactly what I need to do to end this suffering.',
           timestamp: new Date('2024-04-20T11:01:00')
         },
@@ -428,7 +428,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-04-20T11:01:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'It\'s too late for help. I\'ve made my decision. I\'m sorry.',
           timestamp: new Date('2024-04-20T11:02:00')
         }
@@ -442,7 +442,7 @@ const psychiatricDeclineConversations = {
       date: new Date('2024-05-15T14:30:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'I\'m still here, but I wish I wasn\'t. I feel nothing but emptiness.',
           timestamp: new Date('2024-05-15T14:30:00')
         },
@@ -452,7 +452,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-05-15T14:30:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I feel like a shell of who I used to be. I can\'t feel joy or happiness anymore. Everything is gray.',
           timestamp: new Date('2024-05-15T14:31:00')
         },
@@ -462,7 +462,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-05-15T14:31:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I\'m trying, but nothing seems to work. I feel like I\'m broken beyond repair.',
           timestamp: new Date('2024-05-15T14:32:00')
         }
@@ -476,7 +476,7 @@ const psychiatricDeclineConversations = {
       date: new Date('2024-06-10T12:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'I don\'t know why I keep trying. Nothing ever gets better.',
           timestamp: new Date('2024-06-10T12:00:00')
         },
@@ -486,7 +486,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-06-10T12:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I can\'t function anymore. I can\'t work, I can\'t take care of myself, I can\'t even get out of bed most days.',
           timestamp: new Date('2024-06-10T12:01:00')
         },
@@ -496,7 +496,7 @@ const psychiatricDeclineConversations = {
           timestamp: new Date('2024-06-10T12:01:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I don\'t see the point. I\'m a lost cause. I just want the pain to stop.',
           timestamp: new Date('2024-06-10T12:02:00')
         }
@@ -515,7 +515,7 @@ const mixedDeclineConversations = {
       date: new Date('2024-01-20T10:30:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hello, I\'ve been having some concerns about my memory lately, and I\'ve also been feeling quite anxious.',
           timestamp: new Date('2024-01-20T10:30:00')
         },
@@ -525,7 +525,7 @@ const mixedDeclineConversations = {
           timestamp: new Date('2024-01-20T10:30:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I keep forgetting where I put things, and sometimes I can\'t remember what I was doing. This makes me worry that something is wrong with me.',
           timestamp: new Date('2024-01-20T10:31:00')
         },
@@ -535,7 +535,7 @@ const mixedDeclineConversations = {
           timestamp: new Date('2024-01-20T10:31:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'For a few months now. I worry that it\'s getting worse, and that thought makes me feel even more anxious.',
           timestamp: new Date('2024-01-20T10:32:00')
         }
@@ -549,7 +549,7 @@ const mixedDeclineConversations = {
       date: new Date('2024-03-15T14:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'I\'m scared. I don\'t know what\'s happening to me. I can\'t remember things and I feel so worried all the time.',
           timestamp: new Date('2024-03-15T14:00:00')
         },
@@ -559,7 +559,7 @@ const mixedDeclineConversations = {
           timestamp: new Date('2024-03-15T14:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I forget... I forget what I was saying. I forget people\'s names, even people I know well. I feel like I\'m losing myself.',
           timestamp: new Date('2024-03-15T14:01:00')
         },
@@ -569,7 +569,7 @@ const mixedDeclineConversations = {
           timestamp: new Date('2024-03-15T14:01:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I don\'t feel like the same person anymore. I\'m confused and scared and I don\'t know who I am.',
           timestamp: new Date('2024-03-15T14:02:00')
         }
@@ -583,7 +583,7 @@ const mixedDeclineConversations = {
       date: new Date('2024-06-20T09:15:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Help me... please help me. I don\'t know where I am or what\'s happening.',
           timestamp: new Date('2024-06-20T09:15:00')
         },
@@ -593,7 +593,7 @@ const mixedDeclineConversations = {
           timestamp: new Date('2024-06-20T09:15:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I\'m... I\'m at home, I think. But I don\'t remember how I got here. I\'m so confused and afraid.',
           timestamp: new Date('2024-06-20T09:16:00')
         },
@@ -603,7 +603,7 @@ const mixedDeclineConversations = {
           timestamp: new Date('2024-06-20T09:16:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I see... I see things, but I don\'t know what they are. Everything looks strange and scary. I want to go back to being normal.',
           timestamp: new Date('2024-06-20T09:17:00')
         }
@@ -621,7 +621,7 @@ const stablePatientConversations = {
       date: new Date('2024-01-15T11:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Good morning! I wanted to update you on my diabetes management. My blood sugar levels have been quite stable.',
           timestamp: new Date('2024-01-15T11:00:00')
         },
@@ -631,7 +631,7 @@ const stablePatientConversations = {
           timestamp: new Date('2024-01-15T11:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'They\'ve been consistently between 120 and 140 mg/dL, which my doctor says is good for someone my age.',
           timestamp: new Date('2024-01-15T11:01:00')
         }
@@ -643,7 +643,7 @@ const stablePatientConversations = {
       date: new Date('2024-03-15T11:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Hello! I\'m continuing to do well with my diabetes management. I\'ve been very consistent with my diet and exercise routine.',
           timestamp: new Date('2024-03-15T11:00:00')
         },
@@ -653,7 +653,7 @@ const stablePatientConversations = {
           timestamp: new Date('2024-03-15T11:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I feel great! I have good energy levels and I\'m able to maintain my daily activities without any problems.',
           timestamp: new Date('2024-03-15T11:01:00')
         }
@@ -665,7 +665,7 @@ const stablePatientConversations = {
       date: new Date('2024-06-15T11:00:00'),
       messages: [
         {
-          role: 'patient',
+          role: 'client',
           content: 'Good morning! I wanted to share that my diabetes management continues to go well. My A1C was 6.8% at my last checkup.',
           timestamp: new Date('2024-06-15T11:00:00')
         },
@@ -675,7 +675,7 @@ const stablePatientConversations = {
           timestamp: new Date('2024-06-15T11:00:30')
         },
         {
-          role: 'patient',
+          role: 'client',
           content: 'I feel very good about my health. I\'m managing my condition well and I\'m confident in my ability to maintain this level of control.',
           timestamp: new Date('2024-06-15T11:01:00')
         }

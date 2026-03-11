@@ -14,7 +14,7 @@ const {
   insertCaregivertoOrgAndReturnToken,
   insertCaregivertoOrgAndReturnTokenByRole,
 } = require('../fixtures/caregiver.fixture');
-const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
+const { scheduleOne, scheduleTwo, insertScheduleAndAddToClient } = require('../fixtures/schedule.fixture');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
@@ -110,7 +110,7 @@ describe('Schedule routes', () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const [client] = await insertClients([{ ...clientOne, org: org.id }]);
-      const schedule = await insertScheduleAndAddToPatient(client, scheduleOne);
+      const schedule = await insertScheduleAndAddToClient(client, scheduleOne);
 
       const updateBody = {
         frequency: scheduleTwo.frequency,
@@ -142,7 +142,7 @@ describe('Schedule routes', () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
       const [client] = await insertClients([{ ...clientOne, org: org.id }]);
-      const schedule = await insertScheduleAndAddToPatient(client, scheduleOne);
+      const schedule = await insertScheduleAndAddToClient(client, scheduleOne);
 
       await request(app)
         .delete(`/v1/schedules/${schedule.id}`)

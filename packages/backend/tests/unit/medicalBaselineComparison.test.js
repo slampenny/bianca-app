@@ -431,8 +431,8 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
           _id: 'conv1',
           clientId,
           messages: [
-            { role: 'patient', content: 'Hello' },
-            { role: 'patient', content: 'Goodbye' }
+            { role: 'client', content: 'Hello' },
+            { role: 'client', content: 'Goodbye' }
           ]
         }
       ];

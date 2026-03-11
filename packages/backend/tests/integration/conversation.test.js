@@ -462,7 +462,7 @@ describe('Conversation routes', () => {
       const conversationId = createRes.body.id;
 
       const messageData = {
-        role: 'patient',
+        role: 'client',
         content: 'Hello, this is a test message',
       };
 
@@ -498,7 +498,7 @@ describe('Conversation routes', () => {
       // Verify the message was actually created
       const message = await Message.findOne({ conversationId });
       expect(message).toBeTruthy();
-      expect(message.role).toBe('patient');
+      expect(message.role).toBe('client');
       expect(message.content).toBe('Hello, this is a test message');
     });
 
@@ -635,7 +635,7 @@ describe('Conversation routes', () => {
       const conversationId = createRes.body.id;
 
       const messageData = {
-        role: 'patient',
+        role: 'client',
         // content is missing
       };
 
@@ -681,7 +681,7 @@ describe('Conversation routes', () => {
       const { accessToken } = await setupTestData();
       const nonExistentConversationId = new mongoose.Types.ObjectId();
       const messageData = {
-        role: 'patient',
+        role: 'client',
         content: 'This should fail',
       };
 
@@ -713,7 +713,7 @@ describe('Conversation routes', () => {
       const conversationId = createRes.body.id;
 
       const messageData = {
-        role: 'patient',
+        role: 'client',
         content: 'This should fail',
       };
 
@@ -751,7 +751,7 @@ describe('Conversation routes', () => {
       await request(app)
         .post(`/v1/conversations/${conversationId}`)
         .set('Authorization', `Bearer ${staffToken}`)
-        .send({ role: 'patient', content: 'test' })
+        .send({ role: 'client', content: 'test' })
         .expect(httpStatus.FORBIDDEN);
     });
   });
@@ -778,9 +778,9 @@ describe('Conversation routes', () => {
       const conversationId = createRes.body.id;
 
       const messages = [
-        { role: 'patient', content: 'Hello, how are you?' },
+        { role: 'client', content: 'Hello, how are you?' },
         { role: 'assistant', content: 'I am doing well, thank you! How can I help you today?' },
-        { role: 'patient', content: 'I have a question about my medication.' },
+        { role: 'client', content: 'I have a question about my medication.' },
         { role: 'assistant', content: 'I would be happy to help with your medication questions.' },
         { role: 'system', content: 'Call quality: Good' },
       ];

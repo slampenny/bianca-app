@@ -67,7 +67,7 @@ const FIELD_ACCESS_RULES = {
       'message',
       'createdAt',
       'acknowledged',
-      // EXCLUDED: Full patient context, medical details
+      // EXCLUDED: Full client context, medical details
     ]
   },
 
@@ -110,7 +110,7 @@ const FIELD_ACCESS_RULES = {
     
     medicalAnalysis: [
       '_id',
-      'patient',
+      'client',
       'summary',
       'recommendations',
       'analysisDate',
@@ -168,10 +168,8 @@ function filterFields(obj, allowedFields) {
 
 /**
  * Get allowed fields for user role and resource
- * Treats 'patient' as alias for 'client' (patient->client migration).
  */
 function getAllowedFields(userRole, resourceType) {
-  if (resourceType === 'patient') resourceType = 'client';
   const roleRules = FIELD_ACCESS_RULES[userRole] || FIELD_ACCESS_RULES.staff;
   return roleRules[resourceType] || '*'; // Default to all if not specified
 }
@@ -285,7 +283,7 @@ const canAccessField = (userRole, resourceType, fieldName) => {
 
 /**
  * Add custom allowed fields for specific cases
- * (e.g., doctor needs full medical access for specific patient)
+ * (e.g., doctor needs full medical access for specific client)
  */
 const addFieldPermission = (userId, resourceType, fields) => {
   // TODO: Implement persistent field-level permissions
@@ -293,16 +291,8 @@ const addFieldPermission = (userId, resourceType, fields) => {
   logger.info(`[MINIMUM_NECESSARY] Custom field permission requested: ${userId}, ${resourceType}, ${fields}`);
 };
 
-// Export field access rules for documentation (include 'patient' as alias for 'client')
-const getFieldAccessRules = () => {
-  const rules = { ...FIELD_ACCESS_RULES };
-  ['staff', 'orgAdmin', 'superAdmin'].forEach((role) => {
-    if (rules[role] && rules[role].client !== undefined) {
-      rules[role] = { ...rules[role], patient: rules[role].client };
-    }
-  });
-  return rules;
-};
+// Export field access rules for documentation
+const getFieldAccessRules = () => ({ ...FIELD_ACCESS_RULES });
 
 module.exports = {
   minimumNecessaryMiddleware,

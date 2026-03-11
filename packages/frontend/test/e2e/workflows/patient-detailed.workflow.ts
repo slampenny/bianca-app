@@ -1,11 +1,11 @@
 import { Page, expect } from '@playwright/test'
 
 // Comprehensive client management workflow components
-export class PatientDetailedWorkflow {
+export class ClientDetailedWorkflow {
   constructor(private page: Page) {}
 
   // GIVEN steps - Setup conditions
-  async givenIAmLoggedInAsStaffWithPatients() {
+  async givenIAmLoggedInAsStaffWithClients() {
     // Login as staff user who has clients assigned - use data-testid
     await this.page.locator('input[data-testid="email-input"]').fill('fake@example.org')
     await this.page.locator('input[data-testid="password-input"]').fill('Password1')
@@ -44,11 +44,11 @@ export class PatientDetailedWorkflow {
     return clientCards > 0
   }
 
-  async givenIHaveSelectedAPatient(clientName?: string) {
+  async givenIHaveSelectedAClient(clientName?: string) {
     // Check if already logged in by looking for client cards
     const existingClientCards = await this.page.locator('[data-testid^="client-card-"]').count()
     if (existingClientCards === 0) {
-      const hasClients = await this.givenIAmLoggedInAsStaffWithPatients()
+      const hasClients = await this.givenIAmLoggedInAsStaffWithClients()
       if (!hasClients) return false
     }
 
@@ -99,7 +99,7 @@ export class PatientDetailedWorkflow {
   }
 
   async givenIAmOnPatientDetailsScreen(clientName?: string) {
-    const clientSelected = await this.givenIHaveSelectedAPatient(clientName)
+    const clientSelected = await this.givenIHaveSelectedAClient(clientName)
     if (!clientSelected) {
       throw new Error(`Failed to select client${clientName ? `: ${clientName}` : ''} - no client cards found or could not be clicked`)
     }
@@ -126,12 +126,12 @@ export class PatientDetailedWorkflow {
 
   // SCHEDULE MANAGEMENT WORKFLOWS
   async whenIAccessPatientSchedules(patientName?: string) {
-    const patientSelected = await this.givenIHaveSelectedAPatient(patientName)
+    const patientSelected = await this.givenIHaveSelectedAClient(patientName)
     if (!patientSelected) return false
 
     // Look for schedule access
     const scheduleElements = [
-      this.page.getByTestId('patient-schedules-button'),
+      this.page.getByTestId('manage-schedules-button'),
       this.page.getByTestId('schedules-tab'),
       this.page.getByTestId('view-schedules'),
       this.page.getByText(/schedule/i),
@@ -293,12 +293,12 @@ export class PatientDetailedWorkflow {
 
   // CONVERSATION MANAGEMENT WORKFLOWS
   async whenIAccessPatientConversations(patientName?: string) {
-    const patientSelected = await this.givenIHaveSelectedAPatient(patientName)
+    const patientSelected = await this.givenIHaveSelectedAClient(patientName)
     if (!patientSelected) return false
 
     // Look for conversation access
     const conversationElements = [
-      this.page.getByTestId('patient-conversations-button'),
+      this.page.getByTestId('manage-conversations-button'),
       this.page.getByTestId('conversations-tab'),
       this.page.getByTestId('view-conversations'),
       this.page.getByText(/conversation/i),
@@ -370,9 +370,9 @@ export class PatientDetailedWorkflow {
 
     // Look for avatar management
     const avatarElements = [
-      this.page.getByTestId('patient-avatar-picker'),
+      this.page.getByTestId('client-avatar-picker'),
       this.page.getByTestId('avatar-upload'),
-      this.page.getByTestId('patient-avatar'),
+      this.page.getByTestId('client-avatar'),
       this.page.getByText(/avatar/i),
       this.page.getByText(/photo/i),
       this.page.getByText(/picture/i)
@@ -425,9 +425,9 @@ export class PatientDetailedWorkflow {
     // Update patient information
     const patientFormFields = [
       { testId: 'client-name-input', value: patientData.name },
-      { testId: 'patient-email-input', value: patientData.email },
-      { testId: 'patient-phone-input', value: patientData.phone },
-      { testId: 'patient-language-picker', value: patientData.language }
+      { testId: 'client-email-input', value: patientData.email },
+      { testId: 'client-phone-input', value: patientData.phone },
+      { testId: 'language-picker-button', value: patientData.language }
     ]
 
     let fieldsUpdated = 0
@@ -441,10 +441,10 @@ export class PatientDetailedWorkflow {
 
     // Look for save button
     const saveElements = [
-      this.page.getByTestId('save-patient-button'),
-      this.page.getByTestId('update-patient-button'),
-      this.page.getByText(/save patient/i),
-      this.page.getByText(/update patient/i)
+      this.page.getByTestId('save-client-button'),
+      this.page.getByTestId('save-client-button'),
+      this.page.getByText(/save client|create client|update client/i),
+      this.page.getByText(/update client/i)
     ]
 
     for (const element of saveElements) {
@@ -459,7 +459,7 @@ export class PatientDetailedWorkflow {
     return fieldsUpdated
   }
 
-  async whenIAssignCaregiverToPatient(caregiverName: string) {
+  async whenIAssignCaregiverToClient(caregiverName: string) {
     // Assign a caregiver to the patient
     const caregiverAssignmentElements = [
       this.page.getByTestId('assign-caregiver-button'),
@@ -491,7 +491,7 @@ export class PatientDetailedWorkflow {
   async thenIShouldSeePatientSchedules() {
     const scheduleElements = [
       this.page.getByTestId('schedule-list'),
-      this.page.getByTestId('patient-schedules'),
+      this.page.getByTestId('manage-schedules-button'),
       this.page.locator('[data-testid^="schedule-"]'),
       this.page.getByText(/schedule/i)
     ]
@@ -532,7 +532,7 @@ export class PatientDetailedWorkflow {
 
   async thenIShouldSeeAvatarManagementOptions() {
     const avatarElements = [
-      this.page.getByTestId('patient-avatar-picker'),
+      this.page.getByTestId('client-avatar-picker'),
       this.page.getByTestId('avatar-upload'),
       this.page.getByText(/avatar/i),
       this.page.getByText(/photo/i)
@@ -592,7 +592,7 @@ export class PatientDetailedWorkflow {
   async thenIShouldSeeSuccessMessage() {
     const successElements = [
       this.page.getByTestId('success-message'),
-      this.page.getByTestId('patient-saved'),
+      this.page.getByTestId('client-saved'),
       this.page.getByText(/success/i),
       this.page.getByText(/saved/i),
       this.page.getByText(/updated/i)

@@ -179,7 +179,7 @@ const getCallStatus = catchAsync(async (req, res) => {
   
   // Log message details for debugging with ordering information
   logger.info(`[MESSAGE ORDERING] Returning ${messages.length} messages for conversation ${conversationId}`);
-  logger.info(`[MESSAGE ORDERING] Message breakdown: ${messages.filter(m => m.role === 'patient' || m.role === 'client').length} client, ${messages.filter(m => m.role === 'assistant').length} assistant`);
+  logger.info(`[MESSAGE ORDERING] Message breakdown: ${messages.filter(m => m.role === 'client').length} client, ${messages.filter(m => m.role === 'assistant').length} assistant`);
   
   // Log message order with timestamps to verify chronological ordering
   if (messages.length > 0) {

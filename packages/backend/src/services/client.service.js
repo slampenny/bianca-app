@@ -124,7 +124,7 @@ const sendConsentEmailIfRequired = async (client) => {
       return;
     }
     const org = clientWithOrg.org;
-    if (!org.requirePatientConsent) {
+    if (!org.requireClientConsent) {
       return;
     }
     if (client.consented === true) {
@@ -154,7 +154,7 @@ const checkClientConsent = async (clientId) => {
       return false;
     }
     const org = client.org;
-    if (!org.requirePatientConsent) {
+    if (!org.requireClientConsent) {
       return true;
     }
     return client.consented === true;

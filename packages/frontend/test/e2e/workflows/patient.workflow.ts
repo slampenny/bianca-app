@@ -21,9 +21,9 @@ export class PatientWorkflow {
     }
     
     // Check that we have patients or "no patients" message (use correct selectors)
-    const patientCards = await this.page.locator('[data-testid^="patient-card-"]').count()  // Use starts-with selector
-    const noPatients = await this.page.getByTestId('home-no-patients').count()
-    const noUsersText = await this.page.getByText(/no patients found/i).count()
+    const patientCards = await this.page.locator('[data-testid^="client-card-"]').count()  // Use starts-with selector
+    const noPatients = await this.page.getByTestId('home-no-clients').count()
+    const noUsersText = await this.page.getByText(/no clients found/i).count()
     const addPatientButton = await this.page.getByText("Add Patient").count()
     
     console.log('Patient workflow elements found:', { patientCards, noPatients, noUsersText, addPatientButton })
@@ -34,7 +34,7 @@ export class PatientWorkflow {
 
   async givenIHaveAPatientNamed(patientName: string) {
     // Use the correct selector pattern for patient cards
-    const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName })
+    const patientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName })
     await expect(patientCard).toBeVisible()
     return { name: patientName }
   }
@@ -76,7 +76,7 @@ export class PatientWorkflow {
     const callButtonCount = await callButton.count()
     if (callButtonCount === 0) {
       // Try finding call button within the patient card
-      const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName })
+      const patientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName })
       const callButtonInCard = patientCard.locator('[data-testid*="call"]')
       const callButtonInCardCount = await callButtonInCard.count()
       console.log(`⚠ Call button for ${patientName} found in card: ${callButtonInCardCount > 0} (NOT clicking to avoid phone calls)`)
@@ -112,22 +112,22 @@ export class PatientWorkflow {
   }
 
   async whenIClickPatientCard(patientName: string) {
-    const patientCard = this.page.getByTestId('patient-card').filter({ hasText: patientName })
+    const patientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName })
     await patientCard.click()
   }
 
   async whenIClickAddPatient() {
-    await this.page.getByText('Add Patient', { exact: true }).click()
+    await this.page.getByTestId('add-client-button').click()
   }
 
-  async whenIFillPatientForm(patientData: any) {
-    await this.page.getByTestId('client-name-input').fill(patientData.name)
-    await this.page.getByTestId('patient-email-input').fill(patientData.email)
-    await this.page.getByTestId('patient-phone-input').fill(patientData.phone)
+  async whenIFillClientForm(clientData: any) {
+    await this.page.getByTestId('client-name-input').fill(clientData.name)
+    await this.page.getByTestId('client-email-input').fill(clientData.email)
+    await this.page.getByTestId('client-phone-input').fill(clientData.phone)
   }
 
-  async whenIClickCreatePatient() {
-    await this.page.getByTestId('create-patient-button').click()
+  async whenIClickCreateClient() {
+    await this.page.getByTestId('save-client-button').click()
   }
 
   // THEN steps - Assertions
@@ -176,13 +176,13 @@ export class PatientWorkflow {
     await expect(this.page.getByTestId('export-confirmation')).toBeVisible()
   }
 
-  async thenIShouldSeePatientInList(patientName: string) {
-    const patientCard = this.page.getByTestId('patient-card').filter({ hasText: patientName })
-    await expect(patientCard).toBeVisible()
+  async thenIShouldSeeClientInList(clientName: string) {
+    const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+    await expect(clientCard).toBeVisible()
   }
 
-  async thenIShouldSeePatientCreatedMessage() {
-    await expect(this.page.getByTestId('patient-created-success')).toBeVisible()
+  async thenIShouldSeeClientCreatedMessage() {
+    await expect(this.page.getByTestId('client-saved')).toBeVisible()
   }
 
   async thenIShouldSeeErrorMessage(expectedError: string) {

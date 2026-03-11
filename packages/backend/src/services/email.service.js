@@ -651,7 +651,7 @@ Your request for access to your personal information has been processed.
 
 Attached to this email is a complete export of all your personal data stored in the Bianca Wellness platform, including:
 - Your profile information
-- Associated patients
+- Associated clients
 - Conversation history
 - Medical analysis data
 - Consent history
@@ -675,7 +675,7 @@ The Bianca Wellness Team`;
         <p style="color: #555; line-height: 1.6;">Attached to this email is a complete export of all your personal data stored in the Bianca Wellness platform, including:</p>
         <ul style="color: #555; line-height: 1.8;">
           <li>Your profile information</li>
-          <li>Associated patients</li>
+          <li>Associated clients</li>
           <li>Conversation history</li>
           <li>Medical analysis data</li>
           <li>Consent history</li>
@@ -773,12 +773,12 @@ const forceEtherealInitialization = async () => {
 };
 
 /**
- * Send patient consent request email
- * @param {string} to - Patient email address
- * @param {string} patientName - Patient's name
+ * Send client consent request email
+ * @param {string} to - Client email address
+ * @param {string} patientName - Client's name (param name kept for API compat)
  * @param {string} orgName - Organization name
  * @param {string} consentLink - Link to consent page (frontend URL with token)
- * @param {string} [locale='en'] - Patient's preferred language
+ * @param {string} [locale='en'] - Client's preferred language
  * @param {string} [consentEmailVersion='1.0'] - Version of consent email template
  * @returns {Promise}
  */
@@ -796,7 +796,7 @@ const sendPatientConsentRequestEmail = async (to, patientName, orgName, consentL
   if (i18n.__) {
     // Get templates and replace placeholders
     const greetingTemplate = i18n.__('patientConsentEmail.greeting');
-    greeting = greetingTemplate.replace('%s', patientName || 'Patient');
+    greeting = greetingTemplate.replace('%s', patientName || 'Client');
     
     const introTemplate = i18n.__('patientConsentEmail.intro');
     intro = introTemplate.replace('%s', orgName);
@@ -818,9 +818,9 @@ const sendPatientConsentRequestEmail = async (to, patientName, orgName, consentL
     noConsentTitle = i18n.__('patientConsentEmail.noConsentTitle');
   } else {
     // Fallback to English
-    greeting = `Dear ${patientName || 'Patient'},`;
+    greeting = `Dear ${patientName || 'Client'},`;
     intro = `Your healthcare organization, ${orgName}, uses Bianca Wellness to conduct wellness check calls. In accordance with applicable laws in your jurisdiction, we need your consent before we can record these calls.`;
-    whyConsent = 'Some jurisdictions require consent from all parties before a call can be recorded. Your organization has enabled the "Require Patient Consent" setting, which means we need your explicit consent before recording any calls.';
+    whyConsent = 'Some jurisdictions require consent from all parties before a call can be recorded. Your organization has enabled the "Require Client Consent" setting, which means we need your explicit consent before recording any calls.';
     consentBenefit1 = 'Your wellness check calls may be recorded for quality assurance and care coordination purposes';
     consentBenefit2 = 'Recordings will be used to provide summaries and insights to your caregivers';
     consentBenefit3 = 'Recordings will be stored securely and in compliance with applicable privacy laws';
@@ -908,9 +908,9 @@ ${closing}`;
   
   try {
     await sendEmail(to, subject, text, html);
-    logger.info(`[Email Service] Patient consent request email successfully sent to ${to} (locale: ${locale}, version: ${consentEmailVersion})`);
+    logger.info(`[Email Service] Client consent request email successfully sent to ${to} (locale: ${locale}, version: ${consentEmailVersion})`);
   } catch (error) {
-    logger.error(`[Email Service] Failed to send patient consent request email to ${to}`, {
+    logger.error(`[Email Service] Failed to send client consent request email to ${to}`, {
       errorMessage: error.message,
       errorName: error.name,
       errorCode: error.code,

@@ -39,7 +39,7 @@ async function addDecliningPatientConversations(clientId) {
     messages: [],
     history: 'Client discussing medication management and overall health status.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 1 },
+    metadata: { source: 'declining_client_seed', month: 1 },
     createdAt: month1Date,
     updatedAt: month1Date,
     startTime: month1Date,

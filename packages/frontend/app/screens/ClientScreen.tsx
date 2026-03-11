@@ -422,9 +422,9 @@ function ClientScreen() {
         testID="client-screen"
       >
         {/* Display Success Message */}
-        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+        {successMessage ? <Text style={styles.success} testID="client-saved">{successMessage}</Text> : null}
 
-        <View style={styles.formCard}>
+        <View style={styles.formCard} testID="client-avatar-picker">
           <AvatarPicker
             // Use local avatar state which defaults correctly
             initialAvatar={avatar}

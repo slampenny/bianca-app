@@ -109,7 +109,7 @@ afterEach(() => {
   }
 });
 
-// Global cleanup after all tests
+// Global cleanup after all tests (longer timeout for disconnectAll/cleanup)
 afterAll(async () => {
   // Wait a bit for any pending operations
   await new Promise(resolve => setTimeout(resolve, 100));
@@ -198,7 +198,7 @@ afterAll(async () => {
   
   // Wait a bit more for cleanup to complete
   await new Promise(resolve => setTimeout(resolve, 100));
-});
+}, 15000);
 
 // Export cleanup function for use in individual test files
 module.exports = {

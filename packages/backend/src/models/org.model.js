@@ -126,10 +126,10 @@ const orgSchema = mongoose.Schema(
       ref: 'Caregiver',
       required: false,
     },
-    // Require Patient Consent for Recording
-    // When enabled, organization must obtain explicit consent from patients before recording calls
+    // Require Client Consent for Recording
+    // When enabled, organization must obtain explicit consent from clients before recording calls
     // Used in double-party consent jurisdictions (e.g., California, Florida)
-    requirePatientConsent: {
+    requireClientConsent: {
       type: Boolean,
       default: false,
     },

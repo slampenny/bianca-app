@@ -31,7 +31,7 @@ describe('Patient Consent Routes', () => {
 
   describe('POST /v1/clients/consent/verify', () => {
     test('should return 200 and verify consent with valid token', async () => {
-      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -61,7 +61,7 @@ describe('Patient Consent Routes', () => {
     });
 
     test('should return 200 with alreadyConsented=true when patient already consented', async () => {
-      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requireClientConsent: true }]);
       const clientData = { 
         ...clientOne, 
         org: org._id, 
@@ -101,7 +101,7 @@ describe('Patient Consent Routes', () => {
     });
 
     test('should return 401 if consent token is expired', async () => {
-      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -118,7 +118,7 @@ describe('Patient Consent Routes', () => {
     });
 
     test('should return HTML page when Accept header does not include application/json', async () => {
-      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -137,7 +137,7 @@ describe('Patient Consent Routes', () => {
 
   describe('GET /v1/clients/consent/verify', () => {
     test('should return 200 and verify consent with valid token via GET', async () => {
-      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
@@ -155,7 +155,7 @@ describe('Patient Consent Routes', () => {
     });
 
     test('should return HTML page by default for GET requests', async () => {
-      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requirePatientConsent: true }]);
+      const [org] = await insertOrgs([{ name: 'Test Org', email: 'test@example.com', country: 'US', requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
