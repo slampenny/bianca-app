@@ -7,14 +7,14 @@ const logger = require('../config/logger');
 // Controller to initiate the call
 const initiateCall = catchAsync(async (req, res) => {
   logger.info(`[Controller] Initiating call request received.`);
-  const { patientId } = req.body;
+  const { clientId } = req.body;
   
-  if (!patientId) {
+  if (!clientId) {
     return res.status(httpStatus.BAD_REQUEST).send({ message: 'Patient ID is required' });
   }
   
-  await twilioCallService.initiateCall(patientId);
-  logger.info(`[Controller] Call initiation request processed for patientId: ${patientId}`);
+  await twilioCallService.initiateCall(clientId);
+  logger.info(`[Controller] Call initiation request processed for clientId: ${clientId}`);
   
   res.status(httpStatus.OK).json({ message: 'Call initiated successfully' });
 });

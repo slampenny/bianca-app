@@ -69,7 +69,7 @@ export function MFAVerificationScreen() {
       }
     } catch (error: unknown) {
       logger.error('MFA verification error:', error)
-      const errorData = error?.data
+      const errorData = (error as { data?: { message?: string } })?.data
       const errorMessage = errorData?.message || translate("mfa.verificationFailed") || "Invalid code. Please try again."
       setErrorMessage(errorMessage)
       setMfaToken("") // Clear token on error

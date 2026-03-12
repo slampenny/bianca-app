@@ -17,9 +17,9 @@ const ConversationDTO = (conversation) => {
   // which could convert _id to id and delete _id before we can access it
   // 
   // CRITICAL: Use depopulate to convert populated refs (like callId) back to IDs
-  // This prevents issues where callId population can cause patientId to become undefined
+  // This prevents issues where callId population can cause clientId to become undefined
   // BUT we need to preserve populated messages since those should remain as objects
-  // AND we need to preserve patientId before depopulation in case it gets lost
+  // AND we need to preserve clientId before depopulation in case it gets lost
   const preserveMessages = conversation && conversation.messages && 
     Array.isArray(conversation.messages) && 
     conversation.messages.length > 0 && 
@@ -27,12 +27,12 @@ const ConversationDTO = (conversation) => {
     typeof conversation.messages[0] === 'object' && 
     conversation.messages[0].content !== undefined;
   
-  // Preserve patientId BEFORE toObject/depopulate in case it gets lost
-  const originalPatientId = conversation?.patientId;
+  // Preserve clientId BEFORE toObject/depopulate in case it gets lost
+  const originalClientId = conversation?.clientId;
   
-  // Debug logging to understand patientId loss
-  if (conversation && !originalPatientId) {
-    logger.warn('[ConversationDTO] WARN: conversation has no patientId before toObject', {
+  // Debug logging to understand clientId loss
+  if (conversation && !originalClientId) {
+    logger.warn('[ConversationDTO] WARN: conversation has no clientId before toObject', {
       conversationId: conversation._id || conversation.id,
       hasCallId: !!conversation.callId,
       callIdType: typeof conversation.callId,
@@ -49,19 +49,19 @@ const ConversationDTO = (conversation) => {
     conversationObj.messages = conversation.messages;
   }
   
-  // Restore patientId if it was lost during toObject/depopulate
-  if (originalPatientId && conversationObj && !conversationObj.patientId) {
-    logger.info('[ConversationDTO] Restoring patientId that was lost during toObject', {
+  // Restore clientId if it was lost during toObject/depopulate
+  if (originalClientId && conversationObj && !conversationObj.clientId) {
+    logger.info('[ConversationDTO] Restoring clientId that was lost during toObject', {
       conversationId: conversationObj._id || conversationObj.id,
-      originalPatientId: originalPatientId.toString ? originalPatientId.toString() : originalPatientId,
+      originalClientId: originalClientId.toString ? originalClientId.toString() : originalClientId,
     });
     // Convert to string if it's an ObjectId
-    conversationObj.patientId = originalPatientId.toString ? originalPatientId.toString() : originalPatientId;
+    conversationObj.clientId = originalClientId.toString ? originalClientId.toString() : originalClientId;
   }
   
-  // Debug: Check if patientId is still missing after restore
-  if (conversationObj && !conversationObj.patientId && !originalPatientId) {
-    logger.error('[ConversationDTO] CRITICAL: patientId is missing and cannot be restored', {
+  // Debug: Check if clientId is still missing after restore
+  if (conversationObj && !conversationObj.clientId && !originalClientId) {
+    logger.error('[ConversationDTO] CRITICAL: clientId is missing and cannot be restored', {
       conversationId: conversationObj._id || conversationObj.id,
       hasCallId: !!conversationObj.callId,
       callIdType: typeof conversationObj.callId,
@@ -74,11 +74,11 @@ const ConversationDTO = (conversation) => {
   }
   
   // CRITICAL: When callId is populated, Mongoose replaces it with the Call object
-  // This can cause issues with destructuring. Use explicit access for patientId
+  // This can cause issues with destructuring. Use explicit access for clientId
   // to ensure we get the value even when other fields are populated
   const _id = conversationObj._id || conversation._id;
   const callSid = conversationObj.callSid || conversation.callSid;
-  const patientId = conversationObj.patientId || conversation.patientId;
+  const clientId = conversationObj.clientId || conversation.clientId;
   const lineItemId = conversationObj.lineItemId || conversation.lineItemId;
   const messages = conversationObj.messages || conversation.messages;
   const history = conversationObj.history || conversation.history;
@@ -127,7 +127,7 @@ const ConversationDTO = (conversation) => {
       _id_type: typeof _id,
       conversation_type: conversation.constructor?.name || typeof conversation,
       conversation_keys: Object.keys(conversation || {}),
-      patientId: patientId?.toString(),
+      clientId: clientId?.toString(),
       callSid,
       isMongooseDoc: conversation.constructor?.name === 'model' || conversation._id !== undefined,
     };
@@ -137,25 +137,25 @@ const ConversationDTO = (conversation) => {
   }
   
   // Convert ObjectId fields to strings if needed
-  const patientIdStr = patientId ? (patientId instanceof ObjectId ? patientId.toString() : (patientId.toString ? patientId.toString() : patientId)) : null;
+  const clientIdStr = clientId ? (clientId instanceof ObjectId ? clientId.toString() : (clientId.toString ? clientId.toString() : clientId)) : null;
   const agentIdStr = agentId ? (agentId instanceof ObjectId ? agentId.toString() : (agentId.toString ? agentId.toString() : agentId)) : null;
   const lineItemIdStr = lineItemId ? (lineItemId instanceof ObjectId ? lineItemId.toString() : (lineItemId.toString ? lineItemId.toString() : lineItemId)) : null;
 
-  // Debug: Log if patientId conversion resulted in null/undefined
-  if (!patientIdStr) {
-    logger.warn('[ConversationDTO] patientId converted to null/undefined', {
+  // Debug: Log if clientId conversion resulted in null/undefined
+  if (!clientIdStr) {
+    logger.warn('[ConversationDTO] clientId converted to null/undefined', {
       conversationId: id,
-      patientId_value: patientId,
-      patientId_type: typeof patientId,
-      patientId_isObjectId: patientId instanceof ObjectId,
-      patientId_hasToString: patientId && typeof patientId.toString === 'function',
+      clientId_value: clientId,
+      clientId_type: typeof clientId,
+      clientId_isObjectId: clientId instanceof ObjectId,
+      clientId_hasToString: clientId && typeof clientId.toString === 'function',
     });
   }
 
   return {
     id,
     callSid,
-    patientId: patientIdStr,
+    clientId: clientIdStr,
     lineItemId: lineItemIdStr,
     messages,
     history,

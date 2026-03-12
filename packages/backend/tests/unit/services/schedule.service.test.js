@@ -19,10 +19,10 @@ jest.mock('../../../src/config/agenda', () => {
 });
 
 const app = require('../../../src/app');
-const { Schedule, Patient, Caregiver, Org } = require('../../../src/models');
+const { Schedule, Client, Caregiver, Org } = require('../../../src/models');
 const { scheduleService } = require('../../../src/services');
 const { scheduleOne, scheduleTwo, insertSchedules } = require('../../fixtures/schedule.fixture');
-const { patientOne, insertPatients, insertPatientsWithOrg } = require('../../fixtures/patient.fixture');
+const { clientOne, insertClients, insertClientsWithOrg } = require('../../fixtures/client.fixture');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 
 let mongoServer;
@@ -42,33 +42,33 @@ afterAll(async () => {
 describe('Schedule Service', () => {
   afterEach(async () => {
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Schedule.deleteMany();
     await Org.deleteMany();
   });
 
   describe('createSchedule', () => {
-    test("should create a new schedule and add it to the patient's schedules", async () => {
+    test("should create a new schedule and add it to the client's schedules", async () => {
       const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
-      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
+      const [client] = await insertClientsWithOrg([clientOne], org._id);
 
-      const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
+      const schedule = await scheduleService.createSchedule(client.id, scheduleOne);
 
       expect(schedule).toHaveProperty('id');
-      // schedule.patient is now populated, so check the ID from the populated object
-      const patientId = typeof schedule.patient === 'object' ? schedule.patient._id.toString() : schedule.patient.toString();
-      expect(patientId).toEqual(patient.id.toString());
+      // schedule.client is now populated, so check the ID from the populated object
+      const clientId = typeof schedule.client === 'object' ? schedule.client._id.toString() : schedule.client.toString();
+      expect(clientId).toEqual(client.id.toString());
 
-      const updatedPatient = await Patient.findById(patient.id);
-      expect(updatedPatient.schedules.map((id) => id.toString())).toContainEqual(schedule.id.toString());
+      const updatedClient = await Client.findById(client.id);
+      expect(updatedClient.schedules.map((id) => id.toString())).toContainEqual(schedule.id.toString());
     });
   });
 
   describe('updateSchedule', () => {
     test('should update schedule details', async () => {
       const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
-      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
-      const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
+      const [client] = await insertClientsWithOrg([clientOne], org._id);
+      const schedule = await scheduleService.createSchedule(client.id, scheduleOne);
 
       const updateBody = {
         frequency: 'monthly',
@@ -85,26 +85,26 @@ describe('Schedule Service', () => {
   });
 
   describe('deleteSchedule', () => {
-    test("should delete a schedule and update the patient's schedule list", async () => {
+    test("should delete a schedule and update the client's schedule list", async () => {
       const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
-      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
-      const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
+      const [client] = await insertClientsWithOrg([clientOne], org._id);
+      const schedule = await scheduleService.createSchedule(client.id, scheduleOne);
 
       await scheduleService.deleteSchedule(schedule.id);
 
       const deletedSchedule = await Schedule.findById(schedule.id);
-      const updatedPatient = await Patient.findById(patient.id);
+      const updatedClient = await Client.findById(client.id);
 
       expect(deletedSchedule).toBeNull();
-      expect(updatedPatient.schedules).not.toContainEqual(schedule.id);
+      expect(updatedClient.schedules).not.toContainEqual(schedule.id);
     });
   });
 
   describe('getScheduleById', () => {
     test('should retrieve a schedule by its ID', async () => {
       const org = await Org.create({ name: 'Test Org', email: 'test@example.com', country: 'US' });
-      const [patient] = await insertPatientsWithOrg([patientOne], org._id);
-      const schedule = await scheduleService.createSchedule(patient.id, scheduleOne);
+      const [client] = await insertClientsWithOrg([clientOne], org._id);
+      const schedule = await scheduleService.createSchedule(client.id, scheduleOne);
 
       const foundSchedule = await scheduleService.getScheduleById(schedule.id);
 
@@ -123,7 +123,7 @@ describe('Schedule Service', () => {
     test('should convert org time to UTC when creating schedule', async () => {
       // Create org with Eastern timezone
       const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/New_York' }]);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       
       // Create schedule with 9:00 AM Eastern time
       const scheduleData = {
@@ -133,7 +133,7 @@ describe('Schedule Service', () => {
         isActive: true,
       };
 
-      const schedule = await scheduleService.createSchedule(patient.id, scheduleData);
+      const schedule = await scheduleService.createSchedule(client.id, scheduleData);
 
       // Time should be stored in UTC (9:00 AM EST = 14:00 UTC or 9:00 AM EDT = 13:00 UTC)
       expect(['13:00', '14:00']).toContain(schedule.time);
@@ -142,10 +142,10 @@ describe('Schedule Service', () => {
     test('should convert org time to UTC when updating schedule', async () => {
       // Create org with Pacific timezone
       const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/Los_Angeles' }]);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       
       // Create initial schedule
-      const schedule = await scheduleService.createSchedule(patient.id, {
+      const schedule = await scheduleService.createSchedule(client.id, {
         frequency: 'daily',
         intervals: [],
         time: '09:00',
@@ -164,7 +164,7 @@ describe('Schedule Service', () => {
     test('should use default timezone (America/Los_Angeles) if org has no timezone', async () => {
       // Create org without timezone (should default to America/Los_Angeles)
       const [org] = await insertOrgs([orgOne]);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       
       const scheduleData = {
         frequency: 'daily',
@@ -173,7 +173,7 @@ describe('Schedule Service', () => {
         isActive: true,
       };
 
-      const schedule = await scheduleService.createSchedule(patient.id, scheduleData);
+      const schedule = await scheduleService.createSchedule(client.id, scheduleData);
 
       // Should still convert using default timezone (PST/PDT: UTC-8 or UTC-7)
       expect(['16:00', '17:00']).toContain(schedule.time);
@@ -189,9 +189,9 @@ describe('Schedule Service', () => {
 
       for (const { tz, orgTime, expectedUTC } of timezones) {
         const [org] = await insertOrgs([{ ...orgOne, timezone: tz }]);
-        const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+        const [client] = await insertClients([{ ...clientOne, org: org.id }]);
         
-        const schedule = await scheduleService.createSchedule(patient.id, {
+        const schedule = await scheduleService.createSchedule(client.id, {
           frequency: 'daily',
           intervals: [],
           time: orgTime,
@@ -202,33 +202,33 @@ describe('Schedule Service', () => {
         
         // Cleanup
         await Schedule.deleteMany();
-        await Patient.deleteMany();
+        await Client.deleteMany();
         await Org.deleteMany();
       }
     });
 
-    test('should populate patient.org when creating schedule', async () => {
+    test('should populate client.org when creating schedule', async () => {
       const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/New_York' }]);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       
-      const schedule = await scheduleService.createSchedule(patient.id, {
+      const schedule = await scheduleService.createSchedule(client.id, {
         frequency: 'daily',
         intervals: [],
         time: '09:00',
         isActive: true,
       });
 
-      // Schedule should have patient populated with org
-      expect(schedule.patient).toBeDefined();
-      expect(schedule.patient.org).toBeDefined();
-      expect(schedule.patient.org.timezone).toBe('America/New_York');
+      // Schedule should have client populated with org
+      expect(schedule.client).toBeDefined();
+      expect(schedule.client.org).toBeDefined();
+      expect(schedule.client.org.timezone).toBe('America/New_York');
     });
 
-    test('should populate patient.org when getting schedule by ID', async () => {
+    test('should populate client.org when getting schedule by ID', async () => {
       const [org] = await insertOrgs([{ ...orgOne, timezone: 'America/Chicago' }]);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       
-      const schedule = await scheduleService.createSchedule(patient.id, {
+      const schedule = await scheduleService.createSchedule(client.id, {
         frequency: 'daily',
         intervals: [],
         time: '09:00',
@@ -237,9 +237,9 @@ describe('Schedule Service', () => {
 
       const foundSchedule = await scheduleService.getScheduleById(schedule.id);
 
-      expect(foundSchedule.patient).toBeDefined();
-      expect(foundSchedule.patient.org).toBeDefined();
-      expect(foundSchedule.patient.org.timezone).toBe('America/Chicago');
+      expect(foundSchedule.client).toBeDefined();
+      expect(foundSchedule.client.org).toBeDefined();
+      expect(foundSchedule.client.org.timezone).toBe('America/Chicago');
     });
   });
 });

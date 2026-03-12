@@ -58,7 +58,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
     // Create a Call first (conversations require callId)
     const call = await Call.create({
       callSid: callSid,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       status: 'in-progress',
       duration: 0
     });
@@ -67,7 +67,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
     // Create test conversation in database
     const conversation = new Conversation({
       _id: conversationId,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       callId: call._id, // Use Call ObjectId, not callSid
       status: 'in-progress',
       startTime: new Date(),
@@ -107,7 +107,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // Setup connection
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: 'Hello, how are you?',
         activeUserMessageId: null,
         _userIsSpeaking: true,
@@ -120,7 +120,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // Create placeholder when user starts speaking - simulate what createPlaceholderUserMessage does
       const placeholderMessage = await Message.create({
         conversationId,
-        role: 'patient',
+        role: 'client',
         content: '[Speaking...]',
         messageType: 'user_message',
         createdAt: userSpeechStartTime // Explicitly set to when user started speaking
@@ -167,7 +167,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // Setup connection
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingAssistantTranscript: '',
         activeAssistantMessageId: null,
         _aiIsSpeaking: false,
@@ -235,7 +235,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
 
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: 'Hello',
         activeUserMessageId: null,
         pendingAssistantTranscript: '',
@@ -250,7 +250,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // User starts speaking - create placeholder (this is what createPlaceholderUserMessage does)
       const userPlaceholder = await Message.create({
         conversationId,
-        role: 'patient',
+        role: 'client',
         content: '[Speaking...]',
         messageType: 'user_message',
         createdAt: userStartTime
@@ -302,7 +302,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
         .lean();
 
       // CRITICAL TEST: Verify timestamps were preserved
-      const userMessage = allMessages.find(m => m.role === 'patient');
+      const userMessage = allMessages.find(m => m.role === 'client');
       const aiMessage = allMessages.find(m => m.role === 'assistant');
       
       expect(userMessage).toBeTruthy();
@@ -314,7 +314,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       
       // Verify order: user message should come before AI message
       expect(allMessages.length).toBe(2);
-      expect(allMessages[0].role).toBe('patient');
+      expect(allMessages[0].role).toBe('client');
       expect(allMessages[0].content).toBe('Hello');
       expect(allMessages[1].role).toBe('assistant');
       expect(allMessages[1].content).toBe('Hi there!');
@@ -324,7 +324,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // This tests the scenario: user speaks, AI starts speaking (creates placeholder), user stops (updates placeholder), AI stops (updates placeholder)
       // The frontend should see: user message first, then AI message
       const frontendOrder = allMessages.map(m => ({ role: m.role, content: m.content, timestamp: m.createdAt.toISOString() }));
-      expect(frontendOrder[0].role).toBe('patient');
+      expect(frontendOrder[0].role).toBe('client');
       expect(frontendOrder[1].role).toBe('assistant');
       expect(new Date(frontendOrder[0].timestamp).getTime()).toBeLessThan(new Date(frontendOrder[1].timestamp).getTime());
     });
@@ -337,7 +337,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
 
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: '',
         activeUserMessageId: null,
         pendingAssistantTranscript: '',
@@ -370,7 +370,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // User starts and stops speaking (after AI)
       const userPlaceholder = await Message.create({
         conversationId,
-        role: 'patient',
+        role: 'client',
         content: '[Speaking...]',
         messageType: 'user_message',
         createdAt: userStartTime
@@ -394,7 +394,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       expect(allMessages.length).toBe(2);
       expect(allMessages[0].role).toBe('assistant');
       expect(allMessages[0].content).toBe('How can I help you?');
-      expect(allMessages[1].role).toBe('patient');
+      expect(allMessages[1].role).toBe('client');
       expect(allMessages[1].content).toBe('I need help');
       expect(allMessages[0].createdAt.getTime()).toBeLessThan(allMessages[1].createdAt.getTime());
     });
@@ -407,7 +407,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       
       const conn = {
         conversationId,
-        patientId: new mongoose.Types.ObjectId(),
+        clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: '',
         activeUserMessageId: null,
         _userIsSpeaking: true,
@@ -419,7 +419,7 @@ describe('Conversation Ordering - Message Timestamps', () => {
       // Create placeholder when user starts speaking
       const placeholderMessage = await Message.create({
         conversationId,
-        role: 'patient',
+        role: 'client',
         content: '[Speaking...]',
         messageType: 'user_message',
         createdAt: userStartTime

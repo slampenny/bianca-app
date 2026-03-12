@@ -16,20 +16,20 @@ const router = express.Router();
 
 /**
  * @swagger
- * /payments/patients/{patientId}/invoices:
+ * /payments/clients/{clientId}/invoices:
  *   post:
  *     summary: Create invoice from conversations
- *     description: Create a new invoice for a patient based on their conversation history.
+ *     description: Create a new invoice for a client based on their conversation history.
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient id
+ *         description: Client id
  *     responses:
  *       "201":
  *         description: Created
@@ -45,18 +45,18 @@ const router = express.Router();
  *         $ref: '#/components/responses/NotFound'
  *
  *   get:
- *     summary: Get all patient invoices
- *     description: Retrieve all invoices for a patient with optional filtering.
+ *     summary: Get all client invoices
+ *     description: Retrieve all invoices for a client with optional filtering.
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient id
+ *         description: Client id
  *       - in: query
  *         name: status
  *         schema:
@@ -85,22 +85,20 @@ const router = express.Router();
  *         $ref: '#/components/responses/NotFound'
  */
 router
-  .route('/patients/:patientId/invoices')
+  .route('/clients/:clientId/invoices')
   .post(
     (req, res, next) => {
-      logger.debug('Received POST to /patients/:patientId/invoices', {
-        patientId: req.params.patientId
+      logger.debug('Received POST to /payments/clients/:clientId/invoices', {
+        clientId: req.params.clientId
       });
       next();
     },
     auth('createAny:invoice'),
-    // validate(paymentValidation.createInvoiceFromConversations),
     paymentController.createInvoiceFromConversations
   )
   .get(
     auth('readAny:invoice'),
-    // validate(paymentValidation.listInvoicesByPatient),
-    paymentController.listInvoicesByPatient
+    paymentController.listInvoicesByClient
   );
 
 /**
@@ -154,8 +152,8 @@ router
  * @swagger
  * /payments/orgs/{orgId}/unbilled-costs:
  *   get:
- *     summary: Get current unbilled costs by patient for an organization
- *     description: Retrieve current unbilled conversation costs grouped by patient, showing what will be charged in the next billing cycle.
+ *     summary: Get current unbilled costs by client for an organization
+ *     description: Retrieve current unbilled conversation costs grouped by client, showing what will be charged in the next billing cycle.
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -186,14 +184,14 @@ router
  *                   type: string
  *                 totalUnbilledCost:
  *                   type: number
- *                 patientCosts:
+ *                 clientCosts:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
- *                       patientId:
+ *                       clientId:
  *                         type: string
- *                       patientName:
+ *                       clientName:
  *                         type: string
  *                       conversationCount:
  *                         type: integer

@@ -154,14 +154,14 @@ class FraudAbuseAnalyzer {
           const populatedMessages = await Message.find({ _id: { $in: conversation.messages } })
             .sort({ createdAt: 1 });
           populatedMessages.forEach(message => {
-            if (message.role === 'patient' && message.content && message.content.trim()) {
+            if (message.role === 'client' && message.content && message.content.trim()) {
               messages.push(message.content.trim());
             }
           });
         } else {
           // Messages are already populated objects
           conversation.messages.forEach(message => {
-            if (message.role === 'patient' && message.content && message.content.trim()) {
+            if (message.role === 'client' && message.content && message.content.trim()) {
               messages.push(message.content.trim());
             }
           });

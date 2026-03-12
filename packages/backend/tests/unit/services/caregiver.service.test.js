@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Org, Caregiver, Patient } = require('../../../src/models');
+const { Org, Caregiver, Client } = require('../../../src/models');
 const caregiverService = require('../../../src/services/caregiver.service');
 const patientService = require('../../../src/services/patient.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 const { caregiverOneWithPassword, insertCaregivers } = require('../../fixtures/caregiver.fixture');
-const { patientOne, insertPatients } = require('../../fixtures/patient.fixture');
+const { clientOne, insertClients } = require('../../fixtures/client.fixture');
 
 let mongoServer;
 
@@ -25,7 +25,7 @@ describe('caregiverService', () => {
   afterEach(async () => {
     await Org.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
   });
 
   it('should create a new caregiver', async () => {
@@ -78,34 +78,34 @@ describe('caregiverService', () => {
     });
   });
 
-  it('should assign a patient to a caregiver', async () => {
+  it('should assign a client to a caregiver', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const patientData = { ...patientOne, org: org._id };
-    const patient = await patientService.createPatient(patientData);
+    const clientData = { ...clientOne, org: org._id };
+    const client = await patientService.createPatient(clientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
-    const addedPatient = await caregiverService.addPatient(caregiver.id, patient.id);
-    expect(addedPatient.id).toEqual(patient.id);
+    const addedClient = await caregiverService.addClient(caregiver.id, client.id);
+    expect(addedClient.id).toEqual(client.id);
   });
 
-  it('should remove a patient from a caregiver', async () => {
+  it('should remove a client from a caregiver', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const patientData = { ...patientOne, org: org._id };
-    const patient = await patientService.createPatient(patientData);
+    const clientData = { ...clientOne, org: org._id };
+    const client = await patientService.createPatient(clientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
-    await caregiverService.addPatient(caregiver.id, patient.id);
-    const updatedCaregiver = await caregiverService.removePatient(caregiver.id, patient.id);
-    expect(updatedCaregiver.patients.toObject()).toEqual([]);
+    await caregiverService.addClient(caregiver.id, client.id);
+    const updatedCaregiver = await caregiverService.removeClient(caregiver.id, client.id);
+    expect(updatedCaregiver.clients.toObject()).toEqual([]);
   });
 
-  it('should get patients by caregiver id', async () => {
+  it('should get clients by caregiver id', async () => {
     const [org] = await insertOrgs([orgOne]);
-    const patientData = { ...patientOne, org: org._id };
-    const patient = await patientService.createPatient(patientData);
+    const clientData = { ...clientOne, org: org._id };
+    const client = await patientService.createPatient(clientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
-    await caregiverService.addPatient(caregiver.id, patient.id);
-    const patients = await caregiverService.getPatients(caregiver.id);
-    expect(patients).toHaveLength(1);
-    expect(patients[0]).toHaveProperty('id', patient.id);
+    await caregiverService.addClient(caregiver.id, client.id);
+    const clients = await caregiverService.getClients(caregiver.id);
+    expect(clients).toHaveLength(1);
+    expect(clients[0]).toHaveProperty('id', client.id);
   });
 
   describe('Role Promotion Logic', () => {

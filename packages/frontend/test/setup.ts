@@ -51,9 +51,34 @@ jest.mock("i18n-js", () => ({
   },
 }))
 
+// Full mock to avoid loading native modules (requireActual triggers EXNativeModulesProxy warning)
 jest.mock("expo-localization", () => ({
-  ...jest.requireActual("expo-localization"),
   getLocales: () => [{ languageTag: "en-US", textDirection: "ltr" }],
+  locale: "en-US",
+  locales: ["en-US"],
+  timezone: "UTC",
+  isoCurrencyCodes: [],
+  region: "US",
+  getCalendars: () => [],
+}))
+
+// Silence logger in tests so component/app logs don't clutter output
+jest.mock("../app/utils/logger", () => ({
+  logger: {
+    debug: jest.fn(),
+    log: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  },
+}))
+
+// Avoid loading expo-constants native module in Jest
+jest.mock("expo-constants", () => ({
+  default: {
+    expoConfig: { extra: {} },
+    executionEnvironment: undefined,
+  },
 }))
 
 declare global {

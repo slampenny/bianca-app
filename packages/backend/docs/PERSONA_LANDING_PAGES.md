@@ -118,7 +118,7 @@ User navigates to HomeScreen → Tap "Add Patient"
 ```
 
 **Backend Process**:
-1. `POST /v1/patients` - Create patient record
+1. `POST /v1/clients` - Create client record
 2. Required fields:
    - Name, email, phone
    - Preferred language
@@ -258,7 +258,7 @@ User selects patient → Navigate to PatientScreen
 ```
 
 **Backend Process**:
-1. `GET /v1/patients/:id` - Fetch patient details
+1. `GET /v1/clients/:id` - Fetch client details
 2. Check permissions (staff can only see assigned patients)
 3. Return patient data with:
    - Recent conversations
@@ -305,7 +305,7 @@ Caregiver navigates to HomeScreen → Tap "Add Patient" → Fill form → Submit
 ```
 
 **Backend Process**:
-1. `POST /v1/patients` - Create patient record
+1. `POST /v1/clients` - Create client record
 2. Required fields:
    - `name`: Patient's full name
    - `email`: Patient's email (for notifications)
@@ -336,7 +336,7 @@ Caregiver navigates to PatientScreen → Tap "Assign Caregivers"
 
 **Backend Process**:
 1. `GET /v1/caregivers?org=xxx` - Fetch available caregivers
-2. `PATCH /v1/patients/:id` - Update patient caregivers array
+2. `PATCH /v1/clients/:id` - Update client caregivers array
 3. Add/remove caregiver IDs from `Patient.caregivers`
 
 **User Experience**:
@@ -352,7 +352,7 @@ Caregiver navigates to PatientScreen → Edit patient details
 ```
 
 **Backend Process**:
-1. `PATCH /v1/patients/:id` - Update patient record
+1. `PATCH /v1/clients/:id` - Update client record
 2. Configure:
    - Preferred language
    - Emergency contacts
@@ -395,7 +395,7 @@ Caregiver navigates to PatientScreen → Configure emergency settings
 
 **Backend Process**:
 1. Ensure caregivers have verified phone numbers
-2. `GET /v1/patients/:id/caregivers` - Fetch assigned caregivers
+2. `GET /v1/clients/:id/caregivers` - Fetch assigned caregivers
 3. Verify all caregivers have `isPhoneVerified: true`
 4. Emergency alerts will be sent to all assigned caregivers
 

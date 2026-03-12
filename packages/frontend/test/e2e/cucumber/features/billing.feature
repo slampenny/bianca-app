@@ -4,7 +4,7 @@ Feature: Billing Information
   So that I can manage my organization's payments
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
     And I am an organization admin
 

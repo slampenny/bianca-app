@@ -1,5 +1,5 @@
 const httpStatus = require('http-status');
-const { Org, Caregiver, Patient, Schedule } = require('../models');
+const { Org, Caregiver, Client, Schedule } = require('../models');
 const config = require('../config/config');
 const emailService = require('./email.service');
 const tokenService = require('./token.service');
@@ -102,13 +102,13 @@ const deleteOrgById = async (orgId) => {
     await caregiver.delete();
   }
 
-  // Soft delete all patients that belong to the org
-  const patients = await Patient.find({ org: orgId });
-  for (const patient of patients) {
-    await patient.delete();
+  // Soft delete all clients that belong to the org
+  const clients = await Client.find({ org: orgId });
+  for (const client of clients) {
+    await client.delete();
 
-    // Soft delete all schedules that belong to the patient
-    const schedules = await Schedule.find({ patient: patient.id });
+    // Soft delete all schedules that belong to the client
+    const schedules = await Schedule.find({ client: client.id });
     for (const schedule of schedules) {
       await schedule.delete();
     }

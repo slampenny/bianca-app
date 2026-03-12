@@ -11,6 +11,7 @@ const { Call, Conversation } = require('../../../src/models');
 jest.mock('twilio', () => {
   const mockTwilioClient = {
     calls: jest.fn().mockReturnValue({
+      fetch: jest.fn().mockResolvedValue({ sid: 'test-call-sid', status: 'in-progress' }),
       update: jest.fn().mockResolvedValue({ sid: 'test-call-sid', status: 'completed' })
     }),
     messages: jest.fn().mockReturnValue({
@@ -103,13 +104,13 @@ afterAll(async () => {
 
 // Use real services - they'll use the mocked external dependencies
 const callWorkflowController = require('../../../src/controllers/callWorkflow.controller');
-const { conversationService, twilioCallService, patientService, caregiverService } = require('../../../src/services');
+const { conversationService, twilioCallService, clientService, caregiverService } = require('../../../src/services');
 
 describe('CallWorkflow Controller - Initiate Call', () => {
   let req;
   let res;
   let next;
-  let patientId;
+  let clientId;
   let agentId;
   let patient;
   let agent;
@@ -120,18 +121,18 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     // Clear database
     await Call.deleteMany({});
     await Conversation.deleteMany({});
-    const { Patient, Caregiver } = require('../../../src/models');
-    await Patient.deleteMany({});
+    const { Client, Caregiver } = require('../../../src/models');
+    await Client.deleteMany({});
     await Caregiver.deleteMany({});
 
-    patientId = new mongoose.Types.ObjectId();
+    clientId = new mongoose.Types.ObjectId();
     agentId = new mongoose.Types.ObjectId();
 
     // Create mock patient with all required fields (use unique email per test)
-    const uniqueId = patientId.toString().slice(-6);
-    patient = await Patient.create({
-      _id: patientId,
-      name: 'Test Patient',
+    const uniqueId = clientId.toString().slice(-6);
+    patient = await Client.create({
+      _id: clientId,
+      name: 'Test Client',
       email: `patient-${uniqueId}@test.com`,
       phone: '15551234567', // Valid mobile phone format (validator accepts this without +)
       org: new mongoose.Types.ObjectId()
@@ -147,14 +148,14 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     });
 
     // Mock services
-    jest.spyOn(patientService, 'getPatientById').mockResolvedValue(patient);
+    jest.spyOn(clientService, 'getClientById').mockResolvedValue(patient);
     jest.spyOn(caregiverService, 'getCaregiverById').mockResolvedValue(agent);
     jest.spyOn(twilioCallService, 'initiateCall').mockResolvedValue('CA1234567890abcdef');
 
     // Mock request and response
     req = {
       body: {
-        patientId: patientId.toString(),
+        clientId: clientId.toString(),
         callNotes: 'Test call notes'
       },
       caregiver: {
@@ -183,13 +184,13 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       expect(responseData).toHaveProperty('conversationId');
       expect(responseData).toHaveProperty('callId');
       expect(responseData).toHaveProperty('callSid', 'CA1234567890abcdef');
-      expect(responseData.patientId.toString()).toBe(patientId.toString());
+      expect(responseData.clientId.toString()).toBe(clientId.toString());
       expect(responseData.agentId.toString()).toBe(agentId.toString());
 
       // Verify conversation was created in database
       const conversation = await Conversation.findOne({ callId: responseData.callId });
       expect(conversation).toBeTruthy();
-      expect(conversation.patientId.toString()).toBe(patientId.toString());
+      expect(conversation.clientId.toString()).toBe(clientId.toString());
 
       // Verify call was created and linked to conversation
       const call = await Call.findById(responseData.callId);
@@ -199,8 +200,8 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       expect(call.callNotes).toBe('Test call notes');
     });
 
-    it('should return 404 if patient not found', async () => {
-      jest.spyOn(patientService, 'getPatientById').mockResolvedValue(null);
+    it('should return 404 if client not found', async () => {
+      jest.spyOn(clientService, 'getClientById').mockResolvedValue(null);
 
       await callWorkflowController.initiateCall(req, res, next);
 
@@ -208,12 +209,12 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       const error = next.mock.calls[0][0];
       expect(error).toBeInstanceOf(Error);
       expect(error.statusCode).toBe(httpStatus.NOT_FOUND);
-      expect(error.message).toBe('Patient not found');
+      expect(error.message).toBe('Client not found');
     });
 
-    it('should return 400 if patient does not have phone number', async () => {
+    it('should return 400 if client does not have phone number', async () => {
       patient.phone = undefined;
-      jest.spyOn(patientService, 'getPatientById').mockResolvedValue(patient);
+      jest.spyOn(clientService, 'getClientById').mockResolvedValue(patient);
 
       await callWorkflowController.initiateCall(req, res, next);
 
@@ -221,7 +222,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       const error = next.mock.calls[0][0];
       expect(error).toBeInstanceOf(Error);
       expect(error.statusCode).toBe(httpStatus.BAD_REQUEST);
-      expect(error.message).toBe('Patient does not have a phone number');
+      expect(error.message).toBe('Client does not have a phone number');
     });
 
     it('should return 404 if agent not found', async () => {
@@ -240,14 +241,14 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       // First, create a call and conversation
       const existingCall = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patientId,
+        clientId,
         agentId: agentId,
         status: 'initiated',
         callStatus: 'initiating'
       });
 
       const existingConversation = await Conversation.create({
-        patientId: patientId,
+        clientId,
         callId: existingCall._id
       });
 
@@ -298,14 +299,14 @@ describe('CallWorkflow Controller - End Call', () => {
     await Call.deleteMany({});
     await Conversation.deleteMany({});
 
-    const patientId = new mongoose.Types.ObjectId();
+    const clientId = new mongoose.Types.ObjectId();
     const agentId = new mongoose.Types.ObjectId();
     const conversationId = new mongoose.Types.ObjectId();
 
     // Create a real Call record in the database
     const call = await Call.create({
       callSid: 'CA1234567890abcdef',
-      patientId: patientId,
+      clientId,
       agentId: agentId,
       asteriskChannelId: 'asterisk-channel-123',
       status: 'in-progress',
@@ -316,7 +317,7 @@ describe('CallWorkflow Controller - End Call', () => {
     // Create a real Conversation record linked to the Call
     const realConversation = await Conversation.create({
       _id: conversationId,
-      patientId: patientId,
+      clientId,
       agentId: agentId,
       callId: call._id,
       status: 'in-progress',

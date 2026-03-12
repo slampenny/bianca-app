@@ -6,12 +6,12 @@ const httpStatus = require('http-status');
 const mongoose = require('mongoose');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Alert, Org, Caregiver, Patient, Schedule, Conversation, Call } = require('../../src/models');
+const { Alert, Org, Caregiver, Client, Schedule, Conversation, Call } = require('../../src/models');
 const { caregiverOne, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { alertOne, insertAlerts } = require('../fixtures/alert.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
-const { patientOne, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
-const { scheduleOne, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
+const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
+const { scheduleOne, insertScheduleAndAddToClient } = require('../fixtures/schedule.fixture');
 const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
@@ -19,7 +19,7 @@ let mongoServer;
 let caregiverToken;
 let org;
 let caregiver;
-let patient;
+let client;
 
 describe('Call Workflow Integration Tests', () => {
   beforeAll(async () => {
@@ -34,7 +34,7 @@ describe('Call Workflow Integration Tests', () => {
     // Setup test data
     [org] = await insertOrgs([orgOne]);
     [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
-    [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+    [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
     
     // Create auth token for caregiver
     caregiverToken = await tokenService.generateAuthTokens(caregiver);
@@ -44,7 +44,7 @@ describe('Call Workflow Integration Tests', () => {
     // Clean up test data
     await Alert.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Org.deleteMany();
     await Schedule.deleteMany();
     await Conversation.deleteMany();
@@ -52,10 +52,10 @@ describe('Call Workflow Integration Tests', () => {
   });
 
   describe('POST /v1/calls/initiate', () => {
-    it('should initiate a call to a patient successfully', async () => {
+    it('should initiate a call to a client successfully', async () => {
       const callData = {
-        patientId: patient.id,
-        callNotes: 'Test call for patient check-in'
+        clientId: client.id,
+        callNotes: 'Test call for client check-in'
       };
 
       const response = await request(app)
@@ -67,8 +67,8 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('conversationId');
       expect(response.body).toHaveProperty('callId');
       expect(response.body).toHaveProperty('callSid', 'mock-call-sid-12345');
-      expect(response.body.patientId.toString()).toBe(patient.id);
-      expect(response.body.patientName).toBe(patient.name);
+      expect(response.body.clientId.toString()).toBe(client.id);
+      expect(response.body.clientName ?? response.body.patientName).toBe(client.name);
       expect(response.body.agentId.toString()).toBe(caregiver.id);
       expect(response.body.status).toBe('in-progress');
       expect(response.body.callStatus).toBe('ringing');
@@ -76,7 +76,7 @@ describe('Call Workflow Integration Tests', () => {
       // Verify conversation was created in database
       const conversation = await Conversation.findById(response.body.conversationId);
       expect(conversation).toBeTruthy();
-      expect(conversation.patientId.toString()).toBe(patient.id);
+      expect(conversation.clientId.toString()).toBe(client.id);
       expect(conversation.callId.toString()).toBe(response.body.callId);
 
       // Verify call was created and linked to conversation
@@ -89,13 +89,13 @@ describe('Call Workflow Integration Tests', () => {
       expect(call.callNotes).toBe(callData.callNotes);
     });
 
-    it('should return 400 if patient does not have phone number', async () => {
-      // Update patient to remove phone number
-      patient.phone = undefined;
-      await patient.save({ validateBeforeSave: false });
+    it('should return 400 if client does not have phone number', async () => {
+      // Update client to remove phone number
+      client.phone = undefined;
+      await client.save({ validateBeforeSave: false });
 
       const callData = {
-        patientId: patient.id,
+        clientId: client.id,
         callNotes: 'Test call'
       };
 
@@ -105,13 +105,13 @@ describe('Call Workflow Integration Tests', () => {
         .send(callData)
         .expect(httpStatus.BAD_REQUEST);
 
-      expect(response.body.message).toBe('Patient does not have a phone number');
+      expect(response.body.message).toBe('Client does not have a phone number');
     });
 
-    it('should return 404 if patient not found', async () => {
-      const fakePatientId = new mongoose.Types.ObjectId();
+    it('should return 404 if client not found', async () => {
+      const fakeClientId = new mongoose.Types.ObjectId();
       const callData = {
-        patientId: fakePatientId,
+        clientId: fakeClientId,
         callNotes: 'Test call'
       };
 
@@ -121,12 +121,12 @@ describe('Call Workflow Integration Tests', () => {
         .send(callData)
         .expect(httpStatus.NOT_FOUND);
 
-      expect(response.body.message).toBe('Patient not found');
+      expect(response.body.message).toBe('Client not found');
     });
 
     it('should return 401 without valid token', async () => {
       const callData = {
-        patientId: patient.id,
+        clientId: client.id,
         callNotes: 'Test call'
       };
 
@@ -145,7 +145,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -156,7 +156,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 
@@ -174,7 +174,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.conversationId.toString()).toBe(conversation.id);
       expect(response.body.data.status).toBe('in-progress'); // Call status, not conversation status
-      expect(response.body.data.patient).toBeTruthy();
+      expect(response.body.data.client).toBeTruthy();
       expect(response.body.data.agent).toBeTruthy();
     });
 
@@ -202,7 +202,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -213,7 +213,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 
@@ -292,7 +292,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -303,7 +303,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 
@@ -355,7 +355,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create multiple calls with different statuses and their conversations
       const call1 = await Call.create({
         callSid: 'CA1111111111111111',
-        patientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
@@ -366,7 +366,7 @@ describe('Call Workflow Integration Tests', () => {
 
       const call2 = await Call.create({
         callSid: 'CA2222222222222222',
-        patientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -376,12 +376,12 @@ describe('Call Workflow Integration Tests', () => {
       });
 
       const conversation1 = await Conversation.create({
-        patientId: patient.id,
+        clientId: client.id,
         callId: call1._id
       });
 
       const conversation2 = await Conversation.create({
-        patientId: patient.id,
+        clientId: client.id,
         callId: call2._id
       });
 
@@ -422,7 +422,7 @@ describe('Call Workflow Integration Tests', () => {
       // Create a test call first
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
-        patientId: patient.id,
+        clientId: client.id,
         agentId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
@@ -434,7 +434,7 @@ describe('Call Workflow Integration Tests', () => {
 
       // Create a test conversation linked to the call
       conversation = await Conversation.create({
-        patientId: patient.id,
+        clientId: client.id,
         callId: call._id
       });
 
@@ -452,7 +452,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('data');
       expect(response.body.data.conversationId.toString()).toBe(conversation.id);
       expect(response.body.data.status).toBe('in-progress');
-      expect(response.body.data.patient).toBeTruthy();
+      expect(response.body.data.client).toBeTruthy();
       expect(response.body.data.agent).toBeTruthy();
     });
   });

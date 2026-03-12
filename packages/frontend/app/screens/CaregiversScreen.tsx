@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useMemo } from "react"
 import { View, StyleSheet, FlatList } from "react-native"
 import { AutoImage, Text, Button, Screen } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
@@ -41,8 +41,16 @@ export function CaregiversScreen() {
     caregiverRoles: caregivers.map(c => ({ id: c.id, role: c.role }))
   })
 
-  // Just display what the backend returns (no frontend filtering)
-  const orgCaregivers = caregivers
+  // Deduplicate by id so FlatList never sees duplicate keys (e.g. after sendInvite push + refetch)
+  const orgCaregivers = useMemo(() => {
+    const seen = new Set<string>()
+    return caregivers.filter((c) => {
+      const id = c.id ?? ""
+      if (seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+  }, [caregivers])
 
   logger.debug('Displaying caregivers:', {
     orgCaregiversCount: orgCaregivers.length,
@@ -118,13 +126,13 @@ export function CaregiversScreen() {
         logger.error('Navigation to CaregiverInvited failed (resend):', navError)
         // Fallback: try direct navigation
         try {
-          navigation.navigate("CaregiverInvited" as never, {
+          (navigation.navigate as (name: string, params?: object) => void)("CaregiverInvited", {
             caregiver: {
               id: invitedCaregiver.id || caregiver.id,
               name: invitedCaregiver.name || caregiver.name,
               email: invitedCaregiver.email || caregiver.email,
             }
-          } as never)
+          })
           logger.debug('Fallback navigation to CaregiverInvited called (resend)')
         } catch (fallbackError) {
           logger.error('Fallback navigation also failed (resend):', fallbackError)

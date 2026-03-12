@@ -1,5 +1,5 @@
 import React, { useState, forwardRef } from "react"
-import { View, ViewStyle, StyleProp, TouchableOpacity, TextInput } from "react-native"
+import { View, ViewStyle, TextStyle, StyleProp, TouchableOpacity, TextInput } from "react-native"
 import { TextField, TextFieldProps, TextFieldAccessoryProps } from "./TextField"
 import { Icon } from "./Icon"
 import { Text } from "./Text"
@@ -131,8 +131,8 @@ export const PasswordField = forwardRef<TextInput, PasswordFieldProps>((props, r
         status={fieldStatus}
       />
 
-      {/* Password rules display */}
-      {showRules && !isConfirmField && currentPassword.length > 0 && (
+      {/* Password rules display - use ternary to avoid rendering 0 or "" when conditions are falsy */}
+      {showRules && !isConfirmField && currentPassword.length > 0 ? (
         <View style={$rulesContainer}>
           {passwordRules.map(({ rule, met }, index) => (
             <Text
@@ -151,10 +151,10 @@ export const PasswordField = forwardRef<TextInput, PasswordFieldProps>((props, r
             </Text>
           ))}
         </View>
-      )}
+      ) : null}
 
       {/* Confirm password mismatch indicator - only show if no helper/error from parent */}
-      {isConfirmField && comparePassword && currentPassword.length > 0 && !passwordsMatch && !textFieldProps.helper && (
+      {isConfirmField && comparePassword && currentPassword.length > 0 && !passwordsMatch && !textFieldProps.helper ? (
         <Text
           style={[
             $confirmErrorText,
@@ -165,7 +165,7 @@ export const PasswordField = forwardRef<TextInput, PasswordFieldProps>((props, r
         >
           Passwords do not match
         </Text>
-      )}
+      ) : null}
     </View>
   )
 })
@@ -181,12 +181,12 @@ const $rulesContainer: ViewStyle = {
   marginBottom: spacing.sm,
 }
 
-const $ruleText: ViewStyle = {
+const $ruleText: TextStyle = {
   fontSize: 12,
   marginBottom: spacing.xxs,
 }
 
-const $confirmErrorText: ViewStyle = {
+const $confirmErrorText: TextStyle = {
   fontSize: 12,
   marginTop: spacing.xs,
   marginBottom: spacing.xs,

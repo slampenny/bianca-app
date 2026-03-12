@@ -21,12 +21,25 @@ let pendingRequests: PendingRequest[] = []
 let isAuthModalShowing = false
 let initialErrorMessage: string | null = null
 
+// Cooldown so we don't show the auth modal repeatedly (e.g. when many requests 401 in quick succession)
+const AUTH_MODAL_COOLDOWN_MS = 60_000 // 1 minute
+let lastAuthModalShownAt = 0
+
 export function setShowAuthModalCallback(callback: ((initialErrorMessage?: string) => void) | null) {
   showAuthModalCallback = callback
 }
 
 export function getInitialErrorMessage(): string | null {
   return initialErrorMessage
+}
+
+/** Error shown when user closes the auth modal without logging in. Use this to show a friendly message instead of the raw error. */
+export const AUTH_CANCELLED_MESSAGE = 'Please sign in to continue.'
+
+/** Returns true if the error is from the user closing the auth modal without logging in. */
+export function isAuthCancelledError(error: unknown): boolean {
+  const e = error as { error?: { status?: string; error?: string } }
+  return e?.error?.status === 'CUSTOM_ERROR' && e?.error?.error === 'Authentication cancelled'
 }
 
 export function clearInitialErrorMessage() {
@@ -38,6 +51,7 @@ export function notifyAuthSuccess() {
   const requests = [...pendingRequests]
   pendingRequests = []
   isAuthModalShowing = false
+  lastAuthModalShownAt = 0
   clearInitialErrorMessage()
   
   // Use setTimeout to ensure this happens after auth state is updated
@@ -104,11 +118,11 @@ function baseQueryWithReauth(
       const url = typeof args === 'string' ? args : (args as FetchArgs).url || ''
       const isLoginEndpoint = url.includes('/auth/login') || url.includes('/v1/auth/login')
       const isVerifyEmailEndpoint = url.includes('/auth/verify-email') || url.includes('/v1/auth/verify-email')
+      const isRefreshTokensEndpoint = url.includes('/auth/refresh-tokens') || url.includes('/v1/auth/refresh-tokens')
       
-      if (isLoginEndpoint || isVerifyEmailEndpoint) {
-        // Login endpoint 401 = invalid credentials, not expired token
-        // Verify-email endpoint 401 = invalid/expired verification token, not expired auth token
-        // Let the error propagate so the respective handlers can handle it
+      if (isLoginEndpoint || isVerifyEmailEndpoint || isRefreshTokensEndpoint) {
+        // Login 401 = invalid credentials. Verify-email 401 = invalid verification token.
+        // Refresh-tokens 401 = don't show modal (e.g. COOP/popup left stale token); keep session so SSO can complete.
         return result
       }
       
@@ -120,9 +134,12 @@ function baseQueryWithReauth(
           ? result.error.data
           : 'Your session has expired. Please sign in again.'
       
-      // Only show modal if callback is set (modal is ready)
-      if (showAuthModalCallback && !isAuthModalShowing) {
+      // Only show modal if callback is set (modal is ready), not already showing, and not in cooldown
+      const now = Date.now()
+      const inCooldown = now - lastAuthModalShownAt < AUTH_MODAL_COOLDOWN_MS
+      if (showAuthModalCallback && !isAuthModalShowing && !inCooldown) {
         isAuthModalShowing = true
+        lastAuthModalShownAt = now
         // Store the initial error message
         initialErrorMessage = errorMessage
         // Show the modal immediately with the error message

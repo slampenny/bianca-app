@@ -181,6 +181,20 @@ resource "aws_iam_role_policy" "codebuild_staging_policy" {
         ]
         Resource = "*"
       },
+      # Terraform state (SwapAndTerminate updates state after blue-green so next apply doesn't recreate instance)
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.terraform_state.arn,
+          "${aws_s3_bucket.terraform_state.arn}/*"
+        ]
+      },
       {
         Effect = "Allow"
         Action = [

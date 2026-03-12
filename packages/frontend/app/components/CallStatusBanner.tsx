@@ -13,14 +13,14 @@ import { logger } from "../utils/logger"
 interface CallStatusBannerProps {
   conversationId: string
   initialStatus?: string
-  patientName: string
+  clientName: string
   onStatusChange?: (status: string) => void
 }
 
 export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
   conversationId,
   initialStatus = 'initiating',
-  patientName,
+  clientName,
   onStatusChange
 }) => {
   // Validate conversationId
@@ -171,7 +171,7 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       case 'initiated':
         return 'Setting up call...'
       case 'in-progress':
-        return `Connected with ${patientName}`
+        return `Connected with ${clientName}`
       case 'completed':
         return callOutcome === 'answered' ? 'Call completed' : 'Call ended'
       case 'failed':
@@ -248,9 +248,6 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
       })
       
       setError(errorMessage)
-      
-      // Also log to console for debugging
-      console.error('End call failed:', err)
     }
   }
 

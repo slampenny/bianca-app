@@ -12,7 +12,7 @@ import {
   useGetSentimentSummaryQuery,
 } from "../services/api/sentimentApi"
 import { HomeStackParamList } from "../navigators/navigationTypes"
-import { getPatient } from "../store/patientSlice"
+import { getClient } from "../store/clientSlice"
 import { logger } from "../utils/logger"
 
 type SentimentAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "SentimentAnalysis">
@@ -20,20 +20,16 @@ type SentimentAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "Sentiment
 export function SentimentAnalysisScreen() {
   const route = useRoute<SentimentAnalysisScreenRouteProp>()
   
-  // Get patient from route params (when accessed from Patient screen) or Redux state (when accessed from Reports)
-  const routePatientId = route.params?.patientId
-  const routePatientName = route.params?.patientName
-  const selectedPatient = useSelector(getPatient)
+  const routeClientId = route.params?.clientId
+  const routeClientName = route.params?.clientName
+  const selectedClient = useSelector(getClient)
   const { colors, isLoading: themeLoading } = useTheme()
-  
-  // Prioritize route params (from Patient screen) over Redux state (from Reports)
-  const patientId = routePatientId || selectedPatient?.id
-  const patientName = routePatientName || selectedPatient?.name
+  const clientId = routeClientId || selectedClient?.id
+  const clientName = routeClientName || selectedClient?.name
 
   const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("lastCall")
 
-  // Only fetch sentiment data if we have a patient
-  const shouldFetchData = !!patientId && (typeof patientId === 'string' ? patientId.trim().length > 0 : true)
+  const shouldFetchData = !!clientId && (typeof clientId === 'string' ? clientId.trim().length > 0 : true)
 
   // Fetch sentiment data
   const {
@@ -43,7 +39,7 @@ export function SentimentAnalysisScreen() {
     refetch: refetchTrend,
     error: trendError,
   } = useGetSentimentTrendQuery({
-    patientId: patientId || "",
+    clientId: clientId || "",
     timeRange: selectedTimeRange,
   }, {
     skip: !shouldFetchData,
@@ -56,7 +52,7 @@ export function SentimentAnalysisScreen() {
     refetch: refetchSummary,
     error: summaryError,
   } = useGetSentimentSummaryQuery({
-    patientId: patientId || "",
+    clientId: clientId || "",
   }, {
     skip: !shouldFetchData,
   })
@@ -64,9 +60,9 @@ export function SentimentAnalysisScreen() {
   // Debug logging
   React.useEffect(() => {
     logger.debug('=== SENTIMENT ANALYSIS DEBUG ===')
-    logger.debug('[SentimentAnalysis] Patient source:', routePatientId ? 'route params' : 'Redux state')
-    logger.debug('[SentimentAnalysis] Patient ID:', patientId)
-    logger.debug('[SentimentAnalysis] Patient name:', patientName)
+    logger.debug('[SentimentAnalysis] Client source:', routeClientId ? 'route params' : 'Redux state')
+    logger.debug('[SentimentAnalysis] Client ID:', clientId)
+    logger.debug('[SentimentAnalysis] Client name:', clientName)
     logger.debug('[SentimentAnalysis] Should fetch data:', shouldFetchData)
     logger.debug('[SentimentAnalysis] Trend loading:', isTrendLoading)
     logger.debug('[SentimentAnalysis] Summary loading:', isSummaryLoading)
@@ -77,7 +73,7 @@ export function SentimentAnalysisScreen() {
     logger.debug('[SentimentAnalysis] Trend data (full):', JSON.stringify(trendData, null, 2))
     logger.debug('[SentimentAnalysis] Summary data (full):', JSON.stringify(summaryData, null, 2))
     logger.debug('=== END DEBUG ===')
-  }, [patientId, patientName, shouldFetchData, isTrendLoading, isSummaryLoading, isTrendFetching, isSummaryFetching, trendError, summaryError, trendData, summaryData, routePatientId])
+  }, [clientId, clientName, shouldFetchData, isTrendLoading, isSummaryLoading, isTrendFetching, isSummaryFetching, trendError, summaryError, trendData, summaryData, routeClientId])
 
   const handleRefresh = useCallback(() => {
     refetchTrend()
@@ -107,8 +103,7 @@ export function SentimentAnalysisScreen() {
 
   const styles = createStyles(colors)
 
-  // Show message if no patient is selected
-  if (!patientId) {
+  if (!clientId) {
     return (
       <Screen
         style={styles.container}
@@ -116,9 +111,9 @@ export function SentimentAnalysisScreen() {
         safeAreaEdges={["top"]}
       >
         <View style={styles.noPatientContainer}>
-          <Text style={styles.noPatientTitle}>{translate("sentimentAnalysis.noPatientSelected")}</Text>
+          <Text style={styles.noPatientTitle}>{translate("sentimentAnalysis.noClientSelected")}</Text>
           <Text style={styles.noPatientMessage}>
-            {translate("sentimentAnalysis.selectPatientToView")}
+            {translate("sentimentAnalysis.selectClientToView")}
           </Text>
         </View>
       </Screen>
@@ -132,7 +127,7 @@ export function SentimentAnalysisScreen() {
       safeAreaEdges={["top"]}
     >
       <SentimentDashboard
-        patientId={patientId}
+        clientId={clientId}
         trend={trendData}
         summary={summaryData}
         isLoading={isLoading}

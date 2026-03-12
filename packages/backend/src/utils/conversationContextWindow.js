@@ -16,7 +16,7 @@ class ConversationContextWindow {
       ...config
     };
 
-    // In-memory storage: { patientId: [{ text, timestamp, role }] }
+    // In-memory storage: { clientId: [{ text, timestamp, role }] }
     this.contextWindows = new Map();
     
     // Cleanup interval
@@ -27,24 +27,24 @@ class ConversationContextWindow {
   /**
    * Add an utterance to the context window
    * Thread-safe: Ensures atomic read-modify-write operations for concurrent calls
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {string} text - Utterance text
    * @param {string} role - 'user' or 'assistant'
    * @param {number} timestamp - Timestamp (defaults to now)
    */
-  addUtterance(patientId, text, role = 'user', timestamp = Date.now()) {
+  addUtterance(clientId, text, role = 'user', timestamp = Date.now()) {
     try {
-      if (!patientId || !text || !text.trim()) return;
+      if (!clientId || !text || !text.trim()) return;
 
       // Atomic operation: Get current context or create new array
       // Using get-or-create pattern to avoid race conditions
-      let context = this.contextWindows.get(patientId);
+      let context = this.contextWindows.get(clientId);
       if (!context) {
         // Create new array atomically - if another thread sets it between get and set,
         // we'll use the existing one on next iteration
         const newContext = [];
-        this.contextWindows.set(patientId, newContext);
-        context = this.contextWindows.get(patientId); // Get actual value (may be our new one or one set by concurrent call)
+        this.contextWindows.set(clientId, newContext);
+        context = this.contextWindows.get(clientId); // Get actual value (may be our new one or one set by concurrent call)
       }
 
       // Create a copy of the current context to modify atomically
@@ -71,9 +71,9 @@ class ConversationContextWindow {
       // If another call modified it concurrently, we'll overwrite, but that's acceptable
       // since each call operates on a snapshot of the data at read time
       if (filteredContext.length === 0) {
-        this.contextWindows.delete(patientId);
+        this.contextWindows.delete(clientId);
       } else {
-        this.contextWindows.set(patientId, filteredContext);
+        this.contextWindows.set(clientId, filteredContext);
       }
     } catch (error) {
       console.error('Error adding utterance to context window:', error);
@@ -83,14 +83,14 @@ class ConversationContextWindow {
   /**
    * Get recent context for a patient (utterances within time window)
    * Thread-safe: Returns a copy of the context to prevent external mutations
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {number} lookBackMinutes - How many minutes back to look (defaults to config)
    * @returns {Array} - Array of { text, role, timestamp } (copy, safe for concurrent access)
    */
-  getRecentContext(patientId, lookBackMinutes = null) {
+  getRecentContext(clientId, lookBackMinutes = null) {
     try {
       // Atomic read: Get current snapshot of context
-      const context = this.contextWindows.get(patientId);
+      const context = this.contextWindows.get(clientId);
       if (!context || context.length === 0) return [];
 
       // Create a defensive copy to prevent external mutations affecting internal state
@@ -110,16 +110,16 @@ class ConversationContextWindow {
 
   /**
    * Get full conversation context as a single string
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {number} lookBackMinutes - How many minutes back to look
    * @returns {string} - Combined context text
    */
-  getContextText(patientId, lookBackMinutes = null) {
-    const recentContext = this.getRecentContext(patientId, lookBackMinutes);
+  getContextText(clientId, lookBackMinutes = null) {
+    const recentContext = this.getRecentContext(clientId, lookBackMinutes);
     if (recentContext.length === 0) return '';
 
     return recentContext
-      .map(u => `${u.role === 'user' ? 'Patient' : 'Bianca'}: ${u.text}`)
+      .map(u => `${u.role === 'user' ? 'Client' : 'Bianca'}: ${u.text}`)
       .join('\n');
   }
 
@@ -128,10 +128,10 @@ class ConversationContextWindow {
    * Thread-safe: Atomic read-modify-write operation
    * @private
    */
-  trimToWindow(patientId) {
+  trimToWindow(clientId) {
     try {
       // Atomic read
-      const context = this.contextWindows.get(patientId);
+      const context = this.contextWindows.get(clientId);
       if (!context) return;
 
       const cutoffTime = Date.now() - (this.config.windowSizeMinutes * 60 * 1000);
@@ -141,9 +141,9 @@ class ConversationContextWindow {
 
       // Atomic write: Replace entire array atomically
       if (filtered.length === 0) {
-        this.contextWindows.delete(patientId);
+        this.contextWindows.delete(clientId);
       } else {
-        this.contextWindows.set(patientId, filtered);
+        this.contextWindows.set(clientId, filtered);
       }
     } catch (error) {
       console.error('Error trimming context window:', error);
@@ -152,13 +152,13 @@ class ConversationContextWindow {
 
   /**
    * Check if emergency phrase is in narrative context (story about the past)
-   * @param {string} patientId - Patient ID
+   * @param {string} clientId - Client ID
    * @param {string} emergencyText - The text that triggered emergency detection
    * @returns {Object} - { isNarrative: boolean, confidence: number, reason: string }
    */
-  classifyNarrativeVsPresent(patientId, emergencyText) {
+  classifyNarrativeVsPresent(clientId, emergencyText) {
     try {
-      const recentContext = this.getRecentContext(patientId, 3); // Last 3 minutes
+      const recentContext = this.getRecentContext(clientId, 3); // Last 3 minutes
       
       if (recentContext.length === 0) {
         return {
@@ -279,16 +279,16 @@ class ConversationContextWindow {
       // Create snapshot of entries to iterate over (prevents issues if Map is modified during iteration)
       const entries = Array.from(this.contextWindows.entries());
       
-      for (const [patientId, context] of entries) {
+      for (const [clientId, context] of entries) {
         // Atomic read-modify-write per patient
         // Create filtered copy (don't mutate original array)
         const filtered = context.filter(utterance => utterance.timestamp >= cutoffTime);
         
         // Atomic write
         if (filtered.length === 0) {
-          this.contextWindows.delete(patientId);
+          this.contextWindows.delete(clientId);
         } else {
-          this.contextWindows.set(patientId, filtered);
+          this.contextWindows.set(clientId, filtered);
         }
       }
     } catch (error) {
@@ -307,10 +307,10 @@ class ConversationContextWindow {
   }
 
   /**
-   * Clear all context for a patient
+   * Clear all context for a client
    */
-  clearPatientContext(patientId) {
-    this.contextWindows.delete(patientId);
+  clearClientContext(clientId) {
+    this.contextWindows.delete(clientId);
   }
 
   /**
@@ -325,7 +325,7 @@ class ConversationContextWindow {
    */
   getStats() {
     return {
-      totalPatients: this.contextWindows.size,
+      totalClients: this.contextWindows.size,
       totalUtterances: Array.from(this.contextWindows.values())
         .reduce((sum, context) => sum + context.length, 0),
       config: this.config

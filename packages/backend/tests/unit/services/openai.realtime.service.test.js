@@ -1,9 +1,10 @@
-// Set required environment variables for tests
+// Set required environment variables for tests (before any app code loads)
+process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-jwt-secret-for-testing';
 process.env.TWILIO_ACCOUNTSID = 'test-twilio-account-sid';
 process.env.TWILIO_AUTHTOKEN = 'test-twilio-auth-token';
 
-// Mock fs module to prevent MongoDB/AWS SDK issues
+// Mock fs module to prevent MongoDB/AWS SDK issues and satisfy audio debug code
 jest.mock('fs', () => ({
   promises: {
     readFile: jest.fn(),
@@ -15,13 +16,21 @@ jest.mock('fs', () => ({
   existsSync: jest.fn(),
   mkdirSync: jest.fn(),
   appendFileSync: jest.fn(),
-  statSync: jest.fn()
+  writeFileSync: jest.fn(),
+  statSync: jest.fn().mockReturnValue({ size: 0 })
 }));
 
 // Mock models to prevent MongoDB path resolution issues
-jest.mock('../../../src/models', () => ({
+jest.mock('../../../src/models', () => {
+  const makeFindByIdChain = () => {
+    const chain = {};
+    chain.populate = jest.fn().mockReturnValue(chain);
+    chain.lean = jest.fn().mockResolvedValue(null);
+    return chain;
+  };
+  return {
   Conversation: {
-    findById: jest.fn(),
+    findById: jest.fn().mockImplementation(makeFindByIdChain),
     findByIdAndUpdate: jest.fn(),
     create: jest.fn(),
     find: jest.fn(),
@@ -34,12 +43,13 @@ jest.mock('../../../src/models', () => ({
     findByIdAndUpdate: jest.fn(),
     findByIdAndDelete: jest.fn()
   },
-  Patient: {
+  Client: {
     findById: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn()
   }
-}));
+  };
+});
 
 // Mock emergency processor service to prevent MongoDB path resolution issues
 jest.mock('../../../src/services/emergencyProcessor.service', () => ({
@@ -194,7 +204,7 @@ describe('OpenAI Realtime Service', () => {
     const mockCallSid = 'test-call-sid';
     const mockConversationId = 'test-conversation-id';
     const mockPrompt = 'Hello, how can I help you?';
-    const mockPatientId = 'test-patient-id';
+    const mockClientId = 'test-client-id';
 
     beforeEach(() => {
       // Mock successful WebSocket connection
@@ -215,7 +225,7 @@ describe('OpenAI Realtime Service', () => {
         mockCallSid,
         mockConversationId,
         mockPrompt,
-        mockPatientId
+        mockClientId
       );
 
       expect(result).toBe(true);
@@ -225,7 +235,7 @@ describe('OpenAI Realtime Service', () => {
       expect(connection).toBeDefined();
       expect(connection.callSid).toBe(mockCallSid);
       expect(connection.conversationId).toBe(mockConversationId);
-      expect(connection.patientId).toBe(mockPatientId);
+      expect(connection.clientId).toBe(mockClientId);
     });
 
     it('should handle missing call identifier', async () => {

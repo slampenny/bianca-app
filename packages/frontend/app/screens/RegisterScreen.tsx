@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react"
-import { StyleSheet, View, Pressable, ScrollView, Platform } from "react-native"
+import React, { useState, useEffect, useLayoutEffect, useRef, createElement } from "react"
+import { StyleSheet, View, ScrollView, Platform } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
 import { Button, Text, TextField, PasswordField, PhoneInputWeb, Screen, CountryPicker } from "app/components"
@@ -9,10 +9,35 @@ import { translate } from "app/i18n"
 import type { ThemeColors } from "../types"
 import { logger } from "../utils/logger"
 
+// Stable wrapper so it isn't recreated each render (which was remounting inputs and breaking keyboard input)
+function RegisterFormWrapper({
+  children,
+  onSubmit,
+}: {
+  children: React.ReactNode
+  onSubmit: () => void
+}) {
+  if (Platform.OS === "web") {
+    return createElement("form", {
+      onSubmit: (e: React.FormEvent) => {
+        e.preventDefault()
+        onSubmit()
+      },
+      style: { flex: 1, display: "flex", flexDirection: "column" },
+    }, children)
+  }
+  return <View style={{ flex: 1 }}>{children}</View>
+}
+
 export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Register">) => {
-  const { navigation } = props
+  const { navigation, route } = props
   const scrollRef = useRef<ScrollView>(null)
   const { colors, isLoading: themeLoading } = useTheme()
+  const fromOnboarding = !!(route.params?.persona)
+  const onboardingPersona = route.params?.persona
+  const onboardingOrgName = route.params?.orgName
+  const onboardingOrgCountry = route.params?.orgCountry
+  const onboardingOrgTimezone = route.params?.orgTimezone
 
   // Don't return null - render a loading state instead to prevent navigation issues
   if (themeLoading) {
@@ -54,9 +79,11 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [phone, setPhone] = useState("")
-  const [organizationName, setOrganizationName] = useState("")
-  const [country, setCountry] = useState<string>("CA")
-  const [accountType, setAccountType] = useState("individual")
+  const [organizationName, setOrganizationName] = useState(onboardingOrgName ?? "")
+  const [country, setCountry] = useState<string>(onboardingOrgCountry ?? "CA")
+  const [accountType, setAccountType] = useState<"individual" | "organization">(
+    onboardingPersona === "organization" ? "organization" : "individual"
+  )
 
   // Field-specific error messages
   const [nameError, setNameError] = useState("")
@@ -68,6 +95,15 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   const [generalError, setGeneralError] = useState("")
 
   const [shouldRegister, setShouldRegister] = useState(false)
+
+  // Sync from onboarding params when navigating to Register with params
+  useEffect(() => {
+    if (route.params?.persona) {
+      setAccountType(route.params.persona === "organization" ? "organization" : "individual")
+    }
+    if (route.params?.orgName != null) setOrganizationName(route.params.orgName)
+    if (route.params?.orgCountry != null) setCountry(route.params.orgCountry)
+  }, [route.params?.persona, route.params?.orgName, route.params?.orgCountry])
 
   // Clear field error when user starts typing
   const clearFieldError = (field: string) => {
@@ -160,24 +196,21 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
       try {
         // For organization accounts, use organizationName as the org name
         const orgName = accountType === "organization" && organizationName ? organizationName : name
-        const result = await register({ name: orgName, email, password, phone, country }).unwrap()
+        const result = await register({ name: orgName, email, password, phone, ...(country ? { country } as { country?: string } : {}) } as Parameters<typeof register>[0]).unwrap()
         // Handle the new registration response format
         if (result && result.requiresEmailVerification) {
           // Navigate to email verification required screen with email
-          navigation.navigate("EmailVerificationRequired" as never, { email } as never)
+          (navigation.navigate as (name: string, params?: object) => void)("EmailVerificationRequired", { email })
         } else {
           setGeneralError("Registration successful! Please check your email for verification instructions.")
         }
       } catch (error: unknown) {
-        // Extract specific error message from API response
-        logger.error("Registration API Error:", error); // Log the actual error for debugging
-        
-        if (error?.data?.message) {
-          // API returned a specific error message (e.g., "Org Email already taken")
-          setGeneralError(error.data.message)
-        } else if (error?.message) {
-          // Fallback to error.message if data.message doesn't exist
-          setGeneralError(error.message)
+        const err = error as { data?: { message?: string }; message?: string }
+        logger.error("Registration API Error:", error)
+        if (err?.data?.message) {
+          setGeneralError(err.data.message)
+        } else if (err?.message) {
+          setGeneralError(err.message)
         } else {
           // Generic fallback if no specific message is available
           setGeneralError("Registration failed. Please try again.")
@@ -226,34 +259,38 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
             flex: 1,
           } as any,
         }),
-      }}
+      } as import("react-native").ScrollViewProps & { ref?: React.RefObject<ScrollView> }}
     >
+        <RegisterFormWrapper onSubmit={handleRegister}>
         {/* Error message block MOVED FROM HERE */}
 
-        <View style={styles.buttonContainer}>
-          <Button
-            testID="register-individual-toggle"
-            accessibilityLabel={translate("registerScreen.individualButton") || "Individual"}
-            tx="registerScreen.individualButton" // Make sure these tx keys exist in your i18n files
-            onPress={() => setAccountType("individual")}
-            style={accountType === "individual" ? styles.selectedButton : styles.button}
-            preset={accountType === "individual" ? "filled" : "default"} // Example preset usage
-          />
-          <Button
-            testID="register-organization-toggle"
-            accessibilityLabel={translate("registerScreen.organizationButton") || "Organization"}
-            tx="registerScreen.organizationButton" // Make sure these tx keys exist in your i18n files
-            onPress={() => setAccountType("organization")}
-            style={accountType === "organization" ? styles.selectedButton : styles.button}
-            preset={accountType === "organization" ? "filled" : "default"} // Example preset usage
-          />
-        </View>
-
-        <Text style={styles.explanationText}>
-          {accountType === "individual"
-            ? translate("registerScreen.individualExplanation")
-            : translate("registerScreen.organizationExplanation")}
-        </Text>
+        {!fromOnboarding && (
+          <>
+            <View style={styles.buttonContainer}>
+              <Button
+                testID="register-individual-toggle"
+                accessibilityLabel={translate("registerScreen.individualButton") || "Individual"}
+                tx="registerScreen.individualButton"
+                onPress={() => setAccountType("individual")}
+                style={accountType === "individual" ? styles.selectedButton : styles.button}
+                preset={accountType === "individual" ? "filled" : "default"}
+              />
+              <Button
+                testID="register-organization-toggle"
+                accessibilityLabel={translate("registerScreen.organizationButton") || "Organization"}
+                tx="registerScreen.organizationButton"
+                onPress={() => setAccountType("organization")}
+                style={accountType === "organization" ? styles.selectedButton : styles.button}
+                preset={accountType === "organization" ? "filled" : "default"}
+              />
+            </View>
+            <Text style={styles.explanationText}>
+              {accountType === "individual"
+                ? translate("registerScreen.individualExplanation")
+                : translate("registerScreen.organizationExplanation")}
+            </Text>
+          </>
+        )}
 
         {/* Form Fields */}
         {accountType === "organization" && (
@@ -420,6 +457,7 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
         {/* Add extra space at the bottom to ensure scrollability */}
         <View style={{ height: 100 }} />
+        </RegisterFormWrapper>
     </Screen>
   )
 }
@@ -429,7 +467,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   button: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaButtonUnselected,
-    borderRadius: 4,
+    borderRadius: 12,
     flex: 1,
     marginHorizontal: 5,
     paddingVertical: 10,
@@ -486,10 +524,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   registerButton: {
     marginTop: 10,
     width: "100%",
+    borderRadius: 20,
+    paddingVertical: 14,
   },
   selectedButton: {
     flex: 1,
     marginHorizontal: 5,
+    borderRadius: 12,
   },
   successContainer: {
     backgroundColor: colors.palette.biancaSuccessBackground || "#d1fae5",

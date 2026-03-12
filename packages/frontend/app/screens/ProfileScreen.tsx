@@ -6,10 +6,12 @@ import {
   TouchableWithoutFeedback,
   View,
   Switch,
+  Platform,
 } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
-import { Text, TextField } from "app/components"
+import { Text, TextField, Icon } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
 import AvatarPicker from "../components/AvatarPicker"
 import { LegalLinks } from "app/components/LegalLinks"
@@ -43,6 +45,8 @@ function ProfileScreen() {
   const { toast, showInfo, hideToast } = useToast()
   const { colors, isLoading: themeLoading, fontScale } = useTheme()
   const { scale } = useFontScale()
+  const insets = useSafeAreaInsets()
+  const headerColor = (colors.palette as any)?.biancaHeader || colors.text
   
   // Use language hook to trigger re-renders on language change
   useLanguage()
@@ -85,7 +89,7 @@ function ProfileScreen() {
 
   // Fallback: if we have tokens but no user, try to restore from latest SSO login result in API cache (handles race after modal close)
   const ssoLoginUserFromCache = useSelector((state: RootState) => {
-    const api = state.ssoApi as { mutations?: Record<string, { status: string; data?: { caregiver?: unknown } }> } | undefined
+    const api = (state as RootState & { ssoApi?: { mutations?: Record<string, { status: string; data?: { caregiver?: unknown } }> } }).ssoApi
     if (!api?.mutations) {
       logger.debug("ProfileScreen: no SSO API mutations in cache")
       return null
@@ -180,7 +184,7 @@ function ProfileScreen() {
     if (!currentUser && inviteToken) {
       // User has invite token but no current user - redirect to signup
       logger.debug("Redirecting invited user to signup screen")
-      navigation.navigate("Signup", { token: inviteToken })
+      ;(navigation as { navigate: (name: string, params?: object) => void }).navigate("Signup", { token: inviteToken })
     }
   }, [currentUser, inviteToken, navigation])
 
@@ -223,7 +227,7 @@ function ProfileScreen() {
     if (shouldBlock) {
       const unsubscribe = navigation.addListener('beforeRemove', (e) => {
         // Allow logout navigation
-        if (e.data.action.type === 'NAVIGATE' && e.data.action.payload?.name === 'Logout') {
+        if (e.data.action.type === 'NAVIGATE' && (e.data.action.payload as { name?: string })?.name === 'Logout') {
           return // Allow the navigation
         }
         
@@ -258,11 +262,11 @@ function ProfileScreen() {
       // Get current language preference from i18n
       const currentLanguage = i18n.locale || 'en'
       
-      // Create updated user object
+      // Create updated user object (SSO users cannot change email - it must match their provider)
       const updatedCaregiver = {
         ...currentUser,
         name,
-        email,
+        email: isSsoUser ? (currentUser.email ?? email) : email,
         phone,
         preferredLanguage: currentLanguage,
       }
@@ -340,6 +344,21 @@ function ProfileScreen() {
           {...testingProps("profile-screen")}
           accessibilityLabel="Profile"
         >
+          {/* In-screen top bar (no nav header): back + title */}
+          <View style={[styles.inScreenHeader, { paddingTop: Math.max(insets.top, 12), paddingLeft: 12 + (Platform.OS === 'ios' ? 0 : insets.left), paddingRight: 12 + (Platform.OS === 'ios' ? 0 : insets.right) }]}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={styles.backButton}
+              hitSlop={12}
+              testID="profile-back-button"
+              accessibilityLabel={translate("common.back") || "Back"}
+              accessibilityRole="button"
+            >
+              <Icon icon="caretLeft" size={28} color={headerColor} />
+            </Pressable>
+            <Text weight="semiBold" size="lg" text={translate("headers.profile") || "Profile"} style={[styles.inScreenTitle, { color: headerColor }]} />
+            <View style={styles.backButton} />
+          </View>
           {(updateError || uploadError) && (
             <Text style={styles.error}>
               {updateError && "data" in updateError
@@ -397,11 +416,12 @@ function ProfileScreen() {
                 onChangeText={validateEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                editable={!isSsoUser}
                 containerStyle={styles.inputContainer}
-                inputWrapperStyle={styles.inputWrapper}
-                style={styles.input}
+                inputWrapperStyle={isSsoUser ? styles.readonlyInputWrapper : styles.inputWrapper}
+                style={isSsoUser ? styles.readonlyInput : styles.input}
                 status={emailError ? "error" : undefined}
-                helper={emailError || undefined}
+                helper={emailError || (isSsoUser ? translate("profileScreen.emailManagedBySSO") : undefined)}
               />
               {isEmailVerified ? (
                 <View style={styles.verificationStatus}>
@@ -560,6 +580,17 @@ function ProfileScreen() {
 }
 
 const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
+  inScreenHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 12,
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: (colors.palette as any)?.neutral300 || "#e5e7eb",
+  },
+  backButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  inScreenTitle: { flex: 1, textAlign: "center" },
   updateButton: {
     marginBottom: 15,
   },
@@ -599,11 +630,22 @@ const createStyles = (colors: any, fontScale: number) => StyleSheet.create({
   input: {
     // TextField handles text color automatically via theme
   },
+  readonlyInputWrapper: {
+    backgroundColor: (colors.palette as any)?.neutral200 || "#e5e7eb",
+  },
+  readonlyInput: {
+    opacity: 0.7,
+  },
   logoutButton: {
     alignItems: "center",
     backgroundColor: colors.palette.secondary500,
     borderRadius: 5,
     paddingVertical: 15,
+  },
+  buttonText: {
+    color: colors.palette.neutral100 || "#fff",
+    fontSize: 16 * fontScale,
+    fontWeight: "600",
   },
   mfaButton: {
     marginBottom: 15,

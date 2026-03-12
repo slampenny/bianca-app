@@ -1,6 +1,6 @@
 // seedDatabaseDemo.js - Comprehensive demo data seeder for showcasing all app features
 const mongoose = require('mongoose');
-const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice, Call } = require('../models');
+const { Alert, Org, Caregiver, Client, Conversation, Message, Schedule, PaymentMethod, Invoice, Call } = require('../models');
 const config = require('../config/config');
 
 // Import seeders
@@ -22,7 +22,7 @@ async function clearDatabase() {
   console.log('Clearing the database...');
   await Org.deleteMany({});
   await Caregiver.deleteMany({});
-  await Patient.deleteMany({});
+  await Client.deleteMany({});
   await Alert.deleteMany({});
   await Conversation.deleteMany({});
   await Message.deleteMany({});
@@ -35,13 +35,13 @@ async function clearDatabase() {
 }
 
 /**
- * Create additional demo patients with various scenarios
+ * Create additional demo clients with various scenarios
  */
-async function createDemoPatients(caregiver, org) {
-  console.log('Creating additional demo patients...');
-  const demoPatients = [];
+async function createDemoClients(caregiver, org) {
+  console.log('Creating additional demo clients...');
+  const demoClients = [];
   
-  const patientData = [
+  const clientData = [
     {
       name: 'Sarah Johnson',
       email: 'sarah.johnson@demo.com',
@@ -49,7 +49,7 @@ async function createDemoPatients(caregiver, org) {
       age: 72,
       preferredName: 'Sarah',
       preferredLanguage: 'en',
-      notes: 'Active patient with regular wellness checks. Enjoys talking about her grandchildren.',
+      notes: 'Active client with regular wellness checks. Enjoys talking about her grandchildren.',
       isActive: true,
       isEmailVerified: true,
     },
@@ -60,7 +60,7 @@ async function createDemoPatients(caregiver, org) {
       age: 68,
       preferredName: 'Bob',
       preferredLanguage: 'es',
-      notes: 'Spanish-speaking patient. Prefers morning calls.',
+      notes: 'Spanish-speaking client. Prefers morning calls.',
       isActive: true,
       isEmailVerified: true,
     },
@@ -71,7 +71,7 @@ async function createDemoPatients(caregiver, org) {
       age: 75,
       preferredName: 'Emily',
       preferredLanguage: 'zh',
-      notes: 'Chinese-speaking patient. Needs medication reminders.',
+      notes: 'Chinese-speaking client. Needs medication reminders.',
       isActive: true,
       isEmailVerified: true,
     },
@@ -110,34 +110,33 @@ async function createDemoPatients(caregiver, org) {
     },
   ];
 
-  for (const data of patientData) {
-    const patient = new Patient({
+  for (const data of clientData) {
+    const client = new Client({
       ...data,
       caregivers: [caregiver._id],
       org: org._id,
       schedules: [],
     });
-    await patient.save();
-    caregiver.patients.push(patient._id);
-    demoPatients.push(patient);
+    await client.save();
+    caregiver.clients.push(client._id);
+    demoClients.push(client);
   }
   
   await caregiver.save();
-  console.log(`Created ${demoPatients.length} additional demo patients`);
-  return demoPatients;
+  console.log(`Created ${demoClients.length} additional demo clients`);
+  return demoClients;
 }
 
 /**
- * Create demo conversations for patients
+ * Create demo conversations for clients
  */
-async function createDemoConversations(patients) {
+async function createDemoConversations(clients) {
   console.log('Creating demo conversations...');
   const conversations = [];
   const now = new Date();
   
-  // Create conversations for each patient with various scenarios
-  for (let i = 0; i < patients.length; i++) {
-    const patient = patients[i];
+  for (let i = 0; i < clients.length; i++) {
+    const client = clients[i];
     const daysAgo = [1, 3, 7, 14, 21, 30, 45, 60];
     
     for (let j = 0; j < daysAgo.length; j++) {
@@ -146,8 +145,8 @@ async function createDemoConversations(patients) {
       convDate.setHours(10 + (j % 8), 0, 0, 0);
       
       const call = new Call({
-        callSid: `DEMO_CALL_${patient._id}_${Date.now()}_${j}_${Math.random().toString(36).substr(2, 9)}`,
-        patientId: patient._id,
+        callSid: `DEMO_CALL_${client._id}_${Date.now()}_${j}_${Math.random().toString(36).substr(2, 9)}`,
+        clientId: client._id,
         callType: 'wellness-check',
         status: 'completed',
         callStatus: 'ended',
@@ -166,10 +165,10 @@ async function createDemoConversations(patients) {
       const conversationMessages = [
         {
           role: 'assistant',
-          content: `Hello ${patient.preferredName || patient.name.split(' ')[0]}! This is Bianca calling for your wellness check. How are you feeling today?`
+          content: `Hello ${client.preferredName || client.name.split(' ')[0]}! This is Bianca calling for your wellness check. How are you feeling today?`
         },
         {
-          role: 'patient',
+          role: 'client',
           content: j === 0 
             ? 'Hello! I am feeling really good today. I had a great week and I am very happy with how things are going. My medications are working well and I have been sleeping better.'
             : j === 1
@@ -188,11 +187,11 @@ async function createDemoConversations(patients) {
       
       const conv = new Conversation({
         callId: call._id,
-        patientId: patient._id,
+        clientId: client._id,
         messages: [],
         history: `Wellness check conversation from ${days} days ago.`,
         analyzedData: {},
-        metadata: { source: 'demo_seed', daysAgo: days, patientIndex: i },
+        metadata: { source: 'demo_seed', daysAgo: days, clientIndex: i },
         createdAt: convDate,
         updatedAt: convDate,
         startTime: convDate,
@@ -225,14 +224,14 @@ async function createDemoConversations(patients) {
 }
 
 /**
- * Create demo schedules for patients
+ * Create demo schedules for clients
  */
-async function createDemoSchedules(patients) {
+async function createDemoSchedules(clients) {
   console.log('Creating demo schedules...');
   const schedules = [];
   
-  for (let i = 0; i < patients.length; i++) {
-    const patient = patients[i];
+  for (let i = 0; i < clients.length; i++) {
+    const client = clients[i];
     
     // Create different schedule types
     const scheduleTypes = [
@@ -258,17 +257,16 @@ async function createDemoSchedules(patients) {
     for (const scheduleData of scheduleTypes) {
       const schedule = new Schedule({
         ...scheduleData,
-        patient: patient._id,
-        org: patient.org,
+        client: client._id,
+        org: client.org,
       });
-      // Calculate next call date (required by schedule model)
       schedule.calculateNextCallDate();
       await schedule.save();
-      patient.schedules.push(schedule._id);
+      client.schedules.push(schedule._id);
       schedules.push(schedule);
     }
     
-    await patient.save();
+    await client.save();
   }
   
   console.log(`Created ${schedules.length} demo schedules`);
@@ -278,7 +276,7 @@ async function createDemoSchedules(patients) {
 /**
  * Create demo alerts with various severities
  */
-async function createDemoAlerts(caregiver, patients, conversations) {
+async function createDemoAlerts(caregiver, clients, conversations) {
   console.log('Creating demo alerts...');
   const alerts = [];
   const now = new Date();
@@ -287,8 +285,8 @@ async function createDemoAlerts(caregiver, patients, conversations) {
     {
       importance: 'urgent',
       alertType: 'conversation',
-      message: 'Emergency Detected: Patient mentioned feeling chest pain and shortness of breath.',
-      relatedPatient: patients[0]?._id,
+      message: 'Emergency Detected: Client mentioned feeling chest pain and shortness of breath.',
+      relatedClient: clients[0]?._id,
       relatedConversation: conversations[0]?._id,
       visibility: 'allCaregivers',
       createdBy: caregiver._id,
@@ -298,9 +296,9 @@ async function createDemoAlerts(caregiver, patients, conversations) {
     },
     {
       importance: 'high',
-      alertType: 'patient',
-      message: 'Medication Missed: Patient has missed medication for 3 consecutive days.',
-      relatedPatient: patients[1]?._id,
+      alertType: 'client',
+      message: 'Medication Missed: Client has missed medication for 3 consecutive days.',
+      relatedClient: clients[1]?._id,
       visibility: 'assignedCaregivers',
       createdBy: caregiver._id,
       createdModel: 'Caregiver',
@@ -310,8 +308,8 @@ async function createDemoAlerts(caregiver, patients, conversations) {
     {
       importance: 'medium',
       alertType: 'conversation',
-      message: 'Declining Health Pattern: Patient showing signs of declining health over the past month.',
-      relatedPatient: patients[2]?._id,
+      message: 'Declining Health Pattern: Client showing signs of declining health over the past month.',
+      relatedClient: clients[2]?._id,
       relatedConversation: conversations[10]?._id,
       visibility: 'allCaregivers',
       createdBy: caregiver._id,
@@ -322,8 +320,8 @@ async function createDemoAlerts(caregiver, patients, conversations) {
     {
       importance: 'high',
       alertType: 'conversation',
-      message: 'Potential Financial Exploitation: Patient mentioned sending large amounts of money to unknown individuals.',
-      relatedPatient: patients[3]?._id,
+      message: 'Potential Financial Exploitation: Client mentioned sending large amounts of money to unknown individuals.',
+      relatedClient: clients[3]?._id,
       relatedConversation: conversations[15]?._id,
       visibility: 'orgAdmin',
       createdBy: caregiver._id,
@@ -333,9 +331,9 @@ async function createDemoAlerts(caregiver, patients, conversations) {
     },
     {
       importance: 'medium',
-      alertType: 'patient',
-      message: 'Missed Call: Patient did not answer scheduled wellness check call.',
-      relatedPatient: patients[4]?._id,
+      alertType: 'client',
+      message: 'Missed Call: Client did not answer scheduled wellness check call.',
+      relatedClient: clients[4]?._id,
       visibility: 'assignedCaregivers',
       createdBy: caregiver._id,
       createdModel: 'Caregiver',
@@ -345,7 +343,7 @@ async function createDemoAlerts(caregiver, patients, conversations) {
     {
       importance: 'low',
       alertType: 'system',
-      message: 'Schedule Updated: Patient schedule has been updated successfully.',
+      message: 'Schedule Updated: Client schedule has been updated successfully.',
       visibility: 'allCaregivers',
       createdBy: caregiver._id,
       createdModel: 'Caregiver',
@@ -466,7 +464,7 @@ async function seedDatabaseDemo() {
     const patient2 = basePatients[1];
 
     // Create fraud/abuse patient
-    const patient3 = new Patient({
+    const client3 = new Client({
       name: 'Margaret Thompson',
       email: 'vulnerable@example.org',
       phone: '1234567892',
@@ -475,13 +473,13 @@ async function seedDatabaseDemo() {
       schedules: [],
       isActive: true
     });
-    await patient3.save();
-    caregiverOneRecord.patients.push(patient3._id);
+    await client3.save();
+    caregiverOneRecord.clients.push(client3._id);
     await caregiverOneRecord.save();
 
-    // Create additional demo patients
-    const demoPatients = await createDemoPatients(caregiverOneRecord, org);
-    const allPatients = [...basePatients, patient3, ...demoPatients];
+    // Create additional demo clients
+    const demoClients = await createDemoClients(caregiverOneRecord, org);
+    const allClients = [...basePatients, client3, ...demoClients];
 
     // Seed base conversations
     const baseConversations = await conversationsSeeder.seedConversations(patient1);
@@ -492,24 +490,24 @@ async function seedDatabaseDemo() {
     await conversationsSeeder.addRecentPatientConversations(patient1._id);
     await conversationsSeeder.addRecentPatientConversations(patient2._id);
     
-    // Add fraud/abuse pattern conversations for patient3
-    await conversationsSeeder.addFraudAbuseConversations(patient3._id);
+    // Add fraud/abuse pattern conversations for client3
+    await conversationsSeeder.addFraudAbuseConversations(client3._id);
 
     // Create additional demo conversations
-    const demoConversations = await createDemoConversations(allPatients);
+    const demoConversations = await createDemoConversations(allClients);
     const allConversations = [...baseConversations, ...demoConversations];
 
     // Seed base schedules
     await schedulesSeeder.seedSchedules(basePatients);
 
     // Create additional demo schedules
-    await createDemoSchedules(allPatients);
+    await createDemoSchedules(allClients);
 
     // Seed base alerts
     await alertsSeeder.seedAlerts(caregiverOneRecord, basePatients, baseConversations);
 
     // Create additional demo alerts
-    await createDemoAlerts(caregiverOneRecord, allPatients, allConversations);
+    await createDemoAlerts(caregiverOneRecord, allClients, allConversations);
 
     // Seed payment methods
     const paymentMethods = await paymentMethodsSeeder.seedPaymentMethods(org);
@@ -530,18 +528,18 @@ async function seedDatabaseDemo() {
     await sentimentAnalysisSeeder.seedSentimentAnalysis();
 
     // Run medical analysis on seeded patient data
-    console.log('Running medical analysis on seeded patient data...');
+    console.log('Running medical analysis on seeded client data...');
     try {
       const medicalAnalysisScheduler = require('../services/ai/medicalAnalysisScheduler.service');
       
       // Wait a moment for the scheduler to be ready
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Run analyses on multiple patients to create comprehensive demo data
-      for (let i = 0; i < Math.min(5, allPatients.length); i++) {
-        const patient = allPatients[i];
-        console.log(`Triggering medical analysis for patient ${i + 1}...`);
-        await medicalAnalysisScheduler.schedulePatientAnalysis(patient._id.toString(), {
+      // Run analyses on multiple clients to create comprehensive demo data
+      for (let i = 0; i < Math.min(5, allClients.length); i++) {
+        const client = allClients[i];
+        console.log(`Triggering medical analysis for client ${i + 1}...`);
+        await medicalAnalysisScheduler.scheduleClientAnalysis(client._id.toString(), {
           trigger: 'demo_seeding',
           batchId: `demo-seeding-${Date.now()}-${i}`
         });
@@ -556,7 +554,7 @@ async function seedDatabaseDemo() {
 
     console.log('Demo database seeded successfully!');
     console.log(`Created:`);
-    console.log(`- ${allPatients.length} patients`);
+    console.log(`- ${allClients.length} clients`);
     console.log(`- ${allConversations.length} conversations`);
     console.log(`- ${paymentMethods.length} payment methods`);
     console.log(`- Multiple schedules, alerts, and invoices`);
@@ -564,7 +562,7 @@ async function seedDatabaseDemo() {
     return { 
       org, 
       caregiver: caregiverOneRecord, 
-      patients: allPatients, 
+      clients: allClients, 
       paymentMethods 
     };
   } catch (error) {

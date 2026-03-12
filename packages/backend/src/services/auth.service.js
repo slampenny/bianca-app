@@ -117,9 +117,9 @@ const verifyEmail = async (verifyEmailToken) => {
       // Still return tokens for auto-login if already verified
       const tokens = await tokenService.generateAuthTokens(caregiver);
       const orgService = require('./org.service');
-      const { Patient } = require('../models');
+      const { Client } = require('../models');
       const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
-      const patients = await Patient.find({ caregivers: caregiver.id });
+      const clients = await Client.find({ caregivers: caregiver.id });
       
       return {
         success: true,
@@ -128,7 +128,7 @@ const verifyEmail = async (verifyEmailToken) => {
         caregiver,
         tokens,
         org,
-        patients
+        clients
       };
     }
     
@@ -141,11 +141,11 @@ const verifyEmail = async (verifyEmailToken) => {
     // Generate auth tokens for automatic login after verification
     const tokens = await tokenService.generateAuthTokens(caregiver);
     
-    // Fetch org and patients for the response
+    // Fetch org and clients for the response
     const orgService = require('./org.service');
-    const { Patient } = require('../models');
+    const { Client } = require('../models');
     const org = caregiver.org ? await orgService.getOrgById(caregiver.org) : null;
-    const patients = await Patient.find({ caregivers: caregiver.id });
+    const clients = await Client.find({ caregivers: caregiver.id });
     
     return {
       success: true,
@@ -154,7 +154,7 @@ const verifyEmail = async (verifyEmailToken) => {
       caregiver,
       tokens,
       org,
-      patients
+      clients
     };
   } catch (error) {
     logger.error(`[Auth Service] Error in verifyEmail:`, {

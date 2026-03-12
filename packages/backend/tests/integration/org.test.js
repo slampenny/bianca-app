@@ -49,7 +49,7 @@ describe('Org routes', () => {
   it('should create a new org and a caregiver', async () => {
     const res = await request(app)
       .post('/v1/orgs')
-      .send({ org: orgTwo, caregiver: { ...caregiverTwo, password: 'password1' } });
+      .send({ org: orgTwo, caregiver: { ...caregiverTwo, password: 'password1', patients: [] } });
 
     expect(res.statusCode).toEqual(httpStatus.CREATED);
     expect(res.body.name).toEqual(orgTwo.name);

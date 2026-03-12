@@ -17,7 +17,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
 }) => {
   const { colors, currentTheme } = useTheme()
   const [id, setId] = useState(initialSchedule.id)
-  const [patient, setPatient] = useState(initialSchedule.patient)
+  const [client, setClient] = useState(initialSchedule.client ?? initialSchedule.patient)
   const [frequency, setFrequency] = useState(initialSchedule.frequency)
   const [intervals, setIntervals] = useState(initialSchedule.intervals)
   const [isActive, setIsActive] = useState(initialSchedule.isActive)
@@ -214,7 +214,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
     if (currentId !== newId) {
       // Schedule ID changed - definitely a different schedule, reset everything
       setId(initialSchedule.id)
-      setPatient(initialSchedule.patient)
+      setClient(initialSchedule.client ?? initialSchedule.patient)
       setFrequency(initialSchedule.frequency)
       setIntervals(initialSchedule.intervals)
       setIsActive(initialSchedule.isActive)
@@ -224,16 +224,16 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       // This handles the case where user creates a new schedule, then creates another new one
       // IMPORTANT: Don't check time, frequency, intervals, or isActive here to avoid resetting when user is actively changing them
       // Only check patient to detect if it's a different schedule (patient changes are external, not user edits)
-      if (initialSchedule.patient !== patient) {
+      if ((initialSchedule.client ?? initialSchedule.patient) !== client) {
         setId(initialSchedule.id)
-        setPatient(initialSchedule.patient)
+        setClient(initialSchedule.client ?? initialSchedule.patient)
         setFrequency(initialSchedule.frequency)
         setIntervals(initialSchedule.intervals)
         setIsActive(initialSchedule.isActive)
         setTime(initialSchedule.time)
       }
     }
-  }, [initialSchedule.id, initialSchedule.patient, id, patient]) // Removed time, frequency, intervals, and isActive from dependencies to prevent rapid circling/churn
+  }, [initialSchedule.id, initialSchedule.client, initialSchedule.patient, id, client]) // Removed time, frequency, intervals, and isActive from dependencies to prevent rapid circling/churn
 
   // Initialize monthly intervals with default day if empty
   useEffect(() => {
@@ -243,9 +243,9 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   }, [frequency, intervals])
 
   useEffect(() => {
-    const newSchedule: Schedule = { id, patient, frequency, intervals, isActive, time }
+    const newSchedule: Schedule = { id, client, frequency, intervals, isActive, time }
     onScheduleChange(newSchedule)
-  }, [id, patient, frequency, intervals, isActive, time])
+  }, [id, client, frequency, intervals, isActive, time])
 
   const handleDayChange = (dayIndex: number, isChecked: boolean) => {
     const newIntervals = isChecked
@@ -399,7 +399,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       <View style={styles.detailsCard}>
         <Text style={styles.detailsTitle}>{translate("scheduleComponent.scheduleDetails")}</Text>
         <Text style={styles.detailsText}>
-          {translate("scheduleComponent.schedule")}: {formatSchedule({ id, patient, frequency, intervals, isActive, time })}
+          {translate("scheduleComponent.schedule")}: {formatSchedule({ id, client, frequency, intervals, isActive, time })}
         </Text>
         <Text style={styles.detailsText}>{translate("scheduleComponent.frequency")}: {frequency}</Text>
       </View>

@@ -1,14 +1,14 @@
 Feature: Schedule Management
   As a caregiver
-  I want to manage patient schedules
+  I want to manage client schedules
   So that I can coordinate wellness calls
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
     And I am logged in as "caregiver"
 
-  Scenario: View patient schedules
+  Scenario: View client schedules
     Given I am on the schedules screen
     Then I should see the schedules screen
     And I should see at least one schedule or empty state

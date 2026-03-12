@@ -18,7 +18,7 @@ const consentRecordSchema = new mongoose.Schema(
     userType: {
       type: String,
       required: true,
-      enum: ['caregiver', 'patient'],
+      enum: ['caregiver', 'client'],
       index: true
     },
     
@@ -32,7 +32,7 @@ const consentRecordSchema = new mongoose.Schema(
     userModel: {
       type: String,
       required: true,
-      enum: ['Caregiver', 'Patient'],
+      enum: ['Caregiver', 'Client'],
       default: 'Caregiver'
     },
     

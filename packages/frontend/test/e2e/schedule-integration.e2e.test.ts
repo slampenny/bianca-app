@@ -11,63 +11,57 @@ test.describe("Schedule Integration Workflow", () => {
   test("can access schedule functionality from home screen", async ({ page }) => {
     console.log('=== SCHEDULE INTEGRATION WORKFLOW ===')
     
-    // GIVEN: I'm on the home screen with patients
-    // Use accessibilityLabel for React Native Web
+    // GIVEN: I'm on the home screen with clients
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
-    // WHEN: I navigate to a patient (schedules can only be accessed through patient screen)
-    const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
-    const patientCount = await patientCard.count()
+    // WHEN: I navigate to a client (schedules can only be accessed through client screen)
+    const clientCard = page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]')
+    const clientCount = await clientCard.count()
     
-    expect(patientCount).toBeGreaterThan(0)
+    expect(clientCount).toBeGreaterThan(0)
     
-    // Click on a patient to navigate to patient screen
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click({ timeout: 10000, force: true })
     } else {
-      await patientCard.first().click({ timeout: 10000, force: true })
+      await clientCard.first().click({ timeout: 10000, force: true })
     }
     
     await page.waitForTimeout(2000)
     
-    // THEN: I should see the "Manage Schedules" button on the patient screen
+    // THEN: I should see the "Manage Schedules" button on the client screen
     const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
     const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
     
     expect(buttonCount).toBeGreaterThan(0)
-    console.log('✅ Schedule access verified - Manage Schedules button found on patient screen')
+    console.log('✅ Schedule access verified - Manage Schedules button found on client screen')
   })
 
   test("can navigate to schedules via patient management", async ({ page }) => {
     // GIVEN: I'm on the home screen
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
-    // WHEN: I access patient management
-    const patientElements = {
-      'patient cards': await page.locator('[data-testid^="patient-card-"]').count(),
-      'patient nav': await page.locator('[data-testid="patient-nav-button"], [aria-label*="patient"]').count(),
-      'add patient': await page.getByText(/add patient/i).count()
+    // WHEN: I access client management
+    const clientElements = {
+      'client cards': await page.locator('[data-testid^="client-card-"]').count(),
+      'client nav': await page.locator('[data-testid="client-nav-button"], [aria-label*="client"]').count(),
+      'add client': await page.getByText(/add client/i).count()
     }
     
-    console.log('Patient elements:', patientElements)
+    console.log('Client elements:', clientElements)
     
-    if (patientElements['patient cards'] > 0) {
-      // Click on first patient to go to patient details
-      const firstPatient = page.locator('[data-testid^="patient-card-"]').first()
-      await firstPatient.click()
+    if (clientElements['client cards'] > 0) {
+      const firstClient = page.locator('[data-testid^="client-card-"]').first()
+      await firstClient.click()
       await page.waitForTimeout(2000)
       
-      // Look for the "Manage Schedules" button in patient details
       const manageSchedulesButton = await page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]').count()
       console.log('Manage Schedules button found:', manageSchedulesButton)
       
       if (manageSchedulesButton > 0) {
-        // Click the Manage Schedules button
         await page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]').first().click()
         await page.waitForTimeout(2000)
         
-        // Should navigate to schedule screen
         const scheduleScreenElements = {
           'schedule screen': await page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]').count(),
           'schedule header': await page.getByText(/schedule/i).count(),
@@ -76,16 +70,15 @@ test.describe("Schedule Integration Workflow", () => {
         
         console.log('Schedule screen elements after navigation:', scheduleScreenElements)
         
-        // THEN: Should have successfully navigated to schedule screen
         const hasScheduleScreen = Object.values(scheduleScreenElements).some(count => count > 0)
         expect(hasScheduleScreen).toBe(true)
-        console.log('✅ Successfully navigated to schedule screen via patient management')
+        console.log('✅ Successfully navigated to schedule screen via client management')
       } else {
-        console.log('ℹ Manage Schedules button not found on patient screen')
-        expect(true).toBe(true) // Test passes with exploration
+        console.log('ℹ Manage Schedules button not found on client screen')
+        expect(true).toBe(true)
       }
     } else {
-      console.log('ℹ No patients available for schedule testing')
+      console.log('ℹ No clients available for schedule testing')
       expect(true).toBe(true) // Test passes with exploration
     }
   })
@@ -94,34 +87,31 @@ test.describe("Schedule Integration Workflow", () => {
     // GIVEN: I'm logged in and on home screen
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
-    // WHEN: I navigate to schedules through patient screen
-    // Schedules can only be accessed through patient screen
-    const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
-    const patientCount = await patientCard.count()
+    // WHEN: I navigate to schedules through client screen
+    const clientCard = page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]')
+    const clientCount = await clientCard.count()
     
-    if (patientCount === 0) {
-      console.log('ℹ No patients available for schedule testing')
-      expect(true).toBe(true) // Test passes - no patients to test with
+    if (clientCount === 0) {
+      console.log('ℹ No clients available for schedule testing')
+      expect(true).toBe(true)
       return
     }
     
-    // Click on a patient to navigate to patient screen
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click({ timeout: 10000, force: true })
     } else {
-      await patientCard.first().click({ timeout: 10000, force: true })
+      await clientCard.first().click({ timeout: 10000, force: true })
     }
     
     await page.waitForTimeout(2000)
     
-    // Now click Manage Schedules button
     const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
     const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
     
     if (buttonCount === 0) {
-      console.log('ℹ Manage Schedules button not found - may be in new patient mode')
-      expect(true).toBe(true) // Test passes - button only appears for existing patients
+      console.log('ℹ Manage Schedules button not found - may be in new client mode')
+      expect(true).toBe(true)
       return
     }
     
@@ -148,17 +138,16 @@ test.describe("Schedule Integration Workflow", () => {
     
     // WHEN: I explore the complete workflow including schedules
     const workflowCapabilities = {
-      patients: false,
+      clients: false,
       caregivers: false,
       alerts: false,
       schedules: false,
       conversations: false
     }
     
-    // Check patient management
-    if (await page.locator('[data-testid^="patient-card-"]').count() > 0) {
-      workflowCapabilities.patients = true
-      console.log('✅ Patients accessible')
+    if (await page.locator('[data-testid^="client-card-"]').count() > 0) {
+      workflowCapabilities.clients = true
+      console.log('✅ Clients accessible')
     }
     
     // Check caregiver management
@@ -198,7 +187,7 @@ test.describe("Schedule Integration Workflow", () => {
     console.log(`🎉 Schedule Integration Results:`)
     console.log(`   - Total capabilities: ${totalCapabilities}/5`)
     console.log(`   - Schedules integrated: ${hasSchedules ? '✅' : '❌'}`)
-    console.log(`   - Patients: ${workflowCapabilities.patients ? '✅' : '❌'}`)
+    console.log(`   - Clients: ${workflowCapabilities.clients ? '✅' : '❌'}`)
     console.log(`   - Caregivers: ${workflowCapabilities.caregivers ? '✅' : '❌'}`)
     console.log(`   - Alerts: ${workflowCapabilities.alerts ? '✅' : '❌'}`)
     console.log(`   - Conversations: ${workflowCapabilities.conversations ? '✅' : '❌'}`)
@@ -207,32 +196,26 @@ test.describe("Schedule Integration Workflow", () => {
     console.log('=== SCHEDULE INTEGRATION COMPLETE ===')
   })
 
-  test("schedule navigation works from patient screen", async ({ page }) => {
-    // GIVEN: I'm on the home screen
+  test("schedule navigation works from client screen", async ({ page }) => {
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     
-    // WHEN: I navigate to a patient and then to schedules
-    // Schedules can only be accessed through patient screen
-    const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
-    const patientCount = await patientCard.count()
+    const clientCard = page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]')
+    const clientCount = await clientCard.count()
     
-    expect(patientCount).toBeGreaterThan(0)
+    expect(clientCount).toBeGreaterThan(0)
     
-    // Click on a patient to navigate to patient screen
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click({ timeout: 10000, force: true })
     } else {
-      await patientCard.first().click({ timeout: 10000, force: true })
+      await clientCard.first().click({ timeout: 10000, force: true })
     }
     
     await page.waitForTimeout(2000)
     
-    // Verify we're on patient screen
-    const isPatientScreen = await page.getByText(/CREATE PATIENT|UPDATE PATIENT/i).count() > 0
-    expect(isPatientScreen).toBe(true)
+    const isClientScreen = await page.getByText(/CREATE CLIENT|UPDATE CLIENT|CREATE PATIENT|UPDATE PATIENT/i).count() > 0
+    expect(isClientScreen).toBe(true)
     
-    // Now click Manage Schedules button
     const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')
     const buttonCount = await manageSchedulesButton.count({ timeout: 5000 })
     
@@ -241,9 +224,8 @@ test.describe("Schedule Integration Workflow", () => {
     await manageSchedulesButton.first().click({ timeout: 10000, force: true })
     await page.waitForTimeout(2000)
     
-    // THEN: We should be on the schedules screen
     const scheduleScreen = page.locator('[data-testid="schedules-screen"], [aria-label*="schedules-screen"]')
     await expect(scheduleScreen).toBeVisible({ timeout: 10000 })
-    console.log('✅ Schedule navigation verified - accessed through patient screen')
+    console.log('✅ Schedule navigation verified - accessed through client screen')
   })
 })

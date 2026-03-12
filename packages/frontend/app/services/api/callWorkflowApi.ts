@@ -2,17 +2,17 @@ import { createApi } from "@reduxjs/toolkit/query/react"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export interface InitiateCallRequest {
-  patientId: string
+  clientId: string
   callNotes?: string
 }
 
 export interface InitiateCallResponse {
-  conversationId: string  // Always available - conversation is created when call is initiated
+  conversationId: string
   callId: string
   callSid: string
-  patientId: string
-  patientName: string
-  patientPhone: string
+  clientId: string
+  clientName: string
+  clientPhone: string
   agentId: string
   agentName: string
   status: string
@@ -32,7 +32,7 @@ export interface CallStatusResponse {
   startTime: string
   endTime?: string
   duration: number
-  patient: {
+  client: {
     _id: string
     name: string
     phone: string
@@ -43,6 +43,8 @@ export interface CallStatusResponse {
   }
   callOutcome?: string
   callNotes?: string
+  aiSpeaking?: boolean | { isSpeaking?: boolean; userIsSpeaking?: boolean; conversationState?: string }
+  messages?: Array<{ id?: string; role: string; content: string; createdAt?: string }>
 }
 
 export interface UpdateCallStatusRequest {
@@ -58,7 +60,7 @@ export interface EndCallRequest {
 
 export interface ActiveCall {
   _id: string
-  patientId: {
+  clientId: {
     _id: string
     name: string
     phone: string
@@ -81,7 +83,7 @@ export const callWorkflowApi = createApi({
       query: (data) => ({
         url: "/calls/initiate",
         method: "POST",
-        body: data,
+        body: { clientId: data.clientId, callNotes: data.callNotes },
       }),
     }),
     getCallStatus: builder.query<{ data: CallStatusResponse }, string>({

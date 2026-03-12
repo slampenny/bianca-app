@@ -4,7 +4,7 @@ Feature: Privacy Request (PIPEDA Compliance)
   So that I can access my information under PIPEDA
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
     And I am logged in as "caregiver"
     And my organization is in Canada

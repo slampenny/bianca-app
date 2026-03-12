@@ -7,7 +7,7 @@ export const TEST_USERS = {
   },
   WITHOUT_PATIENTS: {
     name: "Test User No Patients",
-    email: "no-patients@example.org",
+    email: "no-clients@example.org",
     password: "Password1",
   },
   ORGANIZATION: {
@@ -16,7 +16,7 @@ export const TEST_USERS = {
     password: "Password1",
     orgName: "Test Organization",
   },
-  // Role-based test users for patient management tests - using actual seeded users
+  // Role-based test users for client management tests - using actual seeded users
   STAFF: {
     name: "Test User",
     email: "fake@example.org",
@@ -40,7 +40,7 @@ export const TEST_USERS = {
   },
 } as const;
 
-// Test patient data
+// Test client data
 export const TEST_PATIENTS = {
   AGNES: {
     name: "Agnes Alphabet",
@@ -88,7 +88,7 @@ export function generateAlertData() {
   return {
     message: `Test Alert ${timestamp}`,
     importance: "high" as const,
-    alertType: "patient" as const,
+    alertType: "client" as const,
   };
 }
 
@@ -97,7 +97,7 @@ export function generatePatientData() {
   const timestamp = Date.now();
   return {
     name: `Test Patient ${timestamp}`,
-    email: `test-patient-${timestamp}@example.com`,
+    email: `test-client-${timestamp}@example.com`,
     phone: "1234567890",
   };
 } 

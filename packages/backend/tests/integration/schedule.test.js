@@ -7,14 +7,14 @@ const app = require('../utils/integration-app');
 const httpStatus = require('http-status');
 const { Patient, Token, Caregiver, Schedule, Org } = require('../../src/models');
 const { insertOrgs } = require('../fixtures/org.fixture');
-const { patientOne, insertPatients } = require('../fixtures/patient.fixture');
+const { clientOne, insertClients } = require('../fixtures/client.fixture');
 const {
   caregiverOne,
   admin,
   insertCaregivertoOrgAndReturnToken,
   insertCaregivertoOrgAndReturnTokenByRole,
 } = require('../fixtures/caregiver.fixture');
-const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = require('../fixtures/schedule.fixture');
+const { scheduleOne, scheduleTwo, insertScheduleAndAddToClient } = require('../fixtures/schedule.fixture');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let mongoServer;
@@ -40,10 +40,10 @@ describe('Schedule routes', () => {
     test('should create a new schedule and return 201', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
 
       const res = await request(app)
-        .post(`/v1/schedules/patients/${patient.id}`)
+        .post(`/v1/schedules/clients/${client.id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send(scheduleOne)
         .expect(httpStatus.CREATED);
@@ -60,7 +60,7 @@ describe('Schedule routes', () => {
         ]),
         isActive: true,
         nextCallDate: expect.any(String),
-        patient: expect.any(String),
+        client: expect.any(String),
         time: scheduleOne.time,
       });
     });
@@ -70,11 +70,11 @@ describe('Schedule routes', () => {
     test('should return 200 and a schedule if data is ok', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       
       // Create schedule via API to ensure proper timezone conversion
       const createRes = await request(app)
-        .post(`/v1/schedules/patients/${patient.id}`)
+        .post(`/v1/schedules/clients/${client.id}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send(scheduleOne)
         .expect(httpStatus.CREATED);
@@ -99,7 +99,7 @@ describe('Schedule routes', () => {
         ]),
         isActive: true,
         nextCallDate: expect.any(String),
-        patient: expect.any(String),
+        client: expect.any(String),
         time: createRes.body.time, // Use the time returned from creation (after timezone conversion)
       });
     });
@@ -109,8 +109,8 @@ describe('Schedule routes', () => {
     test('should update a schedule and return 200', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
-      const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
+      const schedule = await insertScheduleAndAddToClient(client, scheduleOne);
 
       const updateBody = {
         frequency: scheduleTwo.frequency,
@@ -131,7 +131,7 @@ describe('Schedule routes', () => {
         intervals: expect.arrayContaining(scheduleTwo.intervals.map((interval) => expect.objectContaining(interval))),
         isActive: schedule.isActive,
         nextCallDate: expect.any(String),
-        patient: expect.any(String),
+        client: expect.any(String),
         time: scheduleTwo.time,
       });
     });
@@ -141,8 +141,8 @@ describe('Schedule routes', () => {
     test('should delete a schedule and return 204', async () => {
       const [org] = await insertOrgs([admin]);
       const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
-      const [patient] = await insertPatients([{ ...patientOne, org: org.id }]);
-      const schedule = await insertScheduleAndAddToPatient(patient, scheduleOne);
+      const [client] = await insertClients([{ ...clientOne, org: org.id }]);
+      const schedule = await insertScheduleAndAddToClient(client, scheduleOne);
 
       await request(app)
         .delete(`/v1/schedules/${schedule.id}`)

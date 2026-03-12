@@ -141,7 +141,7 @@ export const TermsScreen = () => {
         alwaysBounceVertical={false}
       >
         <View style={styles.contentCard}>
-          <Markdown style={markdownStyles}>{TERMS_MD}</Markdown>
+          <Markdown style={markdownStyles as React.ComponentProps<typeof Markdown>["style"]}>{TERMS_MD}</Markdown>
         </View>
       </ScrollView>
     </View>

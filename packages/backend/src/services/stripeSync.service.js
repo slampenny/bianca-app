@@ -92,24 +92,23 @@ const syncStripeInvoice = async (stripeInvoiceId, orgId) => {
  */
 const syncStripeInvoiceLineItems = async (stripeInvoice, localInvoice) => {
   try {
-    // Extract patient information from Stripe line item metadata
-    // This assumes we're storing patientId in metadata when reporting usage
+    // Extract client information from Stripe line item metadata
     for (const stripeLineItem of stripeInvoice.lines.data) {
       const metadata = stripeLineItem.metadata || {};
-      const patientId = metadata.patientId;
+      const clientId = metadata.clientId;
 
-      if (patientId) {
+      if (clientId) {
         // Check if line item already exists
         let localLineItem = await LineItem.findOne({
           invoiceId: localInvoice._id,
-          patientId,
+          clientId,
           stripeInvoiceItemId: stripeLineItem.id,
         });
 
         if (!localLineItem) {
           // Create new line item
           localLineItem = await LineItem.create({
-            patientId,
+            clientId,
             invoiceId: localInvoice._id,
             amount: stripeLineItem.amount / 100, // Convert from cents
             description: stripeLineItem.description || 'Usage-based billing',
@@ -187,7 +186,7 @@ const linkConversationsToInvoice = async (stripeInvoiceId, localInvoice) => {
       for (const lineItem of lineItems) {
         // Find conversations for this patient in the billing period
         const conversations = await Conversation.find({
-          patientId: lineItem.patientId,
+          clientId: lineItem.clientId,
           lineItemId: null, // Not yet linked
           endTime: {
             $gte: lineItem.periodStart,

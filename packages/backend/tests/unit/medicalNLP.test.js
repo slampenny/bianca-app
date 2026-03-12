@@ -14,12 +14,12 @@ describe('Medical NLP Analysis System', () => {
   const sampleConversations = [
     {
       _id: 'conv1',
-      patientId: 'patient1',
+      clientId: 'patient1',
       createdAt: new Date('2024-01-01'),
       messages: [
         {
           _id: 'msg1',
-          role: 'patient',
+          role: 'client',
           content: 'Hello, I am feeling very sad today. I think I am having depression.',
           createdAt: new Date('2024-01-01T10:00:00')
         },
@@ -31,7 +31,7 @@ describe('Medical NLP Analysis System', () => {
         },
         {
           _id: 'msg3',
-          role: 'patient',
+          role: 'client',
           content: 'I feel like I can never be happy again. Everything is going wrong in my life.',
           createdAt: new Date('2024-01-01T10:02:00')
         }
@@ -39,18 +39,18 @@ describe('Medical NLP Analysis System', () => {
     },
     {
       _id: 'conv2',
-      patientId: 'patient1',
+      clientId: 'patient1',
       createdAt: new Date('2024-01-02'),
       messages: [
         {
           _id: 'msg4',
-          role: 'patient',
+          role: 'client',
           content: 'I had a terrible day yesterday. I could not concentrate on anything.',
           createdAt: new Date('2024-01-02T09:00:00')
         },
         {
           _id: 'msg5',
-          role: 'patient',
+          role: 'client',
           content: 'I keep forgetting things and I am so tired all the time.',
           createdAt: new Date('2024-01-02T09:01:00')
         }
@@ -248,9 +248,9 @@ describe('Medical NLP Analysis System', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'I am so sad today. I am so sad and depressed.' },
-            { role: 'patient', content: 'I am so sad today. I cannot stop thinking about being sad.' },
-            { role: 'patient', content: 'I am so sad today. Everything makes me feel sad.' }
+            { role: 'client', content: 'I am so sad today. I am so sad and depressed.' },
+            { role: 'client', content: 'I am so sad today. I cannot stop thinking about being sad.' },
+            { role: 'client', content: 'I am so sad today. Everything makes me feel sad.' }
           ]
         }
       ];
@@ -269,9 +269,9 @@ describe('Medical NLP Analysis System', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'Hello, how are you today?' },
-            { role: 'patient', content: 'I went to the store yesterday.' },
-            { role: 'patient', content: 'The weather is nice outside.' }
+            { role: 'client', content: 'Hello, how are you today?' },
+            { role: 'client', content: 'I went to the store yesterday.' },
+            { role: 'client', content: 'The weather is nice outside.' }
           ]
         }
       ];
@@ -303,9 +303,9 @@ describe('Medical NLP Analysis System', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'I was going to...' },
-            { role: 'patient', content: 'But then I...' },
-            { role: 'patient', content: 'So I think...' }
+            { role: 'client', content: 'I was going to...' },
+            { role: 'client', content: 'But then I...' },
+            { role: 'client', content: 'So I think...' }
           ]
         }
       ];
@@ -323,8 +323,8 @@ describe('Medical NLP Analysis System', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'I... um... the thing is... you know...' },
-            { role: 'patient', content: 'I can\'t think of the word for... the thing you eat with...' }
+            { role: 'client', content: 'I... um... the thing is... you know...' },
+            { role: 'client', content: 'I can\'t think of the word for... the thing you eat with...' }
           ]
         }
       ];
@@ -347,7 +347,7 @@ describe('Medical NLP Analysis System', () => {
 
       const baseline = await baselineManager.establishBaseline('test-patient', initialMetrics);
 
-      expect(baseline).toHaveProperty('patientId', 'test-patient');
+      expect(baseline).toHaveProperty('clientId', 'test-patient');
       expect(baseline).toHaveProperty('type', 'initial');
       expect(baseline).toHaveProperty('metrics');
       expect(baseline).toHaveProperty('seasonalAdjustments');
@@ -454,7 +454,7 @@ describe('Medical NLP Analysis System', () => {
         {
           _id: 'conv1',
           messages: [
-            { role: 'patient', content: 'Hi' }
+            { role: 'client', content: 'Hi' }
           ]
         }
       ];

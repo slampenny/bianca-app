@@ -1,27 +1,27 @@
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { conversationService, twilioCallService, patientService, caregiverService } = require('../services');
+const { conversationService, twilioCallService, clientService, caregiverService } = require('../services');
 const { ConversationDTO } = require('../dtos');
 const { Call, Conversation } = require('../models');
 const logger = require('../config/logger');
 
 /**
- * Initiate a call to a patient
+ * Initiate a call to a client
  * @route POST /v1/calls/initiate
  */
 const initiateCall = catchAsync(async (req, res) => {
-  const { patientId, callNotes } = req.body;
-  const agentId = req.caregiver.id; // Get agent ID from authenticated user
-  let call = null; // Declare call variable for error handling
+  const clientId = req.body.clientId;
+  const { callNotes } = req.body;
+  const agentId = req.caregiver.id;
+  let call = null;
 
-  // Validate patient exists and has phone number
-  const patient = await patientService.getPatientById(patientId);
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+  const client = await clientService.getClientById(clientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  if (!patient.phone) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Patient does not have a phone number');
+  if (!client.phone) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Client does not have a phone number');
   }
 
   // Validate agent exists
@@ -31,16 +31,12 @@ const initiateCall = catchAsync(async (req, res) => {
   }
 
   try {
-    // Initiate the call via Twilio
-    const callSid = await twilioCallService.initiateCall(patient.id);
-    
-    // Find the Call record created by Twilio service
+    const callSid = await twilioCallService.initiateCall(client.id);
     let call = await Call.findOne({ callSid });
     if (!call) {
-      // Create Call if Twilio service didn't create one (e.g., in test environment)
       call = await Call.create({
         callSid,
-        patientId: patient.id,
+        clientId: client.id,
         startTime: new Date(),
         callStartTime: new Date(),
         callType: 'outbound',
@@ -62,7 +58,7 @@ const initiateCall = catchAsync(async (req, res) => {
     let conversation = await Conversation.findOne({ callId: call._id });
     if (!conversation) {
       // Create conversation using the conversation service
-      conversation = await conversationService.createConversationForPatient(patient._id, call._id);
+      conversation = await conversationService.createConversationForClient(client._id, call._id);
       
       // Update call with conversation reference
       call.conversationId = conversation._id;
@@ -73,15 +69,18 @@ const initiateCall = catchAsync(async (req, res) => {
       logger.info(`[CallWorkflow] Found existing Conversation ${conversation._id} for call ${call._id}`);
     }
 
-    logger.info(`[CallWorkflow] Call initiated for patient ${patient.name}, SID: ${callSid}, Conversation: ${conversation._id}`);
+    logger.info(`[CallWorkflow] Call initiated for client ${client.name}, SID: ${callSid}, Conversation: ${conversation._id}`);
 
     res.status(httpStatus.CREATED).send({
       callId: call._id.toString(),
       callSid,
-      conversationId: conversation._id.toString(), // Always available now
-      patientId: patient._id,
-      patientName: patient.name,
-      patientPhone: patient.phone,
+      conversationId: conversation._id.toString(),
+      clientId: client._id,
+      clientId: client._id,
+      patientName: client.name,
+      clientName: client.name,
+      patientPhone: client.phone,
+      clientPhone: client.phone,
       agentId: agent._id,
       agentName: agent.name,
       status: call.status,
@@ -89,7 +88,7 @@ const initiateCall = catchAsync(async (req, res) => {
     });
 
   } catch (error) {
-    logger.error(`[CallWorkflow] Failed to initiate call for patient ${patient.name}:`, error);
+    logger.error(`[CallWorkflow] Failed to initiate call for client:`, error);
     
     // Update call status to failed if we have a call record
     if (call) {
@@ -120,10 +119,10 @@ const getCallStatus = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
   }
   
-  // Populate patient and agent details
-  await conversation.populate('patientId', 'name phone');
+  // Populate client and agent details
+  await conversation.populate('clientId', 'name phone');
   // Note: agentId is on Call, not Conversation
-  await call.populate('patientId', 'name phone');
+  await call.populate('clientId', 'name phone');
   await call.populate('agentId', 'name');
   
   // CRITICAL: conversation.messages IS THE QUEUE - use it as-is, don't touch it
@@ -180,7 +179,7 @@ const getCallStatus = catchAsync(async (req, res) => {
   
   // Log message details for debugging with ordering information
   logger.info(`[MESSAGE ORDERING] Returning ${messages.length} messages for conversation ${conversationId}`);
-  logger.info(`[MESSAGE ORDERING] Message breakdown: ${messages.filter(m => m.role === 'patient').length} patient, ${messages.filter(m => m.role === 'assistant').length} assistant`);
+  logger.info(`[MESSAGE ORDERING] Message breakdown: ${messages.filter(m => m.role === 'client').length} client, ${messages.filter(m => m.role === 'assistant').length} assistant`);
   
   // Log message order with timestamps to verify chronological ordering
   if (messages.length > 0) {
@@ -219,7 +218,7 @@ const getCallStatus = catchAsync(async (req, res) => {
     startTime: call.startTime,
     endTime: call.endTime,
     duration: call.duration,
-    patient: conversation.patientId || call.patientId,
+    client: conversation.clientId || call.clientId,
     agent: call.agentId,
     // Include all messages (patient and assistant) for live call display
     messages: messages,
@@ -473,7 +472,7 @@ const getActiveCalls = catchAsync(async (req, res) => {
     agentId,
     status: { $in: ['initiated', 'in-progress'] }
   })
-  .populate('patientId', 'name phone')
+  .populate('clientId', 'name phone')
   .populate('agentId', 'name')
   .populate('conversationId')
   .limit(50)
@@ -514,9 +513,9 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
   }
   
-  // Populate patient and agent details
-  await conversation.populate('patientId', 'name phone');
-  await call.populate('patientId', 'name phone');
+  // Populate client and agent details
+  await conversation.populate('clientId', 'name phone');
+  await call.populate('clientId', 'name phone');
   await call.populate('agentId', 'name');
   
   const callDetails = {
@@ -527,7 +526,7 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     startTime: call.startTime,
     endTime: call.endTime,
     duration: call.duration,
-    patient: conversation.patientId || call.patientId,
+    client: conversation.clientId || call.clientId,
     agent: call.agentId
   };
   

@@ -33,9 +33,13 @@ BASE_URL=http://localhost:8082 yarn test:cucumber
 
 ## Feature Files
 
-The port specified in feature files (e.g., `Given the frontend is running on "http://localhost:8082"`) is **ignored**. 
+The URLs in feature files (e.g. `Given the frontend is running on "http://localhost:8084"`) are **ignored at runtime**.
 
-The step definition uses the centralized configuration instead, ensuring:
+Both step definitions use centralized config only:
+- **Frontend:** `this.parameters.baseURL` or `FRONTEND_URL` / `BASE_URL` env (default `http://localhost:8084`)
+- **Backend:** `this.parameters.apiURL` or `API_URL` env (default `http://localhost:3000`)
+
+All feature Backgrounds use the same placeholder URLs so no scenario accidentally implies a different port. This ensures:
 - All tests use the same port
 - If the port is wrong, **ALL tests fail** (not just some)
 - Easy to change port for all tests by updating one config file

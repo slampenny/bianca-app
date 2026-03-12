@@ -9,10 +9,10 @@ export const conversationApi = createApi({
   endpoints: (builder) => ({
     createConversation: builder.mutation<
       Conversation,
-      { patientId: string; data: Partial<Conversation> }
+      { clientId: string; data: Partial<Conversation> }
     >({
-      query: ({ patientId, data }) => ({
-        url: `/conversations/patient/${patientId}`,
+      query: ({ clientId, data }) => ({
+        url: `/conversations/client/${clientId}`,
         method: "POST",
         body: data,
       }),
@@ -32,12 +32,12 @@ export const conversationApi = createApi({
         url: `/conversations/${conversationId}`,
       }),
     }),
-    getConversationsByPatient: builder.query<
+    getConversationsByClient: builder.query<
       ConversationPages,
-      { patientId: string; page?: number; limit?: number; sortBy?: string }
+      { clientId: string; page?: number; limit?: number; sortBy?: string }
     >({
-      query: ({ patientId, page, limit, sortBy }) => ({
-        url: `/patients/${patientId}/conversations`,
+      query: ({ clientId, page, limit, sortBy }) => ({
+        url: `/clients/${clientId}/conversations`,
         params: {
           ...(page && { page }),
           ...(limit && { limit }),
@@ -62,5 +62,5 @@ export const {
   useCreateConversationMutation,
   useAddMessageToConversationMutation,
   useGetConversationQuery,
-  useGetConversationsByPatientQuery,
+  useGetConversationsByClientQuery,
 } = conversationApi

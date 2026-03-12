@@ -9,6 +9,7 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'clover', 'html'],
   testMatch: ['**/*.test.js'], // Simplified to catch all .test.js files
   watchAll: false,
+  setupFiles: ['<rootDir>/tests/setupEnv.js'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   // Ignore devops directories to prevent Haste module naming collisions
   modulePathIgnorePatterns: ['<rootDir>/devops'],

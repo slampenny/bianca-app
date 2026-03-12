@@ -28,7 +28,7 @@ async function seedCaregivers(org) {
     password: hashedPassword,
     role: 'superAdmin',
     org: org._id,
-    patients: [],
+    clients: [],
     isEmailVerified: true,
   };
   
@@ -43,7 +43,7 @@ async function seedCaregivers(org) {
     phone: '+16045624264',
     role: 'staff',
     org: org._id,
-    patients: [],
+    clients: [],
     ssoProvider: 'google',
     ssoProviderId: 'google-oauth2-123456789',
     password: null, // No password - SSO only

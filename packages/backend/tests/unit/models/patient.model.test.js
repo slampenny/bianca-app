@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const faker = require('faker');
-const { Patient, Org } = require('../../../src/models');
+const { Client, Org } = require('../../../src/models');
 
-describe('Patient model', () => {
+describe('Client model', () => {
   let mongoServer;
   let testOrg;
 
@@ -42,17 +42,17 @@ describe('Patient model', () => {
     });
 
     test('should correctly validate a valid patient', async () => {
-      await expect(new Patient(newPatient).validate()).resolves.toBeUndefined();
+      await expect(new Client(newPatient).validate()).resolves.toBeUndefined();
     });
 
     test('should throw a validation error if email is invalid', async () => {
       newPatient.email = 'invalidEmail';
-      await expect(new Patient(newPatient).validate()).rejects.toThrow();
+      await expect(new Client(newPatient).validate()).rejects.toThrow();
     });
 
     test('should throw a validation error if phone is invalid', async () => {
       newPatient.phone = 'invalidPhone';
-      await expect(new Patient(newPatient).validate()).rejects.toThrow();
+      await expect(new Client(newPatient).validate()).rejects.toThrow();
     });
   });
 
@@ -68,7 +68,7 @@ describe('Patient model', () => {
         caregiver: null,
         schedules: [],
       };
-      expect(new Patient(newPatient).toJSON()).not.toHaveProperty('password');
+      expect(new Client(newPatient).toJSON()).not.toHaveProperty('password');
     });
   });
 
@@ -81,7 +81,7 @@ describe('Patient model', () => {
         // org is missing
       };
       
-      const patient = new Patient(patientWithoutOrg);
+      const patient = new Client(patientWithoutOrg);
       await expect(patient.validate()).rejects.toThrow();
     });
 
@@ -93,7 +93,7 @@ describe('Patient model', () => {
         org: testOrg._id,
       };
       
-      const patient = new Patient(patientWithOrg);
+      const patient = new Client(patientWithOrg);
       await expect(patient.validate()).resolves.toBeUndefined();
     });
   });

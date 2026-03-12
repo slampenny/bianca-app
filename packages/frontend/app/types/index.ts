@@ -2,7 +2,8 @@
  * Shared TypeScript types
  */
 
-import { FetchBaseQueryError, SerializedError } from '@reduxjs/toolkit/query/react'
+import { FetchBaseQueryError } from '@reduxjs/toolkit/query/react'
+import type { SerializedError } from '@reduxjs/toolkit'
 
 /**
  * Theme colors type - matches the structure from ThemeContext
@@ -15,6 +16,7 @@ export interface ThemeColors {
     biancaError?: string
     biancaSuccess?: string
     biancaWarning?: string
+    biancaPrimary?: string
     neutral100: string
     neutral200: string
     neutral300: string
@@ -26,6 +28,7 @@ export interface ThemeColors {
     angry500: string
     success500?: string
     warning500?: string
+    primary500?: string
     overlay20?: string
     overlay50?: string
     [key: string]: any
@@ -34,6 +37,8 @@ export interface ThemeColors {
   text: string
   error: string
   border: string
+  backgroundDim?: string
+  transparent?: string
   [key: string]: any
 }
 

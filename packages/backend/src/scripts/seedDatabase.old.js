@@ -1,13 +1,13 @@
 // seedDatabase.js
 const mongoose = require('mongoose');
 const faker = require('faker');
-const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
+const { Alert, Org, Caregiver, Client, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
 const config = require('../config/config');
 
 // Import test fixtures directly for production
 const orgFixture = require('../../tests/fixtures/org.fixture');
 const caregiverFixture = require('../../tests/fixtures/caregiver.fixture');
-const patientFixture = require('../../tests/fixtures/patient.fixture');
+const clientFixture = require('../../tests/fixtures/client.fixture');
 const alertFixture = require('../../tests/fixtures/alert.fixture');
 const scheduleFixture = require('../../tests/fixtures/schedule.fixture');
 const conversationFixture = require('../../tests/fixtures/conversation.fixture');
@@ -16,18 +16,18 @@ const paymentMethodFixture = require('../../tests/fixtures/paymentMethod.fixture
 // Extract the needed exports
 const { orgOne, insertOrgs } = orgFixture;
 const { caregiverOne, admin, playwrightTestUser, hashedPassword, insertCaregiversAndAddToOrg } = caregiverFixture;
-const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = patientFixture;
+const { clientOne, clientTwo, insertClientsAndAddToCaregiver } = clientFixture;
 const { alertOne, alertTwo, alertThree, expiredAlert, insertAlerts } = alertFixture;
-const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = scheduleFixture;
+const { scheduleOne, scheduleTwo, insertScheduleAndAddToClient } = scheduleFixture;
 const { conversationOne, conversationTwo, insertConversations } = conversationFixture;
 const { paymentMethodOne, paymentMethodTwo, insertPaymentMethods } = paymentMethodFixture;
 
 /**
- * Add declining patient conversations to show progression over time
- * @param {string} patientId - The patient ID to add conversations for
+ * Add declining client conversations to show progression over time
+ * @param {string} clientId - The client ID to add conversations for
  */
-async function addDecliningPatientConversations(patientId) {
-  console.log('Adding declining patient conversations for patient:', patientId);
+async function addDecliningClientConversations(clientId) {
+  console.log('Adding declining client conversations for client:', clientId);
   
   const decliningConversations = [];
   
@@ -37,11 +37,11 @@ async function addDecliningPatientConversations(patientId) {
   
   // Create conversation first
   const conv1 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient discussing medication management and overall health status.',
+    history: 'Client discussing medication management and overall health status.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 1 },
+    metadata: { source: 'declining_client_seed', month: 1 },
     createdAt: month1Date,
     updatedAt: month1Date,
     startTime: month1Date,
@@ -56,7 +56,7 @@ async function addDecliningPatientConversations(patientId) {
   
   // Create and save message
   const msg1 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'Good morning! I hope you are having a wonderful day. I wanted to discuss my medication schedule with you today. I take my blood pressure medication every morning at 8 AM, and I have been very consistent with it. I feel good and I have energy. I am managing my health well and everything is going smoothly. My memory has been sharp and I have been able to keep track of all my appointments and medications without any issues.',
     conversationId: conv1._id
   });
@@ -72,11 +72,11 @@ async function addDecliningPatientConversations(patientId) {
   month2Date.setMonth(month2Date.getMonth() - 4);
   
   const conv2 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
     history: 'Patient expressing mild concerns about mood and memory.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 2 },
+    metadata: { source: 'declining_client_seed', month: 2 },
     createdAt: month2Date,
     updatedAt: month2Date,
     startTime: month2Date,
@@ -90,7 +90,7 @@ async function addDecliningPatientConversations(patientId) {
   await conv2.save();
   
   const msg2 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'Hi there, I wanted to talk about how I have been feeling lately. I have been having some ups and downs. Some days I feel okay, but other days I feel really down. I have been having trouble sleeping and I worry a lot about work. I am managing okay though. I have noticed that sometimes I forget where I put my keys, but I think that is normal for my age.',
     conversationId: conv2._id
   });
@@ -105,11 +105,11 @@ async function addDecliningPatientConversations(patientId) {
   month3Date.setMonth(month3Date.getMonth() - 3);
   
   const conv3 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient showing increased cognitive concerns and anxiety.',
+    history: 'Client showing increased cognitive concerns and anxiety.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 3 },
+    metadata: { source: 'declining_client_seed', month: 3 },
     createdAt: month3Date,
     updatedAt: month3Date,
     startTime: month3Date,
@@ -123,7 +123,7 @@ async function addDecliningPatientConversations(patientId) {
   await conv3.save();
   
   const msg3 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I am feeling more confused lately. I keep forgetting things and I do not know why. I had trouble remembering my daughter\'s name yesterday and that scared me. I feel like I am losing my mind. I cannot concentrate on anything and I feel very anxious about everything. I worry that something is really wrong with me.',
     conversationId: conv3._id
   });
@@ -138,11 +138,11 @@ async function addDecliningPatientConversations(patientId) {
   month4Date.setMonth(month4Date.getMonth() - 2);
   
   const conv4 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient showing significant cognitive decline and confusion.',
+    history: 'Client showing significant cognitive decline and confusion.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 4 },
+    metadata: { source: 'declining_client_seed', month: 4 },
     createdAt: month4Date,
     updatedAt: month4Date,
     startTime: month4Date,
@@ -156,7 +156,7 @@ async function addDecliningPatientConversations(patientId) {
   await conv4.save();
   
   const msg4 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I do not understand what is happening to me. I cannot remember what I did yesterday or what I am supposed to do today. I feel lost and confused all the time. I am afraid to leave my house because I might get lost. I cannot think clearly anymore and I keep saying the wrong words. I feel like I am going crazy.',
     conversationId: conv4._id
   });
@@ -171,11 +171,11 @@ async function addDecliningPatientConversations(patientId) {
   month5Date.setMonth(month5Date.getMonth() - 1);
   
   const conv5 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient showing severe cognitive decline with disorientation.',
+    history: 'Client showing severe cognitive decline with disorientation.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 5 },
+    metadata: { source: 'declining_client_seed', month: 5 },
     createdAt: month5Date,
     updatedAt: month5Date,
     startTime: month5Date,
@@ -189,7 +189,7 @@ async function addDecliningPatientConversations(patientId) {
   await conv5.save();
   
   const msg5 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'Help me... please help me. I do not know where I am or what is happening. I am... I am at home, I think. But I do not remember how I got here. I feel confused and afraid. I cannot think clearly and I keep forgetting things. The thing is... you know what I mean? I keep repeating myself and I do not know why. I am scared.',
     conversationId: conv5._id
   });
@@ -203,11 +203,11 @@ async function addDecliningPatientConversations(patientId) {
   const month6Date = new Date();
   
   const conv6 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient in crisis with severe depression and cognitive impairment.',
+    history: 'Client in crisis with severe depression and cognitive impairment.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 6 },
+    metadata: { source: 'declining_client_seed', month: 6 },
     createdAt: month6Date,
     updatedAt: month6Date,
     startTime: month6Date,
@@ -221,7 +221,7 @@ async function addDecliningPatientConversations(patientId) {
   await conv6.save();
   
   const msg6 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I do not know why I keep trying. Nothing ever gets better. I cannot function anymore. I cannot work, I cannot take care of myself, I cannot even get out of bed most days. I just want the pain to stop. I feel worthless and hopeless about everything. I do not know who I am anymore or what I am supposed to do. I am lost.',
     conversationId: conv6._id
   });
@@ -231,17 +231,17 @@ async function addDecliningPatientConversations(patientId) {
   await conv6.save();
   decliningConversations.push(conv6);
   
-  console.log(`Created ${decliningConversations.length} declining patient conversations`);
+  console.log(`Created ${decliningConversations.length} declining client conversations`);
   
   return decliningConversations;
 }
 
 /**
- * Add normal patient conversations to show stable/healthy patterns
- * @param {string} patientId - The patient ID to add conversations for
+ * Add normal client conversations to show stable/healthy patterns
+ * @param {string} clientId - The client ID to add conversations for
  */
-async function addNormalPatientConversations(patientId) {
-  console.log('Adding normal patient conversations for patient:', patientId);
+async function addNormalClientConversations(clientId) {
+  console.log('Adding normal client conversations for client:', clientId);
   
   const normalConversations = [];
   
@@ -250,11 +250,11 @@ async function addNormalPatientConversations(patientId) {
   month1Date.setMonth(month1Date.getMonth() - 5);
   
   const conv1 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient showing healthy cognitive function and good communication.',
+    history: 'Client showing healthy cognitive function and good communication.',
     analyzedData: {},
-    metadata: { source: 'normal_patient_seed', month: 1 },
+    metadata: { source: 'normal_client_seed', month: 1 },
     createdAt: month1Date,
     updatedAt: month1Date,
     startTime: month1Date,
@@ -268,7 +268,7 @@ async function addNormalPatientConversations(patientId) {
   await conv1.save();
   
   const msg1 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'Good morning! I hope you are having a wonderful day. I wanted to discuss my medication schedule with you today. I take my blood pressure medication every morning at 8 AM, and I have been very consistent with it. I feel good and I have energy. I am managing my health well and everything is going smoothly. My memory has been sharp and I have been able to keep track of all my appointments and medications without any issues.',
     conversationId: conv1._id
   });
@@ -283,11 +283,11 @@ async function addNormalPatientConversations(patientId) {
   month2Date.setMonth(month2Date.getMonth() - 4);
   
   const conv2 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient maintaining good cognitive function and clear communication.',
+    history: 'Client maintaining good cognitive function and clear communication.',
     analyzedData: {},
-    metadata: { source: 'normal_patient_seed', month: 2 },
+    metadata: { source: 'normal_client_seed', month: 2 },
     createdAt: month2Date,
     updatedAt: month2Date,
     startTime: month2Date,
@@ -301,7 +301,7 @@ async function addNormalPatientConversations(patientId) {
   await conv2.save();
   
   const msg2 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'Hello again! I am doing well today. I have been keeping up with my exercise routine and eating healthy meals. My doctor says my blood pressure is stable and my cholesterol levels are improving. I feel mentally alert and I have been reading books and doing crossword puzzles to keep my mind active. I am also staying socially connected with friends and family.',
     conversationId: conv2._id
   });
@@ -316,11 +316,11 @@ async function addNormalPatientConversations(patientId) {
   month3Date.setMonth(month3Date.getMonth() - 3);
   
   const conv3 = new Conversation({
-    patientId: patientId,
+    clientId: clientId,
     messages: [],
-    history: 'Patient showing consistent cognitive health and clear thinking.',
+    history: 'Client showing consistent cognitive health and clear thinking.',
     analyzedData: {},
-    metadata: { source: 'normal_patient_seed', month: 3 },
+    metadata: { source: 'normal_client_seed', month: 3 },
     createdAt: month3Date,
     updatedAt: month3Date,
     startTime: month3Date,
@@ -334,7 +334,7 @@ async function addNormalPatientConversations(patientId) {
   await conv3.save();
   
   const msg3 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I wanted to share some good news with you today. I have been feeling great and my recent health checkup went very well. My doctor was pleased with all my test results. I have been maintaining a positive outlook and staying active in my community. I volunteer at the local library twice a week and I find it very rewarding. My memory remains sharp and I have no trouble remembering important dates and appointments.',
     conversationId: conv3._id
   });
@@ -344,17 +344,17 @@ async function addNormalPatientConversations(patientId) {
   await conv3.save();
   normalConversations.push(conv3);
   
-  console.log(`Created ${normalConversations.length} normal patient conversations`);
+  console.log(`Created ${normalConversations.length} normal client conversations`);
   
   return normalConversations;
 }
 
 /**
- * Add recent patient conversations (within last 30 days) for sentiment analysis
- * @param {string} patientId - The patient ID to add conversations for
+ * Add recent client conversations (within last 30 days) for sentiment analysis
+ * @param {string} clientId - The client ID to add conversations for
  */
-async function addRecentPatientConversations(patientId) {
-  console.log('Adding recent patient conversations for patient:', patientId);
+async function addRecentClientConversations(clientId) {
+  console.log('Adding recent client conversations for client:', clientId);
   
   const recentConversations = [];
   
@@ -368,11 +368,11 @@ async function addRecentPatientConversations(patientId) {
     convDate.setHours(10, 0, 0, 0); // Set to 10 AM
     
     const conv = new Conversation({
-      patientId: patientId,
+      clientId: clientId,
       messages: [],
       history: `Recent wellness check conversation from ${days} days ago.`,
       analyzedData: {},
-      metadata: { source: 'recent_patient_seed', daysAgo: days },
+      metadata: { source: 'recent_client_seed', daysAgo: days },
       createdAt: convDate,
       updatedAt: convDate,
       startTime: convDate,
@@ -388,7 +388,7 @@ async function addRecentPatientConversations(patientId) {
     // Create messages with varying sentiment
     const messages = [
       {
-        role: 'patient',
+        role: 'client',
         content: i === 0 
           ? 'Good morning! I am feeling really good today. I had a great week and I am very happy with how things are going. My medications are working well and I have been sleeping better. I feel positive and optimistic about the future.'
           : i === 1
@@ -419,7 +419,7 @@ async function addRecentPatientConversations(patientId) {
     recentConversations.push(conv);
   }
   
-  console.log(`Created ${recentConversations.length} recent patient conversations (within last 30 days)`);
+  console.log(`Created ${recentConversations.length} recent client conversations (within last 30 days)`);
   
   return recentConversations;
 }
@@ -438,11 +438,11 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   let sentimentScore = 0;
   let confidence = 0.85;
   let concernLevel = 'low';
-  let patientMood = 'Patient appears calm and engaged';
+  let patientMood = 'Client appears calm and engaged';
   let keyEmotions = ['neutral'];
   let satisfactionIndicators = { positive: [], negative: [] };
-  let summary = 'Patient engaged in routine wellness check conversation.';
-  let recommendations = 'Continue monitoring patient wellness.';
+  let summary = 'Client engaged in routine wellness check conversation.';
+  let recommendations = 'Continue monitoring client wellness.';
   
   // Positive indicators
   const positiveKeywords = ['good', 'great', 'wonderful', 'excellent', 'happy', 'pleased', 'satisfied', 'feeling well', 'doing well', 'better', 'improving', 'positive', 'optimistic', 'grateful', 'thankful', 'appreciate', 'energy', 'active', 'sharp', 'consistent', 'managing well'];
@@ -456,54 +456,54 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   if (positiveCount > negativeCount + 2) {
     overallSentiment = 'positive';
     sentimentScore = 0.3 + (Math.min(positiveCount, 10) * 0.05);
-    patientMood = 'Patient appears cheerful and optimistic';
+    patientMood = 'Client appears cheerful and optimistic';
     keyEmotions = ['happiness', 'satisfaction', 'contentment'];
     summary = 'Patient expressed positive feelings about their health and daily activities.';
-    recommendations = 'Continue current treatment plan. Patient is responding well.';
+    recommendations = 'Continue current treatment plan. Client is responding well.';
     satisfactionIndicators.positive = ['Expressed satisfaction with care', 'Positive outlook on health'];
   } else if (negativeCount > positiveCount + 2) {
     overallSentiment = 'negative';
     sentimentScore = -0.3 - (Math.min(negativeCount, 10) * 0.05);
-    patientMood = 'Patient appears concerned or experiencing some challenges';
+    patientMood = 'Client appears concerned or experiencing some challenges';
     keyEmotions = ['concern', 'frustration', 'tiredness'];
     concernLevel = negativeCount > 5 ? 'high' : 'medium';
     summary = 'Patient expressed some concerns or challenges during the conversation.';
-    recommendations = 'Schedule follow-up to address patient concerns. Monitor closely.';
+    recommendations = 'Schedule follow-up to address client concerns. Monitor closely.';
     satisfactionIndicators.negative = ['Expressed some concerns', 'May need additional support'];
   } else if (positiveCount > 0 && negativeCount > 0) {
     overallSentiment = 'mixed';
     sentimentScore = (positiveCount - negativeCount) * 0.1;
-    patientMood = 'Patient shows mixed emotions with both positive and concerning elements';
+    patientMood = 'Client shows mixed emotions with both positive and concerning elements';
     keyEmotions = ['mixed', 'cautious', 'hopeful'];
     concernLevel = 'medium';
-    summary = 'Patient conversation shows a mix of positive and concerning elements.';
+    summary = 'Client conversation shows a mix of positive and concerning elements.';
     recommendations = 'Continue monitoring. Address any specific concerns raised.';
   } else {
     overallSentiment = 'neutral';
     sentimentScore = 0;
-    patientMood = 'Patient appears calm and engaged in routine conversation';
+    patientMood = 'Client appears calm and engaged in routine conversation';
     keyEmotions = ['neutral', 'calm'];
-    summary = 'Patient engaged in routine wellness check conversation.';
+    summary = 'Client engaged in routine wellness check conversation.';
   }
   
-  // Adjust based on metadata (for declining patient conversations)
-  if (metadata.source === 'declining_patient_seed') {
+  // Adjust based on metadata (for declining client conversations)
+  if (metadata.source === 'declining_client_seed') {
     if (metadata.month >= 4) {
       overallSentiment = 'negative';
       sentimentScore = -0.4 - (metadata.month - 4) * 0.1;
       concernLevel = 'high';
-      patientMood = 'Patient showing signs of cognitive decline and increased confusion';
+      patientMood = 'Client showing signs of cognitive decline and increased confusion';
       keyEmotions = ['confusion', 'frustration', 'concern'];
-      summary = 'Patient showing concerning signs of cognitive decline. Increased confusion and memory issues noted.';
+      summary = 'Client showing concerning signs of cognitive decline. Increased confusion and memory issues noted.';
       recommendations = 'Urgent follow-up recommended. Consider additional support services.';
       satisfactionIndicators.negative = ['Memory issues', 'Increased confusion', 'Difficulty managing daily tasks'];
     } else if (metadata.month >= 2) {
       overallSentiment = 'mixed';
       sentimentScore = -0.1;
       concernLevel = 'medium';
-      patientMood = 'Patient showing mild concerns about memory and mood';
+      patientMood = 'Client showing mild concerns about memory and mood';
       keyEmotions = ['concern', 'uncertainty'];
-      summary = 'Patient expressing mild concerns about cognitive function and mood.';
+      summary = 'Client expressing mild concerns about cognitive function and mood.';
       recommendations = 'Monitor closely. Consider cognitive assessment.';
     }
   }
@@ -533,7 +533,7 @@ async function seedDatabase() {
     // Clear the database
     await Org.deleteMany({});
     await Caregiver.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Alert.deleteMany({});
     await Conversation.deleteMany({});
     await Message.deleteMany({});
@@ -564,14 +564,14 @@ async function seedDatabase() {
       password: hashedPassword,
       role: 'superAdmin',
       org: org1._id,
-      patients: [],
+      clients: [],
       isEmailVerified: true,
     };
     
     const superAdminRecord = await insertCaregiversAndAddToOrg(org1, [superAdmin]);
     console.log('Inserted super admin:', superAdminRecord);
 
-    // Find the caregiverOne (fake@example.org) to associate patients with
+    // Find the caregiverOne (fake@example.org) to associate clients with
     const caregiverOneRecord = caregivers.find(c => c.email === 'fake@example.org');
     const adminRecord = caregivers.find(c => c.email === 'admin@example.org');
     
@@ -581,18 +581,18 @@ async function seedDatabase() {
 
     // Create additional alerts for testing
     const alertFour = {
-      message: "Patient John Smith missed their scheduled medication dose",
+      message: "Client John Smith missed their scheduled medication dose",
       importance: 'high',
-      alertType: 'patient',
+      alertType: 'client',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 12), // 12 hours from now
       readBy: [],
     };
     
     const alertFive = {
-      message: "New patient registration completed for Sarah Johnson",
+      message: "New client registration completed for Sarah Johnson",
       importance: 'low',
-      alertType: 'patient',
+      alertType: 'client',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 72), // 72 hours from now
       readBy: [],
@@ -608,9 +608,9 @@ async function seedDatabase() {
     };
     
     const alertSeven = {
-      message: "Patient Mary Wilson reported feeling dizzy after medication",
+      message: "Client Mary Wilson reported feeling dizzy after medication",
       importance: 'urgent',
-      alertType: 'patient',
+      alertType: 'client',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 2), // 2 hours from now
       readBy: [],
@@ -626,9 +626,9 @@ async function seedDatabase() {
     };
     
     const alertNine = {
-      message: "Patient Robert Davis completed their wellness check",
+      message: "Client Robert Davis completed their wellness check",
       importance: 'low',
-      alertType: 'patient',
+      alertType: 'client',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
       readBy: [],
@@ -644,9 +644,9 @@ async function seedDatabase() {
     };
     
     const alertEleven = {
-      message: "Patient Lisa Brown needs follow-up appointment scheduling",
+      message: "Client Lisa Brown needs follow-up appointment scheduling",
       importance: 'high',
-      alertType: 'patient',
+      alertType: 'client',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 48), // 48 hours from now
       readBy: [],
@@ -662,9 +662,9 @@ async function seedDatabase() {
     };
     
     const alertThirteen = {
-      message: "Patient Michael Chen reported improved symptoms",
+      message: "Client Michael Chen reported improved symptoms",
       importance: 'low',
-      alertType: 'patient',
+      alertType: 'client',
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 36), // 36 hours from now
       readBy: [],
@@ -680,35 +680,35 @@ async function seedDatabase() {
     };
     
     const alertFifteen = {
-      message: "Patient Jennifer Lee missed their wellness check call",
+      message: "Client Jennifer Lee missed their wellness check call",
       importance: 'medium',
-      alertType: 'patient',
+      alertType: 'client',
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 4), // 4 hours from now
       readBy: [],
     };
     
-    // Insert alerts first (without patient references)
+    // Insert alerts first (without client references)
     await insertAlerts(caregiverOneRecord, 'Caregiver', [
       alertOne, alertTwo, alertThree, expiredAlert, alertSix, alertEight, alertTen, alertTwelve, alertFourteen
     ]);
 
-    // Create a caregiver with no patients for testing "No patients found" scenario
+    // Create a caregiver with no clients for testing "No clients found" scenario
     const caregiverWithNoPatients = {
       name: 'Test User No Patients',
-      email: 'no-patients@example.org',
+      email: 'no-clients@example.org',
       phone: '+16045624263',
       password: hashedPassword,
       role: 'staff',
       org: org1._id,
-      patients: [],
+      clients: [],
       isEmailVerified: true,
     };
     
     const caregiverNoPatientsRecord = await insertCaregiversAndAddToOrg(org1, [caregiverWithNoPatients]);
-    console.log('Inserted caregiver with no patients:', caregiverNoPatientsRecord);
+    console.log('Inserted caregiver with no clients:', caregiverNoPatientsRecord);
 
-    // Create patients with specific names that match the frontend tests
+    // Create clients with specific names that match the frontend tests
     const agnesAlphabet = {
       name: 'Agnes Alphabet',
       email: 'agnes@example.org',
@@ -724,128 +724,128 @@ async function seedDatabase() {
     };
     
     // Insert the specific test patients - Agnes for admin, Barnaby for caregiverOne
-    const [patient1] = await insertPatientsAndAddToCaregiver(adminRecord, [agnesAlphabet]);
-    const [patient2] = await insertPatientsAndAddToCaregiver(caregiverOneRecord, [barnabyButton]);
-    console.log('Inserted test patients:', patient1.name, 'for admin and', patient2.name, 'for caregiverOne');
+    const [client1] = await insertClientsAndAddToCaregiver(adminRecord, [agnesAlphabet]);
+    const [client2] = await insertClientsAndAddToCaregiver(caregiverOneRecord, [barnabyButton]);
+    console.log('Inserted test clients:', client1.name, 'for admin and', client2.name, 'for caregiverOne');
     
-    // Create additional patients for testing with predictable names
-    const patientThree = {
+    // Create additional clients for testing with predictable names
+    const clientThree = {
       name: 'John Smith',
       email: 'john.smith@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const patientFour = {
+    const clientFour = {
       name: 'Sarah Johnson',
       email: 'sarah.johnson@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const patientFive = {
+    const clientFive = {
       name: 'Mary Wilson',
       email: 'mary.wilson@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const patientSix = {
+    const clientSix = {
       name: 'Robert Davis',
       email: 'robert.davis@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const patientSeven = {
+    const clientSeven = {
       name: 'Lisa Brown',
       email: 'lisa.brown@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const patientEight = {
+    const clientEight = {
       name: 'Michael Chen',
       email: 'michael.chen@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const patientNine = {
+    const clientNine = {
       name: 'Jennifer Lee',
       email: 'jennifer.lee@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const patientTen = {
+    const clientTen = {
       name: 'David Miller',
       email: 'david.miller@example.org',
       phone: '+16045624263',
       schedules: [],
     };
     
-    const [patient3, patient4, patient5, patient6, patient7, patient8, patient9, patient10] = 
-      await insertPatientsAndAddToCaregiver(caregiverOneRecord, [
-        patientThree, patientFour, patientFive, patientSix, 
-        patientSeven, patientEight, patientNine, patientTen
+    const [client3, client4, client5, client6, client7, client8, client9, client10] = 
+      await insertClientsAndAddToCaregiver(caregiverOneRecord, [
+        clientThree, clientFour, clientFive, clientSix, 
+        clientSeven, clientEight, clientNine, clientTen
       ]);
     
-    console.log('Inserted patients:', patient1, patient2, patient3, patient4, patient5, patient6, patient7, patient8, patient9, patient10);
+    console.log('Inserted clients:', client1, client2, client3, client4, client5, client6, client7, client8, client9, client10);
 
-    // Insert patient-specific alerts
-    const patientAlertFour = {
+    // Insert client-specific alerts
+    const clientAlertFour = {
       ...alertFour,
-      relatedPatient: patient1._id,
+      relatedClient: client1._id,
     };
     
-    const patientAlertFive = {
+    const clientAlertFive = {
       ...alertFive,
-      relatedPatient: patient2._id,
+      relatedClient: client2._id,
     };
     
-    const patientAlertSeven = {
+    const clientAlertSeven = {
       ...alertSeven,
-      relatedPatient: patient3._id,
+      relatedClient: client3._id,
     };
     
-    const patientAlertNine = {
+    const clientAlertNine = {
       ...alertNine,
-      relatedPatient: patient4._id,
+      relatedClient: client4._id,
     };
     
-    const patientAlertEleven = {
+    const clientAlertEleven = {
       ...alertEleven,
-      relatedPatient: patient5._id,
+      relatedClient: client5._id,
     };
     
-    const patientAlertThirteen = {
+    const clientAlertThirteen = {
       ...alertThirteen,
-      relatedPatient: patient6._id,
+      relatedClient: client6._id,
     };
     
-    const patientAlertFifteen = {
+    const clientAlertFifteen = {
       ...alertFifteen,
-      relatedPatient: patient7._id,
+      relatedClient: client7._id,
     };
 
     await insertAlerts(caregiverOneRecord, 'Caregiver', [
-      patientAlertFour, patientAlertFive, patientAlertSeven, patientAlertNine,
-      patientAlertEleven, patientAlertThirteen, patientAlertFifteen
+      clientAlertFour, clientAlertFive, clientAlertSeven, clientAlertNine,
+      clientAlertEleven, clientAlertThirteen, clientAlertFifteen
     ]);
 
-    // Insert conversations for patients.
-    conversationOne.patientId = patient1._id;
+    // Insert conversations for clients.
+    conversationOne.clientId = client1._id;
     conversationOne.cost = 0.30; // $0.30 for 30 minutes at $0.10/minute
     conversationOne.lineItemId = null; // Unbilled
     
-    conversationTwo.patientId = patient2._id;
+    conversationTwo.clientId = client2._id;
     conversationTwo.cost = 0.45; // $0.45 for 45 minutes at $0.10/minute
     conversationTwo.lineItemId = null; // Unbilled
     
-    // Create additional conversations for patient1 to test autoload
+    // Create additional conversations for client1 to test autoload
     const conversationThree = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -860,7 +860,7 @@ async function seedDatabase() {
     };
     
     const conversationFour = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -875,7 +875,7 @@ async function seedDatabase() {
     };
     
     const conversationFive = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -890,7 +890,7 @@ async function seedDatabase() {
     };
     
     const conversationSix = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -905,7 +905,7 @@ async function seedDatabase() {
     };
     
     const conversationSeven = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -920,7 +920,7 @@ async function seedDatabase() {
     };
     
     const conversationEight = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -935,7 +935,7 @@ async function seedDatabase() {
     };
     
     const conversationNine = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -950,7 +950,7 @@ async function seedDatabase() {
     };
     
     const conversationTen = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -965,7 +965,7 @@ async function seedDatabase() {
     };
     
     const conversationEleven = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -980,7 +980,7 @@ async function seedDatabase() {
     };
     
     const conversationTwelve = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -995,7 +995,7 @@ async function seedDatabase() {
     };
     
     const conversationThirteen = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -1010,7 +1010,7 @@ async function seedDatabase() {
     };
     
     const conversationFourteen = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -1025,7 +1025,7 @@ async function seedDatabase() {
     };
     
     const conversationFifteen = {
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: faker.lorem.paragraph(),
       analyzedData: {},
@@ -1063,7 +1063,7 @@ async function seedDatabase() {
     
     // Create line items for the invoice
     const lineItem1 = await require('../models').LineItem.create({
-      patientId: patient1._id,
+      clientId: client1._id,
       invoiceId: sampleInvoice._id,
       amount: 1.20, // $1.20 for 2 conversations
       description: 'Billed conversations - 2 conversation(s)',
@@ -1074,7 +1074,7 @@ async function seedDatabase() {
     });
     
     const lineItem2 = await require('../models').LineItem.create({
-      patientId: patient2._id,
+      clientId: client2._id,
       invoiceId: sampleInvoice._id,
       amount: 1.30, // $1.30 for 2 conversations
       description: 'Billed conversations - 2 conversation(s)',
@@ -1084,9 +1084,9 @@ async function seedDatabase() {
       unitPrice: 0.65
     });
     
-    // Create billed conversations for patient1
+    // Create billed conversations for client1
     const billedConv1 = await Conversation.create({
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: 'Billed conversation 1 - wellness check',
       analyzedData: {},
@@ -1101,7 +1101,7 @@ async function seedDatabase() {
     });
     
     const billedConv2 = await Conversation.create({
-      patientId: patient1._id,
+      clientId: client1._id,
       messages: [],
       history: 'Billed conversation 2 - follow-up',
       analyzedData: {},
@@ -1115,9 +1115,9 @@ async function seedDatabase() {
       lineItemId: lineItem1._id, // Billed
     });
     
-    // Create billed conversations for patient2
+    // Create billed conversations for client2
     const billedConv3 = await Conversation.create({
-      patientId: patient2._id,
+      clientId: client2._id,
       messages: [],
       history: 'Billed conversation 3 - inbound call',
       analyzedData: {},
@@ -1132,7 +1132,7 @@ async function seedDatabase() {
     });
     
     const billedConv4 = await Conversation.create({
-      patientId: patient2._id,
+      clientId: client2._id,
       messages: [],
       history: 'Billed conversation 4 - wellness check',
       analyzedData: {},
@@ -1148,20 +1148,20 @@ async function seedDatabase() {
     
     console.log('Created billed conversations and invoice:', sampleInvoice.invoiceNumber);
 
-    // Add declining patient conversations for Agnes Alphabet (patient1)
-    await addDecliningPatientConversations(patient1._id);
+    // Add declining client conversations for Agnes Alphabet (client1)
+    await addDecliningClientConversations(client1._id);
 
-    // Add some normal conversation data for Barnaby Button (patient2)
-    await addNormalPatientConversations(patient2._id);
+    // Add some normal conversation data for Barnaby Button (client2)
+    await addNormalClientConversations(client2._id);
 
-    // Add recent conversations (within last 30 days) for both patients so sentiment analysis will show data
-    await addRecentPatientConversations(patient1._id);
-    await addRecentPatientConversations(patient2._id);
+    // Add recent conversations (within last 30 days) for both clients so sentiment analysis will show data
+    await addRecentClientConversations(client1._id);
+    await addRecentClientConversations(client2._id);
 
     // Insert conversation-specific alerts
     const conversationAlertThree = {
       ...alertThree,
-      relatedPatient: patient1._id,
+      relatedClient: client1._id,
       relatedConversation: conv3._id,
     };
 
@@ -1169,7 +1169,7 @@ async function seedDatabase() {
       message: "Wellness check conversation completed - follow-up scheduled",
       importance: 'medium',
       alertType: 'conversation',
-      relatedPatient: patient1._id,
+      relatedClient: client1._id,
       relatedConversation: conv6._id,
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours from now
@@ -1177,10 +1177,10 @@ async function seedDatabase() {
     };
 
     const conversationAlertUrgent = {
-      message: "Patient reported concerning symptoms during conversation",
+      message: "Client reported concerning symptoms during conversation",
       importance: 'urgent',
       alertType: 'conversation',
-      relatedPatient: patient1._id,
+      relatedClient: client1._id,
       relatedConversation: conv7._id,
       visibility: 'assignedCaregivers',
       relevanceUntil: new Date(Date.now() + 1000 * 60 * 60 * 2), // 2 hours from now
@@ -1191,9 +1191,9 @@ async function seedDatabase() {
       conversationAlertThree, conversationAlertSchedule, conversationAlertUrgent
     ]);
 
-    // Seed schedules for patients.
-    await insertScheduleAndAddToPatient(patient1, scheduleOne);
-    await insertScheduleAndAddToPatient(patient2, scheduleTwo);
+    // Seed schedules for clients.
+    await insertScheduleAndAddToClient(client1, scheduleOne);
+    await insertScheduleAndAddToClient(client2, scheduleTwo);
     console.log('Inserted schedules');
 
     // ----------------------
@@ -1245,7 +1245,7 @@ async function seedDatabase() {
           // Format conversation text from messages
           const conversationText = conversation.messages
             .map(msg => {
-              const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+              const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
               return `${speaker}: ${msg.content}`;
             })
             .join('\n');
@@ -1279,18 +1279,18 @@ async function seedDatabase() {
       // Don't fail the entire seeding process if sentiment analysis fails
     }
 
-    // Run medical analysis on the seeded patient data
-    console.log('Running medical analysis on seeded patient data...');
+    // Run medical analysis on the seeded client data
+    console.log('Running medical analysis on seeded client data...');
     try {
       const medicalAnalysisScheduler = require('../services/ai/medicalAnalysisScheduler.service');
       
       // Wait a moment for the scheduler to be ready
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Run multiple analyses on Agnes Alphabet (patient1) to create trend data
+      // Run multiple analyses on Agnes Alphabet (client1) to create trend data
       console.log('Triggering multiple medical analyses for Agnes Alphabet...');
       for (let i = 0; i < 3; i++) {
-        await medicalAnalysisScheduler.schedulePatientAnalysis(patient1._id.toString(), {
+        await medicalAnalysisScheduler.scheduleClientAnalysis(client1._id.toString(), {
           trigger: 'seeding',
           batchId: `seeding-${Date.now()}-${i}`
         });
@@ -1298,9 +1298,9 @@ async function seedDatabase() {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
-      // Also run analysis on Barnaby Button (patient2) for variety
+      // Also run analysis on Barnaby Button (client2) for variety
       console.log('Triggering medical analysis for Barnaby Button...');
-      await medicalAnalysisScheduler.schedulePatientAnalysis(patient2._id.toString(), {
+      await medicalAnalysisScheduler.scheduleClientAnalysis(client2._id.toString(), {
         trigger: 'seeding',
         batchId: `seeding-${Date.now()}`
       });
@@ -1312,7 +1312,7 @@ async function seedDatabase() {
     }
 
     console.log('Database seeded!');
-    return { org1, caregiver: caregiverOneRecord, patients: [patient1, patient2], invoiceRecord, paymentMethods };
+    return { org1, caregiver: caregiverOneRecord, clients: [client1, client2], invoiceRecord, paymentMethods };
   } catch (error) {
     console.error('Error seeding database:', error);
     throw error;

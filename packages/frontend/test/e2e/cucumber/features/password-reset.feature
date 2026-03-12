@@ -4,7 +4,7 @@ Feature: Password Reset
   So that I can regain access to my account
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
 
   Scenario: Request password reset

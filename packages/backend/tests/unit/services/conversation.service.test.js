@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const conversationService = require('../../../src/services/conversation.service');
-const { Conversation, Message, Patient, Call, Org } = require('../../../src/models');
+const { Conversation, Message, Client, Call, Org } = require('../../../src/models');
 
 let mongoServer;
 
@@ -30,63 +30,64 @@ describe('conversationService', () => {
   });
 
   beforeEach(async () => {
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Conversation.deleteMany();
     await Message.deleteMany();
     await Call.deleteMany();
   });
 
-  it('should create a new conversation for a patient', async () => {
-    // Create a patient first
-    const patient = new Patient({
-      name: 'Test Patient',
+  it('should create a new conversation for a client', async () => {
+    // Create a client first
+    const client = new Client({
+      name: 'Test Client',
       email: 'test@example.com',
       phone: '+16045624263',
       preferredLanguage: 'en',
       org: testOrg._id
     });
-    await patient.save();
+    await client.save();
 
     // Create a call first (conversations require a callId)
     const call = new Call({
-      patientId: patient._id,
+      clientId: client._id,
       callSid: 'CA1234567890abcdef',
       status: 'completed',
       duration: 60
     });
     await call.save();
 
-    const conversation = await conversationService.createConversationForPatient(patient._id, call._id);
+    const conversation = await conversationService.createConversationForClient(client._id, call._id);
     expect(conversation).toHaveProperty('_id');
-    expect(conversation).toHaveProperty('patientId', patient._id);
+    expect(conversation).toHaveProperty('clientId');
+    expect(conversation.clientId.toString()).toBe(client._id.toString());
     expect(conversation).toHaveProperty('callId', call._id);
   });
 
   it('should add a message to a conversation', async () => {
-    // Create a patient first
-    const patient = new Patient({
-      name: 'Test Patient',
+    // Create a client first
+    const client = new Client({
+      name: 'Test Client',
       email: 'test@example.com',
       phone: '+16045624263',
       preferredLanguage: 'en',
       org: testOrg._id
     });
-    await patient.save();
+    await client.save();
 
     // Create a call first
     const call = new Call({
-      patientId: patient._id,
+      clientId: client._id,
       callSid: 'CA1234567890abcdef',
       status: 'completed',
       duration: 60
     });
     await call.save();
 
-    const conversation = await conversationService.createConversationForPatient(patient._id, call._id);
+    const conversation = await conversationService.createConversationForClient(client._id, call._id);
     const messageContent = 'Hello, world!';
     const updatedConversation = await conversationService.addMessageToConversation(
       conversation._id,
-      'patient',
+      'client',
       messageContent
     );
     expect(updatedConversation.messages).toHaveLength(1);
@@ -95,44 +96,44 @@ describe('conversationService', () => {
   });
 
   it('should get a conversation by id', async () => {
-    // Create a patient first
-    const patient = new Patient({
-      name: 'Test Patient',
+    // Create a client first
+    const client = new Client({
+      name: 'Test Client',
       email: 'test@example.com',
       phone: '+16045624263',
       preferredLanguage: 'en',
       org: testOrg._id
     });
-    await patient.save();
+    await client.save();
 
     // Create a call first
     const call = new Call({
-      patientId: patient._id,
+      clientId: client._id,
       callSid: 'CA1234567890abcdef',
       status: 'completed',
       duration: 60
     });
     await call.save();
 
-    const conversation = await conversationService.createConversationForPatient(patient._id, call._id);
+    const conversation = await conversationService.createConversationForClient(client._id, call._id);
     const fetchedConversation = await conversationService.getConversationById(conversation._id);
     expect(fetchedConversation).toHaveProperty('_id', conversation._id);
   });
 
-  it('should get conversations by patient', async () => {
-    // Create a patient first
-    const patient = new Patient({
-      name: 'Test Patient',
+  it('should get conversations by client', async () => {
+    // Create a client first
+    const client = new Client({
+      name: 'Test Client',
       email: 'test@example.com',
       phone: '+16045624263',
       preferredLanguage: 'en',
       org: testOrg._id
     });
-    await patient.save();
+    await client.save();
 
     // Create calls for each conversation
     const call1 = new Call({
-      patientId: patient._id,
+      clientId: client._id,
       callSid: 'CA1111111111111111',
       status: 'completed',
       duration: 60
@@ -140,16 +141,16 @@ describe('conversationService', () => {
     await call1.save();
 
     const call2 = new Call({
-      patientId: patient._id,
+      clientId: client._id,
       callSid: 'CA2222222222222222',
       status: 'completed',
       duration: 60
     });
     await call2.save();
 
-    await conversationService.createConversationForPatient(patient._id, call1._id);
-    await conversationService.createConversationForPatient(patient._id, call2._id);
-    const conversations = await conversationService.getConversationsByPatient(patient._id);
+    await conversationService.createConversationForClient(client._id, call1._id);
+    await conversationService.createConversationForClient(client._id, call2._id);
+    const conversations = await conversationService.getConversationsByClient(client._id);
     expect(conversations).toHaveLength(2);
   });
 });

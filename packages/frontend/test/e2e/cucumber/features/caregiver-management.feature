@@ -4,7 +4,7 @@ Feature: Caregiver Management
   So that I can coordinate team members
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
     And I am an organization admin
 

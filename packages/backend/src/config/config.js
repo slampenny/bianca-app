@@ -10,16 +10,20 @@ const logger = require('./logger'); // Assuming logger is available for loadSecr
 const { AwsContext } = require('twilio/lib/rest/accounts/v1/credential/aws');
 const { buildAllConfigs, applyAllSecrets } = require('./domains');
 
-// Load .env file (if present)
-// CRITICAL: Use override: false to ensure container environment variables take precedence
-// This prevents .env file from overriding NODE_ENV set by Docker/CodeBuild
-// Store the NODE_ENV value BEFORE dotenv loads (in case .env file tries to set it)
-const nodeEnvBeforeDotenv = process.env.NODE_ENV;
-dotenv.config({ path: path.join(__dirname, '../../.env'), override: false });
-// CRITICAL: Restore NODE_ENV if dotenv tried to override it (shouldn't happen with override: false, but be safe)
-if (nodeEnvBeforeDotenv && process.env.NODE_ENV !== nodeEnvBeforeDotenv) {
-  logger.warn(`[Config] dotenv tried to override NODE_ENV from "${nodeEnvBeforeDotenv}" to "${process.env.NODE_ENV}". Restoring original value.`);
-  process.env.NODE_ENV = nodeEnvBeforeDotenv;
+// Load .env file only in development and test. In staging/production we use process.env (CodeBuild/Docker) + AWS Secrets only.
+const nodeEnv = process.env.NODE_ENV;
+if (nodeEnv === 'development' || nodeEnv === 'test' || !nodeEnv) {
+  const nodeEnvBeforeDotenv = process.env.NODE_ENV;
+  dotenv.config({ path: path.join(__dirname, '../../.env'), override: false });
+  if (nodeEnvBeforeDotenv && process.env.NODE_ENV !== nodeEnvBeforeDotenv) {
+    logger.warn(`[Config] dotenv tried to override NODE_ENV from "${nodeEnvBeforeDotenv}" to "${process.env.NODE_ENV}". Restoring original value.`);
+    process.env.NODE_ENV = nodeEnvBeforeDotenv;
+  }
+} else {
+  // staging / production: do not load .env; use only process.env and AWS Secrets Manager
+  if (nodeEnv === 'staging' || nodeEnv === 'production') {
+    logger.info(`[Config] NODE_ENV=${nodeEnv}: skipping .env file; using process.env and AWS Secrets only.`);
+  }
 }
 
 // Define the environment variable schema, including new variables
@@ -242,10 +246,14 @@ const baselineConfig = {
 };
 
 // CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation
-// This prevents issues where .env file or Docker image build-time values override runtime env vars
-if (process.env.NODE_ENV && baselineConfig.env !== process.env.NODE_ENV) {
-  logger.warn(`Initial config env (${baselineConfig.env}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
-  baselineConfig.env = process.env.NODE_ENV;
+// (baselineConfig.env is undefined here because the getter is defined later via defineProperty)
+if (process.env.NODE_ENV) {
+  _envOverride = process.env.NODE_ENV;
+}
+// Only warn when we had a defined env that mismatched. Never warn in test or when env was undefined (getter not yet defined).
+const initialEnv = baselineConfig.env;
+if (process.env.NODE_ENV !== 'test' && initialEnv !== undefined && initialEnv !== process.env.NODE_ENV) {
+  logger.warn(`Initial config env (${initialEnv}) does not match runtime NODE_ENV (${process.env.NODE_ENV}). Using runtime value.`);
 }
 
 // Set production-specific overrides (Restored and updated)

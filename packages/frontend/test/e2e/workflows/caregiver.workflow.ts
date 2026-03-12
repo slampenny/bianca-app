@@ -276,14 +276,14 @@ export class CaregiverWorkflow {
   }
 
   async whenIAssignCaregiverToPatients(caregiverName: string) {
-    // Assign caregiver to patients
+    // Assign caregiver to clients
     await this.whenIEditCaregiver(caregiverName)
     
     // Wait for caregiver screen to load
     await this.page.waitForTimeout(1000)
     
     // Look for the "Assign Unassigned Patients" button (the correct testID from CaregiverScreen.tsx)
-    const assignButton = this.page.getByTestId('assign-unassigned-patients-button')
+    const assignButton = this.page.getByTestId('assign-unassigned-clients-button')
     const buttonCount = await assignButton.count().catch(() => 0)
     
     console.log(`🔍 Assign button count: ${buttonCount}`)
@@ -311,7 +311,7 @@ export class CaregiverWorkflow {
       await this.page.waitForTimeout(1000)
       
       // Check if the assignment panel opened successfully
-      const panel = this.page.getByTestId('assign-unassigned-patients-modal')
+      const panel = this.page.getByTestId('assign-unassigned-clients-modal')
       const panelVisible = await panel.isVisible({ timeout: 3000 }).catch(() => false)
       
       if (!panelVisible) {
@@ -319,17 +319,17 @@ export class CaregiverWorkflow {
         return false
       }
       
-      // Panel opened successfully - check if there are unassigned patients
-      // If there are no unassigned patients, we'll see "No unassigned patients found" message
-      // If there are patients, we'll see the patient list
-      const noPatientsMessage = this.page.getByTestId('no-unassigned-patients-message')
+      // Panel opened successfully - check if there are unassigned clients
+      // If there are no unassigned clients, we'll see "No unassigned clients found" message
+      // If there are clients, we'll see the client list
+      const noPatientsMessage = this.page.getByTestId('no-unassigned-clients-message')
       const hasNoPatients = await noPatientsMessage.isVisible({ timeout: 2000 }).catch(() => false)
       
       if (hasNoPatients) {
-        // Panel opened but no unassigned patients available
+        // Panel opened but no unassigned clients available
         // This is valid - the UI is accessible, just no data to assign
-        // To properly test assignment, we'd need to create an unassigned patient first
-        console.log('ℹ Assignment panel opened, but no unassigned patients found')
+        // To properly test assignment, we'd need to create an unassigned client first
+        console.log('ℹ Assignment panel opened, but no unassigned clients found')
         // Close the panel
         const cancelButton = this.page.getByTestId('cancel-unassigned-panel-button')
         if (await cancelButton.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -340,11 +340,11 @@ export class CaregiverWorkflow {
       
       // There are unassigned patients - we could test selecting and assigning them
       // For now, just verify the panel opened with patients
-      const patientList = this.page.locator('[data-testid^="unassigned-patient-item-"]')
-      const patientCount = await patientList.count().catch(() => 0)
+      const clientList = this.page.locator('[data-testid^="unassigned-client-item-"]')
+      const clientCount = await clientList.count().catch(() => 0)
       
-      if (patientCount > 0) {
-        console.log(`✅ Found ${patientCount} unassigned patients available for assignment`)
+      if (clientCount > 0) {
+        console.log(`✅ Found ${clientCount} unassigned clients available for assignment`)
         // Close the panel for now (full assignment testing could be added later)
         const cancelButton = this.page.getByTestId('cancel-unassigned-panel-button')
         if (await cancelButton.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -467,10 +467,10 @@ export class CaregiverWorkflow {
 
   async thenIShouldSeePatientAssignmentInterface() {
     const assignmentElements = [
-      this.page.getByTestId('patient-assignment-modal'),
-      this.page.getByTestId('assign-patients-form'),
-      this.page.getByText(/assign patients/i),
-      this.page.getByText(/patient assignment/i)
+      this.page.getByTestId('assign-unassigned-clients-modal'),
+      this.page.getByTestId('assign-clients-form'),
+      this.page.getByText(/assign clients/i),
+      this.page.getByText(/client assignment/i)
     ]
     
     let assignmentInterfaceFound = false

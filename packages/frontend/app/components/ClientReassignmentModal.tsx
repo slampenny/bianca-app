@@ -15,24 +15,24 @@ import { useSelector } from "react-redux"
 import { Button } from "./Button"
 import {
   useAssignCaregiverMutation,
-} from "../services/api/patientApi"
+} from "../services/api/clientApi"
 import { useGetAllCaregiversQuery } from "../services/api/caregiverApi"
-import { Patient, Caregiver } from "../services/api/api.types"
+import { Client, Caregiver } from "../services/api/api.types"
 import { logger } from "../utils/logger"
 import { RootState } from "../store/store"
 import { TIMEOUTS } from "../constants"
 import { colors } from "../theme/colors"
 
-interface PatientReassignmentModalProps {
-  patients: Patient[]
+interface ClientReassignmentModalProps {
+  clients: Client[]
   isVisible: boolean
   onClose: () => void
   onComplete: () => void
   orgId: string
 }
 
-export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> = ({
-  patients,
+export const ClientReassignmentModal: React.FC<ClientReassignmentModalProps> = ({
+  clients,
   isVisible,
   onClose,
   onComplete,
@@ -58,7 +58,6 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
     { skip: !orgId || !canReadAllCaregivers }
   )
   
-  // Mutation for assigning patients to caregivers
   const [assignCaregiver] = useAssignCaregiverMutation()
   
   // Filter out the current user from the list (since they're being deleted)
@@ -81,9 +80,9 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
     }
   }, [availableCaregivers, selectedCaregiverId])
   
-  const handleReassignAllPatients = async () => {
-    if (!selectedCaregiverId || patients.length === 0) {
-      showError("Please select a caregiver and ensure there are patients to reassign.")
+  const handleReassignAllClients = async () => {
+    if (!selectedCaregiverId || clients.length === 0) {
+      showError("Please select a caregiver and ensure there are clients to reassign.")
       return
     }
     
@@ -91,41 +90,39 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
     let successCount = 0
     
     try {
-      // Reassign each patient to the selected caregiver
-      for (const patient of patients) {
+      for (const client of clients) {
         try {
           await assignCaregiver({ 
-            patientId: patient.id!, 
+            clientId: client.id!, 
             caregiverId: selectedCaregiverId 
           }).unwrap()
           successCount++
         } catch (error) {
-          logger.error(`Failed to reassign patient ${patient.name}:`, error)
+          logger.error(`Failed to reassign client ${client.name}:`, error)
         }
       }
       
       setReassignedCount(successCount)
       
-      // Clear any existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
       
-      if (successCount === patients.length) {
-        showSuccess(`All ${successCount} patients have been successfully reassigned.`)
+      if (successCount === clients.length) {
+        showSuccess(`All ${successCount} clients have been successfully reassigned.`)
         timeoutRef.current = setTimeout(() => {
           onComplete()
           timeoutRef.current = null
         }, TIMEOUTS.NAVIGATION_DELAY)
       } else {
-        showSuccess(`${successCount} out of ${patients.length} patients were reassigned successfully.`)
+        showSuccess(`${successCount} out of ${clients.length} clients were reassigned successfully.`)
         timeoutRef.current = setTimeout(() => {
           onComplete()
           timeoutRef.current = null
         }, TIMEOUTS.NAVIGATION_DELAY)
       }
     } catch (error) {
-      showError("Failed to reassign patients. Please try again.")
+      showError("Failed to reassign clients. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -152,21 +149,20 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Reassign Patients</Text>
+          <Text style={styles.title}>Reassign Clients</Text>
           <Text style={styles.subtitle}>
-            {patients.length} patient{patients.length !== 1 ? 's' : ''} need{patients.length === 1 ? 's' : ''} to be reassigned
+            {clients.length} client{clients.length !== 1 ? 's' : ''} need{clients.length === 1 ? 's' : ''} to be reassigned
           </Text>
         </View>
         
-        {/* Patient List */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Patients to Reassign:</Text>
-          <ScrollView style={styles.patientList} showsVerticalScrollIndicator={false}>
-            {patients.map((patient) => (
-              <View key={patient.id} style={styles.patientItem} testID={`patient-item-${patient.name}`}>
-                <Text style={styles.patientName}>{patient.name}</Text>
-                <Text style={styles.patientDetails}>
-                  {patient.email} • {patient.phone}
+          <Text style={styles.sectionTitle}>Clients to Reassign:</Text>
+          <ScrollView style={styles.clientList} showsVerticalScrollIndicator={false}>
+            {clients.map((client) => (
+              <View key={client.id} style={styles.clientItem} testID={`client-item-${client.name}`}>
+                <Text style={styles.clientName}>{client.name}</Text>
+                <Text style={styles.clientDetails}>
+                  {client.email} • {client.phone}
                 </Text>
               </View>
             ))}
@@ -207,7 +203,7 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
               <View style={styles.emptyState}>
                 <Text style={styles.emptyText}>No other caregivers available in this organization</Text>
                 <Text style={styles.emptySubtext}>
-                  You cannot delete this caregiver because there are no other caregivers to reassign their patients to.
+                  You cannot delete this caregiver because there are no other caregivers to reassign their clients to.
                 </Text>
               </View>
             )}
@@ -219,12 +215,12 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
           {availableCaregivers.length > 0 ? (
             <>
               <Button
-                text={isLoading ? "Reassigning..." : `Reassign All Patients`}
-                onPress={handleReassignAllPatients}
+                text={isLoading ? "Reassigning..." : `Reassign All Clients`}
+                onPress={handleReassignAllClients}
                 style={[styles.reassignButton, isLoading && styles.buttonDisabled]}
                 textStyle={styles.reassignButtonText}
                 disabled={isLoading || !selectedCaregiverId}
-                testID="patient-reassign-reassign-btn"
+                testID="client-reassign-reassign-btn"
               />
               <Button
                 text="Cancel"
@@ -232,7 +228,7 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
                 style={styles.cancelButton}
                 textStyle={styles.cancelButtonText}
                 disabled={isLoading}
-                testID="patient-reassign-cancel-btn"
+                testID="client-reassign-cancel-btn"
               />
             </>
           ) : (
@@ -241,7 +237,7 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
               onPress={onClose}
               style={styles.closeButton}
               textStyle={styles.closeButtonText}
-              testID="patient-reassign-close-btn"
+              testID="client-reassign-close-btn"
             />
           )}
         </View>
@@ -251,17 +247,17 @@ export const PatientReassignmentModal: React.FC<PatientReassignmentModalProps> =
         message={toast.message}
         type={toast.type}
         onHide={hideToast}
-        testID="patient-reassignment-toast"
+        testID="client-reassignment-toast"
       />
       <ConfirmationModal
         visible={showCancelConfirm}
         title="Cancel Reassignment"
-        message="Are you sure you want to cancel? Patients will remain unassigned."
+        message="Are you sure you want to cancel? Clients will remain unassigned."
         confirmText="Cancel"
         cancelText="Continue Reassignment"
         onConfirm={onClose}
         onCancel={() => setShowCancelConfirm(false)}
-        testID="patient-reassignment-cancel-confirm"
+        testID="client-reassignment-cancel-confirm"
       />
     </Modal>
   )
@@ -312,22 +308,22 @@ const styles = StyleSheet.create({
     color: colors.palette.biancaHeader,
     marginBottom: 12,
   },
-  patientList: {
+  clientList: {
     maxHeight: 150,
   },
-  patientItem: {
+  clientItem: {
     backgroundColor: colors.palette.neutral100,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
   },
-  patientName: {
+  clientName: {
     fontSize: 16,
     fontWeight: "600",
     color: colors.palette.biancaHeader,
     marginBottom: 4,
   },
-  patientDetails: {
+  clientDetails: {
     fontSize: 14,
     color: colors.palette.neutral600,
   },

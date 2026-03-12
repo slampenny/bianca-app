@@ -152,7 +152,7 @@ describe('Alert Deduplicator', () => {
       expect(alerts[1].category).toBe('Safety');
     });
 
-    test('should return empty array for unknown patient', () => {
+    test('should return empty array for unknown client', () => {
       const alerts = deduplicator.getRecentAlerts('unknown');
       expect(alerts).toEqual([]);
     });
@@ -178,7 +178,7 @@ describe('Alert Deduplicator', () => {
       deduplicator.recordAlert('patient2', 'Safety', timestamp + 1000, 'Suicide');
 
       const stats = deduplicator.getStats();
-      expect(stats.totalPatients).toBe(2);
+      expect(stats.totalClients).toBe(2);
       expect(stats.totalAlerts).toBe(2);
       expect(stats.alertsInLastHour).toBe(2);
       expect(stats.config.debounceMinutes).toBe(5);

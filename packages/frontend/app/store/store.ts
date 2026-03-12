@@ -3,7 +3,7 @@ import alertReducer from "./alertSlice"
 import authReducer from "./authSlice"
 import orgReducer from "./orgSlice"
 import caregiverReducer from "./caregiverSlice"
-import patientReducer from "./patientSlice"
+import clientReducer from "./clientSlice"
 import paymentReducer from "./paymentSlice"
 import paymentMethodReducer from "./paymentMethodSlice"
 import scheduleReducer from "./scheduleSlice"
@@ -18,7 +18,7 @@ import {
   orgApi,
   caregiverApi,
   scheduleApi,
-  patientApi,
+  clientApi,
   paymentApi,
   paymentMethodApi,
   conversationApi,
@@ -39,7 +39,7 @@ const apiServices = {
   orgApi,
   caregiverApi,
   scheduleApi,
-  patientApi,
+  clientApi,
   paymentApi,
   paymentMethodApi,
   conversationApi,
@@ -77,7 +77,7 @@ const authPersistConfig = {
 }
 
 const apiEntries = Object.entries(apiServices).filter(([key, api]) => {
-  if (!api) {
+  if (!api && !process.env.JEST_WORKER_ID) {
     console.warn(`[store] Missing API service: ${key}`)
   }
   return Boolean(api)
@@ -91,7 +91,7 @@ const apiReducers = Object.fromEntries(
 const rootReducer = combineReducers({
   org: orgReducer,
   caregiver: caregiverReducer,
-  patient: patientReducer,
+  client: clientReducer,
   schedule: scheduleReducer,
   auth: persistReducer(authPersistConfig, authReducer),
   alert: alertReducer,

@@ -83,7 +83,7 @@ const auditLogSchema = mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        'patient',
+        'client',
         'conversation',
         'caregiver',
         'org',

@@ -1,5 +1,5 @@
 const httpStatus = require('http-status');
-const { Patient } = require('../models'); // Assuming Patient model includes phone number
+const { Client } = require('../models');
 // Note: openAiService methods are now in openai.realtime.service.js
 // This service may need to be updated to use the new service structure
 const config = require('../config/config');
@@ -38,15 +38,15 @@ const sendResponseAsCall = async (callSid, textResponse) => {
 };
 
 /**
- * Get the last contact time for a patient (most recent completed call)
- * @param {string} patientId - The patient ID
+ * Get the last contact time for a client (most recent completed call)
+ * @param {string} clientId - The client ID
  * @returns {Date|null} - The endTime of the most recent completed call, or null if none found
  */
-const getLastContactTime = async (patientId) => {
+const getLastContactTime = async (clientId) => {
   try {
     // Query Calls directly instead of going through Conversations
     const lastCall = await Call.findOne({
-      patientId,
+      clientId,
       status: 'completed',
       endTime: { $exists: true }
     })

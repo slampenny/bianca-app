@@ -25,17 +25,17 @@ afterAll(async () => {
 
 describe('Emergency Processor', () => {
   let processor;
-  let mockPatient;
+  let mockClient;
   let mockCaregivers;
 
   beforeEach(async () => {
     processor = new EmergencyProcessor();
     
-    // Create actual Patient and Caregiver documents in the database
-    const { Patient, Caregiver, Org, EmergencyPhrase } = require('../../src/models');
+    // Create actual Client and Caregiver documents in the database
+    const { Client, Caregiver, Org, EmergencyPhrase } = require('../../src/models');
     
     // Clear existing documents
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Caregiver.deleteMany({});
     await Org.deleteMany({});
     await EmergencyPhrase.deleteMany({});
@@ -106,8 +106,8 @@ describe('Emergency Processor', () => {
       org: org._id,
     });
     
-    // Create patient
-    const patient = await Patient.create({
+    // Create client
+    const client = await Client.create({
       name: 'John Doe',
       preferredName: 'John',
       email: 'john@example.com',
@@ -116,7 +116,7 @@ describe('Emergency Processor', () => {
       caregivers: [caregiver1._id, caregiver2._id]
     });
     
-    mockPatient = patient;
+    mockClient = client;
     mockCaregivers = [caregiver1, caregiver2];
 
     // Reset mocks and set up default return values
@@ -130,7 +130,7 @@ describe('Emergency Processor', () => {
 
   describe('processUtterance', () => {
     test('should detect real emergency and recommend alert', async () => {
-      const result = await processor.processUtterance(mockPatient._id.toString(), "I'm having a heart attack");
+      const result = await processor.processUtterance(mockClient._id.toString(), "I'm having a heart attack");
       
       expect(result.shouldAlert).toBe(true);
       expect(result.alertData).toBeDefined();
@@ -141,7 +141,7 @@ describe('Emergency Processor', () => {
     });
 
     test('should filter false positives', async () => {
-      const result = await processor.processUtterance(mockPatient._id.toString(), "If I had a heart attack, I would call 911");
+      const result = await processor.processUtterance(mockClient._id.toString(), "If I had a heart attack, I would call 911");
       
       expect(result.shouldAlert).toBe(false);
       expect(result.reason).toContain('False positive detected');
@@ -149,7 +149,7 @@ describe('Emergency Processor', () => {
     });
 
     test('should handle non-emergency text', async () => {
-      const result = await processor.processUtterance(mockPatient._id.toString(), "Everything is fine today");
+      const result = await processor.processUtterance(mockClient._id.toString(), "Everything is fine today");
       
       expect(result.shouldAlert).toBe(false);
       expect(result.alertData).toBeNull();
@@ -163,26 +163,26 @@ describe('Emergency Processor', () => {
       expect(result1.error).toBe(true);
       expect(result1.reason).toContain('Invalid input');
 
-      const result2 = await processor.processUtterance(mockPatient._id.toString(), '');
+      const result2 = await processor.processUtterance(mockClient._id.toString(), '');
       expect(result2.shouldAlert).toBe(false);
       expect(result2.error).toBe(true);
       expect(result2.reason).toContain('Invalid input');
 
-      const result3 = await processor.processUtterance(mockPatient._id.toString(), null);
+      const result3 = await processor.processUtterance(mockClient._id.toString(), null);
       expect(result3.shouldAlert).toBe(false);
       expect(result3.error).toBe(true);
       expect(result3.reason).toContain('Invalid input');
     });
 
     test('should calculate confidence correctly', async () => {
-      const result = await processor.processUtterance(mockPatient._id.toString(), "I'm having a heart attack");
+      const result = await processor.processUtterance(mockClient._id.toString(), "I'm having a heart attack");
       
       expect(result.alertData.confidence).toBeGreaterThan(0.8);
       expect(result.processing.confidence).toBe(result.alertData.confidence);
     });
 
     test('should include processing details', async () => {
-      const result = await processor.processUtterance(mockPatient._id.toString(), "I'm having a heart attack");
+      const result = await processor.processUtterance(mockClient._id.toString(), "I'm having a heart attack");
       
       expect(result.processing).toBeDefined();
       expect(result.processing.emergencyDetected).toBe(true);
@@ -208,15 +208,15 @@ describe('Emergency Processor', () => {
         responseTimeSeconds: 60
       };
 
-      const result = await processor.createAlert(mockPatient._id.toString(), alertData, "I'm having a heart attack");
+      const result = await processor.createAlert(mockClient._id.toString(), alertData, "I'm having a heart attack");
       
       expect(result.success).toBe(true);
       expect(result.alert).toBeDefined();
-      expect(result.patient.id).toBe(mockPatient._id.toString());
-      expect(result.patient.name).toBe('John Doe');
+      expect(result.client.id).toBe(mockClient._id.toString());
+      expect(result.client.name).toBe('John Doe');
     });
 
-    test('should handle patient not found', async () => {
+    test('should handle client not found', async () => {
       // Using real models now - no mocking needed
 
       const alertData = {
@@ -230,7 +230,7 @@ describe('Emergency Processor', () => {
       const result = await processor.createAlert('nonexistent', alertData, "I'm having a heart attack");
       
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Cast to ObjectId failed');
+      expect(result.error).toBe('Invalid client ID');
     });
 
     test('should create proper alert message', async () => {
@@ -242,7 +242,7 @@ describe('Emergency Processor', () => {
         responseTimeSeconds: 60
       };
 
-      const result = await processor.createAlert(mockPatient._id.toString(), alertData, "I'm having a heart attack");
+      const result = await processor.createAlert(mockClient._id.toString(), alertData, "I'm having a heart attack");
       
       // Test passes if no error is thrown - real alert service will create the alert
       expect(result.success).toBe(true);
@@ -258,11 +258,11 @@ describe('Emergency Processor', () => {
         responseTimeSeconds: 60
       };
 
-      // Test with invalid patient ID to trigger error handling
+      // Test with invalid client ID to trigger error handling
       const result = await processor.createAlert('invalid-id', alertData, "I'm having a heart attack");
       
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Cast to ObjectId failed');
+      expect(result.error).toBe('Invalid client ID');
     });
   });
 
@@ -271,12 +271,12 @@ describe('Emergency Processor', () => {
       // Using real services now - no mocking needed
 
       // Process utterance
-      const processResult = await processor.processUtterance(mockPatient._id.toString(), "I'm having a heart attack");
+      const processResult = await processor.processUtterance(mockClient._id.toString(), "I'm having a heart attack");
       
       expect(processResult.shouldAlert).toBe(true);
       
       // Create alert
-      const alertResult = await processor.createAlert(mockPatient._id.toString(), processResult.alertData, "I'm having a heart attack");
+      const alertResult = await processor.createAlert(mockClient._id.toString(), processResult.alertData, "I'm having a heart attack");
       
       expect(alertResult.success).toBe(true);
       expect(alertResult.alert).toBeDefined();
@@ -311,7 +311,7 @@ describe('Emergency Processor', () => {
       
       // Process utterance - should fallback to basic detector
       const result = await processor.processUtterance(
-        mockPatient._id.toString(), 
+        mockClient._id.toString(), 
         "I'm having a heart attack"
       );
       
@@ -334,13 +334,13 @@ describe('Emergency Processor', () => {
       localizedEmergencyDetector.clearCache();
       await localizedEmergencyDetector.loadPhrases();
       
-      // Update patient to have Spanish language
-      const { Patient } = require('../../src/models');
-      await Patient.findByIdAndUpdate(mockPatient._id, { preferredLanguage: 'es' });
+      // Update client to have Spanish language
+      const { Client } = require('../../src/models');
+      await Client.findByIdAndUpdate(mockClient._id, { preferredLanguage: 'es' });
       
       // Process utterance in Spanish - should fallback to basic detector
       const result = await processor.processUtterance(
-        mockPatient._id.toString(), 
+        mockClient._id.toString(), 
         "I'm having a heart attack"
       );
       

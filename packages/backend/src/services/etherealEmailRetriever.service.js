@@ -51,12 +51,10 @@ function extractTokens(emailText = '', emailHtml = '') {
 async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
   const emailStatus = emailService.getStatus();
   
-  if (!emailStatus.etherealAccount) {
-    if (process.env.NODE_ENV === 'test') {
-      const captured = emailService.getLastCapturedEmail(recipientEmail);
-      if (!captured) {
-        throw new Error('No emails found in inbox');
-      }
+  // In test, sendEmail() only captures; prefer captured emails so unit tests do not need IMAP.
+  if (process.env.NODE_ENV === 'test') {
+    const captured = emailService.getLastCapturedEmail(recipientEmail);
+    if (captured) {
       const emailText = captured.text || '';
       const emailHtml = captured.html || '';
       return {
@@ -69,6 +67,12 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
         tokens: extractTokens(emailText, emailHtml),
         raw: captured,
       };
+    }
+  }
+
+  if (!emailStatus.etherealAccount) {
+    if (process.env.NODE_ENV === 'test') {
+      throw new Error('No emails found in inbox');
     }
     throw new Error('Ethereal account not available. Make sure NODE_ENV is development or test.');
   }

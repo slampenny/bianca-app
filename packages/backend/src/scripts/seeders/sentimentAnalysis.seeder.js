@@ -14,11 +14,11 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   let sentimentScore = 0;
   let confidence = 0.85;
   let concernLevel = 'low';
-  let patientMood = 'Patient appears calm and engaged';
+  let clientMood = 'Client appears calm and engaged';
   let keyEmotions = ['neutral'];
   let satisfactionIndicators = { positive: [], negative: [] };
   let summary = 'Patient engaged in routine wellness check conversation.';
-  let recommendations = 'Continue monitoring patient wellness.';
+  let recommendations = 'Continue monitoring client wellness.';
   
   // Positive indicators
   const positiveKeywords = ['good', 'great', 'wonderful', 'excellent', 'happy', 'pleased', 'satisfied', 'feeling well', 'doing well', 'better', 'improving', 'positive', 'optimistic', 'grateful', 'thankful', 'appreciate', 'energy', 'active', 'sharp', 'consistent', 'managing well'];
@@ -32,7 +32,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   if (positiveCount > negativeCount + 2) {
     overallSentiment = 'positive';
     sentimentScore = 0.3 + (Math.min(positiveCount, 10) * 0.05);
-    patientMood = 'Patient appears cheerful and optimistic';
+    clientMood = 'Client appears cheerful and optimistic';
     keyEmotions = ['happiness', 'satisfaction', 'contentment'];
     summary = 'Patient expressed positive feelings about their health and daily activities.';
     recommendations = 'Continue current treatment plan. Patient is responding well.';
@@ -40,16 +40,16 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   } else if (negativeCount > positiveCount + 2) {
     overallSentiment = 'negative';
     sentimentScore = -0.3 - (Math.min(negativeCount, 10) * 0.05);
-    patientMood = 'Patient appears concerned or experiencing some challenges';
+    clientMood = 'Client appears concerned or experiencing some challenges';
     keyEmotions = ['concern', 'frustration', 'tiredness'];
     concernLevel = negativeCount > 5 ? 'high' : 'medium';
     summary = 'Patient expressed some concerns or challenges during the conversation.';
-    recommendations = 'Schedule follow-up to address patient concerns. Monitor closely.';
+    recommendations = 'Schedule follow-up to address client concerns. Monitor closely.';
     satisfactionIndicators.negative = ['Expressed some concerns', 'May need additional support'];
   } else if (positiveCount > 0 && negativeCount > 0) {
     overallSentiment = 'mixed';
     sentimentScore = (positiveCount - negativeCount) * 0.1;
-    patientMood = 'Patient shows mixed emotions with both positive and concerning elements';
+    clientMood = 'Client shows mixed emotions with both positive and concerning elements';
     keyEmotions = ['mixed', 'cautious', 'hopeful'];
     concernLevel = 'medium';
     summary = 'Patient conversation shows a mix of positive and concerning elements.';
@@ -57,18 +57,18 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   } else {
     overallSentiment = 'neutral';
     sentimentScore = 0;
-    patientMood = 'Patient appears calm and engaged in routine conversation';
+    clientMood = 'Client appears calm and engaged in routine conversation';
     keyEmotions = ['neutral', 'calm'];
     summary = 'Patient engaged in routine wellness check conversation.';
   }
   
-  // Adjust based on metadata (for declining patient conversations)
-  if (metadata.source === 'declining_patient_seed') {
+  // Adjust based on metadata (for declining client conversations)
+  if (metadata.source === 'declining_client_seed') {
     if (metadata.month >= 4) {
       overallSentiment = 'negative';
       sentimentScore = -0.4 - (metadata.month - 4) * 0.1;
       concernLevel = 'high';
-      patientMood = 'Patient showing signs of cognitive decline and increased confusion';
+      clientMood = 'Client showing signs of cognitive decline and increased confusion';
       keyEmotions = ['confusion', 'frustration', 'concern'];
       summary = 'Patient showing concerning signs of cognitive decline. Increased confusion and memory issues noted.';
       recommendations = 'Urgent follow-up recommended. Consider additional support services.';
@@ -77,7 +77,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
       overallSentiment = 'mixed';
       sentimentScore = -0.1;
       concernLevel = 'medium';
-      patientMood = 'Patient showing mild concerns about memory and mood';
+      clientMood = 'Client showing mild concerns about memory and mood';
       keyEmotions = ['concern', 'uncertainty'];
       summary = 'Patient expressing mild concerns about cognitive function and mood.';
       recommendations = 'Monitor closely. Consider cognitive assessment.';
@@ -91,7 +91,8 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
     overallSentiment,
     sentimentScore: Math.round(sentimentScore * 100) / 100, // Round to 2 decimal places
     confidence,
-    patientMood,
+    clientMood,
+    patientMood: clientMood, // legacy alias for API compat
     keyEmotions,
     concernLevel,
     satisfactionIndicators,
@@ -128,7 +129,7 @@ async function seedSentimentAnalysis() {
         // Format conversation text from messages
         const conversationText = conversation.messages
           .map(msg => {
-            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
             return `${speaker}: ${msg.content}`;
           })
           .join('\n');

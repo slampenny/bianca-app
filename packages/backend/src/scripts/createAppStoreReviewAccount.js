@@ -2,39 +2,39 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const config = require('../config/config');
-const { Org, Caregiver, Patient, Conversation, Message, Schedule } = require('../models');
+const { Org, Caregiver, Client, Conversation, Message, Schedule } = require('../models');
 const { insertCaregiversAndAddToOrg } = require('../../tests/fixtures/caregiver.fixture');
-const { insertPatientsAndAddToCaregiver } = require('../../tests/fixtures/patient.fixture');
+const { insertClientsAndAddToCaregiver } = require('../../tests/fixtures/client.fixture');
 
 // App Store Review Account Credentials
 // Note: Password should be stored in AWS Secrets Manager as APP_STORE_REVIEW_PASSWORD
 // and will be loaded via config.loadSecrets() before this script runs
 
 /**
- * Create sample conversations for a patient
+ * Create sample conversations for a client
  */
-async function createSampleConversations(patient) {
+async function createSampleConversations(client) {
   const conversations = [];
   
   // Create a few sample conversations
   const callId1 = new mongoose.Types.ObjectId();
   const conversation1 = await Conversation.create({
-    patient: patient._id,
-    patientId: patient._id,
+    client: client._id,
+    clientId: client._id,
     callId: callId1,
     startTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
     endTime: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000), // 5 minutes later
     duration: 5 * 60, // 5 minutes in seconds
     status: 'completed',
     transcript: 'Hello, how are you feeling today? I\'m doing well, thank you for checking in.',
-    summary: 'Routine wellness check - patient is doing well',
+    summary: 'Routine wellness check - client is doing well',
     sentiment: 'positive',
     isActive: true,
   });
   
   const message1 = await Message.create({
     conversation: conversation1._id,
-    patient: patient._id,
+    client: client._id,
     content: 'Hello, how are you feeling today?',
     role: 'system',
     timestamp: conversation1.startTime,
@@ -42,7 +42,7 @@ async function createSampleConversations(patient) {
   
   const message2 = await Message.create({
     conversation: conversation1._id,
-    patient: patient._id,
+    client: client._id,
     content: 'I\'m doing well, thank you for checking in.',
     role: 'user',
     timestamp: new Date(conversation1.startTime.getTime() + 30 * 1000),
@@ -53,15 +53,15 @@ async function createSampleConversations(patient) {
   // Create another conversation
   const callId2 = new mongoose.Types.ObjectId();
   const conversation2 = await Conversation.create({
-    patient: patient._id,
-    patientId: patient._id,
+    client: client._id,
+    clientId: client._id,
     callId: callId2,
     startTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
     endTime: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 3 * 60 * 1000), // 3 minutes later
     duration: 3 * 60, // 3 minutes in seconds
     status: 'completed',
     transcript: 'Good morning! How did you sleep? I slept well, thank you.',
-    summary: 'Morning check-in - patient slept well',
+    summary: 'Morning check-in - client slept well',
     sentiment: 'positive',
     isActive: true,
   });
@@ -72,14 +72,14 @@ async function createSampleConversations(patient) {
 }
 
 /**
- * Create sample schedules for a patient
+ * Create sample schedules for a client
  */
-async function createSampleSchedules(patient, caregiver) {
+async function createSampleSchedules(client, caregiver) {
   const schedules = [];
   
   // Create a daily schedule
   const schedule1 = await Schedule.create({
-    patient: patient._id,
+    client: client._id,
     caregiver: caregiver._id,
     type: 'daily',
     time: '09:00',
@@ -92,7 +92,7 @@ async function createSampleSchedules(patient, caregiver) {
   
   // Create a weekly schedule
   const schedule2 = await Schedule.create({
-    patient: patient._id,
+    client: client._id,
     caregiver: caregiver._id,
     type: 'weekly',
     dayOfWeek: 1, // Monday
@@ -162,7 +162,7 @@ async function createAppStoreReviewAccount() {
       password: hashedPassword,
       role: 'orgAdmin', // Give admin role so they can see all features
       org: org._id,
-      patients: [],
+      clients: [],
       isEmailVerified: true,
       isPhoneVerified: true, // Verified for easier testing
     });
@@ -172,10 +172,10 @@ async function createAppStoreReviewAccount() {
     await org.save();
     console.log('✅ Created caregiver account:', caregiver.email);
 
-    // Create sample patients
-    const patient1 = await Patient.create({
-      name: 'Sample Patient One',
-      email: 'sample.patient1@example.com',
+    // Create sample clients
+    const client1 = await Client.create({
+      name: 'Sample Client One',
+      email: 'sample.client1@example.com',
       phone: '+16045624264',
       caregivers: [caregiver._id],
       org: org._id,
@@ -183,9 +183,9 @@ async function createAppStoreReviewAccount() {
       isActive: true,
     });
     
-    const patient2 = await Patient.create({
-      name: 'Sample Patient Two',
-      email: 'sample.patient2@example.com',
+    const client2 = await Client.create({
+      name: 'Sample Client Two',
+      email: 'sample.client2@example.com',
       phone: '+16045624265',
       caregivers: [caregiver._id],
       org: org._id,
@@ -193,25 +193,25 @@ async function createAppStoreReviewAccount() {
       isActive: true,
     });
     
-    // Add patients to caregiver
-    caregiver.patients.push(patient1._id, patient2._id);
+    // Add clients to caregiver
+    caregiver.clients.push(client1._id, client2._id);
     await caregiver.save();
-    console.log('✅ Created sample patients');
+    console.log('✅ Created sample clients');
 
     // Create sample conversations
-    const conversations1 = await createSampleConversations(patient1);
-    const conversations2 = await createSampleConversations(patient2);
+    const conversations1 = await createSampleConversations(client1);
+    const conversations2 = await createSampleConversations(client2);
     console.log('✅ Created sample conversations');
 
     // Create sample schedules
-    const schedules1 = await createSampleSchedules(patient1, caregiver);
-    const schedules2 = await createSampleSchedules(patient2, caregiver);
+    const schedules1 = await createSampleSchedules(client1, caregiver);
+    const schedules2 = await createSampleSchedules(client2, caregiver);
     
-    // Add schedules to patients
-    patient1.schedules.push(...schedules1.map(s => s._id));
-    patient2.schedules.push(...schedules2.map(s => s._id));
-    await patient1.save();
-    await patient2.save();
+    // Add schedules to clients
+    client1.schedules.push(...schedules1.map(s => s._id));
+    client2.schedules.push(...schedules2.map(s => s._id));
+    await client1.save();
+    await client2.save();
     console.log('✅ Created sample schedules');
 
     console.log('\n🎉 App Store review account created successfully!');
@@ -224,7 +224,7 @@ async function createAppStoreReviewAccount() {
     console.log(`   • Organization: ${org.name}`);
     console.log(`   • Caregiver account: ${caregiver.name} (${caregiver.email})`);
     console.log(`   • Role: ${caregiver.role}`);
-    console.log(`   • Patients: ${caregiver.patients.length} (with sample data)`);
+    console.log(`   • Clients: ${caregiver.clients.length} (with sample data)`);
     console.log(`   • Conversations: ${conversations1.length + conversations2.length} sample conversations`);
     console.log(`   • Schedules: ${schedules1.length + schedules2.length} sample schedules`);
     console.log('\n✅ Account is ready for App Store review!');

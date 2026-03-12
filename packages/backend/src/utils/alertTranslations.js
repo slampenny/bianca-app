@@ -186,20 +186,21 @@ const translations = {
  * Translate an alert message based on language
  * @param {string} message - Original English alert message
  * @param {string} language - Language code (default: 'en')
- * @param {Object} alertData - Alert data with severity, category, phrase, patientName, originalText
+ * @param {Object} alertData - Alert data with severity, category, phrase, clientName/patientName, originalText
  * @returns {string} Translated alert message
  */
 function translateAlertMessage(message, language = 'en', alertData = null) {
   // If no alert data provided, try to parse from existing message
   if (!alertData && message) {
     // Try to extract data from existing English message format
-    // Format: "🚨 CRITICAL Medical Emergency: PatientName reported "phrase". Original message: "text""
+    // Format: "🚨 CRITICAL Medical Emergency: ClientName reported "phrase". Original message: "text""
     const match = message.match(/^([🚨⚠️📢][^\s]+)\s+([A-Za-z]+)\s+Emergency:\s+([^"]+?)\s+reported\s+"([^"]+)"\.\s+Original message:\s+"([^"]+)"/);
     if (match) {
       alertData = {
         urgency: match[1],
         category: match[2],
-        patientName: match[3].trim(),
+        clientName: match[3].trim(),
+        patientName: match[3].trim(), // legacy alias
         phrase: match[4],
         originalText: match[5],
         severity: match[1].includes('CRITICAL') ? 'CRITICAL' : 
@@ -213,14 +214,14 @@ function translateAlertMessage(message, language = 'en', alertData = null) {
     const t = translations[language] || translations.en;
     const urgency = t.urgency[alertData.severity] || alertData.severity;
     const category = t.category[alertData.category] || alertData.category;
-    const patientName = alertData.patientName || 'Patient';
+    const clientName = alertData.clientName || alertData.patientName || 'Client';
     const phrase = alertData.phrase || '';
     const originalText = alertData.originalText || '';
     const truncatedText = originalText.length > 100 
       ? originalText.substring(0, 100) + '...' 
       : originalText;
 
-    return `${urgency} ${category} ${t.emergency}: ${patientName} ${t.reported} "${phrase}". ${t.originalMessage}: "${truncatedText}"`;
+    return `${urgency} ${category} ${t.emergency}: ${clientName} ${t.reported} "${phrase}". ${t.originalMessage}: "${truncatedText}"`;
   }
 
   // Fallback to original message if no structured data or English
@@ -241,7 +242,8 @@ function parseAlertMessage(message) {
     return {
       urgency: match[1],
       category: match[2],
-      patientName: match[3].trim(),
+      clientName: match[3].trim(),
+        patientName: match[3].trim(), // legacy alias
       phrase: match[4],
       originalText: match[5],
       severity: match[1].includes('CRITICAL') ? 'CRITICAL' : 

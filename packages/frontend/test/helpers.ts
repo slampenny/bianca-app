@@ -4,8 +4,8 @@ import axios from 'axios';
 import { DEFAULT_API_CONFIG } from '../app/services/api/api';
 
 import { store as appStore } from "../app/store/store"
-import { alertApi, authApi, patientApi, orgApi } from "../app/services/api/"
-import { Alert, Org, Caregiver, Patient } from "../app/services/api/api.types"
+import { alertApi, authApi, clientApi, orgApi } from "../app/services/api/"
+import { Alert, Org, Caregiver, Client } from "../app/services/api/api.types"
 
 const buildApiUrl = (path: string) => {
   const base = DEFAULT_API_CONFIG.url.replace(/\/$/, "")
@@ -51,22 +51,24 @@ export async function createCaregiver(orgId: string, caregiver: Partial<Caregive
     const response = await axios.post(buildApiUrl("/test/create-caregiver"), { orgId, ...caregiver });
     return response.data as Caregiver;
   } catch (error) {
-    if (error instanceof Error) {
-      console.error('Failed to create a caregiver', {
-        message: error.message,
-        name: error.name,
-      });
-    } else if (axios.isAxiosError(error)) {
-      console.error('Failed to create a caregiver', {
-        message: error.message,
-        name: error.name,
-        config: error.config,
-        code: error.code,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-      });
-    } else {
-      console.error('Failed to create a caregiver', error);
+    if (!process.env.JEST_WORKER_ID) {
+      if (error instanceof Error) {
+        console.error('Failed to create a caregiver', {
+          message: error.message,
+          name: error.name,
+        });
+      } else if (axios.isAxiosError(error)) {
+        console.error('Failed to create a caregiver', {
+          message: error.message,
+          name: error.name,
+          config: error.config,
+          code: error.code,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+        });
+      } else {
+        console.error('Failed to create a caregiver', error);
+      }
     }
     throw new Error('Failed to create a caregiver');
   }
@@ -127,7 +129,9 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
               // If test endpoint returns 404, email verification might not be required in test mode
               // or the test endpoint might not be available - continue without verification
               if (err.response?.status === 404) {
-                console.log('Email verification test endpoint not available (404) - continuing without verification')
+                if (!process.env.JEST_WORKER_ID) {
+                  console.log('Email verification test endpoint not available (404) - continuing without verification')
+                }
                 break
               }
               throw err
@@ -144,25 +148,36 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
             const verifyToken = tokenMatch[1]
             // Verify the email (DEFAULT_API_CONFIG.url is "http://localhost:3000/v1")
             await axios.get(`${DEFAULT_API_CONFIG.url}/auth/verify-email?token=${verifyToken}`)
-          } else {
+          } else if (!process.env.JEST_WORKER_ID) {
             console.log('Could not extract verification token - continuing without verification')
           }
         }
       } catch (verifyError: any) {
-        // If verification fails (e.g., test endpoint not available), log and continue
-        // The test might still work if email verification isn't strictly required
-        console.log(`Email verification failed (may be acceptable): ${verifyError.message || JSON.stringify(verifyError.response?.data || verifyError)}`)
+        // If verification fails (e.g., test endpoint not available), log and continue (silent in test)
+        if (!process.env.JEST_WORKER_ID) {
+          console.log(`Email verification failed (may be acceptable): ${verifyError.message || JSON.stringify(verifyError.response?.data || verifyError)}`)
+        }
         // Don't throw - allow tests to continue and see if they work without verification
       }
     }
     
-    // Login to get tokens (register doesn't return tokens)
-    const loginResult = await authApi.endpoints.login.initiate({ email, password })(
-      appStore.dispatch, 
-      appStore.getState, 
-      {}
-    )
+    // Brief delay so backend can commit registration before login (reduces flakiness when suite runs in parallel)
+    await new Promise(resolve => setTimeout(resolve, 150))
     
+    // Login to get tokens (register doesn't return tokens)
+    let loginResult = await authApi.endpoints.login.initiate({ email, password })(
+      appStore.dispatch,
+      appStore.getState,
+      {},
+    )
+    if (("error" in loginResult || !loginResult.data) && process.env.JEST_WORKER_ID) {
+      await new Promise(resolve => setTimeout(resolve, 400))
+      loginResult = await authApi.endpoints.login.initiate({ email, password })(
+        appStore.dispatch,
+        appStore.getState,
+        {},
+      )
+    }
     if ("error" in loginResult || !loginResult.data) {
       throw new Error(`Login after registration failed: ${JSON.stringify(loginResult.error || 'Unknown error')}`)
     }
@@ -203,21 +218,25 @@ export async function registerNewOrgAndCaregiver(name: string, email: string, pa
   }
 }
 
-export async function createPatientInOrg(org: Org, email: string, password: string) {
-  const newPatient: Partial<Patient> = {
-    org: org.id,
-    name: "Test Patient",
+export async function createClientInOrg(org: Org, _email: string, _password: string) {
+  const newClient: Partial<Client> = {
+    org: org.id ?? undefined,
+    name: "Test Client",
     email: `test${Math.floor(Math.random() * 10000)}@example.com`,
     phone: "1234567890",
   }
-  const result = await patientApi.endpoints.createPatient.initiate({patient: newPatient})(
+  const result = await clientApi.endpoints.createClient.initiate({ client: newClient })(
     appStore.dispatch,
     appStore.getState,
     {},
   )
   if ("error" in result) {
-    throw new Error(`Create patient failed with error: ${JSON.stringify(result.error)}`)
-  } else {
-    return result.data as Patient
+    throw new Error(`Create client failed with error: ${JSON.stringify(result.error)}`)
   }
+  return result.data as Client
+}
+
+/** @deprecated Use createClientInOrg */
+export async function createPatientInOrg(org: Org, email: string, password: string) {
+  return createClientInOrg(org, email, password)
 }

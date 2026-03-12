@@ -20,7 +20,7 @@ const PHI_PATTERNS = [
   // MongoDB ObjectIds (patient IDs, conversation IDs, etc.) - only in specific contexts
   { pattern: /patient[^\s]*[:\s=]["']?[a-f0-9]{24}["']?/gi, replacement: 'patient=[ID_REDACTED]' },
   { pattern: /conversation[^\s]*[:\s=]["']?[a-f0-9]{24}["']?/gi, replacement: 'conversation=[ID_REDACTED]' },
-  { pattern: /"patientId"\s*:\s*"[a-f0-9]{24}"/g, replacement: '"patientId":"[ID_REDACTED]"' },
+  { pattern: /"clientId"\s*:\s*"[a-f0-9]{24}"/g, replacement: '"clientId":"[ID_REDACTED]"' },
   { pattern: /"conversationId"\s*:\s*"[a-f0-9]{24}"/g, replacement: '"conversationId":"[ID_REDACTED]"' },
   
   // JSON fields containing PHI

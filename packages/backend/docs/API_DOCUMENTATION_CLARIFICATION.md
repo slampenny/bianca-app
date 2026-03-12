@@ -12,7 +12,7 @@
 
 **Fully Documented Routes:**
 - `/v1/auth/*` - Authentication endpoints
-- `/v1/patients/*` - Patient management
+- `/v1/clients/*` - Client management
 - `/v1/alerts/*` - Alert system
 
 **Coverage:** ~60% of public routes

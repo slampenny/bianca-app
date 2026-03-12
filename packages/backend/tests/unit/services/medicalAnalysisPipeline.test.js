@@ -3,6 +3,7 @@
 // require('../../utils/integration-setup');
 
 // tests/unit/services/medicalAnalysisPipeline.test.js
+const logger = require('../../../src/config/logger');
 const MedicalPatternAnalyzer = require('../../../src/services/ai/medicalPatternAnalyzer.service');
 const medicalAnalysisScheduler = require('../../../src/services/ai/medicalAnalysisScheduler.service');
 const baselineManager = require('../../../src/services/ai/baselineManager.service');
@@ -40,11 +41,11 @@ describe('Medical Analysis Pipeline Integration', () => {
 
   describe('End-to-End Medical Analysis Pipeline', () => {
     it('should complete full analysis pipeline for cognitive decline patient', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Step 1: Create conversations from fixture data
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
       
@@ -60,7 +61,7 @@ describe('Medical Analysis Pipeline Integration', () => {
       // Use createdAt instead of startTime (Conversation model uses timestamps)
       const baselineConversations = conversations.filter(c => c && c.createdAt && c.createdAt.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      const baseline = await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
@@ -91,11 +92,11 @@ describe('Medical Analysis Pipeline Integration', () => {
     });
 
     it('should complete full analysis pipeline for psychiatric decline patient', async () => {
-      const patientId = medicalPatients.psychiatricDeclinePatient._id;
+      const clientId = medicalPatients.psychiatricDeclinePatient._id;
 
       // Step 1: Create conversations from fixture data
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         psychiatricDeclineConversations
       );
 
@@ -103,7 +104,7 @@ describe('Medical Analysis Pipeline Integration', () => {
       // Ensure conversations have startTime before filtering
       const baselineConversations = conversations.filter(c => c && c.startTime && c.startTime.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      const baseline = await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
@@ -135,11 +136,11 @@ describe('Medical Analysis Pipeline Integration', () => {
     });
 
     it('should complete full analysis pipeline for mixed decline patient', async () => {
-      const patientId = medicalPatients.mixedDeclinePatient._id;
+      const clientId = medicalPatients.mixedDeclinePatient._id;
 
       // Step 1: Create conversations from fixture data
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         mixedDeclineConversations
       );
 
@@ -147,7 +148,7 @@ describe('Medical Analysis Pipeline Integration', () => {
       // Ensure conversations have startTime before filtering
       const baselineConversations = conversations.filter(c => c && c.startTime && c.startTime.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      const baseline = await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
@@ -176,11 +177,11 @@ describe('Medical Analysis Pipeline Integration', () => {
     });
 
     it('should complete full analysis pipeline for stable patient', async () => {
-      const patientId = medicalPatients.stablePatient._id;
+      const clientId = medicalPatients.stablePatient._id;
 
       // Step 1: Create conversations from fixture data
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         stablePatientConversations
       );
 
@@ -188,7 +189,7 @@ describe('Medical Analysis Pipeline Integration', () => {
       // Ensure conversations have startTime before filtering
       const baselineConversations = conversations.filter(c => c && c.startTime && c.startTime.getMonth() === 0);
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      const baseline = await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      const baseline = await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Step 3: Analyze each subsequent month with baseline comparison
       const monthlyAnalyses = {};
@@ -215,17 +216,17 @@ describe('Medical Analysis Pipeline Integration', () => {
 
   describe('Medical Analysis Scheduler Integration', () => {
     it('should handle monthly analysis job for cognitive decline patient', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 
       // Mock job data
       const jobData = {
-        patientId,
+        clientId,
         trigger: 'monthly',
         batchId: 'test-batch-1'
       };
@@ -239,31 +240,31 @@ describe('Medical Analysis Pipeline Integration', () => {
       };
 
       // Mock conversation service (using correct method name)
-      const originalGetConversations = conversationService.getConversationsByPatientAndDateRange;
-      conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue(conversations);
+      const originalGetConversations = conversationService.getConversationsByClientAndDateRange;
+      conversationService.getConversationsByClientAndDateRange = jest.fn().mockResolvedValue(conversations);
 
       try {
         // Execute patient analysis job
-        await scheduler.handlePatientAnalysis(mockJob);
+        await scheduler.handleClientAnalysis(mockJob);
 
         // Verify conversation service was called with correct parameters
-        expect(conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
-          patientId,
+        expect(conversationService.getConversationsByClientAndDateRange).toHaveBeenCalledWith(
+          clientId,
           expect.any(Date),
           expect.any(Date)
         );
       } finally {
         // Restore original method
-        conversationService.getConversationsByPatientAndDateRange = originalGetConversations;
+        conversationService.getConversationsByClientAndDateRange = originalGetConversations;
       }
     });
 
     it('should handle analysis job with no conversations', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Mock job data
       const jobData = {
-        patientId,
+        clientId,
         trigger: 'monthly',
         batchId: 'test-batch-2'
       };
@@ -276,34 +277,34 @@ describe('Medical Analysis Pipeline Integration', () => {
         }
       };
 
-      // Mock conversation service to return empty array (using correct method name)
-      const originalGetConversations = conversationService.getConversationsByPatientAndDateRange;
-      conversationService.getConversationsByPatientAndDateRange = jest.fn().mockResolvedValue([]);
+      // Mock conversation service to return empty array (scheduler calls getConversationsByClientAndDateRange)
+      const originalGetConversations = conversationService.getConversationsByClientAndDateRange;
+      conversationService.getConversationsByClientAndDateRange = jest.fn().mockResolvedValue([]);
 
       try {
         // Execute patient analysis job
-        await scheduler.handlePatientAnalysis(mockJob);
+        await scheduler.handleClientAnalysis(mockJob);
 
         // Verify conversation service was called
-        expect(conversationService.getConversationsByPatientAndDateRange).toHaveBeenCalledWith(
-          patientId,
+        expect(conversationService.getConversationsByClientAndDateRange).toHaveBeenCalledWith(
+          clientId,
           expect.any(Date),
           expect.any(Date)
         );
       } finally {
         // Restore original method
-        conversationService.getConversationsByPatientAndDateRange = originalGetConversations;
+        conversationService.getConversationsByClientAndDateRange = originalGetConversations;
       }
     });
   });
 
   describe('Data Flow Integration', () => {
     it('should maintain data consistency across analysis components', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 
@@ -316,11 +317,11 @@ describe('Medical Analysis Pipeline Integration', () => {
       expect(analysis.messageCount).toBe(patientMessages.length);
 
       // Step 3: Establish baseline
-      const baseline = await baselineManager.establishBaseline(patientId, analysis);
-      expect(baseline.patientId).toBe(patientId);
+      const baseline = await baselineManager.establishBaseline(clientId, analysis);
+      expect(baseline.clientId).toBe(clientId);
 
       // Step 4: Compare with baseline
-      const deviation = await baselineManager.getDeviation(patientId, analysis);
+      const deviation = await baselineManager.getDeviation(clientId, analysis);
       expect(deviation.hasBaseline).toBe(true);
 
       // Verify data consistency
@@ -330,11 +331,11 @@ describe('Medical Analysis Pipeline Integration', () => {
     });
 
     it('should handle concurrent analysis requests', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 
@@ -364,11 +365,11 @@ describe('Medical Analysis Pipeline Integration', () => {
     });
 
     it('should handle analysis with mixed conversation types', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations with mixed message types
       const mixedConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 
@@ -376,7 +377,7 @@ describe('Medical Analysis Pipeline Integration', () => {
       const assistantOnlyConversations = [
         {
           _id: 'conv-assistant-only',
-          patientId,
+          clientId,
           messages: [
             { role: 'assistant', content: 'Hello, how are you feeling today?' },
             { role: 'assistant', content: 'I hope you are doing well.' }
@@ -400,21 +401,24 @@ describe('Medical Analysis Pipeline Integration', () => {
 
   describe('Error Handling Integration', () => {
     it('should handle analysis errors gracefully across pipeline', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 
       // Test error handling by passing invalid data that will cause internal error
       // The analyzer should catch errors and return error result instead of throwing
       const originalAnalyzeMonth = analyzer.analyzeMonth.bind(analyzer);
-      
+
       // Temporarily break the extractPatientMessages method to simulate an internal error
       const originalExtract = analyzer.extractPatientMessages;
       analyzer.extractPatientMessages = jest.fn().mockRejectedValue(new Error('Analysis service unavailable'));
+
+      // Suppress expected error log so test output is not confusing
+      const logErrorSpy = jest.spyOn(logger, 'error').mockImplementation(() => {});
 
       try {
         // Attempt analysis - should catch error and return error result
@@ -426,17 +430,17 @@ describe('Medical Analysis Pipeline Integration', () => {
         expect(errorWarningsText).toMatch(/Analysis failed/i);
         expect(result.confidence).toBe('none');
       } finally {
-        // Restore original method
         analyzer.extractPatientMessages = originalExtract;
+        logErrorSpy.mockRestore();
       }
     });
 
     it('should handle baseline manager errors gracefully', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 
@@ -449,7 +453,7 @@ describe('Medical Analysis Pipeline Integration', () => {
 
       try {
         // Attempt baseline establishment
-        await expect(baselineManager.establishBaseline(patientId, analysis))
+        await expect(baselineManager.establishBaseline(clientId, analysis))
           .rejects.toThrow('Baseline service unavailable');
       } finally {
         // Restore original method
@@ -458,7 +462,7 @@ describe('Medical Analysis Pipeline Integration', () => {
     });
 
     it('should handle conversation service errors gracefully', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Mock conversation service to throw error
       const originalGetConversations = conversationService.getConversationsByDateRange;
@@ -466,7 +470,7 @@ describe('Medical Analysis Pipeline Integration', () => {
 
       try {
         // Attempt to get conversations
-        await expect(conversationService.getConversationsByDateRange(patientId, new Date(), new Date()))
+        await expect(conversationService.getConversationsByDateRange(clientId, new Date(), new Date()))
           .rejects.toThrow('Database connection failed');
       } finally {
         // Restore original method
@@ -477,11 +481,11 @@ describe('Medical Analysis Pipeline Integration', () => {
 
   describe('Performance Integration', () => {
     it('should complete analysis within reasonable time limits', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 
@@ -498,13 +502,13 @@ describe('Medical Analysis Pipeline Integration', () => {
     });
 
     it('should handle large conversation datasets efficiently', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create large conversation dataset
       const largeConversations = [];
       for (let i = 0; i < 10; i++) {
         const conversations = await createConversationsFromFixture(
-          patientId,
+          clientId,
           cognitiveDeclineConversations
         );
         largeConversations.push(...conversations);
@@ -524,11 +528,11 @@ describe('Medical Analysis Pipeline Integration', () => {
 
   describe('Data Validation Integration', () => {
     it('should validate analysis results across all components', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create conversations
       const conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         cognitiveDeclineConversations
       );
 

@@ -43,7 +43,7 @@ class OpenAISentimentService {
         messages: [
           {
             role: 'system',
-            content: 'You are an expert sentiment analysis AI specialized in healthcare conversations. Analyze the emotional tone, mood, and sentiment of patient conversations with care and accuracy.'
+            content: 'You are an expert sentiment analysis AI specialized in healthcare conversations. Analyze the emotional tone, mood, and sentiment of client conversations with care and accuracy.'
           },
           {
             role: 'user',
@@ -89,7 +89,7 @@ class OpenAISentimentService {
    * @returns {string} The formatted prompt
    */
   buildSentimentPrompt(conversationText, detailed) {
-    const basePrompt = `Please analyze the sentiment and emotional tone of this healthcare conversation between a patient and an AI assistant named Bianca.
+    const basePrompt = `Please analyze the sentiment and emotional tone of this healthcare conversation between a client and an AI assistant named Bianca.
 
 CONVERSATION:
 ${conversationText}
@@ -102,7 +102,7 @@ Please provide your analysis in the following JSON format:`;
   "overallSentiment": "positive|negative|neutral|mixed",
   "sentimentScore": -1.0 to 1.0,
   "confidence": 0.0 to 1.0,
-  "patientMood": "description of patient's emotional state",
+  "clientMood": "description of client's emotional state",
   "keyEmotions": ["emotion1", "emotion2", "emotion3"],
   "concernLevel": "low|medium|high",
   "satisfactionIndicators": {
@@ -206,7 +206,7 @@ Please provide your analysis in the following JSON format:`;
       
       // Get the conversation and its messages
       const conversation = await Conversation.findById(conversationId)
-        .populate('patientId', 'name age')
+        .populate('clientId', 'name age')
         .lean();
 
       if (!conversation) {
@@ -226,7 +226,7 @@ Please provide your analysis in the following JSON format:`;
       // Format conversation text
       const conversationText = messages
         .map(msg => {
-          const speaker = msg.role === 'assistant' ? 'Bianca' : 'Patient';
+          const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
           return `${speaker}: ${msg.content}`;
         })
         .join('\n');

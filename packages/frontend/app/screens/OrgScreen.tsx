@@ -67,7 +67,7 @@ export function OrgScreen() {
   const [retryIntervalMinutes, setRetryIntervalMinutes] = useState("15")
   const [retriesEnabled, setRetriesEnabled] = useState(true)
   const [alertOnAllMissedCalls, setAlertOnAllMissedCalls] = useState(false)
-  const [requirePatientConsent, setRequirePatientConsent] = useState(false)
+  const [requireClientConsent, setRequireClientConsent] = useState(false)
   const [timezone, setTimezone] = useState("America/New_York")
   const [country, setCountry] = useState<string>("CA")
 
@@ -106,8 +106,8 @@ export function OrgScreen() {
           setRetryIntervalMinutes("15")
           setAlertOnAllMissedCalls(false)
         }
-        // Initialize requirePatientConsent
-        setRequirePatientConsent(currentOrg.requirePatientConsent ?? false)
+        // Initialize requireClientConsent
+        setRequireClientConsent(currentOrg.requireClientConsent ?? false)
         setIsLoading(false)
         return
       }
@@ -115,9 +115,10 @@ export function OrgScreen() {
       // If user has an org reference but org not in Redux, fetch it
       if (currentUser?.org && !currentOrg) {
         try {
-          const orgResponse = await dispatch(orgApi.endpoints.getOrg.initiate({ orgId: currentUser.org }))
-          if (orgResponse.data) {
-            dispatch(setOrg(orgResponse.data))
+          const thunkResult = (dispatch as (arg: unknown) => { unwrap: () => Promise<import("app/services/api/api.types").Org> })(orgApi.endpoints.getOrg.initiate({ orgId: currentUser.org }))
+          const orgData = await thunkResult.unwrap()
+          if (orgData) {
+            dispatch(setOrg(orgData))
             // The useEffect will run again when currentOrg updates
           } else {
             // No org found - stop loading to show the screen
@@ -160,7 +161,7 @@ export function OrgScreen() {
             logo,
             timezone,
             country,
-            requirePatientConsent,
+            requireClientConsent,
             callRetrySettings: {
               retryCount: validRetryCount,
               retryIntervalMinutes: validRetryMinutes,
@@ -367,12 +368,13 @@ export function OrgScreen() {
           
           <Toggle
             variant="switch"
-            label="Require Patient Consent"
-            helper="When enabled, consent requests will be automatically sent to patients via email."
-            value={requirePatientConsent}
-            onValueChange={setRequirePatientConsent}
+            label="Require Client Consent"
+            helper="When enabled, consent requests will be automatically sent to clients via email."
+            value={requireClientConsent}
+            onValueChange={setRequireClientConsent}
             editable={canEditOrg}
             containerStyle={styles.inputContainer}
+            testID="require-client-consent-toggle"
           />
         </View>
 
@@ -603,6 +605,15 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: colors.palette.neutral300,
+  },
+  pickerWrapper: {
+    marginTop: 8,
+  },
+  picker: {
+    color: colors.palette.biancaHeader,
+  },
+  pickerItem: {
+    color: colors.palette.biancaHeader,
   },
   callRetrySection: {
     marginTop: 20,

@@ -456,12 +456,12 @@ describe('BreachLog Model', () => {
         type: 'data_exfiltration_attempt',
         severity: 'CRITICAL',
         details: 'Data breach',
-        affectedResourceType: 'patient',
-        affectedResourceIds: ['patient-1', 'patient-2', 'patient-3'],
+        affectedResourceType: 'client',
+        affectedResourceIds: ['client-1', 'client-2', 'client-3'],
         affectedCount: 3
       });
 
-      expect(breach.affectedResourceType).toBe('patient');
+      expect(breach.affectedResourceType).toBe('client');
       expect(breach.affectedResourceIds).toHaveLength(3);
       expect(breach.affectedCount).toBe(3);
     });

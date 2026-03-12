@@ -9,7 +9,7 @@ const en = {
     emptyHeading: "So empty... so sad",
     refreshing: "Refreshing...",
     refresh: "Refresh",
-    patient: "Patient:",
+    client: "Client:",
     importance: "Importance:",
     expires: "Expires:",
   },
@@ -168,28 +168,29 @@ const en = {
     title: "Conversations",
     yesterday: "Yesterday",
     noMessages: "No messages",
-    noPatientSelected: "No patient selected",
-    firstConversation: "No previous conversations found. This will be the first conversation with this patient.",
+    noClientSelected: "No client selected",
+    firstConversation: "No previous conversations found. This will be the first conversation with this client.",
     noConversationsToDisplay: "No conversations to display",
-    noPreviousConversations: "No previous conversations found for this patient",
+    noPreviousConversations: "No previous conversations found for this client",
     errorFetchingConversations: "Error fetching conversations",
+    loadingMoreConversations: "Loading more conversations...",
   },
-  patientScreen: {
+  clientScreen: {
     nameLabel: "Name *",
-    namePlaceholder: "Enter patient name",
+    namePlaceholder: "Enter client name",
     emailLabel: "Email *",
     emailPlaceholder: "Enter email address",
     phoneLabel: "Phone *",
     phonePlaceholder: "Enter phone number",
     preferredLanguageLabel: "Preferred Language",
-    updatePatient: "UPDATE PATIENT",
-    createPatient: "CREATE PATIENT",
+    updateClient: "UPDATE CLIENT",
+    createClient: "CREATE CLIENT",
     manageSchedules: "MANAGE SCHEDULES",
     manageConversations: "MANAGE CONVERSATIONS",
     viewSentimentAnalysis: "VIEW SENTIMENT ANALYSIS",
     manageCaregivers: "MANAGE CAREGIVERS",
     confirmDelete: "CONFIRM DELETE",
-    deletePatient: "DELETE PATIENT",
+    deleteClient: "DELETE CLIENT",
   },
   paymentScreen: {
     paid: "Paid",
@@ -222,10 +223,10 @@ const en = {
     lastDays: "Last {days} days",
     day: "day",
     days: "days",
-    patientsWithCharges: "Patients with Charges:",
-    patient: "patient",
-    patients: "patients",
-    chargesByPatient: "Charges by Patient",
+    clientsWithCharges: "Clients with Charges:",
+    patient: "client",
+    patients: "clients",
+    chargesByClient: "Charges by Client",
     conversation: "conversation",
     conversations: "conversations",
     average: "Average:",
@@ -271,16 +272,29 @@ const en = {
     anErrorOccurred: "An error occurred",
   },
   orgScreen: {
-    namePlaceholder: "Name",
+    namePlaceholder: "Organization Name",
     emailPlaceholder: "Email",
     phonePlaceholder: "Phone",
-    save: "SAVE",
+    save: "Save",
     viewCaregivers: "View Caregivers",
     inviteCaregiver: "Invite Caregiver",
     payments: "Payments",
     organizationActions: "Organization Actions",
     organizationLogo: "Organization Logo",
     noLogoSet: "No logo set",
+    country: "Country",
+    countryHelper: "Select your organization's country. This helps determine applicable privacy regulations.",
+    timezone: "Timezone",
+    timezoneHelper: "Select your organization's timezone. Schedule times will be based on this timezone.",
+    callRetrySettings: "Call Retry Settings",
+    enableRetriesLabel: "Enable Call Retries",
+    enableRetriesHelper: "When enabled, the system will automatically retry failed calls",
+    retryCountLabel: "Call Retry Count",
+    retryCountHelper: "Number of times to retry a call if it's not answered (1-5)",
+    retryIntervalMinutesLabel: "Retry Interval (Minutes)",
+    retryIntervalMinutesHelper: "Time to wait between retry attempts (1-60 minutes, default: 15)",
+    alertOnAllMissedCallsLabel: "Alert on All Missed Calls",
+    alertOnAllMissedCallsHelper: "Send alerts for every missed call and retry attempt",
   },
   caregiverScreen: {
     nameLabel: "Name",
@@ -289,20 +303,20 @@ const en = {
     emailPlaceholder: "Email",
     phoneLabel: "Phone",
     phonePlaceholder: "Phone",
-    loadingUnassignedPatients: "Loading unassigned patients...",
-    assigningPatients: "Assigning patients...",
-    patientsAssignedSuccess: "Patients assigned successfully!",
+    loadingUnassignedClients: "Loading unassigned clients...",
+    assigningClients: "Assigning clients...",
+    clientsAssignedSuccess: "Clients assigned successfully!",
     loadingCaregivers: "Loading caregivers...",
     save: "SAVE",
     invite: "INVITE",
     confirmDelete: "CONFIRM DELETE",
     deleteCaregiver: "DELETE CAREGIVER",
-    assignUnassignedPatients: "Assign Unassigned Patients",
-    assignUnassignedPatientsTitle: "Assign Unassigned Patients",
+    assignUnassignedClients: "Assign Unassigned Clients",
+    assignUnassignedClientsTitle: "Assign Unassigned Clients",
     selectAll: "Select All",
     deselectAll: "Deselect All",
     assignSelected: "Assign Selected",
-    noUnassignedPatientsFound: "No unassigned patients found.",
+    noUnassignedClientsFound: "No unassigned clients found.",
   },
   caregiversScreen: {
     invited: "Invited",
@@ -339,9 +353,9 @@ const en = {
   homeScreen: {
     welcome: "Welcome, {{name}}",
     guest: "Guest",
-    addPatient: "Add Patient",
-    adminOnlyMessage: "Only org admins and super admins can add patients",
-    noPatientsFound: "No patients found",
+    addClient: "Add Client",
+    adminOnlyMessage: "Only org admins and super admins can add clients",
+    noClientsFound: "No clients found",
     viewSchedules: "View Schedules",
     noScheduleWarning: "⚠ No schedule set",
   },
@@ -366,6 +380,53 @@ const en = {
     endCall: "End Call",
     loading: "Loading...",
     delete: "Delete",
+    continue: "Continue",
+  },
+  onboarding: {
+    aboutYou: {
+      title: "Tell us a bit about you",
+      subtitle: "This helps us tailor your experience.",
+      organization: "Organization",
+      caregiver: "Caregiver",
+      agingInPlace: "Aging in place",
+    },
+    howItWorks: {
+      title: "How Bianca works",
+      next: "Next",
+      getStarted: "Get started",
+      organization: "Add your clients, schedule when Bianca should call them, and review conversations and reports in one place. Bianca handles the calls so you can focus on care.",
+      caregiver: "Add the people you care for, choose when Bianca calls them, and see how they're doing through conversations and reports. You stay in the loop without being on every call.",
+      agingInPlace: "Bianca calls you on your schedule for friendly check-ins. You can review your own wellness and reports anytime. It's like having a companion who's always there when you need them.",
+    },
+    orgInfo: {
+      title: "Organization information",
+      subtitle: "Tell us about your organization.",
+      orgNameLabel: "Organization name",
+      orgNamePlaceholder: "Enter your organization name",
+      countryLabel: "Country",
+      timezoneLabel: "Timezone",
+    },
+    registration: {
+      title: "Your details",
+      subtitle: "Confirm your information and accept the terms to continue.",
+      nameRequired: "Name is required.",
+      emailRequired: "Email is required.",
+      termsRequired: "You must accept the Terms of Service and Privacy Policy to continue.",
+    },
+    termsAndConsent: {
+      title: "Terms and consent",
+      acceptTerms: "I have read and accept the",
+      termsLink: "Terms of Service",
+      and: "and",
+      privacyLink: "Privacy Policy",
+      acceptTermsLabel: "Accept Terms of Service and Privacy Policy",
+      singleConsentQuestion: "Are you in a single-consent state? (Only one party needs to consent to recording.)",
+      whyImportant: "Why is this important?",
+      whyImportantBody: "Call recording laws vary by state and country. In single-consent (one-party) states, only one person needs to agree to recording. In two-party states, everyone on the call must consent. Getting this right keeps you and your organization compliant.",
+      yes: "Yes",
+      no: "No",
+      saveAndContinue: "Save and continue",
+    },
   },
   legalLinks: {
     privacyPolicy: "Privacy Policy",
@@ -398,7 +459,7 @@ Under PIPEDA, you have the right to:
 We collect the following types of personal information:
 
 * **Personal Data:** Your name, email address, phone number, and account credentials
-* **Patient/Recipient Information:** Name and phone number of individuals you call through our service
+* **Client/Recipient Information:** Name and phone number of individuals you call through our service
 * **Call Data:** Recordings, transcriptions, metadata, and wellness information from calls
 * **Derivative Data:** Device information, IP address, and usage patterns
 * **AI Analysis Data:** Results and insights generated from call analysis
@@ -413,7 +474,7 @@ We collect your personal information for the following purposes:
 * To provide wellness check call services
 * To record and transcribe calls (with consent)
 * To analyze calls and provide wellness summaries
-* To enable communication between caregivers and patients
+* To enable communication between caregivers and clients
 * To improve our services and AI models
 * To comply with legal obligations
 
@@ -461,7 +522,7 @@ Your personal information may be transferred to and stored in the United States.
 
 We retain your personal information only as long as necessary for the purposes outlined in this policy, or as required by law:
 
-- **Patient data:** 7 years after last activity
+- **Client data:** 7 years after last activity
 - **Call recordings:** 2 years
 - **Conversations:** 5 years
 - **Medical analysis:** 7 years
@@ -651,7 +712,7 @@ Excludes: Disclosures for treatment, payment, and operations (unless you request
 **For Healthcare Operations**:
 - Improve our AI detection algorithms
 - Quality assurance and improvement
-- Training our systems to better serve patients
+- Training our systems to better serve clients
 
 ---
 
@@ -685,7 +746,7 @@ All business associates sign Business Associate Agreements and must protect your
 # HEALTH INFORMATION WE COLLECT
 
 **During Use of Our Services**:
-- Patient name, phone number, date of birth
+- Client name, phone number, date of birth
 - Call recordings and transcriptions
 - Health-related information from calls (symptoms, medications, mood)
 - Emergency alerts and incidents
@@ -761,7 +822,8 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
   },
   headers: {
     home: "Home",
-    patient: "Patient",
+    patient: "Client",
+    client: "Client",
     schedule: "Schedule",
     conversations: "Conversations",
     call: "Call",
@@ -815,14 +877,14 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     lastCall: "Last Call",
     last30Days: "Last 30 Days",
     allTime: "All Time",
-    noPatientSelected: "No Patient Selected",
-    selectPatientToView: "Please select a patient from the Home screen to view their sentiment analysis.",
+    noClientSelected: "No Client Selected",
+    selectClientToView: "Please select a client from the Home screen to view their sentiment analysis.",
     // Dashboard
-    patientSentimentAnalysis: "Patient Sentiment Analysis",
+    clientSentimentAnalysis: "Client Sentiment Analysis",
     emotionalWellnessInsights: "Emotional wellness insights and trends",
     timeRange: "Time Range:",
     noSentimentDataAvailable: "No Sentiment Data Available",
-    noSentimentDataMessage: "Sentiment analysis will appear here once the patient has completed conversations.",
+    noSentimentDataMessage: "Sentiment analysis will appear here once the client has completed conversations.",
     loadingSentimentAnalysis: "Loading sentiment analysis...",
     sentimentAnalysisFooter: "Sentiment analysis is automatically generated after each conversation using AI technology.",
     // Summary Card
@@ -843,7 +905,7 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     noRecentConversations: "No recent conversations with sentiment analysis",
     keyEmotions: "Key Emotions:",
     moreEmotions: "more",
-    patientMood: "Patient Mood:",
+    clientMood: "Client Mood:",
     concern: "concern",
     confidence: "confidence",
     noSentimentAnalysisAvailable: "No sentiment analysis available",
@@ -870,10 +932,9 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     scoreRange: "Score Range: -1.0 (Very Negative) to +1.0 (Very Positive)",
     analysisConfidence: "Analysis Confidence:",
     keyEmotionsDetected: "Key Emotions Detected",
-    patientMoodAssessment: "Patient Mood Assessment",
+    clientMoodAssessment: "Client Mood Assessment",
     concernLevel: "Concern Level",
-    concern: "CONCERN",
-    lowConcernDescription: "The patient appears to be in good spirits with minimal concerns.",
+    lowConcernDescription: "The client appears to be in good spirits with minimal concerns.",
     mediumConcernDescription: "Some areas of concern were noted during the conversation.",
     highConcernDescription: "Significant concerns were identified that may require attention.",
     satisfactionIndicators: "Satisfaction Indicators",
@@ -891,10 +952,8 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     testing: "Testing...",
     testDirectApiCall: "Test Direct API Call",
     forceRefreshCache: "Force Refresh Cache",
-    currentPatient: "Current Patient:",
-    noPatientSelected: "No patient selected",
+    currentClient: "Current Client:",
     debugResults: "Debug Results",
-    totalConversations: "Total Conversations",
     withoutSentiment: "Without Sentiment",
     successfullyAnalyzed: "Successfully Analyzed",
     failedAnalyses: "Failed Analyses",
@@ -904,15 +963,14 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     score: "Score",
     mood: "Mood",
     emotions: "Emotions",
-    concernLevel: "Concern Level",
     failed: "Failed",
     noAnalysisPerformed: "No analysis performed",
     cacheRefreshed: "Cache Refreshed",
     cacheRefreshedMessage: "Sentiment analysis cache has been invalidated. The UI should refresh automatically.",
     debugComplete: "Debug Complete",
     debugFailed: "Debug Failed",
-    noPatient: "No Patient",
-    pleaseSelectPatient: "Please select a patient first",
+    noClient: "No Client",
+    pleaseSelectClient: "Please select a client first",
     conversationDebugComplete: "Conversation Debug Complete",
     directApiTest: "Direct API Test",
   },
@@ -920,15 +978,15 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     title: "Medical Analysis",
     error: "Error",
     success: "Success",
-    noPatientSelected: "No patient selected",
-    selectPatientToView: "Please select a patient to view medical analysis",
+    noClientSelected: "No client selected",
+    selectClientToView: "Please select a client to view medical analysis",
     triggering: "Triggering...",
     triggerAnalysis: "Trigger Analysis",
     loadingResults: "Loading analysis results...",
     noResultsAvailable: "No analysis results available",
     triggerToGetStarted: "Trigger an analysis to get started",
     analysisWillAppearAfterCalls: "Analysis results will appear here after calls are completed.",
-    insufficientDataWarning: "Limited data available: {{current}} call(s) analyzed. For more reliable analysis, {{minimum}} or more calls over a longer period are recommended to better understand patient patterns.",
+    insufficientDataWarning: "Limited data available: {{current}} call(s) analyzed. For more reliable analysis, {{minimum}} or more calls over a longer period are recommended to better understand client patterns.",
     cognitiveHealth: "Cognitive Health",
     mentalHealth: "Mental Health",
     language: "Language",
@@ -999,15 +1057,15 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     title: "Fraud & Abuse Analysis",
     error: "Error",
     success: "Success",
-    noPatientSelected: "No patient selected",
-    selectPatientToView: "Please select a patient to view fraud and abuse analysis",
+    noClientSelected: "No client selected",
+    selectClientToView: "Please select a client to view fraud and abuse analysis",
     triggering: "Triggering...",
     triggerAnalysis: "Trigger Analysis",
     loadingResults: "Loading analysis results...",
     noResultsAvailable: "No analysis results available",
     triggerToGetStarted: "Trigger an analysis to get started",
     analysisWillAppearAfterCalls: "Analysis results will appear here after calls are completed.",
-    insufficientDataWarning: "Limited data available: {{current}} call(s) analyzed. For more reliable analysis, {{minimum}} or more calls over a longer period are recommended to better understand patient patterns.",
+    insufficientDataWarning: "Limited data available: {{current}} call(s) analyzed. For more reliable analysis, {{minimum}} or more calls over a longer period are recommended to better understand client patterns.",
     loadFailed: "Failed to load fraud/abuse analysis results",
     triggerFailed: "Failed to trigger fraud/abuse analysis",
     triggerSuccess: "Fraud/abuse analysis completed successfully.",
@@ -1046,6 +1104,7 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     selectTheme: "Select Theme",
     namePlaceholder: "Name",
     emailPlaceholder: "Email",
+    emailManagedBySSO: "Email is managed by your sign-in provider and cannot be changed.",
     phonePlaceholder: "Phone",
     yourProfile: "Your Profile",
     updateProfile: "UPDATE PROFILE",
@@ -1074,13 +1133,13 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     fontSizeHint: "Adjust font size from 80% to 200%",
   },
   reportsScreen: {
-    selectPatient: "Select Patient:",
-    choosePatient: "Choose a patient...",
+    selectClient: "Select Client:",
+    chooseClient: "Choose a client...",
     sentiment: "Sentiment",
     medicalAnalysis: "Medical Analysis",
     fraudAbuseAnalysis: "Fraud & Abuse",
     comingSoon: "Coming Soon",
-    modalTitle: "Select Patient",
+    modalTitle: "Select Client",
     modalCancel: "Cancel",
   },
   schedulesScreen: {
@@ -1092,26 +1151,6 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     errorLoadingSchedules: "Error loading schedules.",
     invalidScheduleError: "Please fill in all required schedule fields (frequency, time, and days for weekly/monthly schedules).",
     errorSavingSchedule: "Error saving schedule.",
-  },
-  conversationsScreen: {
-    title: "Conversations",
-    yesterday: "Yesterday",
-    noMessages: "No messages",
-    noPatientSelected: "No patient selected",
-    firstConversation: "No previous conversations found. This will be the first conversation with this patient.",
-    noConversationsToDisplay: "No conversations to display",
-    noPreviousConversations: "No previous conversations found for this patient",
-    errorFetchingConversations: "Error fetching conversations",
-    loadingMoreConversations: "Loading more conversations...",
-  },
-  caregiversScreen: {
-    invited: "Invited",
-    edit: "Edit",
-    resendInvite: "Resend Invite",
-    noCaregiversFound: "No caregivers found",
-    notAuthorized: "Not Authorized",
-    noPermissionToView: "You don't have permission to view caregivers",
-    addCaregiver: "Add Caregiver",
   },
   themes: {
     healthcare: {
@@ -1180,31 +1219,6 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     enableFailed: "Failed to enable MFA",
     disableFailed: "Failed to disable MFA. Please check your code.",
     regenerateFailed: "Failed to regenerate backup codes.",
-  },
-  orgScreen: {
-    organizationLogo: "Organization Logo",
-    noLogoSet: "No logo set",
-    namePlaceholder: "Organization Name",
-    emailPlaceholder: "Email",
-    phonePlaceholder: "Phone",
-    save: "Save",
-    organizationActions: "Organization Actions",
-    viewCaregivers: "View Caregivers",
-    inviteCaregiver: "Invite Caregiver",
-    payments: "Payments",
-    country: "Country",
-    countryHelper: "Select your organization's country. This helps determine applicable privacy regulations.",
-    timezone: "Timezone",
-    timezoneHelper: "Select your organization's timezone. Schedule times will be based on this timezone.",
-    callRetrySettings: "Call Retry Settings",
-    enableRetriesLabel: "Enable Call Retries",
-    enableRetriesHelper: "When enabled, the system will automatically retry failed calls",
-    retryCountLabel: "Call Retry Count",
-    retryCountHelper: "Number of times to retry a call if it's not answered (1-5)",
-    retryIntervalMinutesLabel: "Retry Interval (Minutes)",
-    retryIntervalMinutesHelper: "Time to wait between retry attempts (1-60 minutes, default: 15)",
-    alertOnAllMissedCallsLabel: "Alert on All Missed Calls",
-    alertOnAllMissedCallsHelper: "Send alerts for every missed call and retry attempt",
   },
   privacyRequestScreen: {
     title: "Request My Data",
@@ -1276,3 +1290,10 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
 
 export default en
 export type Translations = typeof en
+/** Use for locale files so they can omit keys (fallback to en) or have legacy keys during migration. */
+export type LocaleTranslations = { [key: string]: any }
+
+
+
+
+

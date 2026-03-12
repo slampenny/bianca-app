@@ -97,7 +97,7 @@
 #### 7. **File Upload Endpoints**
 - **Routes:**
   - POST `/v1/caregivers/{id}/avatar` (if exists)
-  - POST `/v1/patients/{id}/avatar` (if exists)
+  - POST `/v1/clients/{id}/avatar` (if exists)
   - POST `/v1/openai/upload-debug-audio`
 - **Risk:** Storage abuse, DoS
 - **Recommendation:**
@@ -108,13 +108,13 @@
 
 ### 🟢 Low Priority (General Protection)
 
-#### 8. **Patient Data Endpoints**
+#### 8. **Client Data Endpoints**
 - **Routes:**
-  - GET `/v1/patients` (list)
-  - GET `/v1/patients/{id}`
-  - POST `/v1/patients` (create)
-  - PUT `/v1/patients/{id}`
-  - DELETE `/v1/patients/{id}`
+  - GET `/v1/clients` (list)
+  - GET `/v1/clients/{id}`
+  - POST `/v1/clients` (create)
+  - PUT `/v1/clients/{id}`
+  - DELETE `/v1/clients/{id}`
 - **Risk:** Data scraping, enumeration
 - **Recommendation:**
   - **Limit:** 100 requests per 15 minutes per user

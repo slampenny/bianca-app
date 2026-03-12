@@ -3,10 +3,10 @@ const conversationFixture = require('../../../tests/fixtures/conversation.fixtur
 
 /**
  * Add declining patient conversations to show progression over time
- * @param {string} patientId - The patient ID to add conversations for
+ * @param {string} clientId - The client ID to add conversations for
  */
-async function addDecliningPatientConversations(patientId) {
-  console.log('Adding declining patient conversations for patient:', patientId);
+async function addDecliningPatientConversations(clientId) {
+  console.log('Adding declining patient conversations for client:', clientId);
   
   const decliningConversations = [];
   
@@ -17,7 +17,7 @@ async function addDecliningPatientConversations(patientId) {
   // Create Call object first
   const call1 = new Call({
     callSid: `TEST_CALL_DECLINING_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    patientId: patientId,
+    clientId,
     callType: 'wellness-check',
     status: 'completed',
     callStatus: 'ended',
@@ -35,11 +35,11 @@ async function addDecliningPatientConversations(patientId) {
   
   const conv1 = new Conversation({
     callId: call1._id,
-    patientId: patientId,
+    clientId,
     messages: [],
-    history: 'Patient discussing medication management and overall health status.',
+    history: 'Client discussing medication management and overall health status.',
     analyzedData: {},
-    metadata: { source: 'declining_patient_seed', month: 1 },
+    metadata: { source: 'declining_client_seed', month: 1 },
     createdAt: month1Date,
     updatedAt: month1Date,
     startTime: month1Date,
@@ -53,7 +53,7 @@ async function addDecliningPatientConversations(patientId) {
   await conv1.save();
   
   const msg1 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'Good morning! I hope you are having a wonderful day. I wanted to discuss my medication schedule with you today. I take my blood pressure medication every morning at 8 AM, and I have been very consistent with it. I feel good and I have energy. I am managing my health well and everything is going smoothly. My memory has been sharp and I have been able to keep track of all my appointments and medications without any issues.',
     conversationId: conv1._id
   });
@@ -71,10 +71,10 @@ async function addDecliningPatientConversations(patientId) {
 
 /**
  * Add normal patient conversations
- * @param {string} patientId - The patient ID to add conversations for
+ * @param {string} clientId - The client ID to add conversations for
  */
-async function addNormalPatientConversations(patientId) {
-  console.log('Adding normal patient conversations for patient:', patientId);
+async function addNormalPatientConversations(clientId) {
+  console.log('Adding normal patient conversations for client:', clientId);
   // Implementation similar to declining conversations but with stable/improving content
   // Simplified for now - can expand later
   return [];
@@ -82,10 +82,10 @@ async function addNormalPatientConversations(patientId) {
 
 /**
  * Add recent patient conversations (within last 30 days)
- * @param {string} patientId - The patient ID to add conversations for
+ * @param {string} clientId - The client ID to add conversations for
  */
-async function addRecentPatientConversations(patientId) {
-  console.log('Adding recent patient conversations for patient:', patientId);
+async function addRecentPatientConversations(clientId) {
+  console.log('Adding recent patient conversations for client:', clientId);
   
   const recentConversations = [];
   const daysAgo = [2, 7, 14];
@@ -99,7 +99,7 @@ async function addRecentPatientConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_RECENT_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -117,7 +117,7 @@ async function addRecentPatientConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId,
       messages: [],
       history: `Recent wellness check conversation from ${days} days ago.`,
       analyzedData: {},
@@ -136,7 +136,7 @@ async function addRecentPatientConversations(patientId) {
     
     const messages = [
       {
-        role: 'patient',
+        role: 'client',
         content: i === 0 
           ? 'Good morning! I am feeling really good today. I had a great week and I am very happy with how things are going. My medications are working well and I have been sleeping better. I feel positive and optimistic about the future.'
           : i === 1
@@ -172,7 +172,7 @@ async function addRecentPatientConversations(patientId) {
 
 /**
  * Seed conversations using fixtures
- * @param {Object} patient - Patient to seed conversations for
+ * @param {Object} client - Client to seed conversations for
  * @returns {Promise<Array>} Array of created conversations
  */
 async function seedConversations(patient) {
@@ -180,10 +180,10 @@ async function seedConversations(patient) {
   const { conversationOne, conversationTwo, insertConversations } = conversationFixture;
   
   // insertConversations expects just an array of conversations
-  // Set patientId on the conversation objects
+  // Set clientId on the conversation objects
   const conversationsToInsert = [
-    { ...conversationOne, patientId: patient._id },
-    { ...conversationTwo, patientId: patient._id }
+    { ...conversationOne, clientId: patient._id },
+    { ...conversationTwo, clientId: patient._id }
   ];
   
   const conversations = await insertConversations(conversationsToInsert);
@@ -195,10 +195,10 @@ async function seedConversations(patient) {
 /**
  * Add fraud/abuse pattern conversations for testing
  * Creates conversations showing financial exploitation, abuse, and neglect patterns
- * @param {string} patientId - The patient ID to add conversations for
+ * @param {string} clientId - The client ID to add conversations for
  */
-async function addFraudAbuseConversations(patientId) {
-  console.log('Adding fraud/abuse pattern conversations for patient:', patientId);
+async function addFraudAbuseConversations(clientId) {
+  console.log('Adding fraud/abuse pattern conversations for client:', clientId);
   
   const conversations = [];
   const now = new Date();
@@ -224,7 +224,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_FINANCIAL_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -242,7 +242,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId,
       messages: [],
       history: `Financial exploitation pattern conversation ${i + 1}`,
       analyzedData: {},
@@ -260,7 +260,7 @@ async function addFraudAbuseConversations(patientId) {
     await conv.save();
     
     const msg = new Message({
-      role: 'patient',
+      role: 'client',
       content: financialMessages[i],
       conversationId: conv._id
     });
@@ -288,7 +288,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_ABUSE_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -306,7 +306,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId,
       messages: [],
       history: `Physical abuse pattern conversation ${i + 1}`,
       analyzedData: {},
@@ -324,7 +324,7 @@ async function addFraudAbuseConversations(patientId) {
     await conv.save();
     
     const msg = new Message({
-      role: 'patient',
+      role: 'client',
       content: abuseMessages[i],
       conversationId: conv._id
     });
@@ -352,7 +352,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_EMOTIONAL_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -370,7 +370,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId,
       messages: [],
       history: `Emotional abuse pattern conversation ${i + 1}`,
       analyzedData: {},
@@ -388,7 +388,7 @@ async function addFraudAbuseConversations(patientId) {
     await conv.save();
     
     const msg = new Message({
-      role: 'patient',
+      role: 'client',
       content: emotionalMessages[i],
       conversationId: conv._id
     });
@@ -416,7 +416,7 @@ async function addFraudAbuseConversations(patientId) {
     // Create Call object first
     const call = new Call({
       callSid: `TEST_CALL_NEGLECT_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 9)}`,
-      patientId: patientId,
+      clientId,
       callType: 'wellness-check',
       status: 'completed',
       callStatus: 'ended',
@@ -434,7 +434,7 @@ async function addFraudAbuseConversations(patientId) {
     
     const conv = new Conversation({
       callId: call._id,
-      patientId: patientId,
+      clientId,
       messages: [],
       history: `Neglect pattern conversation ${i + 1}`,
       analyzedData: {},
@@ -452,7 +452,7 @@ async function addFraudAbuseConversations(patientId) {
     await conv.save();
     
     const msg = new Message({
-      role: 'patient',
+      role: 'client',
       content: neglectMessages[i],
       conversationId: conv._id
     });

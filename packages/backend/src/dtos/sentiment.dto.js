@@ -7,6 +7,7 @@ const SentimentAnalysisDTO = (sentimentData) => {
     overallSentiment,
     sentimentScore,
     confidence,
+    clientMood,
     patientMood,
     keyEmotions,
     concernLevel,
@@ -15,12 +16,14 @@ const SentimentAnalysisDTO = (sentimentData) => {
     recommendations,
     fallback
   } = sentimentData;
+  const mood = clientMood ?? patientMood;
 
   return {
     overallSentiment,
     sentimentScore,
     confidence,
-    patientMood,
+    clientMood: mood,
+    patientMood: mood, // legacy alias
     keyEmotions,
     concernLevel,
     satisfactionIndicators,
@@ -49,7 +52,7 @@ const SentimentTrendPointDTO = (conversation) => {
 
 const SentimentTrendDTO = (trendData) => {
   const {
-    patientId,
+    clientId,
     timeRange,
     startDate,
     endDate,
@@ -59,8 +62,9 @@ const SentimentTrendDTO = (trendData) => {
     summary
   } = trendData;
 
+  const id = clientId != null ? clientId : trendData.clientId;
   return {
-    patientId,
+    clientId: id,
     timeRange,
     startDate: startDate ? new Date(startDate).toISOString() : null,
     endDate: endDate ? new Date(endDate).toISOString() : null,

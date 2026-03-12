@@ -1,18 +1,18 @@
 // app/services/api/__tests__/conversationApi.test.ts
 import { EnhancedStore } from "@reduxjs/toolkit"
-import { orgApi, conversationApi, patientApi } from "../"
+import { orgApi, conversationApi, clientApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
-import { registerNewOrgAndCaregiver, createPatientInOrg } from "../../../../test/helpers"
+import { registerNewOrgAndCaregiver, createClientInOrg } from "../../../../test/helpers"
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 import { newConversation } from "../../../../test/fixtures/conversation.fixture"
-import { Org, Patient, Conversation } from "../api.types"
+import { Org, Client, Conversation } from "../api.types"
 
 describe("conversationApi", () => {
   let store: EnhancedStore<RootState>
   let org: Org
   let orgId: string
-  let patient: Patient
-  let patientId: string
+  let client: Client
+  let clientId: string
   let conversation: Conversation
   let conversationId: string
 
@@ -20,7 +20,7 @@ describe("conversationApi", () => {
     store = appStore
     store.dispatch(conversationApi.util.resetApiState())
     store.dispatch(orgApi.util.resetApiState())
-    store.dispatch(patientApi.util.resetApiState())
+    store.dispatch(clientApi.util.resetApiState())
     const testCaregiver = newCaregiver()
     const response = await registerNewOrgAndCaregiver(
       testCaregiver.name,
@@ -31,17 +31,13 @@ describe("conversationApi", () => {
     org = response.org
     orgId = response.org.id as string
 
-    const result = (await createPatientInOrg(
+    const result = await createClientInOrg(
       org,
       testCaregiver.email,
       testCaregiver.password,
-    )) as Patient
-    if ("error" in result) {
-      throw new Error(`Create patient failed with error: ${JSON.stringify(result.error)}`)
-    } else {
-      patient = result
-      patientId = patient.id as string
-    }
+    )
+    client = result
+    clientId = client.id as string
   })
 
   afterEach(async () => {
@@ -60,7 +56,7 @@ describe("conversationApi", () => {
     // Reset RTK Query state to cancel any pending queries
     store.dispatch(conversationApi.util.resetApiState())
     store.dispatch(orgApi.util.resetApiState())
-    store.dispatch(patientApi.util.resetApiState())
+    store.dispatch(clientApi.util.resetApiState())
 
     jest.clearAllMocks()
   })
@@ -71,11 +67,11 @@ describe("conversationApi", () => {
   })
 
   describe("createConversation", () => {
-    it("should create a conversation for a patient", async () => {
-      const conversationPayload = newConversation(patientId)
+    it("should create a conversation for a client", async () => {
+      const conversationPayload = newConversation(clientId)
       
       const result = await conversationApi.endpoints.createConversation.initiate({
-        patientId,
+        clientId: clientId,
         data: conversationPayload,
       })(store.dispatch, store.getState, {})
 
@@ -84,7 +80,7 @@ describe("conversationApi", () => {
         conversationId = conversation.id as string
         
         expect(conversation).toBeDefined()
-        expect(conversation.patientId).toBe(patientId)
+        expect(conversation.clientId).toBe(clientId)
         expect(conversation.id).toBeDefined()
         expect(conversation.messages).toBeDefined()
         expect(conversation.startTime).toBeDefined()
@@ -93,12 +89,12 @@ describe("conversationApi", () => {
       }
     })
 
-    it("should return 404 when patient does not exist", async () => {
-      const nonExistentPatientId = "507f1f77bcf86cd799439011" // Valid ObjectId format
-      const conversationPayload = newConversation(nonExistentPatientId)
+    it("should return 404 when client does not exist", async () => {
+      const nonExistentClientId = "507f1f77bcf86cd799439011" // Valid ObjectId format
+      const conversationPayload = newConversation(nonExistentClientId)
       
       const result = await conversationApi.endpoints.createConversation.initiate({
-        patientId: nonExistentPatientId,
+        clientId: nonExistentClientId,
         data: conversationPayload,
       })(store.dispatch, store.getState, {})
 
@@ -115,9 +111,9 @@ describe("conversationApi", () => {
   describe("getConversation", () => {
     beforeEach(async () => {
       // Create a conversation first
-      const conversationPayload = newConversation(patientId)
+      const conversationPayload = newConversation(clientId)
       const createResult = await conversationApi.endpoints.createConversation.initiate({
-        patientId,
+        clientId: clientId,
         data: conversationPayload,
       })(store.dispatch, store.getState, {})
 
@@ -139,7 +135,7 @@ describe("conversationApi", () => {
         
         expect(retrievedConversation).toBeDefined()
         expect(retrievedConversation.id).toBe(conversationId)
-        expect(retrievedConversation.patientId).toBe(patientId)
+        expect(retrievedConversation.clientId).toBe(clientId)
         expect(retrievedConversation.messages).toBeDefined()
         expect(retrievedConversation.startTime).toBeDefined()
       } else {
@@ -178,9 +174,9 @@ describe("conversationApi", () => {
   describe("addMessageToConversation", () => {
     beforeEach(async () => {
       // Create a conversation first
-      const conversationPayload = newConversation(patientId)
+      const conversationPayload = newConversation(clientId)
       const createResult = await conversationApi.endpoints.createConversation.initiate({
-        patientId,
+        clientId: clientId,
         data: conversationPayload,
       })(store.dispatch, store.getState, {})
 
@@ -197,7 +193,7 @@ describe("conversationApi", () => {
       
       const result = await conversationApi.endpoints.addMessageToConversation.initiate({
         conversationId,
-        role: "patient",
+        role: "client",
         content: messageContent,
       })(store.dispatch, store.getState, {})
 
@@ -212,7 +208,7 @@ describe("conversationApi", () => {
         // Check that the new message was added
         const lastMessage = updatedConversation.messages[updatedConversation.messages.length - 1]
         expect(lastMessage.content).toBe(messageContent)
-        expect(lastMessage.role).toBe("patient")
+        expect(lastMessage.role).toBe("client")
       } else {
         throw new Error(`Add message failed with error: ${JSON.stringify(result.error)}`)
       }
@@ -224,7 +220,7 @@ describe("conversationApi", () => {
       
       const result = await conversationApi.endpoints.addMessageToConversation.initiate({
         conversationId: nonExistentConversationId,
-        role: "patient",
+        role: "client",
         content: messageContent,
       })(store.dispatch, store.getState, {})
 
@@ -240,7 +236,7 @@ describe("conversationApi", () => {
     it("should return 400 when message content is missing", async () => {
       const result = await conversationApi.endpoints.addMessageToConversation.initiate({
         conversationId,
-        role: "patient",
+        role: "client",
         content: "", // Empty message
       })(store.dispatch, store.getState, {})
 
@@ -254,26 +250,26 @@ describe("conversationApi", () => {
     })
   })
 
-  describe("getConversationsByPatient", () => {
+  describe("getConversationsByClient", () => {
     beforeEach(async () => {
-      // Create multiple conversations for the patient
-      const conversationPayload1 = newConversation(patientId)
-      const conversationPayload2 = newConversation(patientId)
+      // Create multiple conversations for the client
+      const conversationPayload1 = newConversation(clientId)
+      const conversationPayload2 = newConversation(clientId)
       
       await conversationApi.endpoints.createConversation.initiate({
-        patientId,
+        clientId: clientId,
         data: conversationPayload1,
       })(store.dispatch, store.getState, {})
 
       await conversationApi.endpoints.createConversation.initiate({
-        patientId,
+        clientId: clientId,
         data: conversationPayload2,
       })(store.dispatch, store.getState, {})
     })
 
-    it("should get conversations by patient with pagination", async () => {
-      const result = await conversationApi.endpoints.getConversationsByPatient.initiate({
-        patientId,
+    it("should get conversations by client with pagination", async () => {
+      const result = await conversationApi.endpoints.getConversationsByClient.initiate({
+        clientId: clientId,
         page: 1,
         limit: 10,
         sortBy: "startTime:desc",
@@ -290,42 +286,42 @@ describe("conversationApi", () => {
         expect(conversations.totalPages).toBeDefined()
         expect(conversations.totalResults).toBeDefined()
         
-        // Verify all conversations belong to the patient
+        // Verify all conversations belong to the client
         conversations.results.forEach((conv) => {
-          expect(conv.patientId).toBe(patientId)
+          expect(conv.clientId).toBe(clientId)
         })
       } else if ("error" in result && result.error) {
         const error = result.error as any
         if (error.status) {
           expect(error.status).toBe(403)
         } else {
-          throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+          throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
         }
       } else {
-        throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+        throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
       }
     })
 
-    it("should return empty results when patient has no conversations", async () => {
-      // Create a new patient with no conversations
-      const randomEmail = `newpatient${Date.now()}@test.com`
-      const newPatientResult = await patientApi.endpoints.createPatient.initiate({
-        patient: {
-          name: "New Patient",
+    it("should return empty results when client has no conversations", async () => {
+      // Create a new client with no conversations
+      const randomEmail = `newclient${Date.now()}@test.com`
+      const newClientResult = await clientApi.endpoints.createClient.initiate({
+        client: {
+          name: "New Client",
           email: randomEmail,
           phone: "+16045624263",
         }
       })(store.dispatch, store.getState, {})
 
-      let newPatientId: string
-      if ("data" in newPatientResult && newPatientResult.data) {
-        newPatientId = newPatientResult.data.id as string
+      let newClientId: string
+      if ("data" in newClientResult && newClientResult.data) {
+        newClientId = newClientResult.data.id as string
       } else {
-        throw new Error(`Create new patient failed: ${JSON.stringify(newPatientResult.error)}`)
+        throw new Error(`Create new client failed: ${JSON.stringify(newClientResult.error)}`)
       }
 
-      const result = await conversationApi.endpoints.getConversationsByPatient.initiate({
-        patientId: newPatientId,
+      const result = await conversationApi.endpoints.getConversationsByClient.initiate({
+        clientId: newClientId,
         page: 1,
         limit: 10,
       })(store.dispatch, store.getState, {})
@@ -343,10 +339,10 @@ describe("conversationApi", () => {
         if (error.status) {
           expect(error.status).toBe(403)
         } else {
-          throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+          throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
         }
       } else {
-        throw new Error(`Get conversations by patient failed with error: ${JSON.stringify(result.error)}`)
+        throw new Error(`Get conversations by client failed with error: ${JSON.stringify(result.error)}`)
       }
     })
   })

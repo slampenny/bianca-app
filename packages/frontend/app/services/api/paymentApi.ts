@@ -7,19 +7,19 @@ export const paymentApi = createApi({
   reducerPath: "paymentApi",
   baseQuery: baseQueryWithReauth(),
   endpoints: (builder) => ({
-    createInvoiceFromConversations: builder.mutation<Invoice, { patientId: string; payload: any }>({
-      query: ({ patientId, payload }) => ({
-        url: `/payments/patients/${patientId}/invoices`,
+    createInvoiceFromConversations: builder.mutation<Invoice, { clientId: string; payload: any }>({
+      query: ({ clientId, payload }) => ({
+        url: `/payments/clients/${clientId}/invoices`,
         method: "POST",
         body: payload,
       }),
     }),
-    getInvoicesByPatient: builder.query<
+    getInvoicesByClient: builder.query<
       Invoice[],
-      { patientId: string; status?: string; dueDate?: string }
+      { clientId: string; status?: string; dueDate?: string }
     >({
-      query: ({ patientId, status, dueDate }) => ({
-        url: `/payments/patients/${patientId}/invoices`,
+      query: ({ clientId, status, dueDate }) => ({
+        url: `/payments/clients/${clientId}/invoices`,
         method: "GET",
         params: { status, dueDate },
       }),
@@ -39,18 +39,22 @@ export const paymentApi = createApi({
         orgId: string;
         orgName: string;
         totalUnbilledCost: number;
-        patientCosts: Array<{
-          patientId: string;
-          patientName: string;
-          conversationCount: number;
+        /** Prefer clientCosts; backend returns this. patientCosts kept for legacy. */
+        clientCosts?: Array<{
+          clientId: string;
+          clientName: string;
+          callCount?: number;
+          conversationCount?: number;
           totalCost: number;
-          conversations: Array<{
-            conversationId: string;
-            startTime: string;
-            duration: number;
-            cost: number;
-            status: string;
-          }>;
+          calls?: Array<{ callId: string; startTime: string; duration: number; cost: number; status: string }>;
+          conversations?: Array<{ conversationId: string; startTime: string; duration: number; cost: number; status: string }>;
+        }>;
+        patientCosts?: Array<{
+          clientId: string;
+          clientName: string;
+          conversationCount?: number;
+          callCount?: number;
+          totalCost: number;
         }>;
         period: {
           days: number;
@@ -76,7 +80,7 @@ export const paymentApi = createApi({
 
 export const {
   useCreateInvoiceFromConversationsMutation,
-  useGetInvoicesByPatientQuery,
+  useGetInvoicesByClientQuery,
   useGetInvoicesByOrgQuery,
   useGetUnbilledCostsByOrgQuery,
 } = paymentApi

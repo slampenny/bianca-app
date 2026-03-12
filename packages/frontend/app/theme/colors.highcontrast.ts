@@ -105,6 +105,21 @@ const palette = {
   // Transparent colors
   transparent: "rgba(0, 0, 0, 0)",
   overlay: "rgba(0, 0, 0, 0.7)", // Darker overlay for better contrast
+  overlay20: "rgba(0, 0, 0, 0.2)",
+  overlay50: "rgba(0, 0, 0, 0.5)",
+  // Legacy Bianca / shared palette keys (for ThemeColors union)
+  biancaBackground: "#FFFFFF",
+  biancaHeader: "#000000",
+  biancaButtonSelected: "#0066CC",
+  biancaButtonUnselected: "#FFFFFF",
+  biancaBorder: "#000000",
+  biancaError: "#CC0000",
+  biancaSuccess: "#006600",
+  biancaExplanation: "#000000",
+  biancaSuccessBackground: "#E6F5E6",
+  angry100: "#FFE6E6",
+  angry500: "#CC0000",
+  biancaPrimary: "#0066CC",
 } as const
 
 // Legacy color mappings for backward compatibility

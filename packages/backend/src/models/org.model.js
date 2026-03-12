@@ -118,7 +118,7 @@ const orgSchema = mongoose.Schema(
       },
     },
     caregivers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' }],
-    patients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Patient' }],
+    clients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Client' }],
     // Privacy Officer (PIPEDA/HIPAA requirement)
     // Defaults to org creator (first caregiver), but can be reassigned
     privacyOfficerId: {
@@ -126,10 +126,10 @@ const orgSchema = mongoose.Schema(
       ref: 'Caregiver',
       required: false,
     },
-    // Require Patient Consent for Recording
-    // When enabled, organization must obtain explicit consent from patients before recording calls
+    // Require Client Consent for Recording
+    // When enabled, organization must obtain explicit consent from clients before recording calls
     // Used in double-party consent jurisdictions (e.g., California, Florida)
-    requirePatientConsent: {
+    requireClientConsent: {
       type: Boolean,
       default: false,
     },
@@ -170,25 +170,29 @@ orgSchema.statics.createOrgAndCaregiver = async function (orgBody, caregiverBody
   
   // Create org first so we can assign it to caregiver at creation time
   // Set privacy officer to org creator (first caregiver) by default
-  const org = await this.create({ 
-    ...orgBody, 
+  const org = await this.create({
+    ...orgBody,
     caregivers: [], // Will add caregiver after creation
     privacyOfficerId: null // Will set after caregiver is created
   });
-  
+
   // Create caregiver WITH org assigned from the start
-  const caregiver = await Caregiver.create({ 
-    ...caregiverBody, 
+  const caregiver = await Caregiver.create({
+    ...caregiverBody,
     role: caregiverBody.role || 'orgAdmin',
     org: org._id // CRITICAL: Set org at creation time
   });
-  
-  // Update org with caregiver and privacy officer
-  org.caregivers.push(caregiver._id);
-  org.privacyOfficerId = caregiver._id;
-  await org.save();
 
-  return org;
+  // Update org with caregiver and privacy officer using findByIdAndUpdate.
+  await this.findByIdAndUpdate(org._id, {
+    $push: { caregivers: caregiver._id },
+    $set: { privacyOfficerId: caregiver._id }
+  });
+  const updatedOrg = await this.findById(org._id);
+  if (updatedOrg) return { org: updatedOrg, caregiver };
+  org.caregivers = [caregiver._id];
+  org.privacyOfficerId = caregiver._id;
+  return { org, caregiver };
 };
 
 /**

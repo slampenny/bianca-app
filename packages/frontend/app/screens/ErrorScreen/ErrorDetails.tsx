@@ -80,15 +80,13 @@ const $errorSectionContentContainer: ViewStyle = {
 
 const $errorContent: TextStyle = {
   color: colors.error,
-  wordBreak: 'break-word' as any,
-  overflowWrap: 'break-word' as any,
+  ...(Platform.OS === 'web' ? { wordBreak: 'break-word', overflowWrap: 'break-word' } as TextStyle : {}),
 }
 
 const $errorBacktrace: TextStyle = {
   marginTop: spacing.md,
   color: colors.textDim,
-  wordBreak: 'break-word' as any,
-  overflowWrap: 'break-word' as any,
+  ...(Platform.OS === 'web' ? { wordBreak: 'break-word', overflowWrap: 'break-word' } as TextStyle : {}),
   fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
   fontSize: Platform.OS === 'web' ? 12 : undefined,
 }

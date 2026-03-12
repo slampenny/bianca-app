@@ -53,11 +53,10 @@ When('I navigate to the alerts screen', async function() {
   
   // Wait for home screen elements or tabs to appear (React Native Web specific)
   try {
-    await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="patient-list"]', { timeout: 15000 });
+    await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="client-list"]', { timeout: 15000 });
   } catch (e) {
-    // Tabs might not have testid, try waiting for any navigation element
-    await safeWait(this.page, 3000);
-    
+    await this.page.locator('[data-testid^="tab-"], [data-testid="home-header"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
     // Check again if we're on wrong page after wait
     const urlAfterWait = this.page.url();
     const stillWrongPage = urlAfterWait.includes('phpmyadmin') || 
@@ -67,9 +66,8 @@ When('I navigate to the alerts screen', async function() {
     }
   }
   
-  // Wait a bit more for tabs to fully render
-  await safeWait(this.page, 2000);
-  
+  await this.page.locator('[data-testid="tab-alert"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // Click on alert tab - try multiple selectors
   // React Native Web tabs might render differently, so try both getByTestId and locator
   let alertTab = null;
@@ -92,9 +90,8 @@ When('I navigate to the alerts screen', async function() {
   }
   
   if (tabCount === 0) {
-    // Wait a bit more for tabs to render
-    await safeWait(this.page, 2000);
-    
+    await this.page.locator('[data-testid="tab-alert"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
     // Try all selectors again
     alertTab = this.page.getByTestId('tab-alert');
     tabCount = await alertTab.count().catch(() => 0);
@@ -117,7 +114,7 @@ When('I navigate to the alerts screen', async function() {
     const anyTabCount = await anyTab.count().catch(() => 0);
     
     // Also check for home screen elements (React Native Web specific)
-    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="patient-list"]').count().catch(() => 0);
+    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').count().catch(() => 0);
     
     // Check URL to see if we're on home screen (React Native Web uses specific routes)
     const urlAfterWait = this.page.url();
@@ -169,7 +166,7 @@ When('I navigate to the alerts screen', async function() {
   if (alertTab && tabCount > 0) {
     await alertTab.waitFor({ state: 'visible', timeout: 10000 });
     await alertTab.click({ force: true });
-    await safeWait(this.page, 1000);
+    await this.page.locator('[data-testid="alert-screen"], [data-testid="alert-list"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } else {
     throw new Error('Alert tab not found or invalid');
   }
@@ -190,9 +187,8 @@ When('I navigate to the alerts screen', async function() {
 });
 
 Then('I should see the alert badge count', async function() {
-  // Wait for tabs to load
-  await safeWait(this.page, 1000);
-  
+  await this.page.locator('[data-testid="tab-alert"], [aria-label*="Alerts"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+
   // Try multiple ways to find the badge (from old Playwright test)
   let badgeElement = this.page.locator('[data-testid="tab-alert"] span[style*="background-color: rgb(255, 59, 48)"]').first();
   let badgeCount = await badgeElement.count();
@@ -252,10 +248,16 @@ Then('I should see at least {int} alerts', async function(minCount) {
 });
 
 Given('I am on the alerts screen', async function() {
-  // Navigate to home screen
-  await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-  await safeWait(this.page, 2000);
-  
+  // Avoid full page reload when already on the app (same rehydration race as billing: requests run before token is in Redux → 401).
+  const initialUrl = this.page.url();
+  const base = this.baseURL.replace(/\/$/, '');
+  const alreadyOnApp = initialUrl === base || initialUrl === `${base}/` || initialUrl.startsWith(`${base}/`);
+  const tabsOrHomeVisible = await this.page.locator('[data-testid^="tab-"], [data-testid="home-header"]').first().isVisible().catch(() => false);
+  if (!alreadyOnApp || !tabsOrHomeVisible) {
+    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+  }
+  await this.page.locator('[data-testid="home-header"], [data-testid^="tab-"], [data-testid="email-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // Check if we're logged in - if login screen is visible, we need to login
   const loginInput = this.page.getByTestId('email-input');
   const loginCount = await loginInput.count();
@@ -282,13 +284,11 @@ Given('I am on the alerts screen', async function() {
     
     await loginButton.click();
     await loginPromise;
-    await safeWait(this.page, 2000);
+    await this.page.locator('[data-testid="home-header"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
   }
-  
-  // Wait for home screen to load - check for home header or tabs
+
   await this.page.waitForSelector('[data-testid="home-header"], [data-testid^="tab-"]', { timeout: 15000 }).catch(() => {});
-  await safeWait(this.page, 1000);
-  
+
   // Try multiple ways to find the alert tab (from old Playwright test)
   let alertTab = this.page.getByTestId('tab-alert').first();
   let tabCount = await alertTab.count();
@@ -304,8 +304,7 @@ Given('I am on the alerts screen', async function() {
   }
   
   if (tabCount === 0) {
-    // Wait a bit more - tabs might still be loading
-    await safeWait(this.page, 2000);
+    await this.page.locator('[data-testid="tab-alert"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     alertTab = this.page.getByTestId('tab-alert').first();
     tabCount = await alertTab.count();
   }
@@ -313,18 +312,17 @@ Given('I am on the alerts screen', async function() {
   if (tabCount === 0) {
     // Wait for home screen to load (tabs might not be visible immediately)
     try {
-      await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="patient-list"]', { timeout: 15000 });
+      await this.page.waitForSelector('[data-testid^="tab-"], [data-testid="home-header"], [data-testid="client-list"]', { timeout: 15000 });
     } catch (e) {
-      // Tabs might not have testid, try waiting for any navigation element
-      await safeWait(this.page, 2000);
+      await this.page.locator('[data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
-    
+
     // Check if we're actually logged in by looking for any tabs or home screen elements
     const anyTab = this.page.locator('[data-testid^="tab-"]').first();
     const anyTabCount = await anyTab.count().catch(() => 0);
     
     // Also check for home screen elements
-    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="patient-list"]').count().catch(() => 0);
+    const homeElements = await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').count().catch(() => 0);
     
     if (anyTabCount === 0 && homeElements === 0) {
       throw new Error('No tabs found - user may not be logged in');
@@ -334,8 +332,8 @@ Given('I am on the alerts screen', async function() {
   
   await alertTab.waitFor({ state: 'visible', timeout: 15000 });
   await alertTab.click({ force: true });
-  await safeWait(this.page, 2000);
-  
+  await this.page.locator('[data-testid="alert-screen"], [data-testid="alert-list"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // CRITICAL: Switch to "All Alerts" tab so read/unread toggles don't hide alerts
   // The screen defaults to "Unread" tab which filters out read alerts
   try {
@@ -343,17 +341,16 @@ Given('I am on the alerts screen', async function() {
     const allAlertsCount = await allAlertsTab.count();
     if (allAlertsCount > 0) {
       await allAlertsTab.first().click();
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="alert-list"], [data-testid="alert-item"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
   } catch (e) {
     // All Alerts tab might not be available, continue anyway
   }
-  
+
   // Wait for alert screen (from old Playwright test)
   const alertScreen = this.page.locator('[data-testid="alert-screen"], [aria-label*="alert" i]').first();
   await alertScreen.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
-    // If selector doesn't work, just wait a bit more
-    return this.page.waitForTimeout(2000);
+    return this.page.locator('[data-testid="alert-screen"], [aria-label*="alert" i]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   });
 });
 
@@ -392,15 +389,24 @@ Given('I have both read and unread alerts', async function() {
 When('I view the {string} tab', async function(tabName) {
   const tab = this.page.getByText(new RegExp(tabName, 'i')).first();
   await tab.waitFor({ state: 'visible', timeout: 10000 });
-  await tab.click();
-  await safeWait(this.page, 500);
+  await tab.click({ force: true });
+  // Wait for alerts list to refetch after tab switch (avoids asserting on stale/401 state)
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 20000 }
+  ).catch(() => null);
+  await this.page.locator('[data-testid="alert-list"], [data-testid="alert-item"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 });
 
 When('I switch to the {string} tab', async function(tabName) {
   const tab = this.page.getByText(new RegExp(tabName, 'i')).first();
   await tab.waitFor({ state: 'visible', timeout: 10000 });
-  await tab.click();
-  await safeWait(this.page, 500);
+  await tab.click({ force: true });
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 20000 }
+  ).catch(() => null);
+  await this.page.locator('[data-testid="alert-list"], [data-testid="alert-item"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 });
 
 Then('I should see all alerts including read ones', async function() {
@@ -428,14 +434,12 @@ When('I click the {string} alert filter', async function(filterName) {
   
   await filterButton.waitFor({ state: 'visible', timeout: 10000 });
   await filterButton.click({ force: true });
-  await safeWait(this.page, 500);
+  await this.page.locator('[data-testid="alert-list"], [data-testid="alert-item"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
 });
 
 When('I mark all alerts as read', async function() {
-  // Wait a bit for alerts to load and button to appear (from old Playwright test)
-  // Button only appears if there are unread alerts
-  await safeWait(this.page, 2000);
-  
+  await this.page.locator('[data-testid="alert-item"], [data-testid*="mark-all"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
   // Check if we have unread alerts first
   const alertItems = this.page.locator('[data-testid="alert-item"]');
   const alertCount = await alertItems.count();
@@ -461,9 +465,8 @@ When('I mark all alerts as read', async function() {
     buttonCount = await markAllReadButton.count();
   }
   
-  // Wait a bit more - button might appear after alerts fully load
   if (buttonCount === 0) {
-    await safeWait(this.page, 2000);
+    await this.page.locator('[data-testid*="mark-all"], [aria-label*="mark all" i]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     markAllReadButton = this.page.locator('[data-testid*="mark-all"], [aria-label*="mark all" i]').first();
     buttonCount = await markAllReadButton.count();
   }
@@ -485,7 +488,10 @@ When('I mark all alerts as read', async function() {
   
   await markAllReadButton.click({ force: true });
   await markReadPromise;
-  await safeWait(this.page, 1000);
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 10000 }
+  ).catch(() => {});
 });
 
 Then('all alerts should be marked as read', async function() {
@@ -498,204 +504,230 @@ Then('all alerts should be marked as read', async function() {
   expect(badgeCount).toBe(0);
 });
 
-// Store the test alert for checkbox tests
-let testAlertMessage = null;
+// Test alert message is stored on the World (this.testAlertMessage) so it's per-scenario
 
 Given('I have an unread alert', async function() {
   // IMPORTANT: Create alert AFTER ensuring we're on the alerts screen
-  // This ensures RTK Query polling has started before we create the alert
-  
-  // Wait for the alert screen to be fully loaded and polling to have started
   const alertScreen = this.page.locator('[data-testid="alert-screen"]').or(this.page.getByLabel('alert-screen'));
+  let visible = await alertScreen.isVisible().catch(() => false);
+  if (!visible) {
+    const alertTab = this.page.getByTestId('tab-alert').or(this.page.locator('[aria-label*="alert" i]').first());
+    const tabCount = await alertTab.count().catch(() => 0);
+    if (tabCount > 0) {
+      await alertTab.first().click({ force: true });
+      await this.page.locator('[data-testid="alert-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    }
+    visible = await alertScreen.isVisible().catch(() => false);
+  }
   await alertScreen.waitFor({ state: 'visible', timeout: 15000 });
-  
-  // Wait an additional 3+ seconds to ensure at least one polling cycle has completed
-  await safeWait(this.page, 4000);
-  
-  testAlertMessage = `Checkbox Test Alert - ${Date.now()}`;
-  
-  // Get caregiver data
-  const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1';
+
+  // Ensure at least one polling cycle has completed so list is loaded
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 15000 }
+  ).catch(() => {});
+
+  this.testAlertMessage = `Checkbox Test Alert - ${Date.now()}`;
+
+  const API_BASE_URL = (this.apiURL || process.env.API_URL || 'http://localhost:3000').replace(/\/$/, '') + '/v1';
   const credentials = this.getCredentials('caregiver');
   const email = credentials.email;
-  
+
   const caregiverResponse = await this.page.request.post(`${API_BASE_URL}/test/get-caregiver-by-email`, {
     headers: { 'Content-Type': 'application/json' },
     data: { email },
   });
-  
+
   if (!caregiverResponse.ok()) {
     throw new Error('Could not get caregiver data');
   }
-  
+
   const caregiver = await caregiverResponse.json();
   const caregiverId = caregiver.id || caregiver._id;
-  const patientId = caregiver.patients?.[0]?.id || caregiver.patients?.[0]?._id || caregiver.patients?.[0];
-  
-  if (!patientId) {
-    throw new Error('Caregiver has no patients');
+  const clientId = caregiver.clients?.[0]?.id ?? caregiver.clients?.[0]?._id ?? caregiver.clients?.[0]
+    ?? null;
+
+  if (!clientId) {
+    throw new Error('Caregiver has no clients');
   }
-  
-  // Create alert
+
   const alertResponse = await this.page.request.post(`${API_BASE_URL}/test/create-alert`, {
     headers: { 'Content-Type': 'application/json' },
     data: {
       caregiverId,
-      message: testAlertMessage,
+      message: this.testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
       visibility: 'allCaregivers',
       relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     },
   });
-  
+
   if (!alertResponse.ok()) {
     throw new Error('Could not create test alert');
   }
-  
-  // Wait for polling to pick up the new alert
-  // NOTE: If playwright_test localStorage isn't set early enough, polling interval is 30s
-  // Wait for at least one full poll cycle (35s to be safe)
-  await safeWait(this.page, 35000);
-  
-  // Scroll to bottom of alerts list to ensure FlatList renders all items (virtualization)
+
+  // Match by pattern so we find the item even if the message is truncated in the UI (e.g. numberOfLines={1})
+  this.testAlertPattern = /Checkbox Test Alert -\d+/;
+
+  // Wait for several GET /alerts 200 so the frontend has polled after our create (polling interval 3s)
+  for (let i = 0; i < 4; i++) {
+    await this.page.waitForResponse(
+      (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+      { timeout: 12000 }
+    ).catch(() => {});
+  }
+
+  const alertItemLocator = this.page.locator('[data-testid="alert-item"]').filter({ hasText: this.testAlertPattern });
+  await alertItemLocator.first().waitFor({ state: 'visible', timeout: 45000 });
+
   const alertList = this.page.locator('[data-testid="alert-list"]');
   const listCount = await alertList.count();
   if (listCount > 0) {
     await alertList.first().evaluate((element) => {
-      // Scroll to the bottom to trigger FlatList virtualization
       element.scrollTo({ top: element.scrollHeight, behavior: 'smooth' });
     });
-    await safeWait(this.page, 2000);
+    await this.page.locator('[data-testid="alert-item"]').filter({ hasText: this.testAlertPattern }).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
 });
 
+function alertItemLocator(world) {
+  const pattern = world.testAlertPattern || world.testAlertMessage;
+  if (!pattern) throw new Error('No test alert message or pattern stored');
+  return world.page.locator('[data-testid="alert-item"]').filter({ hasText: pattern });
+}
+
 When('I click the checkbox on the alert', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  // Find the alert item using filter (like the working Playwright test)
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
-  await alertItem.waitFor({ state: 'visible', timeout: 10000 });
-  
-  // Find and click the checkbox within this specific alert (use .first() in case of duplicates)
+
+  const alertItem = alertItemLocator(this);
+  await alertItem.first().waitFor({ state: 'visible', timeout: 10000 });
+
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]').first();
   await checkbox.waitFor({ state: 'visible', timeout: 5000 });
   await checkbox.click();
-  
-  // Wait for API call to complete
-  await safeWait(this.page, 2000);
+
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && (res.url().includes('markAsRead') || res.url().includes('markAsUnread')) && res.status() === 200,
+    { timeout: 5000 }
+  ).catch(() => {});
 });
 
 When('I click the checkbox on the alert again', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  // Find the alert item using filter (like the working Playwright test)
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
-  await alertItem.waitFor({ state: 'visible', timeout: 10000 });
-  
-  // Find and click the checkbox within this specific alert (use .first() in case of duplicates)
+
+  const alertItem = alertItemLocator(this);
+  await alertItem.first().waitFor({ state: 'visible', timeout: 10000 });
+
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]').first();
   await checkbox.waitFor({ state: 'visible', timeout: 5000 });
   await checkbox.click();
-  
-  // Wait for API call to complete
-  await safeWait(this.page, 2000);
+
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && (res.url().includes('markAsRead') || res.url().includes('markAsUnread')) && res.status() === 200,
+    { timeout: 5000 }
+  ).catch(() => {});
 });
 
 Then('the alert should be marked as read', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  // Find the alert and verify checkbox is checked
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+
+  const alertItem = alertItemLocator(this);
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
-  
-  // Wait a moment for state to update
-  await safeWait(this.page, 1000);
-  
+
+  await alertItem.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+
   const isChecked = await checkbox.isChecked().catch(() => true);
   expect(isChecked).toBe(true);
 });
 
 Then('the checkbox should be checked', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+
+  const alertItem = alertItemLocator(this);
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
-  
+
   const isChecked = await checkbox.isChecked().catch(() => true);
   expect(isChecked).toBe(true);
 });
 
 Then('the alert should be marked as unread', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+
+  const alertItem = alertItemLocator(this);
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
-  
-  await safeWait(this.page, 1000);
-  
+
+  await alertItem.first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+
   const isChecked = await checkbox.isChecked().catch(() => false);
   expect(isChecked).toBe(false);
 });
 
 Then('the checkbox should be unchecked', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+
+  const alertItem = alertItemLocator(this);
   const checkbox = alertItem.locator('[data-testid="alert-checkbox"]');
-  
+
   const isChecked = await checkbox.isChecked().catch(() => false);
   expect(isChecked).toBe(false);
 });
 
 Then('the alert should be visible', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
-  await expect(alertItem).toBeVisible({ timeout: 10000 });
+
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 20000 }
+  ).catch(() => {});
+
+  const alertItem = alertItemLocator(this);
+  await expect(alertItem.first()).toBeVisible({ timeout: 15000 });
 });
 
 Then('the alert should disappear from the {string} tab', async function(tabName) {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  // Wait a moment for the alert to disappear
-  await safeWait(this.page, 2000);
-  
-  // Alert should not be visible in this tab
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
+
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 15000 }
+  ).catch(() => {});
+
+  const alertItem = alertItemLocator(this);
+  await alertItem.first().waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
   const count = await alertItem.count();
-  
-  // In the Unread tab, a read alert should not be present
   expect(count).toBe(0);
 });
 
 Then('the alert should be visible again', async function() {
-  if (!testAlertMessage) {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
     throw new Error('No test alert message stored');
   }
-  
-  // Wait for alert to reappear
-  await safeWait(this.page, 2000);
-  
-  const alertItem = this.page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage });
-  await expect(alertItem).toBeVisible({ timeout: 10000 });
+
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 15000 }
+  ).catch(() => {});
+
+  const alertItem = alertItemLocator(this);
+  await expect(alertItem.first()).toBeVisible({ timeout: 15000 });
 });
 
 

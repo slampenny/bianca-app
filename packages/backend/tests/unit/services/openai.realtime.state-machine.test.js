@@ -34,7 +34,7 @@ jest.mock('../../../src/models', () => ({
     findByIdAndUpdate: jest.fn(),
     findByIdAndDelete: jest.fn()
   },
-  Patient: {
+  Client: {
     findById: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn()
@@ -117,7 +117,7 @@ describe('OpenAI Realtime Service - State Machine', () => {
       webSocket: mockWebSocket,
       sessionReady: true,
       conversationId: 'test-conversation-123',
-      patientId: 'test-patient-123',
+      clientId: 'test-patient-123',
       conversationState: null,
       stateHistory: [],
       _userIsSpeaking: false,

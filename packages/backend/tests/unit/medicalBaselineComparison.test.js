@@ -62,7 +62,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
       );
 
       expect(baseline).toBeDefined();
-      expect(baseline.patientId).toBe(medicalPatients.cognitiveDeclinePatient._id);
+      expect(baseline.clientId).toBe(medicalPatients.cognitiveDeclinePatient._id);
       expect(baseline.type).toBe('initial');
       expect(baseline.metrics).toBeDefined();
       
@@ -74,24 +74,24 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should update baseline with new data points over time', async () => {
-      const patientId = medicalPatients.stablePatient._id;
+      const clientId = medicalPatients.stablePatient._id;
 
       // Establish initial baseline
       const initialConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: stablePatientConversations.month1 }
       );
       const initialAnalysis = await analyzer.analyzeMonth(initialConversations);
-      await baselineManager.establishBaseline(patientId, initialAnalysis);
+      await baselineManager.establishBaseline(clientId, initialAnalysis);
 
       // Add new data point (month 3)
       const month3Conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month3: stablePatientConversations.month3 }
       );
       const month3Analysis = await analyzer.analyzeMonth(month3Conversations);
 
-      const updatedBaseline = await baselineManager.updateBaseline(patientId, month3Analysis);
+      const updatedBaseline = await baselineManager.updateBaseline(clientId, month3Analysis);
 
       expect(updatedBaseline).toBeDefined();
       expect(updatedBaseline.version).toBeGreaterThan(1);
@@ -113,25 +113,25 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
 
   describe('Baseline Deviation Detection', () => {
     it('should detect significant cognitive decline from baseline', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Establish baseline from month 1 (normal cognitive function)
       const baselineConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: cognitiveDeclineConversations.month1 }
       );
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Analyze month 6 (significant cognitive decline)
       const month6Conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: cognitiveDeclineConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(month6Conversations);
 
       // Compare with baseline
-      const deviation = await baselineManager.getDeviation(patientId, currentAnalysis);
+      const deviation = await baselineManager.getDeviation(clientId, currentAnalysis);
 
       expect(deviation).toBeDefined();
       expect(deviation.hasBaseline).toBe(true);
@@ -144,25 +144,25 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should detect significant psychiatric decline from baseline', async () => {
-      const patientId = medicalPatients.psychiatricDeclinePatient._id;
+      const clientId = medicalPatients.psychiatricDeclinePatient._id;
 
       // Establish baseline from month 1 (mild psychiatric symptoms)
       const baselineConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: psychiatricDeclineConversations.month1 }
       );
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Analyze month 6 (severe psychiatric symptoms)
       const month6Conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: psychiatricDeclineConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(month6Conversations);
 
       // Compare with baseline
-      const deviation = await baselineManager.getDeviation(patientId, currentAnalysis);
+      const deviation = await baselineManager.getDeviation(clientId, currentAnalysis);
 
       expect(deviation).toBeDefined();
       expect(deviation.hasBaseline).toBe(true);
@@ -175,25 +175,25 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should not flag stable patients as having significant deviations', async () => {
-      const patientId = medicalPatients.stablePatient._id;
+      const clientId = medicalPatients.stablePatient._id;
 
       // Establish baseline from month 1
       const baselineConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: stablePatientConversations.month1 }
       );
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Analyze month 6 (should be similar to baseline)
       const month6Conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: stablePatientConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(month6Conversations);
 
       // Compare with baseline
-      const deviation = await baselineManager.getDeviation(patientId, currentAnalysis);
+      const deviation = await baselineManager.getDeviation(clientId, currentAnalysis);
 
       expect(deviation).toBeDefined();
       expect(deviation.hasBaseline).toBe(true);
@@ -210,38 +210,38 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should detect significant changes using z-score analysis', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Establish baseline
       const baselineConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: cognitiveDeclineConversations.month1 }
       );
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
-      await baselineManager.establishBaseline(patientId, baselineAnalysis);
+      await baselineManager.establishBaseline(clientId, baselineAnalysis);
 
       // Add multiple data points to establish variance
       for (let month = 2; month <= 5; month++) {
         const monthKey = `month${month}`;
         if (cognitiveDeclineConversations[monthKey]) {
           const monthConversations = await createConversationsFromFixture(
-            patientId,
+            clientId,
             { [monthKey]: cognitiveDeclineConversations[monthKey] }
           );
           const monthAnalysis = await analyzer.analyzeMonth(monthConversations);
-          await baselineManager.updateBaseline(patientId, monthAnalysis);
+          await baselineManager.updateBaseline(clientId, monthAnalysis);
         }
       }
 
       // Analyze month 6 (significant decline)
       const month6Conversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: cognitiveDeclineConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(month6Conversations);
 
       // Check for significant changes
-      const deviation = await baselineManager.getDeviation(patientId, currentAnalysis);
+      const deviation = await baselineManager.getDeviation(clientId, currentAnalysis);
 
       expect(deviation).toBeDefined();
       expect(deviation.hasBaseline).toBe(true);
@@ -256,7 +256,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
 
   describe('Trend Analysis Over Time', () => {
     it('should analyze cognitive trends across multiple months', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
       const monthlyAnalyses = {};
 
       // Analyze each month
@@ -264,7 +264,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
         const monthKey = `month${month}`;
         if (cognitiveDeclineConversations[monthKey]) {
           const conversations = await createConversationsFromFixture(
-            patientId,
+            clientId,
             { [monthKey]: cognitiveDeclineConversations[monthKey] }
           );
           monthlyAnalyses[monthKey] = await analyzer.analyzeMonth(conversations);
@@ -291,7 +291,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should analyze psychiatric trends across multiple months', async () => {
-      const patientId = medicalPatients.psychiatricDeclinePatient._id;
+      const clientId = medicalPatients.psychiatricDeclinePatient._id;
       const monthlyAnalyses = {};
 
       // Analyze each month
@@ -299,7 +299,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
         const monthKey = `month${month}`;
         if (psychiatricDeclineConversations[monthKey]) {
           const conversations = await createConversationsFromFixture(
-            patientId,
+            clientId,
             { [monthKey]: psychiatricDeclineConversations[monthKey] }
           );
           monthlyAnalyses[monthKey] = await analyzer.analyzeMonth(conversations);
@@ -326,7 +326,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should detect stable trends for stable patients', async () => {
-      const patientId = medicalPatients.stablePatient._id;
+      const clientId = medicalPatients.stablePatient._id;
       const monthlyAnalyses = {};
 
       // Analyze each month
@@ -334,7 +334,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
         const monthKey = `month${month}`;
         if (stablePatientConversations[monthKey]) {
           const conversations = await createConversationsFromFixture(
-            patientId,
+            clientId,
             { [monthKey]: stablePatientConversations[monthKey] }
           );
           monthlyAnalyses[monthKey] = await analyzer.analyzeMonth(conversations);
@@ -351,18 +351,18 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
 
   describe('Baseline Comparison Integration', () => {
     it('should integrate baseline comparison with medical analysis', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Establish baseline
       const baselineConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: cognitiveDeclineConversations.month1 }
       );
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
 
       // Analyze current with baseline comparison
       const currentConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: cognitiveDeclineConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(currentConversations, baselineAnalysis);
@@ -381,11 +381,11 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should handle missing baseline gracefully', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Analyze without baseline
       const currentConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: cognitiveDeclineConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(currentConversations);
@@ -398,18 +398,18 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should provide baseline comparison warnings', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Establish baseline
       const baselineConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: cognitiveDeclineConversations.month1 }
       );
       const baselineAnalysis = await analyzer.analyzeMonth(baselineConversations);
 
       // Analyze current with significant decline
       const currentConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: cognitiveDeclineConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(currentConversations, baselineAnalysis);
@@ -423,16 +423,16 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
 
   describe('Edge Cases for Baseline Comparison', () => {
     it('should handle insufficient baseline data', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Create minimal baseline data
       const minimalConversations = [
         {
           _id: 'conv1',
-          patientId,
+          clientId,
           messages: [
-            { role: 'patient', content: 'Hello' },
-            { role: 'patient', content: 'Goodbye' }
+            { role: 'client', content: 'Hello' },
+            { role: 'client', content: 'Goodbye' }
           ]
         }
       ];
@@ -445,7 +445,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should handle baseline data with errors', async () => {
-      const patientId = medicalPatients.cognitiveDeclinePatient._id;
+      const clientId = medicalPatients.cognitiveDeclinePatient._id;
 
       // Mock baseline analysis with errors
       const baselineAnalysis = {
@@ -458,7 +458,7 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
 
       // Analyze current with problematic baseline
       const currentConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: cognitiveDeclineConversations.month6 }
       );
       const currentAnalysis = await analyzer.analyzeMonth(currentConversations, baselineAnalysis);
@@ -470,18 +470,18 @@ describe('Medical Baseline Comparison and Trend Analysis', () => {
     });
 
     it('should handle seasonal variations in baseline', async () => {
-      const patientId = medicalPatients.stablePatient._id;
+      const clientId = medicalPatients.stablePatient._id;
 
       // Establish baseline in winter (month 1)
       const winterConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month1: stablePatientConversations.month1 }
       );
       const winterAnalysis = await analyzer.analyzeMonth(winterConversations);
 
       // Analyze current in summer (month 6)
       const summerConversations = await createConversationsFromFixture(
-        patientId,
+        clientId,
         { month6: stablePatientConversations.month6 }
       );
       const summerAnalysis = await analyzer.analyzeMonth(summerConversations, winterAnalysis);

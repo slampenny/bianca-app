@@ -47,10 +47,11 @@ export const paymentsSlice = createSlice({
       },
     )
     builder.addMatcher(
-      paymentApi.endpoints.getInvoicesByPatient.matchFulfilled,
-      (state, { payload }) => {
-        logger.debug("[paymentsSlice] getInvoicesByPatient.matchFulfilled", payload)
-        state.payments = payload
+      paymentApi.endpoints.getInvoicesByClient.matchFulfilled,
+      (state, action) => {
+        const payload = (action as { payload?: Invoice[] }).payload
+        logger.debug("[paymentsSlice] getInvoicesByClient.matchFulfilled", payload)
+        if (payload) state.payments = payload
       },
     )
     builder.addMatcher(

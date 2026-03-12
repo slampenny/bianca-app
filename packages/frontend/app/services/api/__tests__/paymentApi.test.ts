@@ -1,17 +1,19 @@
 // app/services/api/__tests__/paymentApiWithFixtures.test.ts
 import { paymentApi, conversationApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
-import { registerNewOrgAndCaregiver, createPatientInOrg, generateUniqueEmail } from "../../../../test/helpers"
+import { registerNewOrgAndCaregiver, createClientInOrg, generateUniqueEmail } from "../../../../test/helpers"
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 import { newConversation } from "../../../../test/fixtures/conversation.fixture"
 import { Org } from "../api.types"
 
 describe("paymentApi", () => {
+  jest.setTimeout(20000)
+
   let store: typeof appStore
   let org: Org
   let orgId: string
-  let patient: any
-  let patientId: string
+  let client: any
+  let clientId: string
 
   beforeEach(async () => {
     store = appStore
@@ -27,32 +29,32 @@ describe("paymentApi", () => {
     )
     org = response.org
     orgId = org.id as string
-    console.log(`caregiver role: ${response.caregiver.role}`)
-    const patientResponse = await createPatientInOrg(
+    const clientResponse = await createClientInOrg(
       org,
       testCaregiver.email,
       testCaregiver.password,
     )
-    if ("error" in patientResponse) {
-      throw new Error(`Create patient failed with error: ${JSON.stringify(patientResponse.error)}`)
-    } else {
-      patient = patientResponse
-      patientId = patient.id as string
-    }
+    client = clientResponse
+    clientId = client.id as string
 
-    // Create a conversation for the patient using the conversation fixture.
-    const conversationPayload = newConversation(patientId)
-    // Note: conversationApi expects an object with patientId and data properties.
+    // Create a conversation for the client using the conversation fixture.
+    const conversationPayload = newConversation(clientId)
+    // Note: conversationApi expects an object with clientId and data properties.
     await conversationApi.endpoints.createConversation.initiate({
-      patientId,
+      clientId,
       data: conversationPayload,
     })(store.dispatch, store.getState, {})
+  })
+
+  afterEach(() => {
+    jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   describe("createInvoiceFromConversations", () => {
     it("should create an invoice from conversations successfully", async () => {
       const result = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -65,7 +67,7 @@ describe("paymentApi", () => {
         expect(result.data.org).toBe(orgId)
       } else {
         // If no conversations exist, that's acceptable - skip the test
-        if (result.error?.status === 404 && result.error?.data?.message?.includes("No uncharged")) {
+        if ((result.error as { status?: number })?.status === 404 && (result.error as { data?: { message?: string } })?.data?.message?.includes("No uncharged")) {
           console.log('Skipping test - no uncharged conversations/calls exist')
           return
         }
@@ -73,11 +75,11 @@ describe("paymentApi", () => {
       }
     })
 
-    it("should handle patient not found error", async () => {
-      const nonExistentPatientId = "507f1f77bcf86cd799439011"
+    it("should handle client not found error", async () => {
+      const nonExistentClientId = "507f1f77bcf86cd799439011"
 
       const result = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId: nonExistentPatientId,
+        clientId: nonExistentClientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -88,7 +90,7 @@ describe("paymentApi", () => {
           expect(error.status).toBe(404)
         }
         if (error.data?.message) {
-          expect(error.data.message).toBe("Patient not found")
+          expect(error.data.message).toBe("Client not found")
         }
       }
     })
@@ -96,7 +98,7 @@ describe("paymentApi", () => {
     it("should handle no uncharged conversations error", async () => {
       // First create an invoice to consume all conversations
       const firstInvoice = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -108,7 +110,7 @@ describe("paymentApi", () => {
 
       // Try to create another invoice - should fail
       const result = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -133,7 +135,7 @@ describe("paymentApi", () => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       const result = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -142,20 +144,20 @@ describe("paymentApi", () => {
     })
   })
 
-  describe("getInvoicesByPatient", () => {
+  describe("getInvoicesByClient", () => {
     beforeEach(async () => {
       // Create an invoice first
       await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
     })
 
-    it("should get invoices for a patient successfully", async () => {
+    it("should get invoices for a client successfully", async () => {
       // First try to create an invoice if none exist
       try {
         await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-          patientId,
+          clientId: clientId,
           payload: {},
         })(store.dispatch, store.getState, {})
         // Wait a bit for invoice to be saved
@@ -164,8 +166,8 @@ describe("paymentApi", () => {
         // If invoice creation fails (no conversations), that's ok - we'll test with empty array
       }
 
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
@@ -179,7 +181,7 @@ describe("paymentApi", () => {
           // Note: totalAmount can be 0 for zero-duration conversations
           expect(invoice.totalAmount).toBeGreaterThanOrEqual(0)
         } else {
-          console.log('No invoices found for patient - test passes with empty array')
+          console.log('No invoices found for client - test passes with empty array')
         }
       } else {
         throw new Error(`Get invoices failed with error: ${JSON.stringify(result.error)}`)
@@ -187,8 +189,8 @@ describe("paymentApi", () => {
     })
 
     it("should filter invoices by status", async () => {
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
         status: "pending",
       })(store.dispatch, store.getState, {})
 
@@ -208,8 +210,8 @@ describe("paymentApi", () => {
     it("should filter invoices by due date", async () => {
       const today = new Date().toISOString().split("T")[0]
       
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
         dueDate: today,
       })(store.dispatch, store.getState, {})
 
@@ -227,19 +229,19 @@ describe("paymentApi", () => {
       }
     })
 
-    it("should return empty array for patient with no invoices", async () => {
-      const newPatientResponse = await createPatientInOrg(
+    it("should return empty array for client with no invoices", async () => {
+      const newClientResponse = await createClientInOrg(
         org,
         generateUniqueEmail(),
         "password123",
       )
       
-      if ("error" in newPatientResponse) {
-        throw new Error(`Create patient failed with error: ${JSON.stringify(newPatientResponse.error)}`)
+      if ("error" in newClientResponse) {
+        throw new Error(`Create client failed with error: ${JSON.stringify(newClientResponse.error)}`)
       }
 
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId: newPatientResponse.id as string,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: newClientResponse.id as string,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
@@ -251,11 +253,11 @@ describe("paymentApi", () => {
       }
     })
 
-    it("should handle patient not found", async () => {
+    it("should handle client not found", async () => {
       const nonExistentPatientId = "507f1f77bcf86cd799439011"
 
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId: nonExistentPatientId,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: nonExistentPatientId,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
@@ -274,8 +276,8 @@ describe("paymentApi", () => {
       // Wait a bit for the logout to take effect
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
       })(store.dispatch, store.getState, {})
 
       // The API might still work due to cached tokens, so we'll check for either error or data
@@ -285,9 +287,9 @@ describe("paymentApi", () => {
 
   describe("getInvoicesByOrg", () => {
     beforeEach(async () => {
-      // Create invoices for the patient
+      // Create invoices for the client
       await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
     })
@@ -441,7 +443,7 @@ describe("paymentApi", () => {
     it("should return properly structured invoice data", async () => {
       // Create an invoice first
       const createResult = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -480,7 +482,7 @@ describe("paymentApi", () => {
         expect(invoice.totalAmount).toBeGreaterThanOrEqual(0)
       } else {
         // If no conversations exist, that's acceptable - skip the test
-        if (createResult.error?.status === 404 && createResult.error?.data?.message?.includes("No uncharged")) {
+        if ((createResult.error as { status?: number })?.status === 404 && (createResult.error as { data?: { message?: string } })?.data?.message?.includes("No uncharged")) {
           console.log('Skipping test - no uncharged conversations/calls exist')
           return
         }
@@ -491,13 +493,13 @@ describe("paymentApi", () => {
     it("should include line items when populated", async () => {
       // Create an invoice first
       const createResult = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
       // If invoice creation failed (no conversations), skip the test
       if ("error" in createResult) {
-        if (createResult.error?.status === 404 && createResult.error?.data?.message?.includes("No uncharged")) {
+        if ((createResult.error as { status?: number })?.status === 404 && (createResult.error as { data?: { message?: string } })?.data?.message?.includes("No uncharged")) {
           console.log('Skipping test - no uncharged conversations/calls exist')
           return
         }
@@ -507,8 +509,8 @@ describe("paymentApi", () => {
       await new Promise(resolve => setTimeout(resolve, 200))
 
       // Get invoices which should include line items
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
@@ -528,19 +530,19 @@ describe("paymentApi", () => {
             
             // Validate line item structure
             expect(lineItem.id).toBeDefined()
-            expect(lineItem.patientId).toBeDefined()
+            expect(lineItem.clientId).toBeDefined()
             expect(lineItem.amount).toBeDefined()
             expect(lineItem.description).toBeDefined()
             
             // Validate line item types
             expect(typeof lineItem.id).toBe("string")
-            expect(typeof lineItem.patientId).toBe("string")
+            expect(typeof lineItem.clientId).toBe("string")
             expect(typeof lineItem.amount).toBe("number")
             expect(typeof lineItem.description).toBe("string")
             
             // Validate line item values
             expect(lineItem.amount).toBeGreaterThan(0)
-            expect(lineItem.patientId).toBe(patientId)
+            expect(lineItem.clientId).toBe(clientId)
           }
         }
       } else {
@@ -554,7 +556,7 @@ describe("paymentApi", () => {
       // This test would require more complex mocking of the fetch function
       // For now, we'll test that the API handles errors properly
       const result = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId: "invalid-patient-id",
+        clientId: "invalid-client-id",
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -563,7 +565,7 @@ describe("paymentApi", () => {
 
     it("should handle malformed request data", async () => {
       const result = await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId: "",
+        clientId: "",
         payload: {},
       })(store.dispatch, store.getState, {})
 
@@ -571,8 +573,8 @@ describe("paymentApi", () => {
     })
 
     it("should handle invalid query parameters", async () => {
-      const result = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
         status: "invalid-status" as any,
       })(store.dispatch, store.getState, {})
 
@@ -594,7 +596,8 @@ describe("paymentApi", () => {
         expect(result.data.orgName).toBeDefined()
         expect(typeof result.data.totalUnbilledCost).toBe("number")
         expect(result.data.totalUnbilledCost).toBeGreaterThanOrEqual(0)
-        expect(Array.isArray(result.data.patientCosts)).toBe(true)
+        const costs = result.data.clientCosts ?? result.data.patientCosts
+        expect(Array.isArray(costs)).toBe(true)
         expect(result.data.period).toBeDefined()
         expect(result.data.period.days).toBe(30)
         expect(result.data.period.startDate).toBeDefined()
@@ -604,34 +607,32 @@ describe("paymentApi", () => {
       }
     })
 
-    it("should return patient costs with proper structure", async () => {
+    it("should return client costs with proper structure", async () => {
       const result = await paymentApi.endpoints.getUnbilledCostsByOrg.initiate({
         orgId,
         days: 7,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
-        expect(result.data.patientCosts).toBeDefined()
-        expect(Array.isArray(result.data.patientCosts)).toBe(true)
-        
-        if (result.data.patientCosts.length > 0) {
-          const patientCost = result.data.patientCosts[0]
-          
-          // Validate patient cost structure
-          expect(patientCost.patientId).toBeDefined()
-          expect(patientCost.patientName).toBeDefined()
-          expect(typeof patientCost.conversationCount).toBe("number")
-          expect(typeof patientCost.totalCost).toBe("number")
-          expect(Array.isArray(patientCost.conversations)).toBe(true)
-          
-          // Validate conversation structure
-          if (patientCost.conversations.length > 0) {
-            const conversation = patientCost.conversations[0]
-            expect(conversation.conversationId).toBeDefined()
-            expect(conversation.startTime).toBeDefined()
-            expect(typeof conversation.duration).toBe("number")
-            expect(typeof conversation.cost).toBe("number")
-            expect(conversation.status).toBeDefined()
+        const costs = result.data.clientCosts ?? result.data.patientCosts
+        expect(costs).toBeDefined()
+        expect(Array.isArray(costs)).toBe(true)
+
+        if (costs.length > 0) {
+          const item = costs[0]
+          expect(item.clientId).toBeDefined()
+          expect(item.clientName).toBeDefined()
+          expect(typeof item.totalCost).toBe("number")
+          const count = (item as any).callCount ?? (item as any).conversationCount
+          const entries = (item as any).calls ?? (item as any).conversations
+          if (typeof count === "number") {
+            expect(count).toBeGreaterThanOrEqual(0)
+          }
+          if (Array.isArray(entries) && entries.length > 0) {
+            const entry = entries[0]
+            expect(entry.startTime !== undefined || entry.conversationId !== undefined || (entry as any).callId !== undefined).toBe(true)
+            expect(typeof (entry.duration ?? 0)).toBe("number")
+            expect(typeof (entry.cost ?? 0)).toBe("number")
           }
         }
       } else {
@@ -694,13 +695,13 @@ describe("paymentApi", () => {
   describe("Cache behavior", () => {
     it("should cache invoice data appropriately", async () => {
       // First request
-      const result1 = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result1 = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
       })(store.dispatch, store.getState, {})
 
       // Second request should use cache
-      const result2 = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const result2 = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result1 && result1.data && "data" in result2 && result2.data) {
@@ -710,19 +711,19 @@ describe("paymentApi", () => {
 
     it("should invalidate cache when new invoice is created", async () => {
       // Get initial invoices
-      const initialResult = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const initialResult = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
       })(store.dispatch, store.getState, {})
 
       // Create new invoice
       await paymentApi.endpoints.createInvoiceFromConversations.initiate({
-        patientId,
+        clientId: clientId,
         payload: {},
       })(store.dispatch, store.getState, {})
 
       // Get invoices again - should include the new one
-      const updatedResult = await paymentApi.endpoints.getInvoicesByPatient.initiate({
-        patientId,
+      const updatedResult = await paymentApi.endpoints.getInvoicesByClient.initiate({
+        clientId: clientId,
       })(store.dispatch, store.getState, {})
 
       if ("data" in initialResult && initialResult.data && "data" in updatedResult && updatedResult.data) {

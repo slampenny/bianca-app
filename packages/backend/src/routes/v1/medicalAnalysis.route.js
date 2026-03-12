@@ -17,20 +17,20 @@ const router = express.Router();
 
 /**
  * @swagger
- * /medical-analysis/{patientId}:
+ * /medical-analysis/{clientId}:
  *   get:
- *     summary: Get medical analysis for a patient
- *     description: Retrieves comprehensive medical NLP analysis for a patient over a specified time period
+ *     summary: Get medical analysis for a client
+ *     description: Retrieves comprehensive medical NLP analysis for a client over a specified time period
  *     tags: [MedicalAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *       - in: query
  *         name: timeRange
  *         schema:
@@ -70,9 +70,9 @@ const router = express.Router();
  *                 data:
  *                   type: object
  *                   properties:
- *                     patientId:
+ *                     clientId:
  *                       type: string
- *                     patientName:
+ *                     clientName:
  *                       type: string
  *                     timeRange:
  *                       type: string
@@ -129,14 +129,14 @@ const router = express.Router();
  *                       type: string
  *                       format: date-time
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       400:
  *         description: Invalid parameters
  *       500:
  *         description: Internal server error
  */
 router.get(
-  '/:patientId',
+  '/:clientId',
   auth(),
   validate(medicalAnalysisValidation.getMedicalAnalysis),
   medicalAnalysisController.getMedicalAnalysis
@@ -144,7 +144,7 @@ router.get(
 
 /**
  * @swagger
- * /medical-analysis/{patientId}/summary:
+ * /medical-analysis/{clientId}/summary:
  *   get:
  *     summary: Get medical analysis summary for dashboard
  *     description: Retrieves a summary of medical analysis suitable for dashboard display
@@ -153,11 +153,11 @@ router.get(
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     responses:
  *       200:
  *         description: Medical analysis summary retrieved successfully
@@ -172,9 +172,9 @@ router.get(
  *                 data:
  *                   type: object
  *                   properties:
- *                     patientId:
+ *                     clientId:
  *                       type: string
- *                     patientName:
+ *                     clientName:
  *                       type: string
  *                     hasData:
  *                       type: boolean
@@ -227,12 +227,12 @@ router.get(
  *                     messageCount:
  *                       type: number
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       500:
  *         description: Internal server error
  */
 router.get(
-  '/:patientId/summary',
+  '/:clientId/summary',
   auth(),
   validate(medicalAnalysisValidation.getMedicalAnalysisSummary),
   medicalAnalysisController.getMedicalAnalysisSummary
@@ -240,20 +240,20 @@ router.get(
 
 /**
  * @swagger
- * /medical-analysis/{patientId}/baseline:
+ * /medical-analysis/{clientId}/baseline:
  *   get:
- *     summary: Get baseline for a patient
- *     description: Retrieves the established baseline metrics for a patient
+ *     summary: Get baseline for a client
+ *     description: Retrieves the established baseline metrics for a client
  *     tags: [MedicalAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     responses:
  *       200:
  *         description: Baseline retrieved successfully
@@ -268,7 +268,7 @@ router.get(
  *                 data:
  *                   type: object
  *                   properties:
- *                     patientId:
+ *                     clientId:
  *                       type: string
  *                     type:
  *                       type: string
@@ -288,12 +288,12 @@ router.get(
  *                     version:
  *                       type: number
  *       404:
- *         description: No baseline found for patient
+ *         description: No baseline found for client
  *       500:
  *         description: Internal server error
  */
 router.get(
-  '/:patientId/baseline',
+  '/:clientId/baseline',
   auth(),
   validate(medicalAnalysisValidation.getBaseline),
   medicalAnalysisController.getBaseline
@@ -301,20 +301,20 @@ router.get(
 
 /**
  * @swagger
- * /medical-analysis/{patientId}/baseline:
+ * /medical-analysis/{clientId}/baseline:
  *   post:
- *     summary: Establish or update baseline for a patient
- *     description: Establishes or updates the baseline metrics for a patient
+ *     summary: Establish or update baseline for a client
+ *     description: Establishes or updates the baseline metrics for a client
  *     tags: [MedicalAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     requestBody:
  *       required: true
  *       content:
@@ -363,14 +363,14 @@ router.get(
  *                   type: string
  *                   example: "Baseline established successfully"
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       400:
  *         description: Invalid metrics data
  *       500:
  *         description: Internal server error
  */
 router.post(
-  '/:patientId/baseline',
+  '/:clientId/baseline',
   auth(),
   validate(medicalAnalysisValidation.establishBaseline),
   medicalAnalysisController.establishBaseline
@@ -378,20 +378,20 @@ router.post(
 
 /**
  * @swagger
- * /medical-analysis/results/{patientId}:
+ * /medical-analysis/results/{clientId}:
  *   get:
- *     summary: Get medical analysis results for a patient
- *     description: Retrieves stored medical analysis results for a patient
+ *     summary: Get medical analysis results for a client
+ *     description: Retrieves stored medical analysis results for a client
  *     tags: [MedicalAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *       - in: query
  *         name: limit
  *         schema:
@@ -416,32 +416,32 @@ router.post(
  *                 count:
  *                   type: integer
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       500:
  *         description: Internal server error
  */
 router.get(
-  '/results/:patientId',
+  '/results/:clientId',
   auth('readOwn:medicalAnalysis', 'readAny:medicalAnalysis'),
   medicalAnalysisController.getMedicalAnalysisResults
 );
 
 /**
  * @swagger
- * /medical-analysis/trigger-patient/{patientId}:
+ * /medical-analysis/trigger-client/{clientId}:
  *   post:
- *     summary: Trigger medical analysis for a specific patient
- *     description: Manually triggers medical analysis for a specific patient
+ *     summary: Trigger medical analysis for a specific client
+ *     description: Manually triggers medical analysis for a specific client
  *     tags: [MedicalAnalysis]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *     responses:
  *       200:
  *         description: Medical analysis triggered successfully
@@ -459,28 +459,28 @@ router.get(
  *                 jobId:
  *                   type: string
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       500:
  *         description: Internal server error
  */
 router.post(
-  '/trigger-patient/:patientId',
+  '/trigger-client/:clientId',
   auth('createOwn:medicalAnalysis', 'createAny:medicalAnalysis'),
-  medicalAnalysisController.triggerPatientAnalysis
+  medicalAnalysisController.triggerClientAnalysis
 );
 
 /**
  * @swagger
  * /medical-analysis/trigger-all:
  *   post:
- *     summary: Trigger medical analysis for all active patients
- *     description: Manually triggers medical analysis for all active patients
+ *     summary: Trigger medical analysis for all active clients
+ *     description: Manually triggers medical analysis for all active clients
  *     tags: [MedicalAnalysis]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Medical analysis triggered successfully for all patients
+ *         description: Medical analysis triggered successfully for all clients
  *         content:
  *           application/json:
  *             schema:
@@ -491,7 +491,7 @@ router.post(
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Medical analysis triggered for all patients"
+ *                   example: "Medical analysis triggered for all clients"
  *                 jobCount:
  *                   type: integer
  *       500:
@@ -543,7 +543,7 @@ router.get(
 
 /**
  * @swagger
- * /medical-analysis/trend/{patientId}:
+ * /medical-analysis/trend/{clientId}:
  *   get:
  *     summary: Get medical analysis trend data for time series visualization
  *     description: Retrieves time series data for medical analysis metrics over time
@@ -552,11 +552,11 @@ router.get(
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: Patient ID
+ *         description: Client ID
  *       - in: query
  *         name: timeRange
  *         schema:
@@ -578,7 +578,7 @@ router.get(
  *                 data:
  *                   type: object
  *                   properties:
- *                     patientId:
+ *                     clientId:
  *                       type: string
  *                     timeRange:
  *                       type: string
@@ -613,12 +613,12 @@ router.get(
  *                           type: string
  *                           enum: [improving, stable, declining]
  *       404:
- *         description: Patient not found
+ *         description: Client not found
  *       500:
  *         description: Internal server error
  */
 router.get(
-  '/trend/:patientId',
+  '/trend/:clientId',
   auth('readOwn:medicalAnalysis', 'readAny:medicalAnalysis'),
   medicalAnalysisController.getMedicalAnalysisTrend
 );

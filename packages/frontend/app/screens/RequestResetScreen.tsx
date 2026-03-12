@@ -144,10 +144,10 @@ const createStyles = (colors: any) => StyleSheet.create({
   registerButton: {
     alignItems: "center",
     backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 4,
+    borderRadius: 20,
     justifyContent: "center",
     marginTop: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
     width: "100%",
   },
   successText: {

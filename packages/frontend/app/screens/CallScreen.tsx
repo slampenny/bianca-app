@@ -2,7 +2,7 @@ import React from "react"
 import { View, StyleSheet, ScrollView } from "react-native"
 import { Text } from "app/components"
 import { useSelector, useDispatch } from "react-redux"
-import { getPatient } from "../store/patientSlice"
+import { getClient } from "../store/clientSlice"
 import { getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall, consumePendingCallData } from "../store/callSlice"
 import { CallStatusBanner } from "../components/CallStatusBanner"
@@ -15,7 +15,7 @@ import { STRINGS, POLLING_INTERVALS } from "../constants"
 
 export function CallScreen() {
   const dispatch = useDispatch()
-  const patient = useSelector(getPatient)
+  const client = useSelector(getClient)
   const activeCall = useSelector(getActiveCall)
   const currentConversation = useSelector(getConversation)
   const { colors, isLoading: themeLoading } = useTheme()
@@ -66,11 +66,12 @@ export function CallScreen() {
     })
     
     // Log AI speaking status
-    if (callStatusData?.data?.aiSpeaking) {
+    if (callStatusData?.data?.aiSpeaking && typeof callStatusData.data.aiSpeaking === 'object') {
+      const ai = callStatusData.data.aiSpeaking as { isSpeaking?: boolean; userIsSpeaking?: boolean; conversationState?: string }
       logger.debug('🎤 CallScreen - AI Speaking Status:', {
-        isSpeaking: callStatusData.data.aiSpeaking.isSpeaking,
-        userIsSpeaking: callStatusData.data.aiSpeaking.userIsSpeaking,
-        conversationState: callStatusData.data.aiSpeaking.conversationState,
+        isSpeaking: ai.isSpeaking,
+        userIsSpeaking: ai.userIsSpeaking,
+        conversationState: ai.conversationState,
         timestamp: new Date().toISOString()
       });
     }
@@ -80,7 +81,7 @@ export function CallScreen() {
       logger.debug('💬 CallScreen - Messages from call status:', {
         messageCount: callStatusData.data.messages.length,
         messages: callStatusData.data.messages.map(m => ({
-          id: m.id,
+          id: (m as { id?: string }).id,
           role: m.role,
           content: m.content?.substring(0, 50) + '...',
           createdAt: m.createdAt
@@ -105,12 +106,12 @@ export function CallScreen() {
   const conversationToDisplay = liveConversationData || 
     (callStatusData?.data ? {
       id: callStatusData.data.conversationId,
-      messages: callStatusData.data.messages || [], // Now includes messages from call status API
+      messages: (callStatusData.data.messages || []) as import("../services/api/api.types").Message[], // Now includes messages from call status API
       startTime: callStatusData.data.startTime,
       endTime: callStatusData.data.endTime,
       duration: callStatusData.data.duration,
       status: callStatusData.data.status,
-      patientId: callStatusData.data.patient._id,
+      clientId: (callStatusData.data as any).client?._id ?? (callStatusData.data as any).patient?._id,
       callSid: '', // Not available in call status
       lineItemId: null,
       history: '',
@@ -151,14 +152,14 @@ export function CallScreen() {
 
   const styles = createStyles(colors)
 
-  if (!patient) {
+  if (!client) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Call</Text>
         </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No patient selected</Text>
+          <Text style={styles.errorText}>No client selected</Text>
         </View>
       </View>
     )
@@ -168,7 +169,7 @@ export function CallScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Call with {patient.name} v1</Text>
+        <Text style={styles.headerTitle}>Call with {client.name} v1</Text>
       </View>
 
       {/* Call Status Banner - Prominently displayed */}
@@ -177,7 +178,7 @@ export function CallScreen() {
           <CallStatusBanner
             conversationId={activeCall.conversationId}
             initialStatus={activeCall.status || 'initiated'}
-            patientName={patient.name}
+            clientName={client.name}
             onStatusChange={(status) => {
               logger.debug('Call status changed:', status)
             }}
@@ -239,13 +240,13 @@ export function CallScreen() {
           
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Patient:</Text>
-            <Text style={styles.infoValue}>{patient.name}</Text>
+            <Text style={styles.infoValue}>{client.name}</Text>
           </View>
           
-          {patient.phone && (
+          {client.phone && (
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Phone:</Text>
-              <Text style={styles.infoValue}>{patient.phone}</Text>
+              <Text style={styles.infoValue}>{client.phone}</Text>
             </View>
           )}
 
@@ -264,10 +265,10 @@ export function CallScreen() {
             {isConversationFetching && (
               <Text style={styles.liveIndicator}> 🔄</Text>
             )}
-            {callStatusData?.data?.aiSpeaking?.isSpeaking && (
+            {typeof callStatusData?.data?.aiSpeaking === 'object' && (callStatusData?.data?.aiSpeaking as { isSpeaking?: boolean })?.isSpeaking && (
               <Text style={styles.speakingIndicator}> 🎤 AI Speaking...</Text>
             )}
-            {callStatusData?.data?.aiSpeaking?.userIsSpeaking && (
+            {typeof callStatusData?.data?.aiSpeaking === 'object' && (callStatusData?.data?.aiSpeaking as { userIsSpeaking?: boolean })?.userIsSpeaking && (
               <Text style={styles.speakingIndicator}> 👤 User Speaking...</Text>
             )}
           </Text>

@@ -1,6 +1,6 @@
 // seedDatabase.js - Refactored version using modular seeders
 const mongoose = require('mongoose');
-const { Alert, Org, Caregiver, Patient, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
+const { Alert, Org, Caregiver, Client, Conversation, Message, Schedule, PaymentMethod, Invoice } = require('../models');
 const config = require('../config/config');
 
 // Import seeders
@@ -22,7 +22,7 @@ async function clearDatabase() {
   console.log('Clearing the database...');
   await Org.deleteMany({});
   await Caregiver.deleteMany({});
-  await Patient.deleteMany({});
+  await Client.deleteMany({});
   await Alert.deleteMany({});
   await Conversation.deleteMany({});
   await Message.deleteMany({});
@@ -70,7 +70,7 @@ async function seedDatabase() {
     const patient2 = patients[1];
 
     // Create a third patient for fraud/abuse testing
-    const patient3 = new Patient({
+    const patient3 = new Client({
       name: 'Margaret Thompson',
       email: 'vulnerable@example.org',
       phone: '1234567892',
@@ -80,7 +80,7 @@ async function seedDatabase() {
       isActive: true
     });
     await patient3.save();
-    caregiverOneRecord.patients.push(patient3._id);
+    caregiverOneRecord.clients.push(patient3._id);
     await caregiverOneRecord.save();
     patients.push(patient3);
 
@@ -128,7 +128,7 @@ async function seedDatabase() {
       // Run multiple analyses on patient1 to create trend data
       console.log('Triggering multiple medical analyses for patient1...');
       for (let i = 0; i < 3; i++) {
-        await medicalAnalysisScheduler.schedulePatientAnalysis(patient1._id.toString(), {
+        await medicalAnalysisScheduler.scheduleClientAnalysis(patient1._id.toString(), {
           trigger: 'seeding',
           batchId: `seeding-${Date.now()}-${i}`
         });
@@ -137,7 +137,7 @@ async function seedDatabase() {
       
       // Also run analysis on patient2 for variety
       console.log('Triggering medical analysis for patient2...');
-      await medicalAnalysisScheduler.schedulePatientAnalysis(patient2._id.toString(), {
+      await medicalAnalysisScheduler.scheduleClientAnalysis(patient2._id.toString(), {
         trigger: 'seeding',
         batchId: `seeding-${Date.now()}`
       });

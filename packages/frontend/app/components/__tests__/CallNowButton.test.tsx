@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, fireEvent, waitFor } from '@testing-library/react-native'
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native'
 import { CallNowButton } from '../CallNowButton'
 import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
@@ -17,9 +17,14 @@ jest.mock('@react-navigation/native', () => ({
 
 const mockInitiateCallMutation = jest.fn()
 
-// Mock the API hook
+// Mock the API hook and provide minimal API shape so store.ts does not warn "Missing API service: callWorkflowApi"
 jest.mock('../../services/api/callWorkflowApi', () => ({
   useInitiateCallMutation: () => [mockInitiateCallMutation],
+  callWorkflowApi: {
+    reducerPath: 'callWorkflowApi',
+    reducer: (state = {}) => state,
+    middleware: () => (next: (a: unknown) => unknown) => (action: unknown) => next(action),
+  },
 }))
 
 // Create a test store
@@ -44,8 +49,8 @@ const renderWithProvider = (component: React.ReactElement) => {
 
 describe('CallNowButton', () => {
   const defaultProps = {
-    patientId: 'patient-123',
-    patientName: 'John Doe',
+    clientId: 'client-123',
+    clientName: 'John Doe',
     disabled: false,
   }
   const mockSuccessResponse = {
@@ -53,9 +58,9 @@ describe('CallNowButton', () => {
       conversationId: 'conv-123',
       status: 'initiated',
       callSid: 'call-456',
-      patientId: 'patient-123',
-      patientName: 'John Doe',
-      patientPhone: '+1234567890',
+      clientId: 'client-123',
+      clientName: 'John Doe',
+      clientPhone: '+1234567890',
       agentId: 'agent-123',
       agentName: 'Agent Name',
     }
@@ -75,14 +80,14 @@ describe('CallNowButton', () => {
     expect(getByText('Call Now')).toBeTruthy()
   })
 
-  it('shows patient name in call notes when initiating call', async () => {
+  it('shows client name in call notes when initiating call', async () => {
     const mockResponse = {
       data: {
         conversationId: 'conv-123',
         callSid: 'call-456',
-        patientId: 'patient-123',
-        patientName: 'John Doe',
-        patientPhone: '+1234567890',
+        clientId: 'client-123',
+        clientName: 'John Doe',
+        clientPhone: '+1234567890',
         agentId: 'agent-123',
         agentName: 'Agent Name',
         callStatus: 'ringing'
@@ -102,7 +107,7 @@ describe('CallNowButton', () => {
 
     await waitFor(() => {
       expect(mockInitiateCallMutation).toHaveBeenCalledWith({
-        patientId: 'patient-123',
+        clientId: 'client-123',
         callNotes: 'Manual call initiated by agent to John Doe'
       })
     })
@@ -113,9 +118,9 @@ describe('CallNowButton', () => {
       data: {
         conversationId: 'conv-123',
         callSid: 'call-456',
-        patientId: 'patient-123',
-        patientName: 'John Doe',
-        patientPhone: '+1234567890',
+        clientId: 'client-123',
+        clientName: 'John Doe',
+        clientPhone: '+1234567890',
         agentId: 'agent-123',
         agentName: 'Agent Name',
         callStatus: 'ringing'
@@ -152,12 +157,17 @@ describe('CallNowButton', () => {
     )
 
     const button = getByTestId('call-now-John Doe')
-    fireEvent.press(button)
+    await act(async () => {
+      fireEvent.press(button)
+    })
 
     // Should show "Calling..." text
     expect(getByText('Calling...')).toBeTruthy()
 
-    resolvePromise!(mockSuccessResponse.data)
+    await act(async () => {
+      resolvePromise!(mockSuccessResponse.data)
+      await Promise.resolve()
+    })
     await waitFor(() => {
       expect(mockInitiateCallMutation).toHaveBeenCalledTimes(1)
     })
@@ -169,16 +179,21 @@ describe('CallNowButton', () => {
       unwrap: () => Promise.reject({ data: { message: errorMessage } })
     })
 
+    const loggerSpy = jest.spyOn(require('../../utils/logger').logger, 'error').mockImplementation(() => {})
+
     const { getByTestId, getByText } = renderWithProvider(
       <CallNowButton {...defaultProps} />
     )
 
     const button = getByTestId('call-now-John Doe')
-    fireEvent.press(button)
-
+    await act(async () => {
+      fireEvent.press(button)
+    })
     await waitFor(() => {
       expect(getByText(errorMessage)).toBeTruthy()
     })
+
+    loggerSpy.mockRestore()
   })
 
   it('is disabled when disabled prop is true', () => {
@@ -204,12 +219,17 @@ describe('CallNowButton', () => {
     )
 
     const button = getByTestId('call-now-John Doe')
-    fireEvent.press(button)
+    await act(async () => {
+      fireEvent.press(button)
+    })
 
     // Button should be disabled while calling
     expect(button.props.accessibilityState?.disabled).toBe(true)
 
-    resolvePromise!(mockSuccessResponse.data)
+    await act(async () => {
+      resolvePromise!(mockSuccessResponse.data)
+      await Promise.resolve()
+    })
     await waitFor(() => {
       expect(mockInitiateCallMutation).toHaveBeenCalledTimes(1)
     })
@@ -229,17 +249,21 @@ describe('CallNowButton', () => {
     )
 
     const button = getByTestId('call-now-John Doe')
-    
-    // Press button multiple times
-    fireEvent.press(button)
-    fireEvent.press(button)
-    fireEvent.press(button)
+
+    await act(async () => {
+      fireEvent.press(button)
+      fireEvent.press(button)
+      fireEvent.press(button)
+    })
 
     // Should only call the API once
     await waitFor(() => {
       expect(mockInitiateCallMutation).toHaveBeenCalledTimes(1)
     })
 
-    resolvePromise!(mockSuccessResponse.data)
+    await act(async () => {
+      resolvePromise!(mockSuccessResponse.data)
+      await Promise.resolve()
+    })
   })
 })

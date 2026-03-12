@@ -5,7 +5,7 @@ const messageSchema = mongoose.Schema({
   role: {
     type: String,
     required: true,
-    enum: ['patient', 'assistant', 'system', 'debug-user'],
+    enum: ['client', 'assistant', 'system', 'debug-user'],
   },
   content: {
     type: String,
@@ -41,10 +41,10 @@ const conversationSchema = mongoose.Schema(
       ref: 'Call',
       unique: true, // One conversation per call
     },
-    patientId: {
+    clientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient',
+      ref: 'Client',
     },
     messages: [
       {
@@ -107,9 +107,9 @@ const conversationSchema = mongoose.Schema(
 );
 
 // Indexes for efficient querying
-conversationSchema.index({ patientId: 1 });
+conversationSchema.index({ clientId: 1 });
 // Note: callId already has an index from unique: true, so we don't need an explicit index here
-conversationSchema.index({ patientId: 1, createdAt: -1 }); // For patient conversation history
+conversationSchema.index({ clientId: 1, createdAt: -1 });
 
 // Plugins for JSON conversion and pagination
 conversationSchema.plugin(toJSON);

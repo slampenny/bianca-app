@@ -2,50 +2,41 @@ import { test as base, expect, Page } from '@playwright/test'
 
 export { expect }
 import { asyncStorageMockScript } from './asyncStorageMock'
+import { goThroughOnboardingToRegister } from './navigation'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
   // Ensure we're on login screen first
   await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 }).catch(async () => {
-    // If not on login screen, try to navigate there
     await page.goto('/')
     await page.waitForLoadState('networkidle')
     await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
   })
-  
-  // Use data-testid for React Native Web
+
   if (await page.locator('input[data-testid="register-name"]').count() === 0) {
-    // Wait for register button to be visible - try multiple selectors
     let registerButton = page.getByTestId('register-button')
     let buttonCount = await registerButton.count().catch(() => 0)
-    
     if (buttonCount === 0) {
-      // Try alternative selector
       registerButton = page.locator('[data-testid="register-button"]').first()
       buttonCount = await registerButton.count().catch(() => 0)
     }
-    
     if (buttonCount === 0) {
-      // Last resort: find by text
       registerButton = page.getByText(/register|create account/i).first()
       buttonCount = await registerButton.count().catch(() => 0)
     }
-    
     if (buttonCount === 0) {
-      // If still not found, reload the page and try again
       console.log('⚠️ Register button not found, reloading page...')
       await page.reload({ waitUntil: 'networkidle' })
       await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
       registerButton = page.getByTestId('register-button')
       buttonCount = await registerButton.count().catch(() => 0)
     }
-    
     if (buttonCount === 0) {
       throw new Error('Register button not found on page. Page might not be in login state.')
     }
-    
     await registerButton.waitFor({ state: 'visible', timeout: 10000 })
     await registerButton.click()
-    await page.waitForSelector('input[data-testid="register-name"]', { timeout: 10000 })
+    // New flow: Register button goes to onboarding first; go through to reach Register screen
+    await goThroughOnboardingToRegister(page, 'caregiver')
   }
   // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
   await page.locator('input[data-testid="register-name"]').fill(name)
@@ -188,9 +179,9 @@ export async function loginUserViaUI(page: Page, email: string, password: string
       const homeIndicators = [
         '[data-testid="home-header"]',
         '[data-testid="tab-home"]',
-        '[data-testid="add-patient-button"]',
+        '[data-testid="add-client-button"]',
         '[aria-label="Home tab"]',
-        'text=Add Patient'
+        'text=Add Client'
       ]
       
       let foundHome = false
@@ -315,34 +306,34 @@ export async function loginUserViaUI(page: Page, email: string, password: string
   }
 }
 
-export async function createPatientViaUI(page: Page, name: string, email: string, phone: string): Promise<void> {
-  console.log(`Creating patient: ${name} (${email})`)
+export async function createClientViaUI(page: Page, name: string, email: string, phone: string): Promise<void> {
+  console.log(`Creating client: ${name} (${email})`)
   
-  // Wait for add patient button to be enabled (indicating user role is loaded)
-  await page.waitForSelector('[data-testid="add-patient-button"]:not([disabled])', { timeout: 10000 })
+  // Wait for add client button to be enabled (indicating user role is loaded)
+  await page.waitForSelector('[data-testid="add-client-button"]:not([disabled])', { timeout: 10000 })
   
-  await page.getByTestId('add-patient-button').click()
+  await page.getByTestId('add-client-button').click()
   
-  // Wait for patient screen to be fully loaded
-  await page.waitForSelector('[data-testid="patient-name-input"]', { timeout: 10000 })
-  console.log('Patient screen loaded')
+  // Wait for client screen to be fully loaded
+  await page.waitForSelector('[data-testid="client-name-input"]', { timeout: 10000 })
+  console.log('Client screen loaded')
   
-  await page.getByTestId('patient-name-input').fill(name)
-  await page.getByTestId('patient-email-input').fill(email)
+  await page.getByTestId('client-name-input').fill(name)
+  await page.getByTestId('client-email-input').fill(email)
   // Use phone number as-is since test data already has proper format
-  await page.getByTestId('patient-phone-input').fill(phone)
+  await page.getByTestId('client-phone-input').fill(phone)
   
   // Wait a moment for validation to complete
   await page.waitForTimeout(500)
   
   // Debug: Check form field values
-  const nameValue = await page.getByTestId('patient-name-input').inputValue()
-  const emailValue = await page.getByTestId('patient-email-input').inputValue()
-  const phoneValue = await page.getByTestId('patient-phone-input').inputValue()
+  const nameValue = await page.getByTestId('client-name-input').inputValue()
+  const emailValue = await page.getByTestId('client-email-input').inputValue()
+  const phoneValue = await page.getByTestId('client-phone-input').inputValue()
   console.log(`Form field values - Name: "${nameValue}", Email: "${emailValue}", Phone: "${phoneValue}"`)
   
   // Debug: Check if save button is enabled before clicking
-  const saveButton = page.getByTestId('save-patient-button')
+  const saveButton = page.getByTestId('save-client-button')
   const isEnabled = await saveButton.isEnabled()
   console.log(`Save button enabled: ${isEnabled}`)
   
@@ -366,19 +357,19 @@ export async function createPatientViaUI(page: Page, name: string, email: string
       const currentUrl = page.url()
       console.log(`Current URL: ${currentUrl}`)
       
-      // Check if patient name input is visible
-      const nameInputVisible = await page.getByTestId('patient-name-input').isVisible()
-      console.log(`Patient name input visible: ${nameInputVisible}`)
+      // Check if client name input is visible
+      const nameInputVisible = await page.getByTestId('client-name-input').isVisible()
+      console.log(`Client name input visible: ${nameInputVisible}`)
       
       // Check for validation errors (optional - they might not exist)
       let emailError: string | null = null
       let phoneError: string | null = null
       try {
-        const emailErrorElement = page.locator('[data-testid="patient-email-input"] + div')
+        const emailErrorElement = page.locator('[data-testid="client-email-input"] + div')
         if (await emailErrorElement.count() > 0) {
           emailError = await emailErrorElement.textContent()
         }
-        const phoneErrorElement = page.locator('[data-testid="patient-phone-input"] + div')
+        const phoneErrorElement = page.locator('[data-testid="client-phone-input"] + div')
         if (await phoneErrorElement.count() > 0) {
           phoneError = await phoneErrorElement.textContent()
         }
@@ -410,7 +401,7 @@ export async function createPatientViaUI(page: Page, name: string, email: string
     if (errorCount > 0) {
       const errorText = await errorElements.first().textContent()
       console.log('Error message found:', errorText)
-      throw new Error(`Patient creation failed: ${errorText}`)
+      throw new Error(`Client creation failed: ${errorText}`)
     }
     
     // If no error message, try waiting a bit longer
@@ -420,25 +411,30 @@ export async function createPatientViaUI(page: Page, name: string, email: string
   // Small delay to allow Redux state to update
   await page.waitForTimeout(1000)
   
-  // Wait for the patient to appear in the list
+  // Wait for the client to appear in the list
   try {
-    await page.waitForSelector(`[data-testid^="patient-name-"]:has-text("${name}")`, { timeout: 15000 })
-    console.log(`Patient "${name}" successfully created and visible in list`)
+    await page.waitForSelector(`[data-testid^="client-name-"]:has-text("${name}"), [data-testid^="client-card-"]:has-text("${name}")`, { timeout: 15000 })
+    console.log(`Client "${name}" successfully created and visible in list`)
   } catch (error) {
-    console.log(`Patient "${name}" not found in list after creation`)
+    console.log(`Client "${name}" not found in list after creation`)
     
-    // Check what patients are actually in the list
-    const patientElements = page.locator('[data-testid^="patient-name-"]')
-    const patientCount = await patientElements.count()
-    console.log(`Found ${patientCount} patients in list`)
+    // Check what clients are actually in the list
+    const clientElements = page.locator('[data-testid^="client-name-"], [data-testid^="client-card-"]')
+    const clientCount = await clientElements.count()
+    console.log(`Found ${clientCount} clients in list`)
     
-    for (let i = 0; i < patientCount; i++) {
-      const patientText = await patientElements.nth(i).textContent()
-      console.log(`Patient ${i + 1}: ${patientText}`)
+    for (let i = 0; i < clientCount; i++) {
+      const clientText = await clientElements.nth(i).textContent()
+      console.log(`Client ${i + 1}: ${clientText}`)
     }
     
     throw error
   }
+}
+
+/** @deprecated Use createClientViaUI */
+export async function createPatientViaUI(page: Page, name: string, email: string, phone: string): Promise<void> {
+  return createClientViaUI(page, name, email, phone)
 }
 
 export async function goToOrgTab(page: Page): Promise<void> {
@@ -465,14 +461,14 @@ export async function goToPaymentTab(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="payment-info-container"]', { timeout: 10000 })
 }
 
-export async function createAlertViaUI(page: Page, message: string, importance: string, alertType: string, patientName?: string) {
+export async function createAlertViaUI(page: Page, message: string, importance: string, alertType: string, clientName?: string) {
   await goToAlertTab(page)
   await page.click('[data-testid="create-alert-button"]')
   await page.fill('[data-testid="alert-message-input"]', message)
   await page.selectOption('[data-testid="alert-importance-select"]', importance)
   await page.selectOption('[data-testid="alert-type-select"]', alertType)
-  if (patientName) {
-    await page.selectOption('[data-testid="alert-patient-select"]', { label: patientName })
+  if (clientName) {
+    await page.selectOption('[data-testid="alert-client-select"]', { label: clientName })
   }
   await page.click('[data-testid="save-alert-button"]')
   await page.waitForSelector(`text=${message}`, { timeout: 10000 })
@@ -516,11 +512,11 @@ export async function ensureUserRegisteredAndLoggedInViaUI(page: Page, name: str
   } catch {
     // Login failed, check for error and register
     if (await page.getByText(/Failed to log in/i).isVisible()) {
-      // Go to register screen
+      // Go to register screen (new flow: Register button → onboarding → Register form)
       if (await page.locator('input[data-testid="register-name"]').count() === 0) {
         await page.getByTestId('register-button').click()
+        await goThroughOnboardingToRegister(page, 'caregiver')
       }
-      // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
       await page.fill('input[data-testid="register-name"]', name)
       await page.fill('input[data-testid="register-email"]', email)
       await page.fill('input[data-testid="register-password"]', password)
@@ -584,58 +580,61 @@ export async function logoutViaUI(page: Page): Promise<void> {
   }
 }
 
-export async function editPatientViaUI(page: Page, patientName: string, newName: string, newEmail: string, newPhone: string): Promise<void> {
-  // Click on the edit button for the specified patient
-  await page.getByTestId(`edit-patient-button-${patientName}`).click()
+export async function editClientViaUI(page: Page, clientName: string, newName: string, newEmail: string, newPhone: string): Promise<void> {
+  // Find the client card by name and click the edit button (edit-client-button-<id> is inside the card)
+  const card = page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+  await card.locator('[data-testid^="edit-client-button-"]').first().click()
   
-  // Wait for patient edit screen to load
-  await page.waitForSelector('[data-testid="patient-name-input"]', { timeout: 10000 })
+  // Wait for client edit screen to load
+  await page.waitForSelector('[data-testid="client-name-input"]', { timeout: 10000 })
   
-  // Update the patient information
-  await page.getByTestId('patient-name-input').fill(newName)
-  await page.getByTestId('patient-email-input').fill(newEmail)
-  await page.getByTestId('patient-phone-input').fill(newPhone)
+  // Update the client information
+  await page.getByTestId('client-name-input').fill(newName)
+  await page.getByTestId('client-email-input').fill(newEmail)
+  await page.getByTestId('client-phone-input').fill(newPhone)
   
   // Save the changes
-  await page.getByTestId('save-patient-button').click()
+  await page.getByTestId('save-client-button').click()
   
   // Wait for navigation back to home screen
   await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 }
 
-export async function deletePatientViaUI(page: Page, patientName: string): Promise<void> {
-  // Click on the edit button for the specified patient
-  await page.getByTestId(`edit-patient-button-${patientName}`).click()
+export async function deleteClientViaUI(page: Page, clientName: string): Promise<void> {
+  // Find the client card by name and click the edit button to open details
+  const card = page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+  await card.locator('[data-testid^="edit-client-button-"]').first().click()
   
-  // Wait for patient edit screen to load
-  await page.waitForSelector('[data-testid="delete-patient-button"]', { timeout: 10000 })
+  // Wait for client screen to load
+  await page.waitForSelector('[data-testid="delete-client-button"]', { timeout: 10000 })
   
   // Click delete button
-  await page.getByTestId('delete-patient-button').click()
+  await page.getByTestId('delete-client-button').click()
   
   // Wait for confirm delete button to appear
-  await page.waitForSelector('[data-testid="delete-patient-button"]:has-text("CONFIRM DELETE")', { timeout: 5000 })
+  await page.waitForSelector('[data-testid="delete-client-button"]:has-text("CONFIRM DELETE"), button:has-text("CONFIRM DELETE")', { timeout: 5000 })
   
   // Click confirm delete
-  await page.getByTestId('delete-patient-button').click()
+  await page.getByTestId('delete-client-button').click().catch(() => page.locator('button:has-text("CONFIRM DELETE")').click())
   
   // Wait for navigation back to home screen
   await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })
 }
 
-export async function checkPatientExists(page: Page, patientName: string): Promise<boolean> {
+export async function checkClientExists(page: Page, clientName: string): Promise<boolean> {
   try {
-    await page.waitForSelector(`[data-testid="patient-name-${patientName}"]`, { timeout: 3000 })
+    await page.waitForSelector(`[data-testid="client-name-${clientName}"], [data-testid^="client-card-"]:has-text("${clientName}")`, { timeout: 3000 })
     return true
   } catch {
     return false
   }
 }
 
-export async function getPatientCount(page: Page): Promise<number> {
-  const patientCards = page.locator('[data-testid^="patient-card-"]')
-  return await patientCards.count()
+export async function getClientCount(page: Page): Promise<number> {
+  const clientCards = page.locator('[data-testid^="client-card-"]')
+  return await clientCards.count()
 }
+
 
 export async function navigateToPrivacyRequestScreen(page: Page): Promise<void> {
   // Navigate directly via URL (fastest method)
@@ -643,8 +642,13 @@ export async function navigateToPrivacyRequestScreen(page: Page): Promise<void> 
   await page.waitForSelector('[data-testid="privacy-request-screen"], [aria-label="privacy-request-screen"]', { timeout: 10000 })
 }
 
+export async function waitForClientListToLoad(page: Page): Promise<void> {
+  await page.waitForSelector('[data-testid="client-list"]', { timeout: 10000 })
+}
+
+/** @deprecated Use waitForClientListToLoad */
 export async function waitForPatientListToLoad(page: Page): Promise<void> {
-  await page.waitForSelector('[data-testid="patient-list"]', { timeout: 10000 })
+  return waitForClientListToLoad(page)
 }
 
 // Custom test fixture that navigates to the root URL before each test

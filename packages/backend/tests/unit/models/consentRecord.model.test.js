@@ -5,7 +5,7 @@ const { ConsentRecord } = require('../../../src/models');
 describe('ConsentRecord Model', () => {
   let mongoServer;
   let caregiverId;
-  let patientId;
+  let clientId;
 
   beforeAll(async () => {
     mongoServer = new MongoMemoryServer();
@@ -24,7 +24,7 @@ describe('ConsentRecord Model', () => {
   beforeEach(async () => {
     await ConsentRecord.deleteMany({});
     caregiverId = new mongoose.Types.ObjectId();
-    patientId = new mongoose.Types.ObjectId();
+    clientId = new mongoose.Types.ObjectId();
   });
 
   describe('Schema Validation', () => {

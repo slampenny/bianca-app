@@ -48,23 +48,20 @@ const calculateVariance = (scores) => {
 };
 
 /**
- * Get sentiment trend data for a patient over a specified time range
- * @param {string} patientId - The patient ID
+ * Get sentiment trend data for a client over a specified time range
+ * @param {string} clientId - The client ID
  * @param {string} timeRange - Time range: 'lastCall', 'month', or 'lifetime'
  * @returns {Promise<Object>} Sentiment trend data
  */
-const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
+const getSentimentTrend = async (clientId, timeRange = 'lastCall') => {
   try {
     const now = new Date();
     let startDate;
 
-    // Calculate start date based on time range
     switch (timeRange) {
       case 'lastCall':
-        // For lastCall, we'll get the most recent conversation with sentiment analysis
-        // Use Call's endTime by populating callId
         const lastConversation = await Conversation.findOne({
-          patientId,
+          clientId,
           'analyzedData.sentiment': { $exists: true }
         })
         .populate('callId', 'endTime')
@@ -77,7 +74,8 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
         } else {
           // No conversations with sentiment analysis, return empty data
           return {
-            patientId,
+            clientId,
+            clientId,
             timeRange,
             startDate: now.toISOString(),
             endDate: now.toISOString(),
@@ -107,7 +105,8 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
     // Get conversations with sentiment analysis for the patient
     // Use Call's endTime by populating callId
     let conversations = await Conversation.find({
-      patientId,
+      clientId,
+      clientId,
       'analyzedData.sentiment': { $exists: true }
     })
       .populate('callId', 'endTime startTime duration status')
@@ -129,7 +128,7 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
 
     // Get all conversations (including those without sentiment) for total count
     // Count conversations where Call's endTime is within range
-    const allConversations = await Conversation.find({ patientId })
+    const allConversations = await Conversation.find({ clientId })
       .populate('callId', 'endTime')
       .lean();
     const totalConversations = allConversations.filter(conv => {
@@ -169,7 +168,8 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
     let confidence = 0;
     
     logger.debug('SentimentTrend processing', {
-      patientId,
+      clientId,
+      clientId,
       dataPointCount: dataPoints.length
     });
     
@@ -183,7 +183,8 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
       const sentimentScores = sortedDataPoints.map(point => point.analyzedData?.sentiment?.sentimentScore || 0);
       
       logger.debug('SentimentTrend sorted scores', {
-        patientId,
+        clientId,
+      clientId,
         sentimentScores
       });
       
@@ -191,7 +192,8 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
       trendDirection = calculateLinearTrend(sentimentScores);
       
       logger.debug('SentimentTrend calculated direction', {
-        patientId,
+        clientId,
+      clientId,
         trendDirection
       });
       
@@ -212,7 +214,8 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
       const difference = lastScore - firstScore;
       
       logger.debug('SentimentTrend 2-point comparison', {
-        patientId,
+        clientId,
+      clientId,
         firstScore,
         lastScore,
         difference
@@ -222,7 +225,8 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
       else if (difference < -0.05) trendDirection = 'declining';
       
       logger.debug('SentimentTrend 2-point direction', {
-        patientId,
+        clientId,
+      clientId,
         trendDirection
       });
       
@@ -236,18 +240,18 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
 
     // Generate key insights
     const keyInsights = [];
-    if (averageSentiment > 0.3) keyInsights.push('Patient shows generally positive sentiment');
-    else if (averageSentiment < -0.3) keyInsights.push('Patient shows generally negative sentiment');
+    if (averageSentiment > 0.3) keyInsights.push('Client shows generally positive sentiment');
+    else if (averageSentiment < -0.3) keyInsights.push('Client shows generally negative sentiment');
     
     if (trendDirection === 'improving') keyInsights.push('Sentiment trend is improving over time');
     else if (trendDirection === 'declining') keyInsights.push('Sentiment trend is declining over time');
     
     if (sentimentDistribution.negative > sentimentDistribution.positive) {
-      keyInsights.push('Patient has more negative than positive conversations');
+      keyInsights.push('Client has more negative than positive conversations');
     }
 
     return {
-      patientId,
+      clientId,
       timeRange,
       startDate,
       endDate: now,
@@ -264,25 +268,23 @@ const getSentimentTrend = async (patientId, timeRange = 'lastCall') => {
     };
 
   } catch (error) {
-    logger.error(`[Sentiment Trend] Error getting sentiment trend for patient ${patientId}: ${error.message}`);
+    logger.error(`[Sentiment Trend] Error getting sentiment trend for client ${clientId}: ${error.message}`);
     throw error;
   }
 };
 
 /**
- * Get sentiment summary for a patient
- * @param {string} patientId - The patient ID
+ * Get sentiment summary for a client
+ * @param {string} clientId - The client ID
  * @returns {Promise<Object>} Sentiment summary data
  */
-const getSentimentSummary = async (patientId) => {
+const getSentimentSummary = async (clientId) => {
   try {
-    // Get recent conversations (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Get recent conversations using Call's endTime (date/duration live on Call, not Conversation)
     let recentConversations = await Conversation.find({
-      patientId
+      clientId
     })
       .populate('callId', 'endTime startTime duration callDuration status')
       .select('_id analyzedData callId')
@@ -360,7 +362,7 @@ const getSentimentSummary = async (patientId) => {
     };
 
   } catch (error) {
-    logger.error(`[Sentiment Summary] Error getting sentiment summary for patient ${patientId}: ${error.message}`);
+    logger.error(`[Sentiment Summary] Error getting sentiment summary for client ${clientId}: ${error.message}`);
     throw error;
   }
 };

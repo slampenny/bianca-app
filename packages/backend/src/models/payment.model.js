@@ -3,10 +3,10 @@ const { toJSON, paginate } = require('./plugins');
 
 const lineItemSchema = mongoose.Schema(
   {
-    patientId: {
+    clientId: {
       type: mongoose.SchemaTypes.ObjectId,
       required: true,
-      ref: 'Patient',
+      ref: 'Client',
     },
     invoiceId: {
       type: mongoose.SchemaTypes.ObjectId,
@@ -133,9 +133,9 @@ invoiceSchema.index({ org: 1 });
 invoiceSchema.index({ org: 1, createdAt: -1 }); // For org invoice lists
 invoiceSchema.index({ status: 1, createdAt: -1 }); // For status filtering
 
-lineItemSchema.index({ patientId: 1 });
+lineItemSchema.index({ clientId: 1 });
 lineItemSchema.index({ invoiceId: 1 });
-lineItemSchema.index({ patientId: 1, invoiceId: 1 }); // Compound
+lineItemSchema.index({ clientId: 1, invoiceId: 1 });
 
 invoiceSchema.plugin(toJSON);
 invoiceSchema.plugin(paginate);

@@ -111,7 +111,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     },
   });
   
-  const isDarkMode = themeInfo.darkMode;
+  const isDarkMode = themeInfo.accessibility.darkMode;
   const styles = createStyles(colors, isDarkMode);
   
   // No debug logging here to reduce console noise in web dev builds
@@ -123,9 +123,12 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     try {
       const result = await ssoService.signInWithGoogle();
       
+      if ('redirecting' in result && result.redirecting) {
+        // Web redirect flow: page will navigate away; keep loading state
+        return;
+      }
       if ('error' in result) {
         onSSOError?.(result);
-        // Show different toasts based on error type
         const message = result.description || result.error;
         if (result.error.includes('not configured')) {
           showError(`${translate("ssoButtons.ssoNotAvailable")}: ${message}`);
@@ -154,9 +157,11 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
     try {
       const result = await ssoService.signInWithMicrosoft();
       
+      if ('redirecting' in result && result.redirecting) {
+        return;
+      }
       if ('error' in result) {
         onSSOError?.(result);
-        // Show different toasts based on error type
         const message = result.description || result.error;
         if (result.error.includes('not configured')) {
           showError(`${translate("ssoButtons.ssoNotAvailable")}: ${message}`);

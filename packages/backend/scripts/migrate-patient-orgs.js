@@ -15,7 +15,7 @@
 
 const mongoose = require('mongoose');
 const config = require('../src/config/config');
-const { Patient, Caregiver, Org, Schedule } = require('../src/models');
+const { Client, Caregiver, Org, Schedule } = require('../src/models');
 const logger = require('../src/config/logger');
 
 async function migratePatientOrgs() {
@@ -26,7 +26,7 @@ async function migratePatientOrgs() {
     logger.info('Connected to database');
 
     // Find all patients without an org
-    const patientsWithoutOrg = await Patient.find({
+    const patientsWithoutOrg = await Client.find({
       $or: [
         { org: { $exists: false } },
         { org: null },
@@ -46,14 +46,14 @@ async function migratePatientOrgs() {
     let errorCount = 0;
     const patientsNeedingManualReview = [];
 
-    for (const patient of patientsWithoutOrg) {
+    for (const client of patientsWithoutOrg) {
       try {
         let orgToAssign = null;
 
-        // Strategy 1: Get org from patient's caregivers
-        if (patient.caregivers && patient.caregivers.length > 0) {
+        // Strategy 1: Get org from client's caregivers
+        if (client.caregivers && client.caregivers.length > 0) {
           // Populate caregivers if they're not already populated
-          const caregivers = patient.caregivers.map(cg => 
+          const caregivers = client.caregivers.map(cg => 
             cg._id ? cg : null
           ).filter(Boolean);
 
@@ -73,13 +73,13 @@ async function migratePatientOrgs() {
           }
         }
 
-        // Strategy 2: If still no org, try to find org from patient's schedules
-        if (!orgToAssign && patient.schedules && patient.schedules.length > 0) {
-          const schedule = await Schedule.findById(patient.schedules[0])
-            .populate('patient.org');
+        // Strategy 2: If still no org, try to find org from client's schedules
+        if (!orgToAssign && client.schedules && client.schedules.length > 0) {
+          const schedule = await Schedule.findById(client.schedules[0])
+            .populate('client.org');
           
-          if (schedule && schedule.patient && schedule.patient.org) {
-            orgToAssign = schedule.patient.org;
+          if (schedule && schedule.client && schedule.client.org) {
+            orgToAssign = schedule.client.org;
           }
         }
 
@@ -87,15 +87,15 @@ async function migratePatientOrgs() {
           // Verify org exists
           const orgExists = await Org.findById(orgToAssign);
           if (orgExists) {
-            patient.org = orgToAssign;
-            await patient.save();
+            client.org = orgToAssign;
+            await client.save();
             updatedCount++;
-            logger.info(`✅ Updated patient ${patient._id} (${patient.name}) with org ${orgExists.name}`);
+            logger.info(`✅ Updated client ${client._id} (${client.name}) with org ${orgExists.name}`);
           } else {
-            logger.warn(`⚠️  Org ${orgToAssign} not found for patient ${patient._id}`);
+            logger.warn(`⚠️  Org ${orgToAssign} not found for client ${client._id}`);
             patientsNeedingManualReview.push({
-              patientId: patient._id,
-              patientName: patient.name,
+              clientId: client._id,
+              clientName: client.name,
               reason: `Org ${orgToAssign} not found in database`,
             });
             errorCount++;
@@ -103,21 +103,21 @@ async function migratePatientOrgs() {
         } else {
           // No org found - needs manual review
           patientsNeedingManualReview.push({
-            patientId: patient._id,
-            patientName: patient.name,
-            email: patient.email,
-            caregiversCount: patient.caregivers?.length || 0,
+            clientId: client._id,
+            clientName: client.name,
+            email: client.email,
+            caregiversCount: client.caregivers?.length || 0,
             reason: 'No caregivers with orgs found',
           });
           skippedCount++;
-          logger.warn(`⚠️  Patient ${patient._id} (${patient.name}) has no org and no caregivers with orgs - needs manual assignment`);
+          logger.warn(`⚠️  Client ${client._id} (${client.name}) has no org and no caregivers with orgs - needs manual assignment`);
         }
       } catch (error) {
         errorCount++;
-        logger.error(`❌ Error processing patient ${patient._id}: ${error.message}`, error);
+        logger.error(`❌ Error processing client ${client._id}: ${error.message}`, error);
         patientsNeedingManualReview.push({
-          patientId: patient._id,
-          patientName: patient.name,
+          clientId: client._id,
+          clientName: client.name,
           reason: `Error: ${error.message}`,
         });
       }
@@ -125,15 +125,15 @@ async function migratePatientOrgs() {
 
     // Summary
     logger.info('\n📊 Migration Summary:');
-    logger.info(`   ✅ Updated: ${updatedCount} patient(s)`);
-    logger.info(`   ⚠️  Skipped (needs manual review): ${skippedCount} patient(s)`);
-    logger.info(`   ❌ Errors: ${errorCount} patient(s)`);
+    logger.info(`   ✅ Updated: ${updatedCount} client(s)`);
+    logger.info(`   ⚠️  Skipped (needs manual review): ${skippedCount} client(s)`);
+    logger.info(`   ❌ Errors: ${errorCount} client(s)`);
 
-    // Report patients needing manual review
+    // Report clients needing manual review
     if (patientsNeedingManualReview.length > 0) {
-      logger.warn('\n⚠️  Patients requiring manual org assignment:');
+      logger.warn('\n⚠️  Clients requiring manual org assignment:');
       patientsNeedingManualReview.forEach((p) => {
-        logger.warn(`   - ${p.patientName} (${p.patientId}): ${p.reason}`);
+        logger.warn(`   - ${p.clientName} (${p.clientId}): ${p.reason}`);
         if (p.email) {
           logger.warn(`     Email: ${p.email}`);
         }
@@ -144,7 +144,7 @@ async function migratePatientOrgs() {
     }
 
     // Verify migration
-    const remainingPatientsWithoutOrg = await Patient.find({
+    const remainingPatientsWithoutOrg = await Client.find({
       $or: [
         { org: { $exists: false } },
         { org: null },

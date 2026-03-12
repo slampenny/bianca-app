@@ -4,17 +4,17 @@ const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const {
   conversationService,
-  patientService,
+  clientService,
   fraudAbuseAnalyzer: FraudAbuseAnalyzer,
 } = require('../services');
 const { FraudAbuseAnalysis } = require('../models');
 const logger = require('../config/logger');
 
 /**
- * Get fraud/abuse analysis for a patient for a specific time period
+ * Get fraud/abuse analysis for a client for a specific time period
  */
 const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { 
     timeRange = 'month',
     startDate,
@@ -23,12 +23,11 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
   } = req.query;
 
   try {
-    // Validate patient exists
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
@@ -67,9 +66,8 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
         });
     }
 
-    // Get conversations for the time period
-    const conversations = await conversationService.getConversationsByPatientAndDateRange(
-      patientId,
+    const conversations = await conversationService.getConversationsByClientAndDateRange(
+      clientId,
       start,
       end
     );
@@ -78,7 +76,7 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
       return res.status(httpStatus.OK).json({
         success: true,
         data: {
-          patientId,
+          clientId,
           timeRange,
           startDate: start,
           endDate: end,
@@ -100,7 +98,7 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
 
     // Check if analysis already exists for this time period
     const existingAnalysis = await FraudAbuseAnalysis.findOne({
-      patientId,
+      clientId,
       startDate: start,
       endDate: end,
       timeRange
@@ -111,31 +109,25 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
     if (existingAnalysis && existingAnalysis.createdAt > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
       // Use existing analysis if it's less than 24 hours old
       analysis = existingAnalysis;
-      logger.info('Using existing fraud/abuse analysis for patient:', patientId);
+      logger.info('Using existing fraud/abuse analysis for client:', clientId);
     } else {
-      // Perform fresh analysis
       const startTime = Date.now();
       const analyzer = new FraudAbuseAnalyzer();
-      
-      // Get baseline if requested
       if (includeBaseline === 'true') {
         try {
-          const baselineAnalysis = await FraudAbuseAnalysis.findOne({ patientId })
+          const baselineAnalysis = await FraudAbuseAnalysis.findOne({ clientId })
             .sort({ analysisDate: -1 });
           if (baselineAnalysis && baselineAnalysis.analysisDate < start) {
             baseline = baselineAnalysis;
           }
         } catch (error) {
-          logger.warn('Could not retrieve baseline for patient:', patientId, error.message);
+          logger.warn('Could not retrieve baseline for client:', clientId, error.message);
         }
       }
-      
       analysis = await analyzer.analyzeConversations(conversations, baseline);
       const processingTime = Date.now() - startTime;
-
-      // Store analysis in database
       const analysisData = {
-        patientId,
+        clientId,
         analysisDate: new Date(),
         timeRange,
         startDate: start,
@@ -157,7 +149,7 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
 
       try {
         await FraudAbuseAnalysis.create(analysisData);
-        logger.info('Fraud/abuse analysis stored for patient:', patientId);
+        logger.info('Fraud/abuse analysis stored for client:', clientId);
       } catch (error) {
         logger.error('Failed to store fraud/abuse analysis:', error);
         // Continue with response even if storage fails
@@ -167,8 +159,8 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
     res.status(httpStatus.OK).json({
       success: true,
       data: {
-        patientId,
-        patientName: `${patient.firstName} ${patient.lastName}`,
+        clientId,
+        clientName: client.name,
         timeRange,
         startDate: start,
         endDate: end,
@@ -200,14 +192,14 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
 });
 
 /**
- * Get fraud/abuse analysis results for a patient
+ * Get fraud/abuse analysis results for a client
  */
 const getFraudAbuseAnalysisResults = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+  const { clientId } = req.params;
   const { limit = 5 } = req.query;
 
   try {
-    const analyses = await FraudAbuseAnalysis.find({ patientId })
+    const analyses = await FraudAbuseAnalysis.find({ clientId })
       .sort({ analysisDate: -1 })
       .limit(parseInt(limit, 10));
 
@@ -240,23 +232,21 @@ const getFraudAbuseAnalysisResults = catchAsync(async (req, res) => {
 });
 
 /**
- * Trigger fraud/abuse analysis for a patient
+ * Trigger fraud/abuse analysis for a client
  */
-const triggerPatientAnalysis = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
+const triggerClientAnalysis = catchAsync(async (req, res) => {
+  const { clientId } = req.params;
 
   try {
-    // Validate patient exists
-    const patient = await patientService.getPatientById(patientId);
-    if (!patient) {
+    const client = await clientService.getClientById(clientId);
+    if (!client) {
       return res.status(httpStatus.NOT_FOUND).json({
         success: false,
-        message: 'Patient not found'
+        message: 'Client not found'
       });
     }
 
-    // Get all conversations for the patient
-    const conversations = await conversationService.getConversationsByPatient(patientId);
+    const conversations = await conversationService.getConversationsByClient(clientId);
 
     if (conversations.length === 0) {
       const analyzer = new FraudAbuseAnalyzer();
@@ -279,8 +269,7 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
       });
     }
 
-    // Get baseline analysis (previous result)
-    const baselineResults = await FraudAbuseAnalysis.find({ patientId })
+    const baselineResults = await FraudAbuseAnalysis.find({ clientId })
       .sort({ analysisDate: -1 })
       .limit(1);
     const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
@@ -291,9 +280,8 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
     const analysisResult = await analyzer.analyzeConversations(conversations, baseline);
     const processingTime = Date.now() - startTime;
 
-    // Store analysis result
     const resultToStore = {
-      patientId,
+      clientId,
       analysisDate: new Date(),
       timeRange: 'custom',
       startDate: conversations.length > 0 ? conversations[conversations.length - 1].createdAt : new Date(),
@@ -316,7 +304,7 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
     await FraudAbuseAnalysis.create(resultToStore);
 
     logger.info('Synchronous fraud/abuse analysis completed', {
-      patientId,
+      clientId,
       conversationCount: conversations.length,
       processingTime: `${processingTime}ms`,
       confidence: analysisResult.confidence,
@@ -332,7 +320,7 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Error in triggerPatientAnalysis:', error);
+    logger.error('Error in triggerClientAnalysis:', error);
     res.status(httpStatus.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: 'Failed to trigger fraud/abuse analysis',
@@ -344,6 +332,6 @@ const triggerPatientAnalysis = catchAsync(async (req, res) => {
 module.exports = {
   getFraudAbuseAnalysis,
   getFraudAbuseAnalysisResults,
-  triggerPatientAnalysis
+  triggerClientAnalysis,
 };
 

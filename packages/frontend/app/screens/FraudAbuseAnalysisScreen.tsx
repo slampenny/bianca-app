@@ -19,7 +19,7 @@ import {
   FraudAbuseConfidence,
 } from "../services/api/api.types"
 import { HomeStackParamList } from "../navigators/navigationTypes"
-import { getPatient } from "../store/patientSlice"
+import { getClient } from "../store/clientSlice"
 import { logger } from "../utils/logger"
 import { formatDate as formatDateLocalized } from "../utils/formatDate"
 
@@ -30,13 +30,12 @@ export function FraudAbuseAnalysisScreen() {
   const { toast, showError, showSuccess, hideToast } = useToast()
   const navigation = useNavigation()
   
-  const routePatientId = route.params?.patientId
-  const routePatientName = route.params?.patientName
-  const selectedPatient = useSelector(getPatient)
+  const routeClientId = route.params?.clientId
+  const routeClientName = route.params?.clientName
+  const selectedClient = useSelector(getClient)
   const { colors, isLoading: themeLoading } = useTheme()
-  
-  const patientId = routePatientId || selectedPatient?.id
-  const patientName = routePatientName || selectedPatient?.name
+  const clientId = routeClientId || selectedClient?.id
+  const clientName = routeClientName || selectedClient?.name
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['financial', 'abuse', 'relationship']))
 
@@ -47,15 +46,16 @@ export function FraudAbuseAnalysisScreen() {
     error: analysisError,
     refetch: refetchAnalysis
   } = useGetFraudAbuseAnalysisQuery(
-    { patientId: patientId || '', timeRange: 'month' },
+    { clientId: clientId || '', timeRange: 'month' },
     { 
-      skip: !patientId,
-      retry: (failureCount, error: any) => {
-        if (error?.status === 403 || error?.status === 404) {
-          return false
+      skip: !clientId,
+      ...({
+        retry: (failureCount: number, error: unknown) => {
+          const e = error as { status?: number }
+          if (e?.status === 403 || e?.status === 404) return false
+          return failureCount < 3
         }
-        return failureCount < 3
-      }
+      } as Record<string, unknown>)
     }
   )
 
@@ -97,13 +97,13 @@ export function FraudAbuseAnalysisScreen() {
 
   const styles = createStyles(colors)
 
-  if (!patientId) {
+  if (!clientId) {
     return (
       <Screen preset="scroll" style={styles.container}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.palette.neutral600} />
-          <Text style={styles.errorText}>{translate("fraudAbuseAnalysis.noPatientSelected")}</Text>
-          <Text style={styles.errorSubtext}>{translate("fraudAbuseAnalysis.selectPatientToView")}</Text>
+          <Text style={styles.errorText}>{translate("fraudAbuseAnalysis.noClientSelected")}</Text>
+          <Text style={styles.errorSubtext}>{translate("fraudAbuseAnalysis.selectClientToView")}</Text>
         </View>
       </Screen>
     )
@@ -119,18 +119,22 @@ export function FraudAbuseAnalysisScreen() {
     }
   }
 
-  const getRiskLevel = (score: number) => {
-    if (score >= 70) return { level: translate('fraudAbuseAnalysis.critical'), color: colors.palette.biancaError }
-    if (score >= 50) return { level: translate('fraudAbuseAnalysis.high'), color: colors.palette.biancaError }
-    if (score >= 30) return { level: translate('fraudAbuseAnalysis.medium'), color: colors.palette.biancaWarning }
+  const getRiskLevel = (score: number | undefined) => {
+    const s = score != null ? Number(score) : 0
+    if (s >= 70) return { level: translate('fraudAbuseAnalysis.critical'), color: colors.palette.biancaError }
+    if (s >= 50) return { level: translate('fraudAbuseAnalysis.high'), color: colors.palette.biancaError }
+    if (s >= 30) return { level: translate('fraudAbuseAnalysis.medium'), color: colors.palette.biancaWarning }
     return { level: translate('fraudAbuseAnalysis.low'), color: colors.palette.biancaSuccess }
   }
+
+  const formatScore = (value: number | undefined): string =>
+    value != null && Number.isFinite(value) ? Number(value).toFixed(0) : '--'
 
   return (
     <Screen preset="scroll" style={styles.container} testID="fraud-abuse-analysis-screen" accessibilityLabel="fraud-abuse-analysis-screen">
       <View style={styles.header}>
         <Text style={styles.title}>{translate("fraudAbuseAnalysis.title")}</Text>
-        <Text style={styles.patientName}>{patientName}</Text>
+        <Text style={styles.clientName}>{clientName}</Text>
       </View>
 
       <View style={styles.disclaimerContainer}>
@@ -169,20 +173,20 @@ export function FraudAbuseAnalysisScreen() {
           <View style={styles.overviewCard}>
             <View style={styles.overviewHeader}>
               <Text style={styles.sectionTitle}>{translate("fraudAbuseAnalysis.overview")}</Text>
-              <View style={[styles.riskBadge, { backgroundColor: getRiskLevel(latestAnalysis.overallRiskScore).color + '20' }]}>
+              <View style={[styles.riskBadge, { backgroundColor: getRiskLevel(latestAnalysis?.overallRiskScore).color + '20' }]}>
                 <View 
                   style={[
                     styles.riskDot, 
-                    { backgroundColor: getRiskLevel(latestAnalysis.overallRiskScore).color }
+                    { backgroundColor: getRiskLevel(latestAnalysis?.overallRiskScore).color }
                   ]} 
                 />
-                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis.overallRiskScore).color }]}>
-                  {getRiskLevel(latestAnalysis.overallRiskScore).level}
+                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis?.overallRiskScore).color }]}>
+                  {getRiskLevel(latestAnalysis?.overallRiskScore).level}
                 </Text>
               </View>
             </View>
             <Text style={styles.overviewDate}>
-              {formatDateLocalized(latestAnalysis.analysisDate)}
+              {latestAnalysis.analysisDate ? formatDateLocalized(latestAnalysis.analysisDate) : '--'}
             </Text>
             <View style={styles.overviewStats}>
               <View style={styles.statItem}>
@@ -194,8 +198,8 @@ export function FraudAbuseAnalysisScreen() {
                 <Text style={styles.statLabel}>{translate("fraudAbuseAnalysis.messages")}</Text>
               </View>
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: getRiskLevel(latestAnalysis.overallRiskScore).color }]}>
-                  {latestAnalysis.overallRiskScore.toFixed(0)}
+                <Text style={[styles.statValue, { color: getRiskLevel(latestAnalysis?.overallRiskScore).color }]}>
+                  {formatScore(latestAnalysis?.overallRiskScore)}
                 </Text>
                 <Text style={styles.statLabel}>{translate("fraudAbuseAnalysis.riskScore")}</Text>
               </View>
@@ -221,8 +225,8 @@ export function FraudAbuseAnalysisScreen() {
             
             <View style={styles.sectionSummary}>
               <View style={styles.scoreContainer}>
-                <Text style={[styles.scoreValue, { color: getRiskLevel(latestAnalysis.financialRisk.riskScore).color }]}>
-                  {latestAnalysis.financialRisk.riskScore.toFixed(0)}
+                <Text style={[styles.scoreValue, { color: getRiskLevel(latestAnalysis.financialRisk?.riskScore).color }]}>
+                  {formatScore(latestAnalysis.financialRisk?.riskScore)}
                 </Text>
                 <Text style={styles.scoreLabel}>%</Text>
               </View>
@@ -230,11 +234,11 @@ export function FraudAbuseAnalysisScreen() {
                 <View 
                   style={[
                     styles.riskDot, 
-                    { backgroundColor: getRiskLevel(latestAnalysis.financialRisk.riskScore).color }
+                    { backgroundColor: getRiskLevel(latestAnalysis.financialRisk?.riskScore).color }
                   ]} 
                 />
-                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis.financialRisk.riskScore).color }]}>
-                  {getRiskLevel(latestAnalysis.financialRisk.riskScore).level}
+                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis.financialRisk?.riskScore).color }]}>
+                  {getRiskLevel(latestAnalysis.financialRisk?.riskScore).level}
                 </Text>
               </View>
             </View>
@@ -282,20 +286,20 @@ export function FraudAbuseAnalysisScreen() {
 
             <View style={styles.sectionSummary}>
               <View style={styles.scoreContainer}>
-                <Text style={[styles.scoreValue, { color: getRiskLevel(latestAnalysis.abuseRisk.riskScore).color }]}>
-                  {latestAnalysis.abuseRisk.riskScore.toFixed(0)}
+                <Text style={[styles.scoreValue, { color: getRiskLevel(latestAnalysis.abuseRisk?.riskScore).color }]}>
+                  {formatScore(latestAnalysis.abuseRisk?.riskScore)}
                 </Text>
                 <Text style={styles.scoreLabel}>%</Text>
               </View>
               <View style={styles.riskBadge}>
                 <View 
-                  style={[
+style={[
                     styles.riskDot, 
-                    { backgroundColor: getRiskLevel(latestAnalysis.abuseRisk.riskScore).color }
-                  ]} 
+                    { backgroundColor: getRiskLevel(latestAnalysis.abuseRisk?.riskScore).color }
+                  ]}
                 />
-                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis.abuseRisk.riskScore).color }]}>
-                  {getRiskLevel(latestAnalysis.abuseRisk.riskScore).level}
+                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis.abuseRisk?.riskScore).color }]}>
+                  {getRiskLevel(latestAnalysis.abuseRisk?.riskScore).level}
                 </Text>
               </View>
             </View>
@@ -305,19 +309,19 @@ export function FraudAbuseAnalysisScreen() {
                 <View style={styles.metricRow}>
                   <Text style={styles.metricLabel}>{translate("fraudAbuseAnalysis.physicalAbuseScore")}</Text>
                   <Text style={styles.metricValue}>
-                    {latestAnalysis.abuseRisk.physicalAbuseScore.toFixed(0)}
+                    {formatScore(latestAnalysis.abuseRisk.physicalAbuseScore)}
                   </Text>
                 </View>
                 <View style={styles.metricRow}>
                   <Text style={styles.metricLabel}>{translate("fraudAbuseAnalysis.emotionalAbuseScore")}</Text>
                   <Text style={styles.metricValue}>
-                    {latestAnalysis.abuseRisk.emotionalAbuseScore.toFixed(0)}
+                    {formatScore(latestAnalysis.abuseRisk.emotionalAbuseScore)}
                   </Text>
                 </View>
                 <View style={styles.metricRow}>
                   <Text style={styles.metricLabel}>{translate("fraudAbuseAnalysis.neglectScore")}</Text>
                   <Text style={styles.metricValue}>
-                    {latestAnalysis.abuseRisk.neglectScore.toFixed(0)}
+                    {formatScore(latestAnalysis.abuseRisk.neglectScore)}
                   </Text>
                 </View>
               </View>
@@ -343,8 +347,8 @@ export function FraudAbuseAnalysisScreen() {
 
             <View style={styles.sectionSummary}>
               <View style={styles.scoreContainer}>
-                <Text style={[styles.scoreValue, { color: getRiskLevel(latestAnalysis.relationshipRisk.riskScore).color }]}>
-                  {latestAnalysis.relationshipRisk.riskScore.toFixed(0)}
+<Text style={[styles.scoreValue, { color: getRiskLevel(latestAnalysis.relationshipRisk?.riskScore).color }]}>
+                {formatScore(latestAnalysis.relationshipRisk?.riskScore)}
                 </Text>
                 <Text style={styles.scoreLabel}>%</Text>
               </View>
@@ -352,11 +356,11 @@ export function FraudAbuseAnalysisScreen() {
                 <View 
                   style={[
                     styles.riskDot, 
-                    { backgroundColor: getRiskLevel(latestAnalysis.relationshipRisk.riskScore).color }
+                    { backgroundColor: getRiskLevel(latestAnalysis.relationshipRisk?.riskScore).color }
                   ]} 
                 />
-                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis.relationshipRisk.riskScore).color }]}>
-                  {getRiskLevel(latestAnalysis.relationshipRisk.riskScore).level}
+                <Text style={[styles.riskText, { color: getRiskLevel(latestAnalysis.relationshipRisk?.riskScore).color }]}>
+                  {getRiskLevel(latestAnalysis.relationshipRisk?.riskScore).level}
                 </Text>
               </View>
             </View>
@@ -445,7 +449,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.palette.biancaHeader,
     marginBottom: 4,
   },
-  patientName: {
+  clientName: {
     fontSize: 16,
     color: colors.palette.neutral600,
   },

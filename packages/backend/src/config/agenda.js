@@ -4,8 +4,8 @@ const moment = require('moment');
 const config = require('./config');
 const logger = require('./logger');
 const Schedule = require('../models/schedule.model');
-const { patientService, alertService, paymentService } = require('../services');
-const { Org, Patient, Conversation } = require('../models');
+const { clientService, alertService, paymentService } = require('../services');
+const { Org, Client, Conversation } = require('../models');
 
 const agenda = new Agenda({
   db: {
@@ -38,8 +38,8 @@ agenda.on('ready', () => {
 
   // Schedule patient schedule check job (runs every 30 minutes)
   // Checks for patients created more than 30 minutes ago without schedules
-  agenda.every('30 minutes', 'checkPatientsWithoutSchedules');
-  logger.info('[Agenda] Patient schedule check scheduled to run every 30 minutes');
+  agenda.every('30 minutes', 'checkClientsWithoutSchedules');
+  logger.info('[Agenda] Client schedule check scheduled to run every 30 minutes');
 
   // Start processing jobs only after the connection is ready
   agenda.start();
@@ -82,14 +82,13 @@ agenda.define('processDataDeletion', { concurrency: 1, lockLifetime: 3600000 }, 
   }
 });
 
-// Patient schedule check job definition
-// Checks for patients created more than 30 minutes ago without schedules
-agenda.define('checkPatientsWithoutSchedules', { concurrency: 1, lockLifetime: 600000 }, async (job, done) => {
+// Client schedule check job definition
+agenda.define('checkClientsWithoutSchedules', { concurrency: 1, lockLifetime: 600000 }, async (job, done) => {
   try {
-    await checkPatientsWithoutSchedules();
+    await checkClientsWithoutSchedules();
     done();
   } catch (error) {
-    logger.error(`Error in checkPatientsWithoutSchedules job: ${error}`);
+    logger.error(`Error in checkClientsWithoutSchedules job: ${error}`);
     done(error);
   }
 });
@@ -97,7 +96,8 @@ agenda.define('checkPatientsWithoutSchedules', { concurrency: 1, lockLifetime: 6
 // Retry missed call job definition
 agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async (job, done) => {
   try {
-    const { callId, patientId, retryAttempt, originalCallId } = job.attrs.data;
+    const { callId, clientId: jobClientId, retryAttempt, originalCallId } = job.attrs.data;
+    const clientId = jobClientId;
     
     logger.info(`[Agenda] Executing retry missed call job: callId=${callId}, retryAttempt=${retryAttempt}`);
     
@@ -109,16 +109,16 @@ agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async
       return done(new Error('Original call not found'));
     }
     
-    // Get patient and org
-    const patient = await Patient.findById(patientId).populate('org');
-    if (!patient) {
-      logger.error(`[Agenda] Patient not found: ${patientId}`);
-      return done(new Error('Patient not found'));
+    // Get client and org
+    const client = await Client.findById(clientId).populate('org');
+    if (!client) {
+      logger.error(`[Agenda] Client not found: ${clientId}`);
+      return done(new Error('Client not found'));
     }
     
-    const org = patient.org;
+    const org = client.org;
     if (!org) {
-      logger.error(`[Agenda] Org not found for patient: ${patientId}`);
+      logger.error(`[Agenda] Org not found for client: ${clientId}`);
       return done(new Error('Org not found'));
     }
     
@@ -133,7 +133,7 @@ agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async
     
     // Initiate the retry call (lazy load to avoid circular dependency)
     const { twilioCallService } = require('../services');
-    const newCallSid = await twilioCallService.initiateCall(patientId);
+    const newCallSid = await twilioCallService.initiateCall(clientId);
     
     // Find the new call record created by initiateCall
     const retryCall = await Call.findOne({ callSid: newCallSid });
@@ -201,35 +201,35 @@ async function runSchedules() {
     logger.info(`Running schedule ${schedule.id} for UTC time ${schedule.time} (current UTC time: ${nowUTC.toISOString()})`);
 
     // Check that the schedule has a valid patient id
-    if (!schedule.patient) {
+    if (!schedule.client) {
       logger.error(`Schedule ${schedule.id} has no patient assigned.`);
       continue;
     }
 
     // Get patient with org populated to check consent requirements
-    const patient = await Patient.findById(schedule.patient).populate('org');
-    if (!patient) {
-      logger.error(`Patient with ID ${schedule.patient} not found for schedule ${schedule.id}`);
+    const client = await Client.findById(schedule.client).populate('org');
+    if (!client) {
+      logger.error(`Client with ID ${schedule.client} not found for schedule ${schedule.id}`);
       continue;
     }
 
-    if (!patient.org) {
-      logger.error(`Patient ${schedule.patient} has no org for schedule ${schedule.id}`);
+    if (!client.org) {
+      logger.error(`Client ${schedule.client} has no org for schedule ${schedule.id}`);
       continue;
     }
 
-    const org = patient.org;
-    const hasConsent = await patientService.checkPatientConsent(schedule.patient);
+    const org = client.org;
+    const hasConsent = await clientService.checkClientConsent(schedule.client);
 
-    // If org requires consent but patient hasn't consented, skip the call and alert caregivers
-    if (org.requirePatientConsent && !hasConsent) {
-      logger.warn(`Skipping scheduled call for patient ${schedule.patient} - consent required but not given`);
+    // If org requires consent but client hasn't consented, skip the call and alert caregivers
+    if (org.requireClientConsent && !hasConsent) {
+      logger.warn(`Skipping scheduled call for client ${schedule.client} - consent required but not given`);
       
       await alertService.createAlert({
-        message: `Scheduled call to ${patient.name} was skipped because patient consent is required but has not been obtained. Please obtain consent from the patient before the next scheduled call.`,
+        message: `Scheduled call to ${client.name} was skipped because client consent is required but has not been obtained. Please obtain consent from the client before the next scheduled call.`,
         importance: 'medium',
         alertType: 'system',
-        relatedPatient: schedule.patient,
+        relatedClient: schedule.client,
         createdBy: schedule.id,
         createdModel: 'Schedule',
         visibility: 'assignedCaregivers',
@@ -245,14 +245,14 @@ async function runSchedules() {
     try {
       // Lazy load twilioCallService to avoid circular dependency
       const { twilioCallService } = require('../services');
-      logger.info(`Initiating call for patient with ID: ${schedule.patient}`);
-      await twilioCallService.initiateCall(schedule.patient);
+      logger.info(`Initiating call for client with ID: ${schedule.client}`);
+      await twilioCallService.initiateCall(schedule.client);
 
       await alertService.createAlert({
-        message: `Called ${patient.name} for their scheduled check-in at ${now.toISOString()}`,
+        message: `Called ${client.name} for their scheduled check-in at ${now.toISOString()}`,
         importance: 'low',
-        alertType: 'patient',
-        relatedPatient: schedule.patient,
+        alertType: 'client',
+        relatedClient: schedule.client,
         createdBy: schedule.id,
         createdModel: 'Schedule',
         visibility: 'assignedCaregivers',
@@ -264,10 +264,10 @@ async function runSchedules() {
     } catch (error) {
       logger.error(`Error running schedule ${schedule.id}: ${error}`);
       await alertService.createAlert({
-        message: `Call to ${patient.name} for their scheduled check-in at ${now.toISOString()} generated an error: ${error}`,
+        message: `Call to ${client.name} for their scheduled check-in at ${now.toISOString()} generated an error: ${error}`,
         importance: 'high',
         alertType: 'system',
-        relatedPatient: schedule.patient,
+        relatedClient: schedule.client,
         createdBy: schedule.id,
         createdModel: 'Schedule',
         visibility: 'allCaregivers',
@@ -304,12 +304,12 @@ async function processDailyBilling() {
 async function processOrgBilling(org) {
   logger.info(`[Daily Billing] Processing billing for organization: ${org.name} (${org._id})`);
   
-  // Get all patients for this organization
-  const patients = await Patient.find({ org: org._id });
-  logger.info(`[Daily Billing] Found ${patients.length} patients for org ${org.name}`);
+  // Get all clients for this organization
+  const clients = await Client.find({ org: org._id });
+  logger.info(`[Daily Billing] Found ${clients.length} clients for org ${org.name}`);
   
-  if (patients.length === 0) {
-    logger.info(`[Daily Billing] No patients found for org ${org.name}, skipping billing`);
+  if (clients.length === 0) {
+    logger.info(`[Daily Billing] No clients found for org ${org.name}, skipping billing`);
     return;
   }
   
@@ -328,7 +328,7 @@ async function processOrgBilling(org) {
   // Only calls with lineItemId: null will be updated, ensuring no duplicates
   const updateResult = await Call.updateMany(
     {
-      patientId: { $in: patients.map(p => p._id) },
+      clientId: { $in: clients.map((c) => c._id) },
       lineItemId: null, // Not yet billed
       endTime: { $gte: yesterday }, // From last 24 hours
       cost: { $gt: 0 }, // Has a cost
@@ -352,24 +352,24 @@ async function processOrgBilling(org) {
   // Now fetch the calls we just claimed
   const unbilledCalls = await Call.find({
     billingSessionId: billingSessionId
-  }).populate('patientId');
+  }).populate('clientId');
   
-  // Group calls by patient for itemized billing
-  const patientBilling = {};
+  // Group calls by client for itemized billing
+  const clientBilling = {};
   let totalCost = 0;
   
   for (const call of unbilledCalls) {
-    const patientId = call.patientId._id.toString();
-    if (!patientBilling[patientId]) {
-      patientBilling[patientId] = {
-        patient: call.patientId,
+    const clientId = call.clientId._id.toString();
+    if (!clientBilling[clientId]) {
+      clientBilling[clientId] = {
+        client: call.clientId,
         calls: [],
         totalCost: 0
       };
     }
     
-    patientBilling[patientId].calls.push(call);
-    patientBilling[patientId].totalCost += call.cost;
+    clientBilling[clientId].calls.push(call);
+    clientBilling[clientId].totalCost += call.cost;
     totalCost += call.cost;
   }
   
@@ -385,18 +385,18 @@ async function processOrgBilling(org) {
   
   try {
     // Create invoice for the organization
-    const invoice = await createOrgInvoice(org, patientBilling, totalCost);
+    const invoice = await createOrgInvoice(org, clientBilling, totalCost);
     
-    // Create a mapping of patientId to lineItemId
-    const patientToLineItem = {};
+    // Create a mapping of clientId to lineItemId
+    const clientToLineItem = {};
     for (const lineItem of invoice.lineItems) {
-      patientToLineItem[lineItem.patientId.toString()] = lineItem._id;
+      clientToLineItem[lineItem.clientId.toString()] = lineItem._id;
     }
     
-    // Update each call with its patient's line item ID and clear session marker
+    // Update each call with its client's line item ID and clear session marker
     for (const call of unbilledCalls) {
-      const patientId = call.patientId._id.toString();
-      const lineItemId = patientToLineItem[patientId];
+      const clientId = call.clientId._id.toString();
+      const lineItemId = clientToLineItem[clientId];
       
       if (lineItemId) {
         await Call.updateOne(
@@ -433,7 +433,12 @@ async function processOrgBilling(org) {
         });
       }
     } else {
-      logger.warn(`[Daily Billing] No payment method found for org ${org.name}, invoice created but not charged`);
+      const msg = `[Daily Billing] No payment method found for org ${org.name}, invoice created but not charged`;
+      if (process.env.NODE_ENV === 'test') {
+        logger.debug(msg);
+      } else {
+        logger.warn(msg);
+      }
       // Create alert for missing payment method
       await alertService.createAlert({
         message: `No payment method configured for daily billing. Invoice ${invoice.invoiceNumber} created but not charged.`,
@@ -456,21 +461,28 @@ async function processOrgBilling(org) {
   }
 }
 
-async function createOrgInvoice(org, patientBilling, totalCost) {
-  // Generate invoice number
-  const lastInvoice = await require('../models').Invoice.findOne({}, {}, { sort: { createdAt: -1 } });
-  let nextNum = 1;
-  if (lastInvoice && lastInvoice.invoiceNumber) {
-    const parts = lastInvoice.invoiceNumber.split('-');
-    if (parts.length >= 2) {
-      const parsed = parseInt(parts[1]);
-      if (!isNaN(parsed)) {
-        nextNum = parsed + 1;
-      }
-    }
+/**
+ * Get next invoice number atomically to avoid E11000 duplicate key when processDailyBilling runs concurrently.
+ */
+async function getNextInvoiceNumber() {
+  const mongoose = require('mongoose');
+  const db = mongoose.connection?.db;
+  if (!db) {
+    // Fallback when no connection (e.g. some tests): use timestamp-based to avoid duplicates
+    return `INV-${Date.now().toString().slice(-9)}`;
   }
-  const invoiceNumber = `INV-${nextNum.toString().padStart(6, '0')}`;
-  
+  const result = await db.collection('counters').findOneAndUpdate(
+    { _id: 'invoiceNumber' },
+    { $inc: { value: 1 } },
+    { upsert: true, returnDocument: 'after' }
+  );
+  const nextNum = result?.value ?? 1;
+  return `INV-${nextNum.toString().padStart(6, '0')}`;
+}
+
+async function createOrgInvoice(org, clientBilling, totalCost) {
+  const invoiceNumber = await getNextInvoiceNumber();
+
   // Create invoice
   const invoice = await require('../models').Invoice.create({
     org: org._id,
@@ -479,14 +491,14 @@ async function createOrgInvoice(org, patientBilling, totalCost) {
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
     status: 'pending',
     totalAmount: totalCost,
-    notes: `Daily billing for ${Object.keys(patientBilling).length} patients`
+    notes: `Daily billing for ${Object.keys(clientBilling).length} clients`
   });
   
-  // Create line items for each patient
+  // Create line items for each client
   const lineItemData = [];
-  for (const [patientId, billing] of Object.entries(patientBilling)) {
+  for (const [clientId, billing] of Object.entries(clientBilling)) {
     lineItemData.push({
-      patientId: billing.patient._id,
+      clientId: billing.client._id,
       invoiceId: invoice._id,
       amount: billing.totalCost,
       description: `Daily billing - ${billing.calls.length} call(s)`,
@@ -521,62 +533,55 @@ async function chargePaymentMethod(org, invoice) {
   // }
 }
 
-async function checkPatientsWithoutSchedules() {
-  logger.info('[Patient Schedule Check] Starting patient schedule check...');
+async function checkClientsWithoutSchedules() {
+  logger.info('[Client Schedule Check] Starting client schedule check...');
   
   try {
-    // Check patients created in a specific time window: between 30-60 minutes ago
-    // This ensures we only check each patient once, not repeatedly on every job run
     const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
     const sixtyMinutesAgo = new Date(Date.now() - 60 * 60 * 1000);
     
-    // Find patients created in this window who don't have schedules yet
-    const patients = await Patient.find({
-      createdAt: { 
-        $gte: sixtyMinutesAgo,  // Created after 60 minutes ago
-        $lte: thirtyMinutesAgo   // Created before 30 minutes ago
+    const clients = await Client.find({
+      createdAt: {
+        $gte: sixtyMinutesAgo,
+        $lte: thirtyMinutesAgo
       }
     }).populate('org');
     
-    logger.info(`[Patient Schedule Check] Found ${patients.length} patients created 30-60 minutes ago`);
+    logger.info(`[Client Schedule Check] Found ${clients.length} clients created 30-60 minutes ago`);
     
-    let patientsChecked = 0;
+    let clientsChecked = 0;
     let alertsCreated = 0;
-    let patientsWithSchedules = 0;
+    let clientsWithSchedules = 0;
     
-    for (const patient of patients) {
-      patientsChecked++;
-      
-      // Check if patient has any schedules
-      const scheduleCount = await Schedule.countDocuments({ patient: patient._id });
+    for (const client of clients) {
+      clientsChecked++;
+      const scheduleCount = await Schedule.countDocuments({ client: client._id });
       
       if (scheduleCount === 0) {
-        // Create alert for patient without schedule
-        logger.info(`[Patient Schedule Check] Creating alert for patient ${patient.name} (${patient._id}) with no schedule`);
-        
-        const alertMessage = `Patient ${patient.name} has no schedule configured`;
+        logger.info(`[Client Schedule Check] Creating alert for client ${client.name} (${client._id}) with no schedule`);
+        const alertMessage = `Client ${client.name} has no schedule configured`;
         const relevanceUntil = moment().add(30, 'days').toISOString();
         
         await alertService.createAlert({
           message: alertMessage,
           importance: 'medium',
-          alertType: 'patient',
-          relatedPatient: patient._id,
-          createdBy: patient._id,
-          createdModel: 'Patient',
+          alertType: 'client',
+          relatedClient: client._id,
+          createdBy: client._id,
+          createdModel: 'Client',
           visibility: 'assignedCaregivers',
           relevanceUntil
         });
         
         alertsCreated++;
       } else {
-        patientsWithSchedules++;
+        clientsWithSchedules++;
       }
     }
     
-    logger.info(`[Patient Schedule Check] Completed. Patients checked: ${patientsChecked}, Alerts created: ${alertsCreated}, Patients with schedules: ${patientsWithSchedules}`);
+    logger.info(`[Client Schedule Check] Completed. Clients checked: ${clientsChecked}, Alerts created: ${alertsCreated}, Clients with schedules: ${clientsWithSchedules}`);
   } catch (error) {
-    logger.error(`[Patient Schedule Check] Error: ${error.message}`);
+    logger.error(`[Client Schedule Check] Error: ${error.message}`);
     throw error;
   }
 }

@@ -1,45 +1,31 @@
 const httpStatus = require('http-status');
-const { Schedule, Patient, Org } = require('../models');
+const { Schedule, Client, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { convertOrgTimeToUTC } = require('../utils/timezone.utils');
 
-const createSchedule = async (patientId, scheduleData) => {
-  // Get the patient to find their org
-  const patient = await Patient.findById(patientId).populate('org');
-
-  // Check if the patient exists
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+const createSchedule = async (clientId, scheduleData) => {
+  const client = await Client.findById(clientId).populate('org');
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-
-  // Get org timezone (default to 'America/Los_Angeles' if not set)
-  const orgTimezone = patient.org?.timezone || 'America/Los_Angeles';
-
-  // Convert time from org timezone to UTC before storing
+  const orgTimezone = client.org?.timezone || 'America/Los_Angeles';
   const scheduleDataWithUTCTime = { ...scheduleData };
   if (scheduleData.time) {
     scheduleDataWithUTCTime.time = convertOrgTimeToUTC(scheduleData.time, orgTimezone);
   }
-
-  // Create the schedule with UTC time
-  const schedule = await Schedule.create({ ...scheduleDataWithUTCTime, patient: patientId });
-
-  // Add the new schedule's ID to the patient's schedules field
-  patient.schedules.push(schedule.id);
-  await patient.save();
-
-  // Populate patient.org for DTO conversion
+  const schedule = await Schedule.create({ ...scheduleDataWithUTCTime, client: clientId });
+  client.schedules.push(schedule.id);
+  await client.save();
   await schedule.populate({
-    path: 'patient',
+    path: 'client',
     populate: { path: 'org' }
   });
-
   return schedule;
 };
 
 const updateSchedule = async (scheduleId, updateBody) => {
   const schedule = await Schedule.findById(scheduleId).populate({
-    path: 'patient',
+    path: 'client',
     populate: { path: 'org' }
   });
   if (!schedule) {
@@ -47,7 +33,7 @@ const updateSchedule = async (scheduleId, updateBody) => {
   }
 
   // Get org timezone (default to 'America/New_York' if not set)
-  const orgTimezone = schedule.patient?.org?.timezone || 'America/New_York';
+  const orgTimezone = schedule.client?.org?.timezone || 'America/New_York';
 
   // Convert time from org timezone to UTC if time is being updated
   const updateBodyWithUTCTime = { ...updateBody };
@@ -59,24 +45,25 @@ const updateSchedule = async (scheduleId, updateBody) => {
     schedule[key] = updateBodyWithUTCTime[key];
   });
 
-  if (updateBody.patient && updateBody.patient !== schedule.patient.toString()) {
-    const oldPatient = await Patient.findById(schedule.patientId);
-    oldPatient.schedules.pull(schedule.id);
-    await oldPatient.save();
-
-    const newPatient = await Patient.findById(updateBody.patient);
-    newPatient.schedules.push(schedule.id);
-    await newPatient.save();
+  if (updateBody.client && updateBody.client !== schedule.client.toString()) {
+    const oldClient = await Client.findById(schedule.client);
+    if (oldClient) {
+      oldClient.schedules.pull(schedule.id);
+      await oldClient.save();
+    }
+    const newClient = await Client.findById(updateBody.client);
+    if (newClient) {
+      newClient.schedules.push(schedule.id);
+      await newClient.save();
+    }
   }
 
   await schedule.save();
   
-  // Re-populate patient.org after save for DTO conversion
   await schedule.populate({
-    path: 'patient',
+    path: 'client',
     populate: { path: 'org' }
   });
-  
   return schedule;
 };
 
@@ -84,7 +71,7 @@ const patchSchedule = async (id, updateBody) => {
   const schedule = await getScheduleById(id);
   
   // Get org timezone (default to 'America/New_York' if not set)
-  const orgTimezone = schedule.patient?.org?.timezone || 'America/New_York';
+  const orgTimezone = schedule.client?.org?.timezone || 'America/New_York';
 
   // Convert time from org timezone to UTC if time is being updated
   const updateBodyWithUTCTime = { ...updateBody };
@@ -96,23 +83,21 @@ const patchSchedule = async (id, updateBody) => {
     schedule[key] = updateBodyWithUTCTime[key];
   });
 
-  // If the patientId is updated, remove the schedule's ID from the old patient's schedules field
-  // and add it to the new patient's schedules field
-  if (updateBody.patient && updateBody.patient !== schedule.patient.toString()) {
-    const oldPatient = await Patient.findById(schedule.patient);
-    oldPatient.schedules.pull(schedule._id);
-    await oldPatient.save();
-
-    const newPatient = await Patient.findById(updateBody.patient);
-    newPatient.schedules.push(schedule._id);
-    await newPatient.save();
+  if (updateBody.client && updateBody.client !== schedule.client.toString()) {
+    const oldClient = await Client.findById(schedule.client);
+    if (oldClient) {
+      oldClient.schedules.pull(schedule._id);
+      await oldClient.save();
+    }
+    const newClient = await Client.findById(updateBody.client);
+    if (newClient) {
+      newClient.schedules.push(schedule._id);
+      await newClient.save();
+    }
   }
-
   await schedule.save();
-  
-  // Re-populate patient.org after save for DTO conversion
   await schedule.populate({
-    path: 'patient',
+    path: 'client',
     populate: { path: 'org' }
   });
   
@@ -125,15 +110,12 @@ const deleteSchedule = async (id) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Schedule not found');
   }
 
-  // Remove the schedule's ID from the patient's schedules field
-  const patient = await Patient.findById(schedule.patient);
-
-  if (!patient) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Patient not found');
+  const client = await Client.findById(schedule.client);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-
-  patient.schedules.pull(schedule.id);
-  await patient.save();
+  client.schedules.pull(schedule.id);
+  await client.save();
 
   await schedule.delete();
   return schedule;
@@ -141,7 +123,7 @@ const deleteSchedule = async (id) => {
 
 const getScheduleById = async (id) => {
   const schedule = await Schedule.findById(id).populate({
-    path: 'patient',
+    path: 'client',
     populate: { path: 'org' }
   });
   if (!schedule) {

@@ -1,5 +1,5 @@
 const logger = require('../config/logger');
-const { Org, Patient, Call, Conversation } = require('../models');
+const { Org, Client, Call, Conversation } = require('../models');
 const stripeSubscriptionService = require('./stripeSubscription.service');
 const stripeUsageService = require('./stripeUsage.service');
 const stripeSyncService = require('./stripeSync.service');
@@ -83,9 +83,9 @@ const processOrgBilling = async (orgId) => {
     logger.info(`Processing billing for organization: ${org.name} (${orgId})`);
 
     // Get all patients for this organization
-    const patients = await Patient.find({ org: orgId });
-    if (patients.length === 0) {
-      logger.info(`No patients found for org ${org.name}, skipping billing`);
+    const clients = await Client.find({ org: orgId });
+    if (clients.length === 0) {
+      logger.info(`No clients found for org ${org.name}, skipping billing`);
       return;
     }
 
@@ -94,11 +94,11 @@ const processOrgBilling = async (orgId) => {
     yesterday.setDate(yesterday.getDate() - 1);
 
     const unbilledCalls = await Call.find({
-      patientId: { $in: patients.map((p) => p._id) },
+      clientId: { $in: clients.map((c) => c._id) },
       lineItemId: null, // Not yet billed
       endTime: { $gte: yesterday }, // From last 24 hours
       cost: { $gt: 0 }, // Has a cost
-    }).populate('patientId');
+    }).populate('clientId');
 
     if (unbilledCalls.length === 0) {
       logger.info(`No unbilled calls found for org ${org.name}`);
@@ -162,7 +162,7 @@ const getUnbilledCosts = async (orgId, days = 7) => {
         orgId: org._id,
         orgName: org.name,
         totalUnbilledCost: 0,
-        patientCosts: [],
+        clientCosts: [],
         period: {
           days,
           startDate: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
@@ -180,35 +180,35 @@ const getUnbilledCosts = async (orgId, days = 7) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const patients = await Patient.find({ org: orgId });
+    const clients = await Client.find({ org: orgId });
     const unbilledCalls = await Call.find({
-      patientId: { $in: patients.map((p) => p._id) },
+      clientId: { $in: clients.map((c) => c._id) },
       lineItemId: null, // Not yet linked to an invoice
       endTime: { $gte: startDate },
       cost: { $gt: 0 },
-    }).populate('patientId');
+    }).populate('clientId');
 
-    // Group by patient
-    const patientCosts = {};
+    // Group by client
+    const clientCosts = {};
     let totalUnbilledCost = 0;
 
     for (const call of unbilledCalls) {
-      const patientId = call.patientId._id.toString();
-      const patientName = call.patientId.name;
+      const clientId = call.clientId._id.toString();
+      const clientName = call.clientId.name;
 
-      if (!patientCosts[patientId]) {
-        patientCosts[patientId] = {
-          patientId,
-          patientName,
+      if (!clientCosts[clientId]) {
+        clientCosts[clientId] = {
+          clientId,
+          clientName,
           callCount: 0,
           totalCost: 0,
           calls: [],
         };
       }
 
-      patientCosts[patientId].callCount++;
-      patientCosts[patientId].totalCost += call.cost;
-      patientCosts[patientId].calls.push({
+      clientCosts[clientId].callCount++;
+      clientCosts[clientId].totalCost += call.cost;
+      clientCosts[clientId].calls.push({
         callId: call._id,
         startTime: call.startTime,
         duration: call.duration,
@@ -223,7 +223,7 @@ const getUnbilledCosts = async (orgId, days = 7) => {
       orgId: org._id,
       orgName: org.name,
       totalUnbilledCost,
-      patientCosts: Object.values(patientCosts).sort(
+      clientCosts: Object.values(clientCosts).sort(
         (a, b) => b.totalCost - a.totalCost
       ),
       period: {

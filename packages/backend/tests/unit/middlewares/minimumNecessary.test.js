@@ -23,7 +23,7 @@ describe('Minimum Necessary Middleware', () => {
       const res = httpMocks.createResponse();
       const next = jest.fn();
 
-      const middleware = minimumNecessaryMiddleware('patient');
+      const middleware = minimumNecessaryMiddleware('client');
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
@@ -31,7 +31,7 @@ describe('Minimum Necessary Middleware', () => {
       // Verify json method is not wrapped
       const originalJson = res.json;
       res.json({
-        email: 'patient@example.com',
+        email: 'client@example.com',
         phone: '1234567890',
         medicalRecordNumber: '12345'
       });
@@ -42,7 +42,7 @@ describe('Minimum Necessary Middleware', () => {
       expect(data).toHaveProperty('medicalRecordNumber');
     });
 
-    it('should filter patient data for staff role', async () => {
+    it('should filter client data for staff role', async () => {
       const req = httpMocks.createRequest({
         caregiver: {
           _id: '123',
@@ -52,17 +52,17 @@ describe('Minimum Necessary Middleware', () => {
       const res = httpMocks.createResponse();
       const next = jest.fn();
 
-      const middleware = minimumNecessaryMiddleware('patient');
+      const middleware = minimumNecessaryMiddleware('client');
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
 
       // Call the wrapped json method
       res.json({
-        _id: 'patient-123',
+        _id: 'client-123',
         name: 'John Doe',
         preferredName: 'John',
-        email: 'patient@example.com',
+        email: 'client@example.com',
         phone: '1234567890',
         avatar: 'avatar.jpg',
         language: 'en',
@@ -80,7 +80,7 @@ describe('Minimum Necessary Middleware', () => {
       expect(data).not.toHaveProperty('medicalRecordNumber');
     });
 
-    it('should filter patient data for orgAdmin role', async () => {
+    it('should filter client data for orgAdmin role', async () => {
       const req = httpMocks.createRequest({
         caregiver: {
           _id: '123',
@@ -90,15 +90,15 @@ describe('Minimum Necessary Middleware', () => {
       const res = httpMocks.createResponse();
       const next = jest.fn();
 
-      const middleware = minimumNecessaryMiddleware('patient');
+      const middleware = minimumNecessaryMiddleware('client');
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
 
       res.json({
-        _id: 'patient-123',
+        _id: 'client-123',
         name: 'John Doe',
-        email: 'patient@example.com',
+        email: 'client@example.com',
         phone: '1234567890',
         medicalRecordNumber: '12345', // Should be filtered out for orgAdmin
         address: '123 Main St'
@@ -113,7 +113,7 @@ describe('Minimum Necessary Middleware', () => {
       expect(data).not.toHaveProperty('medicalRecordNumber'); // Filtered
     });
 
-    it('should filter array of patients', async () => {
+    it('should filter array of clients', async () => {
       const req = httpMocks.createRequest({
         caregiver: {
           _id: '123',
@@ -123,22 +123,22 @@ describe('Minimum Necessary Middleware', () => {
       const res = httpMocks.createResponse();
       const next = jest.fn();
 
-      const middleware = minimumNecessaryMiddleware('patient');
+      const middleware = minimumNecessaryMiddleware('client');
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
 
       res.json([
         {
-          _id: 'patient-1',
-          name: 'Patient One',
-          email: 'patient1@example.com',
+          _id: 'client-1',
+          name: 'Client One',
+          email: 'client1@example.com',
           phone: '1111111111'
         },
         {
-          _id: 'patient-2',
-          name: 'Patient Two',
-          email: 'patient2@example.com',
+          _id: 'client-2',
+          name: 'Client Two',
+          email: 'client2@example.com',
           phone: '2222222222'
         }
       ]);
@@ -162,7 +162,7 @@ describe('Minimum Necessary Middleware', () => {
       const res = httpMocks.createResponse();
       const next = jest.fn();
 
-      const middleware = minimumNecessaryMiddleware('patient');
+      const middleware = minimumNecessaryMiddleware('client');
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
@@ -170,9 +170,9 @@ describe('Minimum Necessary Middleware', () => {
       res.json({
         results: [
           {
-            _id: 'patient-1',
-            name: 'Patient One',
-            email: 'patient1@example.com'
+            _id: 'client-1',
+            name: 'Client One',
+            email: 'client1@example.com'
           }
         ],
         page: 1,
@@ -193,7 +193,7 @@ describe('Minimum Necessary Middleware', () => {
       const res = httpMocks.createResponse();
       const next = jest.fn();
 
-      const middleware = minimumNecessaryMiddleware('patient');
+      const middleware = minimumNecessaryMiddleware('client');
       await middleware(req, res, next);
 
       expect(next).toHaveBeenCalled();
@@ -214,7 +214,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'conv-123',
-        patient: 'patient-123',
+        client: 'client-123',
         status: 'completed',
         duration: 300,
         transcript: 'Full conversation transcript',
@@ -245,7 +245,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'conv-123',
-        patient: 'patient-123',
+        client: 'client-123',
         transcript: 'Full conversation transcript',
         summary: 'Conversation summary',
         cost: 1.50
@@ -259,15 +259,15 @@ describe('Minimum Necessary Middleware', () => {
 
   describe('filterDataForRole', () => {
     it('should filter data for staff role', () => {
-      const patient = {
-        _id: 'patient-123',
+      const clientDoc = {
+        _id: 'client-123',
         name: 'John Doe',
-        email: 'patient@example.com',
+        email: 'client@example.com',
         phone: '1234567890',
         dateOfBirth: '1990-01-01'
       };
 
-      const filtered = filterDataForRole(patient, 'patient', 'staff');
+      const filtered = filterDataForRole(clientDoc, 'client', 'staff');
 
       expect(filtered).toHaveProperty('_id');
       expect(filtered).toHaveProperty('name');
@@ -277,35 +277,35 @@ describe('Minimum Necessary Middleware', () => {
     });
 
     it('should not filter data for superAdmin', () => {
-      const patient = {
-        _id: 'patient-123',
+      const clientDoc = {
+        _id: 'client-123',
         name: 'John Doe',
-        email: 'patient@example.com',
+        email: 'client@example.com',
         phone: '1234567890',
         dateOfBirth: '1990-01-01',
         medicalRecordNumber: '12345'
       };
 
-      const filtered = filterDataForRole(patient, 'patient', 'superAdmin');
+      const filtered = filterDataForRole(clientDoc, 'client', 'superAdmin');
 
-      expect(filtered).toEqual(patient);
+      expect(filtered).toEqual(clientDoc);
     });
 
     it('should filter array of data', () => {
-      const patients = [
+      const clients = [
         {
-          _id: 'patient-1',
-          name: 'Patient One',
+          _id: 'client-1',
+          name: 'Client One',
           email: 'p1@example.com'
         },
         {
-          _id: 'patient-2',
-          name: 'Patient Two',
+          _id: 'client-2',
+          name: 'Client Two',
           email: 'p2@example.com'
         }
       ];
 
-      const filtered = filterDataForRole(patients, 'patient', 'staff');
+      const filtered = filterDataForRole(clients, 'client', 'staff');
 
       expect(Array.isArray(filtered)).toBe(true);
       expect(filtered).toHaveLength(2);
@@ -314,36 +314,36 @@ describe('Minimum Necessary Middleware', () => {
     });
 
     it('should handle null or undefined data', () => {
-      expect(filterDataForRole(null, 'patient', 'staff')).toBeNull();
-      expect(filterDataForRole(undefined, 'patient', 'staff')).toBeUndefined();
+      expect(filterDataForRole(null, 'client', 'staff')).toBeNull();
+      expect(filterDataForRole(undefined, 'client', 'staff')).toBeUndefined();
     });
   });
 
   describe('canAccessField', () => {
     it('should return true if field is allowed for role', () => {
-      expect(canAccessField('staff', 'patient', '_id')).toBe(true);
-      expect(canAccessField('staff', 'patient', 'name')).toBe(true);
-      expect(canAccessField('staff', 'patient', 'preferredName')).toBe(true);
+      expect(canAccessField('staff', 'client', '_id')).toBe(true);
+      expect(canAccessField('staff', 'client', 'name')).toBe(true);
+      expect(canAccessField('staff', 'client', 'preferredName')).toBe(true);
     });
 
     it('should return false if field is not allowed for role', () => {
-      expect(canAccessField('staff', 'patient', 'email')).toBe(false);
-      expect(canAccessField('staff', 'patient', 'phone')).toBe(false);
-      expect(canAccessField('staff', 'patient', 'dateOfBirth')).toBe(false);
+      expect(canAccessField('staff', 'client', 'email')).toBe(false);
+      expect(canAccessField('staff', 'client', 'phone')).toBe(false);
+      expect(canAccessField('staff', 'client', 'dateOfBirth')).toBe(false);
     });
 
     it('should return true for all fields for superAdmin', () => {
-      expect(canAccessField('superAdmin', 'patient', 'email')).toBe(true);
-      expect(canAccessField('superAdmin', 'patient', 'phone')).toBe(true);
-      expect(canAccessField('superAdmin', 'patient', 'medicalRecordNumber')).toBe(true);
+      expect(canAccessField('superAdmin', 'client', 'email')).toBe(true);
+      expect(canAccessField('superAdmin', 'client', 'phone')).toBe(true);
+      expect(canAccessField('superAdmin', 'client', 'medicalRecordNumber')).toBe(true);
     });
 
     it('should allow orgAdmin to access more fields than staff', () => {
       // OrgAdmin can access email
-      expect(canAccessField('orgAdmin', 'patient', 'email')).toBe(true);
+      expect(canAccessField('orgAdmin', 'client', 'email')).toBe(true);
       
       // Staff cannot access email
-      expect(canAccessField('staff', 'patient', 'email')).toBe(false);
+      expect(canAccessField('staff', 'client', 'email')).toBe(false);
     });
 
     it('should handle alert resource type', () => {
@@ -361,19 +361,19 @@ describe('Minimum Necessary Middleware', () => {
       expect(rules).toHaveProperty('orgAdmin');
       expect(rules).toHaveProperty('superAdmin');
 
-      expect(rules.staff).toHaveProperty('patient');
+      expect(rules.staff).toHaveProperty('client');
       expect(rules.staff).toHaveProperty('conversation');
       expect(rules.staff).toHaveProperty('medicalAnalysis');
 
-      expect(Array.isArray(rules.staff.patient)).toBe(true);
+      expect(Array.isArray(rules.staff.client)).toBe(true);
     });
 
     it('should have different access levels for each role', () => {
       const rules = getFieldAccessRules();
 
-      const staffPatientFields = rules.staff.patient.length;
-      const orgAdminPatientFields = rules.orgAdmin.patient.length;
-      const superAdminPatientAccess = rules.superAdmin.patient;
+      const staffPatientFields = rules.staff.client.length;
+      const orgAdminPatientFields = rules.orgAdmin.client.length;
+      const superAdminPatientAccess = rules.superAdmin.client;
 
       expect(orgAdminPatientFields).toBeGreaterThan(staffPatientFields);
       expect(superAdminPatientAccess).toBe('*');
@@ -396,7 +396,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'analysis-123',
-        patient: 'patient-123',
+        client: 'client-123',
         summary: 'High-level summary',
         recommendations: ['Take medication'],
         detailedMetrics: {
@@ -429,7 +429,7 @@ describe('Minimum Necessary Middleware', () => {
 
       res.json({
         _id: 'analysis-123',
-        patient: 'patient-123',
+        client: 'client-123',
         summary: 'High-level summary',
         cognitiveMetrics: { score: 85 },
         riskLevel: 'low'

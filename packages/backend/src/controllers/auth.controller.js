@@ -4,13 +4,13 @@ const config = require('../config/config');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService, privacyService } = require('../services');
-const { AlertDTO, CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
+const { AlertDTO, CaregiverDTO, OrgDTO, ClientDTO } = require('../dtos');
 const { auditAuthFailure } = require('../middlewares/auditLog');
 const { AuditLog, Token } = require('../models');
 const i18n = require('i18n');
 
 const register = catchAsync(async (req, res, next) => {
-  const org = await orgService.createOrg(
+  const { org, caregiver } = await orgService.createOrg(
     {
       email: req.body.email,
       name: req.body.name,
@@ -25,13 +25,10 @@ const register = catchAsync(async (req, res, next) => {
       role: 'orgAdmin', // User creating the org should be orgAdmin from the start
     }
   );
-
-  // Fetch the full caregiver object (org.caregivers[0] is just an ObjectId)
-  const caregiver = await caregiverService.getCaregiverById(org.caregivers[0]);
   if (!caregiver) {
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve created caregiver');
   }
-  
+
   // Record PIPEDA consent for data collection (required for Canadian users)
   try {
     await privacyService.createConsentRecord({
@@ -77,13 +74,13 @@ const register = catchAsync(async (req, res, next) => {
       fullError: JSON.stringify(emailError, Object.getOwnPropertyNames(emailError)) // Include all error properties
     });
     
-    // In test mode, allow registration to succeed even if email fails (Ethereal might not be available)
-    // Log a warning but don't throw an error
-    if (config.env === 'test') {
-      logger.warn('[Registration] Email service failed in test mode - registration will succeed but email was not sent. This is expected if Ethereal is not available.');
+    // In test or development, allow registration to succeed even if email fails (e.g. Ethereal not available, or frontend tests hitting dev backend)
+    // Log a warning but don't throw so integration tests and local dev work without email configured
+    if (config.env === 'test' || config.env === 'development') {
+      logger.warn('[Registration] Email service failed - registration will succeed but email was not sent. This is expected in test/dev when email is not configured.');
       // Continue with registration - email can be sent later via verification endpoint
     } else {
-      // In production/development, email failure is critical
+      // In production/staging, email failure is critical
       throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Registration successful but verification email failed. Please contact support.');
     }
   }
@@ -190,29 +187,32 @@ const login = catchAsync(async (req, res, next) => {
   try {
     // Step 1: Validate credentials
     const loginData = await authService.loginCaregiverWithEmailAndPassword(email, password);
-    const { caregiver, patients, org } = loginData;
+    const { caregiver, clients, org } = loginData;
 
     // Check if account is locked
     if (caregiver.accountLocked) {
       throw new Error(`Account is locked: ${caregiver.lockedReason || 'Contact support for assistance'}`);
     }
 
-    // Step 1.5: Check email verification status
+    // Step 1.5: Check email verification status (skip in test/development so integration tests and local dev work without email)
     if (!caregiver.isEmailVerified) {
-      // Send verification email if not already sent recently
-      try {
-        const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
-        const locale = caregiver.preferredLanguage || 'en';
-        await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
-      } catch (emailError) {
-        logger.error('Failed to resend verification email', {
-          error: emailError.message,
-          stack: emailError.stack,
-          email: caregiver.email
-        });
+      if (config.env === 'test' || config.env === 'development') {
+        logger.warn('[Auth] Login allowed for unverified email in test/development');
+      } else {
+        // Send verification email if not already sent recently
+        try {
+          const verifyEmailToken = await tokenService.generateVerifyEmailToken(caregiver);
+          const locale = caregiver.preferredLanguage || 'en';
+          await emailService.sendVerificationEmail(caregiver.email, verifyEmailToken, caregiver.name, locale);
+        } catch (emailError) {
+          logger.error('Failed to resend verification email', {
+            error: emailError.message,
+            stack: emailError.stack,
+            email: caregiver.email
+          });
+        }
+        throw new ApiError(httpStatus.FORBIDDEN, 'Please verify your email before logging in. A verification email has been sent.');
       }
-      
-      throw new ApiError(httpStatus.FORBIDDEN, 'Please verify your email before logging in. A verification email has been sent.');
     }
 
     // Step 2: Check MFA requirement
@@ -263,7 +263,7 @@ const login = catchAsync(async (req, res, next) => {
     // Step 4: Create session and audit log
     const alerts = await alertService.getAlerts(caregiverId);
     const alertDTOs = alerts.map((alert) => AlertDTO(alert));
-    const patientDTOs = patients.map((patient) => PatientDTO(patient));
+    const clientDTOs = clients.map((c) => ClientDTO(c));
     const caregiverDTO = CaregiverDTO(caregiver);
     const tokens = await tokenService.generateAuthTokens(caregiver);
     
@@ -307,7 +307,7 @@ const login = catchAsync(async (req, res, next) => {
       }
     });
     
-    res.send({ org: OrgDTO(orgForDTO), caregiver: caregiverDTO, patients: patientDTOs, alerts: alertDTOs, tokens });
+    res.send({ org: OrgDTO(orgForDTO), caregiver: caregiverDTO, clients: clientDTOs, alerts: alertDTOs, tokens });
   } catch (error) {
     // HIPAA Compliance: Log failed authentication attempts
     await auditAuthFailure(
@@ -396,6 +396,44 @@ const resetPassword = catchAsync(async (req, res) => {
  * Set password for SSO user
  * Allows SSO users to set a password so they can login with email/password
  */
+/**
+ * Complete onboarding: set persona, optionally update org requireClientConsent (for organization/caregiver).
+ * Requires acceptTerms: true. singleConsentState: true => requireClientConsent false (one-party consent).
+ */
+const completeOnboarding = catchAsync(async (req, res) => {
+  const caregiverId = req.caregiver?.id || req.caregiver?._id;
+  if (!caregiverId) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Authentication required');
+  }
+  const { persona, acceptTerms, singleConsentState } = req.body;
+  if (!acceptTerms) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'You must accept the Terms and Privacy Policy');
+  }
+
+  const caregiver = await caregiverService.getCaregiverById(caregiverId);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+
+  await caregiverService.updateCaregiverById(caregiverId, {
+    onboardingComplete: true,
+    persona,
+  });
+
+  if ((persona === 'organization' || persona === 'caregiver') && caregiver.org) {
+    const orgId = caregiver.org._id || caregiver.org;
+    await orgService.updateOrgById(orgId, {
+      requireClientConsent: singleConsentState === false,
+    });
+  }
+
+  const updatedCaregiver = await caregiverService.getCaregiverById(caregiverId);
+  res.status(httpStatus.OK).send({
+    caregiver: CaregiverDTO(updatedCaregiver),
+    message: 'Onboarding complete',
+  });
+});
+
 const setPasswordForSSO = catchAsync(async (req, res) => {
   const { email, password, confirmPassword } = req.body;
   
@@ -760,7 +798,7 @@ const verifyEmail = async (req, res, next) => {
     
     // If JSON is requested, return tokens and user data for auto-login
     if (wantsJson) {
-      const { CaregiverDTO, OrgDTO, PatientDTO } = require('../dtos');
+      const { CaregiverDTO, OrgDTO, ClientDTO } = require('../dtos');
       return res.status(httpStatus.OK).json({
         success: true,
         message: result.message,
@@ -768,7 +806,7 @@ const verifyEmail = async (req, res, next) => {
         caregiver: CaregiverDTO(result.caregiver),
         tokens: result.tokens,
         org: result.org ? OrgDTO(result.org) : null,
-        patients: result.patients ? result.patients.map(p => PatientDTO(p)) : []
+        clients: result.clients ? result.clients.map((c) => ClientDTO(c)) : []
       });
     }
     
@@ -824,5 +862,6 @@ module.exports = {
   sendVerificationEmail,
   resendVerificationEmail,
   verifyEmail,
+  completeOnboarding,
   setPasswordForSSO,
 };

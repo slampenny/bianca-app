@@ -10,20 +10,19 @@ const createObjectId = () => {
   return id;
 };
 
-export function newConversation(patientId: string): Partial<Conversation> {
+export function newConversation(clientId: string): Partial<Conversation> {
   const startTime = new Date();
   const endTime = new Date(startTime.getTime() + 60000); // 1 minute later
 
   // Create some default messages
   const messages: Message[] = [
-    { role: 'patient', content: 'Hello, I need some assistance.' },
+    { role: 'client', content: 'Hello, I need some assistance.' },
     { role: 'assistant', content: 'Sure, how can I help you today?' },
   ];
 
   return {
-    callId: createObjectId(),
     callSid: `TEST_CALL_SID_${Date.now()}`,
-    patientId,
+    clientId,
     lineItemId: null,
     messages,
     history: 'Test conversation history',

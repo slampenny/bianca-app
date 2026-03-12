@@ -15,7 +15,7 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
   const { colors, isLoading: themeLoading } = useTheme()
 
   const handleRegisterPress = () => {
-    navigation.navigate("Register")
+    navigation.navigate("OnboardingAboutYou")
   }
 
   const handleForgotPasswordPress = () => {
@@ -24,20 +24,17 @@ export const LoginScreen: FC<LoginScreenProps> = ({ navigation }) => {
 
   // Handle SSO account linking navigation
   const handleSSOAccountLinking = (email: string, provider: string) => {
-    navigation.navigate("SSOAccountLinking" as never, { 
-      email,
-      ssoProvider: provider || 'google'
-    } as never)
+    (navigation.navigate as (name: string, params?: object) => void)("SSOAccountLinking", { email, ssoProvider: provider || 'google' })
   }
 
   // Handle email verification navigation
   const handleEmailVerificationRequired = (email: string) => {
-    navigation.navigate("EmailVerificationRequired" as never, { email } as never)
+    (navigation.navigate as (name: string, params?: object) => void)("EmailVerificationRequired", { email })
   }
 
   // Handle MFA verification navigation
   const handleMFARequired = (email: string, password: string, tempToken: string) => {
-    navigation.navigate("MFAVerification" as never, { email, password, tempToken } as never)
+    (navigation.navigate as (name: string, params?: object) => void)("MFAVerification", { email, password, tempToken })
   }
 
   if (themeLoading) {

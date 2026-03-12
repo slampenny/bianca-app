@@ -151,7 +151,7 @@ Content-Type: multipart/form-data
 
 #### **5. Create Patient**
 ```http
-POST /v1/patients
+POST /v1/clients
 Authorization: Bearer {token}
 Content-Type: application/json
 
@@ -358,7 +358,7 @@ Content-Type: application/json
 
 #### **3. Get Assigned Patients**
 ```http
-GET /v1/patients?caregiver=caregiver_id
+GET /v1/clients?caregiver=caregiver_id
 Authorization: Bearer {token}
 ```
 
@@ -640,7 +640,7 @@ curl -X POST http://localhost:3000/v1/caregivers/accept-invitation \
 ### **Patient Creation Test**
 ```bash
 # Create patient (as orgAdmin or staff)
-curl -X POST http://localhost:3000/v1/patients \
+curl -X POST http://localhost:3000/v1/clients \
   -H "Authorization: Bearer {token}" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Patient","email":"patient@test.com","phone":"+1987654321","preferredLanguage":"en"}'

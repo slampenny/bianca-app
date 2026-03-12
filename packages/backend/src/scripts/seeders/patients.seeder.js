@@ -1,21 +1,20 @@
-const patientFixture = require('../../../tests/fixtures/patient.fixture');
+const clientFixture = require('../../../tests/fixtures/client.fixture');
 
 /**
- * Seed patients for a caregiver
- * @param {Object} caregiver - Caregiver to seed patients for
- * @returns {Promise<Array>} Array of created patients
+ * Seed clients for a caregiver (legacy name: seedPatients)
+ * @param {Object} caregiver - Caregiver to seed clients for
+ * @returns {Promise<Array>} Array of created clients
  */
 async function seedPatients(caregiver) {
-  console.log('Seeding Patients for caregiver:', caregiver._id);
-  const { patientOne, patientTwo, insertPatientsAndAddToCaregiver } = patientFixture;
-  
-  const patients = await insertPatientsAndAddToCaregiver(caregiver, [patientOne, patientTwo]);
-  console.log(`Seeded ${patients.length} patients`);
-  
-  return patients;
+  console.log('Seeding clients for caregiver:', caregiver._id);
+  const { clientOne, clientTwo, insertClientsAndAddToCaregiver } = clientFixture;
+
+  const clients = await insertClientsAndAddToCaregiver(caregiver, [clientOne, clientTwo]);
+  console.log(`Seeded ${clients.length} clients`);
+
+  return clients;
 }
 
 module.exports = {
   seedPatients,
 };
-

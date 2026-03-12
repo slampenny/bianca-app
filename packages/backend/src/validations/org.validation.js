@@ -27,7 +27,8 @@ const createOrg = {
       password: Joi.string().required(),
       org: Joi.string().custom(objectId),
       role: Joi.string().required().valid('orgAdmin', 'staff'),
-      patients: Joi.array().items(Joi.string().custom(objectId)),
+      patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
+      clients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     }),
   }),
 };
@@ -71,7 +72,7 @@ const updateOrg = {
         retryIntervalMinutes: Joi.number().integer().min(1).max(1440).optional(),
         alertOnAllMissedCalls: Joi.boolean().optional(),
       }).optional(),
-      requirePatientConsent: Joi.boolean().optional(),
+      requireClientConsent: Joi.boolean().optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

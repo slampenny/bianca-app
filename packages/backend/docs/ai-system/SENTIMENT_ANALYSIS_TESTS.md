@@ -160,7 +160,7 @@ yarn test:e2e test/e2e/sentiment-analysis.e2e.test.ts
 ### Test Fixtures
 - **`test/fixtures/sentiment.fixture.ts`**: Sentiment analysis test data
 - **`test/fixtures/conversation.fixture.ts`**: Conversation test data
-- **`test/fixtures/patient.fixture.ts`**: Patient test data
+- **`test/fixtures/client.fixture.js`**: Client test data
 
 ## Test Scenarios
 

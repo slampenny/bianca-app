@@ -43,7 +43,7 @@ describe('CallStatusBanner', () => {
   const defaultProps = {
     conversationId: 'conv-123',
     initialStatus: 'initiating',
-    patientName: 'John Doe',
+    clientName: 'John Doe',
     onStatusChange: jest.fn(),
   }
 
@@ -161,16 +161,23 @@ describe('CallStatusBanner', () => {
       unwrap: () => Promise.reject(new Error('Failed to end call')),
     })
 
+    const loggerErrorSpy = jest.spyOn(require('../../utils/logger').logger, 'error').mockImplementation(() => {})
+    const loggerInfoSpy = jest.spyOn(require('../../utils/logger').logger, 'info').mockImplementation(() => {})
+
     const { getByTestId, getByText } = renderWithProvider(
       <CallStatusBanner {...defaultProps} initialStatus="in-progress" />
     )
 
     const endCallButton = getByTestId('end-call-button')
-    fireEvent.press(endCallButton)
-
+    await act(async () => {
+      fireEvent.press(endCallButton)
+    })
     await waitFor(() => {
       expect(getByText('Failed to end call')).toBeTruthy()
     })
+
+    loggerErrorSpy.mockRestore()
+    loggerInfoSpy.mockRestore()
   })
 
   it('updates call duration for active calls', () => {

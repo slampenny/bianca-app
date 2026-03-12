@@ -8,8 +8,11 @@ import { store } from '../store/store';
 import { logger } from '../utils/logger';
 import Config from '../config';
 
-// Complete the auth session in the browser
+// Complete the auth session in the browser (required so the OAuth popup closes after redirect)
 WebBrowser.maybeCompleteAuthSession();
+// If you see "Cross-Origin-Opener-Policy would block window.closed" and SSO never completes,
+// the app or CDN is sending Cross-Origin-Opener-Policy. For OAuth popup flow to work, either
+// do not send that header or set it to "unsafe-none" for the web app origin (see docs/SSO-COOP.md).
 
 // OAuth configuration - loaded from Expo config
 const GOOGLE_CLIENT_ID = Constants.expoConfig?.extra?.googleClientId;
@@ -36,6 +39,22 @@ const getRedirectUri = (): string => {
 
 const redirectUri = getRedirectUri();
 // Intentionally no debug logging here to reduce console noise in web dev builds
+
+const isWeb = () => Platform.OS === 'web';
+
+const SSO_REDIRECT_STORAGE_KEY = 'sso_redirect_pending';
+
+/** Web only: true if the current URL has OAuth callback params (?code= or #code=). */
+export function hasSSOCallbackInUrl(): boolean {
+  if (typeof window === 'undefined' || !window.location) return false;
+  if (new URLSearchParams(window.location.search).get('code')) return true;
+  if (window.location.hash && new URLSearchParams(window.location.hash.replace(/^#/, '')).get('code')) return true;
+  return false;
+}
+
+export interface SSORedirecting {
+  redirecting: true;
+}
 
 export interface SSOUser {
   id: string;
@@ -98,15 +117,108 @@ class SSOService {
     };
   }
 
-  // Sign in with Google
-  async signInWithGoogle(): Promise<SSOUser | SSOError> {
+  /**
+   * Web-only: start SSO by redirecting the current tab to the provider.
+   * Avoids COOP/popup issues. Call tryCompleteRedirectAuth() on app load after redirect.
+   */
+  private async startRedirectAuth(provider: 'google' | 'microsoft'): Promise<SSORedirecting> {
+    if (!isWeb() || typeof window === 'undefined' || !window.sessionStorage) {
+      throw new Error('Redirect auth is only supported on web');
+    }
+    const request = provider === 'google' ? this.getGoogleAuthRequest() : this.getMicrosoftAuthRequest();
+    const endpoints = provider === 'google' ? this.getGoogleEndpoints() : this.getMicrosoftEndpoints();
+    const authUrl = await request.makeAuthUrlAsync(endpoints);
+    sessionStorage.setItem(SSO_REDIRECT_STORAGE_KEY, JSON.stringify({
+      provider,
+      codeVerifier: request.codeVerifier ?? '',
+      state: request.state ?? '',
+    }));
+    window.location.href = authUrl;
+    return { redirecting: true };
+  }
+
+  /**
+   * Web-only: after redirect back from OAuth provider, exchange code and log in.
+   * Call once on app load. Returns null if URL has no OAuth callback params.
+   */
+  async tryCompleteRedirectAuth(): Promise<(SSOUser & { tokens?: any; backendUser?: any; backendOrg?: any; backendClients?: any[]; backendAlerts?: any[] }) | SSOError | null> {
+    if (!isWeb() || typeof window === 'undefined' || !window.location) return null;
+    // Code can be in query (?code=) or in hash (#code=) depending on provider/config
+    const params = new URLSearchParams(window.location.search);
+    let code = params.get('code');
+    let state = params.get('state');
+    if (!code && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      code = code || hashParams.get('code');
+      state = state || hashParams.get('state');
+    }
+    if (!code) return null;
+    const stored = (() => {
+      try {
+        const raw = sessionStorage.getItem(SSO_REDIRECT_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw) as { provider: string; codeVerifier: string; state?: string };
+      } catch {
+        return null;
+      }
+    })();
+    if (!stored) {
+      return { error: 'Authentication failed', description: 'Session expired. Please try signing in again.' };
+    }
+    sessionStorage.removeItem(SSO_REDIRECT_STORAGE_KEY);
+    // Clear URL without reload
+    if (window.history.replaceState) {
+      const cleanUrl = window.location.pathname || '/';
+      window.history.replaceState({}, '', cleanUrl);
+    }
+    const { getDefaultApiConfig } = require('./api/api');
+    const apiConfig = getDefaultApiConfig();
     try {
-      // Check if Google client ID is configured
+      const exchangeResponse = await fetch(`${apiConfig.url}/sso/exchange-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: stored.provider,
+          code,
+          redirectUri,
+          codeVerifier: stored.codeVerifier || '',
+        }),
+      });
+      const exchangeData = await exchangeResponse.json().catch(() => ({}));
+      if (!exchangeResponse.ok || !exchangeData.success) {
+        logger.error('Backend code exchange failed (redirect):', exchangeData);
+        return { error: 'Authentication failed', description: exchangeData.message || 'Failed to exchange authorization code' };
+      }
+      const accessToken = exchangeData.accessToken;
+      if (!accessToken) {
+        return { error: 'Authentication failed', description: 'Failed to get access token from backend' };
+      }
+      const userInfo = stored.provider === 'microsoft'
+        ? await this.fetchMicrosoftUserInfo(accessToken)
+        : await this.fetchGoogleUserInfo(accessToken);
+      const backendResponse = await this.authenticateWithBackend(userInfo);
+      return backendResponse;
+    } catch (err) {
+      logger.error('Redirect SSO exchange error:', err);
+      return {
+        error: 'Authentication failed',
+        description: err instanceof Error ? err.message : 'Unknown error',
+      };
+    }
+  }
+
+  // Sign in with Google
+  async signInWithGoogle(): Promise<SSOUser | SSOError | SSORedirecting> {
+    try {
       if (!GOOGLE_CLIENT_ID) {
         return {
           error: 'Google SSO not configured',
           description: 'Please contact your administrator to set up Google SSO.',
         };
+      }
+      // On web, use redirect flow so SSO works even when COOP blocks the popup
+      if (isWeb()) {
+        return await this.startRedirectAuth('google');
       }
 
       const request = this.getGoogleAuthRequest();
@@ -130,7 +242,8 @@ class SSOService {
         const apiConfig = getDefaultApiConfig();
         
         try {
-          const exchangeResponse = await fetch(`${apiConfig.url}/sso/exchange-code`, {
+          const exchangeUrl = `${apiConfig.url}/sso/exchange-code`;
+          const exchangeResponse = await fetch(exchangeUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -143,7 +256,7 @@ class SSOService {
             }),
           });
 
-          const exchangeData = await exchangeResponse.json();
+          const exchangeData = await exchangeResponse.json().catch(() => ({}));
 
           if (!exchangeResponse.ok || !exchangeData.success) {
             logger.error('Backend code exchange failed:', exchangeData);
@@ -170,13 +283,19 @@ class SSOService {
           return backendResponse;
         } catch (exchangeError) {
           logger.error('Code exchange error:', exchangeError);
+          const isNetworkError =
+            exchangeError instanceof TypeError &&
+            (exchangeError.message === 'Failed to fetch' || exchangeError.message?.includes('fetch'));
+          const description = isNetworkError
+            ? `Cannot reach the server at ${apiConfig.url}. Make sure the backend is running (e.g. \`yarn workspace backend start\` or \`cd packages/backend && yarn start\`).`
+            : exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token';
           return {
             error: 'Authentication failed',
-            description: exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token',
+            description,
           };
         }
       } else {
-        logger.warn('Google OAuth result:', { type: result.type, params: result.params });
+        logger.warn('Google OAuth result:', { type: result.type, params: (result as { params?: unknown }).params });
         return {
           error: 'Authentication cancelled',
           description: result.type === 'cancel' ? 'User cancelled the authentication' : 'Authentication failed',
@@ -192,14 +311,16 @@ class SSOService {
   }
 
   // Sign in with Microsoft
-  async signInWithMicrosoft(): Promise<SSOUser | SSOError> {
+  async signInWithMicrosoft(): Promise<SSOUser | SSOError | SSORedirecting> {
     try {
-      // Check if Microsoft client ID is configured
       if (!MICROSOFT_CLIENT_ID) {
         return {
           error: 'Microsoft SSO not configured',
           description: 'Please contact your administrator to set up Microsoft SSO.',
         };
+      }
+      if (isWeb()) {
+        return await this.startRedirectAuth('microsoft');
       }
 
       const request = this.getMicrosoftAuthRequest();
@@ -223,7 +344,8 @@ class SSOService {
         const apiConfig = getDefaultApiConfig();
         
         try {
-          const exchangeResponse = await fetch(`${apiConfig.url}/sso/exchange-code`, {
+          const exchangeUrl = `${apiConfig.url}/sso/exchange-code`;
+          const exchangeResponse = await fetch(exchangeUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -236,7 +358,7 @@ class SSOService {
             }),
           });
 
-          const exchangeData = await exchangeResponse.json();
+          const exchangeData = await exchangeResponse.json().catch(() => ({}));
 
           if (!exchangeResponse.ok || !exchangeData.success) {
             logger.error('Backend code exchange failed:', exchangeData);
@@ -263,13 +385,19 @@ class SSOService {
           return backendResponse;
         } catch (exchangeError) {
           logger.error('Code exchange error:', exchangeError);
+          const isNetworkError =
+            exchangeError instanceof TypeError &&
+            (exchangeError.message === 'Failed to fetch' || exchangeError.message?.includes('fetch'));
+          const description = isNetworkError
+            ? `Cannot reach the server at ${apiConfig.url}. Make sure the backend is running (e.g. \`yarn workspace backend start\` or \`cd packages/backend && yarn start\`).`
+            : exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token';
           return {
             error: 'Authentication failed',
-            description: exchangeError instanceof Error ? exchangeError.message : 'Failed to exchange code for token',
+            description,
           };
         }
       } else {
-        logger.warn('Microsoft OAuth result:', { type: result.type, params: result.params });
+        logger.warn('Microsoft OAuth result:', { type: result.type, params: (result as { params?: unknown }).params });
         return {
           error: 'Authentication cancelled',
           description: result.type === 'cancel' ? 'User cancelled the authentication' : 'Authentication failed',
@@ -361,24 +489,21 @@ class SSOService {
       // Intentionally no debug logging here to reduce console noise in web dev builds
       
       // Use RTK Query mutation for backend authentication
-      const result = store.dispatch(
-        ssoApi.endpoints.ssoLogin.initiate(requestPayload)
-      );
+      const result = (store.dispatch as (arg: unknown) => { unwrap: () => Promise<{ success?: boolean; tokens?: unknown; caregiver?: unknown; org?: unknown; clients?: unknown[]; alerts?: unknown[]; message?: string }> })(ssoApi.endpoints.ssoLogin.initiate(requestPayload));
 
       try {
-        // Unwrap throws on RTK Query errors, returns payload on success
         const data = await result.unwrap();
 
         if (data?.success) {
-          // Return the user info with tokens, org, patients, and alerts for the frontend to handle
+          // Return the user info with tokens, org, clients, and alerts for the frontend to handle
           return {
             ...userInfo,
             tokens: data.tokens,
             backendUser: data.caregiver,
             backendOrg: data.org,
-            backendPatients: data.patients,
+            backendClients: data.clients,
             backendAlerts: data.alerts,
-          } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any; backendPatients?: any[]; backendAlerts?: any[] };
+          } as SSOUser & { tokens: any; backendUser: any; backendOrg?: any; backendClients?: any[]; backendAlerts?: any[] };
         }
 
         return {
@@ -441,8 +566,9 @@ class SSOService {
           description: errorMessage,
         };
       } finally {
-        if (typeof (result as any)?.unsubscribe === 'function') {
-          result.unsubscribe();
+        const r = result as { unsubscribe?: () => void }
+        if (typeof r?.unsubscribe === 'function') {
+          r.unsubscribe();
         }
       }
     } catch (error) {

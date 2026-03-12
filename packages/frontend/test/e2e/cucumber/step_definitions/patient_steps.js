@@ -32,7 +32,7 @@ async function safeWait(page, ms) {
 // Login step is now in auth_steps.js - this step is kept for backward compatibility
 // but the implementation is shared across all test suites
 
-Given('a patient exists with name {string}', async function(patientName) {
+Given(/a client exists with name "([^"]*)"/, async function(patientName) {
   // Create patient via UI to ensure Redux store is properly updated
   // This is more reliable for E2E tests since it matches real user behavior
   
@@ -58,16 +58,16 @@ Given('a patient exists with name {string}', async function(patientName) {
     const homeHeader = this.page.getByTestId('home-header');
     const headerCount = await homeHeader.count();
     
-    // Check for patient-list
-    const patientList = this.page.getByTestId('patient-list');
+    // Check for client-list
+    const patientList = this.page.getByTestId('client-list');
     const listCount = await patientList.count();
     
     // Check for home-screen accessibility label
     const homeScreen = this.page.locator('[accessibilitylabel="home-screen"]');
     const screenCount = await homeScreen.count();
     
-    // Check for add-patient-button
-    const addButton = this.page.getByTestId('add-patient-button');
+    // Check for add-client-button
+    const addButton = this.page.getByTestId('add-client-button');
     const buttonCount = await addButton.count();
     
     if (headerCount > 0 || listCount > 0 || screenCount > 0 || buttonCount > 0) {
@@ -82,7 +82,7 @@ Given('a patient exists with name {string}', async function(patientName) {
       console.log(`[DEBUG] Attempt ${homeAttempts + 1}: URL=${currentUrl}, waiting for home screen...`);
     }
     
-    await safeWait(this.page, 500);
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-form"], [data-testid="client-name-input"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
     homeAttempts++;
   }
   
@@ -96,22 +96,22 @@ Given('a patient exists with name {string}', async function(patientName) {
     throw new Error(`Home screen not loaded after ${maxHomeAttempts} attempts. URL: ${pageUrl}`);
   }
   
-  await safeWait(this.page, 1000);
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   
   // Check if patient already exists in the UI
-  const existingPatient = this.page.getByTestId(`patient-name-${patientName}`).first();
+  const existingPatient = this.page.getByTestId(`client-name-${patientName}`).first();
   const existingCount = await existingPatient.count();
   
   if (existingCount > 0) {
-    console.log(`[DEBUG] Patient "${patientName}" already exists in UI`);
+    console.log(`[DEBUG] Client "${patientName}" already exists in UI`);
     this.currentPatientName = patientName;
     
     // Try to get the patient ID from the existing card's testID
-    const existingCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName }).first();
+    const existingCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName }).first();
     const cardCount = await existingCard.count();
     if (cardCount > 0) {
       const testId = await existingCard.getAttribute('data-testid').catch(() => '');
-      const match = testId.match(/patient-card-(.+)/);
+      const match = testId.match(/client-card-(.+)/);
       if (match && match[1]) {
         this.createdPatientId = match[1];
         console.log(`[DEBUG] Found existing patient ID from card: ${this.createdPatientId}`);
@@ -131,9 +131,9 @@ Given('a patient exists with name {string}', async function(patientName) {
           if (store && store.getState) {
             const state = store.getState();
             const currentUser = state?.auth?.currentUser || state?.auth?.user;
-            const userPatients = currentUser?.id ? (state?.patient?.patients?.[currentUser.id] || []) : [];
-            const patient = userPatients.find(p => p.name === name);
-            return patient?.id || null;
+            const userClients = currentUser?.id ? (state?.client?.clients?.[currentUser.id] || []) : [];
+            const client = userClients.find(c => c.name === name);
+            return client?.id || null;
           }
           return null;
         }, patientName);
@@ -153,15 +153,15 @@ Given('a patient exists with name {string}', async function(patientName) {
   const email = `${patientName.toLowerCase().replace(/\s+/g, '.')}@example.com`;
   const phone = '+16045624264';
   
-  console.log(`[DEBUG] Creating patient "${patientName}" via UI...`);
+  console.log(`[DEBUG] Creating client "${patientName}" via UI...`);
   
-  // Click the "Add Patient" button - check for both enabled and disabled states
-  let addButton = this.page.getByTestId('add-patient-button');
+  // Click the "Add Client" button - check for both enabled and disabled states
+  let addButton = this.page.getByTestId('add-client-button');
   let buttonCount = await addButton.count();
   
   if (buttonCount === 0) {
     // Try alternative selector
-    addButton = this.page.getByRole('button', { name: /add patient/i }).first();
+    addButton = this.page.getByRole('button', { name: /add client/i }).first();
     buttonCount = await addButton.count();
   }
   
@@ -169,9 +169,9 @@ Given('a patient exists with name {string}', async function(patientName) {
     // Button not found - check what's on the page
     const pageContent = await this.page.content();
     const hasHomeHeader = pageContent.includes('home-header') || await this.page.getByTestId('home-header').count() > 0;
-    const hasPatientList = await this.page.getByTestId('patient-list').count() > 0;
-    console.log(`[DEBUG] Add button not found. Has home-header: ${hasHomeHeader}, has patient-list: ${hasPatientList}`);
-    throw new Error(`Add Patient button not found on page. URL: ${this.page.url()}`);
+    const hasPatientList = await this.page.getByTestId('client-list').count() > 0;
+    console.log(`[DEBUG] Add button not found. Has home-header: ${hasHomeHeader}, has client-list: ${hasPatientList}`);
+    throw new Error(`Add Client button not found on page. URL: ${this.page.url()}`);
   }
   
   // Wait for button to be visible (even if disabled)
@@ -182,33 +182,33 @@ Given('a patient exists with name {string}', async function(patientName) {
   const ariaDisabled = await addButton.getAttribute('aria-disabled').catch(() => null);
   
   if (isDisabled !== null || ariaDisabled === 'true') {
-    console.log('[DEBUG] Add Patient button is disabled - user might not have permission');
-    throw new Error('Add Patient button is disabled - user may not have permission to create patients');
+    console.log('[DEBUG] Add Client button is disabled - user might not have permission');
+    throw new Error('Add Client button is disabled - user may not have permission to create clients');
   }
   
   await addButton.click();
-  await safeWait(this.page, 1000);
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   
   // Fill in the patient form
-  const nameInput = this.page.getByTestId('patient-name-input')
+  const nameInput = this.page.getByTestId('client-name-input')
     .or(this.page.locator('input[placeholder*="name" i]').first());
   await nameInput.waitFor({ state: 'visible', timeout: 10000 });
   await nameInput.fill(patientName);
   
-  const emailInput = this.page.getByTestId('patient-email-input')
+  const emailInput = this.page.getByTestId('client-email-input')
     .or(this.page.locator('input[type="email"]').first());
   await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   await emailInput.fill(email);
   
-  const phoneInput = this.page.getByTestId('patient-phone-input')
+  const phoneInput = this.page.getByTestId('client-phone-input')
     .or(this.page.locator('input[placeholder*="phone" i]').first());
   await phoneInput.waitFor({ state: 'visible', timeout: 10000 });
   await phoneInput.fill(phone);
   
-  await safeWait(this.page, 1000); // Wait for form validation
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {}); // Wait for form validation
   
   // Submit the form
-  const submitButton = this.page.getByTestId('patient-submit-button')
+  const submitButton = this.page.getByTestId('save-client-button')
     .or(this.page.getByRole('button', { name: /submit|save|create/i }).first());
   await submitButton.waitFor({ state: 'visible', timeout: 10000 });
   
@@ -242,7 +242,7 @@ Given('a patient exists with name {string}', async function(patientName) {
       await phoneInput.fill(phone);
     }
     
-    await safeWait(this.page, 300);
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
     buttonAttempts++;
   }
   
@@ -251,7 +251,7 @@ Given('a patient exists with name {string}', async function(patientName) {
   let createdPatientId = null;
   
   const submitPromise = this.page.waitForResponse((response) => {
-    return response.url().includes('/v1/patients') && 
+    return response.url().includes('/v1/clients') && 
            (response.status() === 201 || response.status() === 200) &&
            response.request().method() === 'POST';
   }, { timeout: 15000 }).catch(() => null);
@@ -261,7 +261,7 @@ Given('a patient exists with name {string}', async function(patientName) {
   
   // Wait for patient to be added to Redux after creation
   // The reducer and onQueryStarted callback should add it, but we'll wait a bit to ensure
-  await safeWait(this.page, 2000);
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   
   // Extract patient ID from response
   if (response) {
@@ -269,13 +269,13 @@ Given('a patient exists with name {string}', async function(patientName) {
       const responseData = await response.json();
       createdPatientId = responseData.id || responseData._id || responseData.data?.id || responseData.data?._id;
       patientCreated = true;
-      console.log(`[DEBUG] Patient created successfully with ID: ${createdPatientId}`);
+      console.log(`[DEBUG] Client created successfully with ID: ${createdPatientId}`);
     } catch (e) {
       console.log(`[DEBUG] Could not parse patient creation response: ${e.message}`);
     }
   }
   
-  await safeWait(this.page, 2000); // Wait for form submission and navigation
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {}); // Wait for form submission and navigation
   
   // Store patient ID for later use
   if (createdPatientId) {
@@ -286,7 +286,7 @@ Given('a patient exists with name {string}', async function(patientName) {
   // If patient was created, ensure it's added to Redux
   // The reducer should add it, but if it doesn't, we'll manually add it
   if (patientCreated && this.createdPatientId) {
-    console.log('[DEBUG] Patient created, ensuring it is in Redux...');
+    console.log('[DEBUG] Client created, ensuring it is in Redux...');
     
     // Always try to manually add patient to Redux to ensure it's there
     try {
@@ -304,28 +304,28 @@ Given('a patient exists with name {string}', async function(patientName) {
             const currentUserId = state?.auth?.currentUser?.id || state?.auth?.user?.id;
             
             if (currentUserId) {
-              const userPatients = state?.patient?.patients?.[currentUserId] || [];
-              const patientInRedux = userPatients.find((p) => p.id === patientId);
+              const userClients = state?.client?.clients?.[currentUserId] || [];
+              const clientInRedux = userClients.find((c) => c.id === patientId);
               
-              if (!patientInRedux) {
-                // Fetch patient and add to Redux
+              if (!clientInRedux) {
+                // Fetch client and add to Redux
                 const token = localStorage.getItem('accessToken') || 
                              document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
                 
                 if (token) {
-                  const response = await fetch(`${apiURL}/v1/patients/${patientId}`, {
+                  const response = await fetch(`${apiURL}/v1/clients/${patientId}`, {
                     headers: { 'Authorization': `Bearer ${token}` },
                   });
                   
                   if (response.ok) {
-                    const patient = await response.json();
+                    const client = await response.json();
                     
-                    // Add to current user's patient list
+                    // Add to current user's client list
                     store.dispatch({
-                      type: 'patient/setPatientsForCaregiver',
+                      type: 'client/setClientsForCaregiver',
                       payload: {
                         caregiverId: currentUserId,
-                        patients: [...userPatients, patient],
+                        clients: [...userClients, client],
                       },
                     });
                     
@@ -347,7 +347,7 @@ Given('a patient exists with name {string}', async function(patientName) {
       if (reduxResult && reduxResult.success) {
         console.log(`[DEBUG] Patient ${reduxResult.added ? 'added to' : 'already in'} Redux`);
       } else {
-        console.log(`[DEBUG] Could not add patient to Redux: ${reduxResult ? reduxResult.error : 'no result'}`);
+        console.log(`[DEBUG] Could not add client to Redux: ${reduxResult ? reduxResult.error : 'no result'}`);
       }
     } catch (e) {
       console.log(`[DEBUG] Could not manually add patient to Redux: ${e.message}`);
@@ -357,7 +357,7 @@ Given('a patient exists with name {string}', async function(patientName) {
     const currentUrl = this.page.url();
     if (currentUrl.includes('/Patient') && !currentUrl.includes('/MainTabs/Home')) {
       await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
   }
   
@@ -370,19 +370,16 @@ Given('a patient exists with name {string}', async function(patientName) {
     const currentUrlAfterCreation = this.page.url();
     if (!currentUrlAfterCreation.includes('/MainTabs/Home') && !currentUrlAfterCreation.includes('/HomeDetail') && currentUrlAfterCreation !== `${this.baseURL}/`) {
       await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
     
-    // Wait for patients API call to refresh the list
     try {
-      await this.page.waitForResponse(response => 
-        response.url().includes('/v1/patients') && response.status() === 200,
-        { timeout: 5000 }
-      ).catch(() => {
-        console.log('[DEBUG] Patients API call not detected, continuing...');
-      });
-    } catch (e) {
-      // API call might have already happened
+      await this.page.waitForResponse(response =>
+        response.url().includes('/v1/clients') && response.status() === 200,
+        { timeout: 2000 }
+      );
+    } catch (_) {
+      // Response may have already completed; rely on UI wait below.
     }
   }
   
@@ -393,7 +390,7 @@ Given('a patient exists with name {string}', async function(patientName) {
   
   while (!patientFound && attempts < maxAttempts) {
     // Try multiple selectors to find the patient
-    let patientItem = this.page.getByTestId(`patient-name-${patientName}`).first();
+    let patientItem = this.page.getByTestId(`client-name-${patientName}`).first();
     let count = await patientItem.count();
     
     if (count === 0) {
@@ -404,24 +401,24 @@ Given('a patient exists with name {string}', async function(patientName) {
     
     if (count === 0) {
       // Try in patient card
-      patientItem = this.page.locator(`[data-testid^="patient-card-"]`).filter({ hasText: patientName }).first();
+      patientItem = this.page.locator(`[data-testid^="client-card-"]`).filter({ hasText: patientName }).first();
       count = await patientItem.count();
     }
     
     if (count > 0) {
       patientFound = true;
-      console.log(`[DEBUG] Patient "${patientName}" successfully created and visible in UI`);
+      console.log(`[DEBUG] Client "${patientName}" successfully created and visible in UI`);
       break;
     }
     
     attempts++;
-    await safeWait(this.page, 1000);
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   }
   
   if (!patientFound) {
     // Patient might have been created but not visible yet
     // Check if we're still on the patient form (creation might have failed)
-    const nameInputCheck = await this.page.getByTestId('patient-name-input').count();
+    const nameInputCheck = await this.page.getByTestId('client-name-input').count();
     if (nameInputCheck > 0) {
       // Still on form - check for error messages
       const errorMessages = await this.page.locator('[role="alert"], .error, [data-testid*="error"]').allTextContents();
@@ -435,10 +432,10 @@ Given('a patient exists with name {string}', async function(patientName) {
         // We're on the patient screen, which means creation succeeded
         // Just navigate back to home
         await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-        await safeWait(this.page, 2000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         
         // Check again for patient in list
-        const patientItem = this.page.getByTestId(`patient-name-${patientName}`).first();
+        const patientItem = this.page.getByTestId(`client-name-${patientName}`).first();
         const count = await patientItem.count();
         if (count > 0) {
           patientFound = true;
@@ -448,33 +445,33 @@ Given('a patient exists with name {string}', async function(patientName) {
         // Still on form - check if patient was actually created by navigating back and checking
         console.log(`[DEBUG] Still on form, checking if patient was created...`);
         await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-        await safeWait(this.page, 2000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         
         // Wait for patients to load
         try {
           await this.page.waitForResponse(response => 
-            response.url().includes('/v1/patients') && response.status() === 200,
+            response.url().includes('/v1/clients') && response.status() === 200,
             { timeout: 10000 }
           );
         } catch (e) {
           // API call might have already happened
         }
         
-        await safeWait(this.page, 1000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         
         // Wait for patients API call to complete
         try {
           await this.page.waitForResponse(response => 
-            response.url().includes('/v1/patients') && response.status() === 200,
+            response.url().includes('/v1/clients') && response.status() === 200,
             { timeout: 10000 }
           );
         } catch (e) {
           // API call might have already happened
         }
-        await safeWait(this.page, 2000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         
         // Check if patient exists in list
-        const patientItem = this.page.getByTestId(`patient-name-${patientName}`).first();
+        const patientItem = this.page.getByTestId(`client-name-${patientName}`).first();
         const count = await patientItem.count();
         if (count > 0) {
           patientFound = true;
@@ -500,61 +497,49 @@ Given('a patient exists with name {string}', async function(patientName) {
   this.currentPatientName = patientName;
 });
 
-When('I navigate to the patients screen', async function() {
-  // The patient list is on the Home screen, not a separate Patients screen
-  // Navigate to home screen and wait for patient list to load
+When(/I navigate to the clients screen/, async function() {
   const currentUrl = this.page.url();
-  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === `${this.baseURL}/`;
-  
+  const base = (this.baseURL || '').replace(/\/$/, '');
+  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === base || currentUrl === `${base}/`;
+
   if (!isOnHomeScreen) {
-    // Navigate to home screen
-    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-  }
-  
-  // Wait for patient list API call to ensure data is loaded
-  try {
-    await this.page.waitForResponse(response => 
-      response.url().includes('/v1/patients') && response.request().method() === 'GET' && response.status() === 200,
-      { timeout: 5000 }
-    ).catch(() => {
-      console.log('Patients API response not detected, continuing...');
-    });
-  } catch (e) {
-    // API call might have already happened
-  }
-  
-  // Wait for patient list to be visible
-  await this.page.getByTestId('patient-list').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {
-    // List might be empty, that's okay
-  });
-  
-  try {
-      if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
+    // Avoid full page reload when already on app (same rehydration race → 401 as billing/alerts).
+    const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
+    const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
+    if (!alreadyOnApp || !listOrHomeVisible) {
+      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
     }
-  
-  // Wait for patients API call to complete
+  }
+
+  // Optionally wait for in-flight GET /clients (short timeout: request often already completed when we're on home).
   try {
-    await this.page.waitForResponse(response => 
-      response.url().includes('/v1/patients') && response.status() === 200,
-      { timeout: 15000 }
+    await this.page.waitForResponse(response =>
+      response.url().includes('/v1/clients') && response.request().method() === 'GET' && response.status() === 200,
+      { timeout: 2000 }
     );
+  } catch (_) {
+    // Response may have already completed before we started listening; rely on UI wait below.
+  }
+
+  await this.page.getByTestId('client-list').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
+  try {
+    if (this.page && !this.page.isClosed()) {
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    }
   } catch (e) {
-    console.log('Patients API response not detected, continuing...');
+    if (e.message && e.message.includes('closed')) {
+      throw new Error('Browser was closed during test execution');
+    }
   }
 });
 
-Then('I should see the patient list', async function() {
-  // The patient list container should exist - be more lenient
-  // Check for patient items directly (they use patient-card-{id} or patient-name-{name})
+Then(/I should see the client list/, async function() {
+  // The client list container should exist - be more lenient
+  // Check for patient items directly (they use client-card-{id} or client-name-{name})
   try {
       if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       }
     } catch (e) {
       if (e.message && e.message.includes('closed')) {
@@ -562,33 +547,33 @@ Then('I should see the patient list', async function() {
       }
     } // Wait for list to render
   
-  const patientItems = this.page.locator('[data-testid^="patient-card-"], [data-testid^="patient-name-"]');
+  const patientItems = this.page.locator('[data-testid^="client-card-"], [data-testid^="client-name-"]');
   const itemCount = await patientItems.count();
   
-  // Also check for patient-list container
-  const patientList = this.page.getByTestId('patient-list');
+  // Also check for client-list container
+  const patientList = this.page.getByTestId('client-list');
   const listCount = await patientList.count();
   
   // Either we have patient items or the list container
   expect(itemCount + listCount).toBeGreaterThan(0);
 });
 
-Then('I should see at least one patient', async function() {
+Then(/I should see at least one client/, async function() {
   // Since patients render immediately, just check for them directly
-  // Look for patient items in the list - they use patient-card-{id} or patient-name-{name}
-  const patientItems = this.page.locator('[data-testid^="patient-card-"], [data-testid^="patient-name-"]');
+  // Look for patient items in the list - they use client-card-{id} or client-name-{name}
+  const patientItems = this.page.locator('[data-testid^="client-card-"], [data-testid^="client-name-"]');
   let count = await patientItems.count();
   
   // If no patients found, check if we're on home screen with list container
   // (user might not have patients yet, which is valid for this scenario)
   if (count === 0) {
-    const patientList = await this.page.getByTestId('patient-list').count();
+    const patientList = await this.page.getByTestId('client-list').count();
     const homeHeader = await this.page.getByTestId('home-header').count();
     
     // If we're on home screen with list container, the UI is working correctly
     // The list is rendering, just empty - this is acceptable for "View patient list"
     if (homeHeader > 0 && patientList > 0) {
-      console.log('On home screen with patient list container but no patients - UI is working correctly');
+      console.log('On home screen with client list container but no clients - UI is working correctly');
       return; // Allow to pass - the list is rendering correctly
     }
   }
@@ -599,8 +584,8 @@ Then('I should see at least one patient', async function() {
 // Note: "I click the {string} button" is defined in common_steps.js
 // Removed duplicate to avoid ambiguity
 
-When('I enter patient name {string}', async function(name) {
-  const nameInput = this.page.getByTestId('patient-name-input')
+When(/I enter client name "([^"]*)"/, async function(name) {
+  const nameInput = this.page.getByTestId('client-name-input')
     .or(this.page.locator('input[placeholder*="name" i]').first());
   
   await nameInput.waitFor({ state: 'visible', timeout: 10000 });
@@ -608,24 +593,24 @@ When('I enter patient name {string}', async function(name) {
   this.currentPatientName = name;
 });
 
-When('I enter patient phone {string}', async function(phone) {
-  const phoneInput = this.page.getByTestId('patient-phone-input')
+When(/I enter client phone "([^"]*)"/, async function(phone) {
+  const phoneInput = this.page.getByTestId('client-phone-input')
     .or(this.page.locator('input[placeholder*="phone" i]').first());
   
   await phoneInput.waitFor({ state: 'visible', timeout: 10000 });
   await phoneInput.fill(phone);
 });
 
-When('I enter patient email {string}', async function(email) {
-  const emailInput = this.page.getByTestId('patient-email-input')
+When(/I enter client email "([^"]*)"/, async function(email) {
+  const emailInput = this.page.getByTestId('client-email-input')
     .or(this.page.locator('input[type="email"]').first());
   
   await emailInput.waitFor({ state: 'visible', timeout: 10000 });
   await emailInput.fill(email);
 });
 
-When('I edit the patient name to {string}', async function(newName) {
-  const nameInput = this.page.getByTestId('patient-name-input');
+When(/I edit the client name to "([^"]*)"/, async function(newName) {
+  const nameInput = this.page.getByTestId('client-name-input');
   await nameInput.waitFor({ state: 'visible', timeout: 10000 });
   await nameInput.clear();
   await nameInput.fill(newName);
@@ -633,10 +618,10 @@ When('I edit the patient name to {string}', async function(newName) {
   
   // Ensure email and phone are still filled (required for save button to be enabled)
   // Wait a bit for form state to update
-  await safeWait(this.page, 500);
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-form"], [data-testid="client-name-input"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
   
   // Check if email and phone are filled, if not, fill them with default values
-  const emailInput = this.page.getByTestId('patient-email-input');
+  const emailInput = this.page.getByTestId('client-email-input');
   const emailCount = await emailInput.count();
   if (emailCount > 0) {
     const emailValue = await emailInput.inputValue().catch(() => '');
@@ -645,7 +630,7 @@ When('I edit the patient name to {string}', async function(newName) {
     }
   }
   
-  const phoneInput = this.page.getByTestId('patient-phone-input');
+  const phoneInput = this.page.getByTestId('client-phone-input');
   const phoneCount = await phoneInput.count();
   if (phoneCount > 0) {
     const phoneValue = await phoneInput.inputValue().catch(() => '');
@@ -655,16 +640,16 @@ When('I edit the patient name to {string}', async function(newName) {
   }
   
   // Wait for form validation to complete
-  await safeWait(this.page, 500);
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-form"], [data-testid="client-name-input"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
 });
 
-When('I save the patient changes', async function() {
+When(/I save the client changes/, async function() {
   // Check if page is closed before proceeding
   if (this.page.isClosed()) {
     throw new Error('Browser was closed before saving patient changes');
   }
   
-  const saveButton = this.page.getByTestId('save-patient-button')
+  const saveButton = this.page.getByTestId('save-client-button')
     .or(this.page.getByRole('button', { name: /save|update/i }).first());
   
   await saveButton.waitFor({ state: 'visible', timeout: 10000 });
@@ -688,9 +673,9 @@ When('I save the patient changes', async function() {
     // If button is disabled, check form fields
     if (disabled !== null || ariaDisabled === 'true') {
       // Check if name, email, phone are filled
-      const nameInput = this.page.getByTestId('patient-name-input');
-      const emailInput = this.page.getByTestId('patient-email-input');
-      const phoneInput = this.page.getByTestId('patient-phone-input');
+      const nameInput = this.page.getByTestId('client-name-input');
+      const emailInput = this.page.getByTestId('client-email-input');
+      const phoneInput = this.page.getByTestId('client-phone-input');
       
       const nameValue = await nameInput.inputValue().catch(() => '');
       const emailValue = await emailInput.inputValue().catch(() => '');
@@ -698,7 +683,7 @@ When('I save the patient changes', async function() {
       
       // Fill missing fields
       if (!nameValue || nameValue.trim() === '') {
-        await nameInput.fill('Test Patient');
+        await nameInput.fill('Test Client');
       }
       if (!emailValue || emailValue.trim() === '') {
         await emailInput.fill('test@example.com');
@@ -708,11 +693,11 @@ When('I save the patient changes', async function() {
       }
       
       // Wait for form validation
-      await safeWait(this.page, 300);
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 1000 }).catch(() => {});
     }
     
     attempts++;
-    await safeWait(this.page, 200);
+    await this.page.locator('[data-testid="client-form"], [data-testid="client-name-input"]').first().waitFor({ state: 'attached', timeout: 1000 }).catch(() => {});
   }
   
   if (!isEnabled) {
@@ -721,7 +706,7 @@ When('I save the patient changes', async function() {
   }
   
   const savePromise = this.page.waitForResponse(response => 
-    response.url().includes('/v1/patients') && 
+    response.url().includes('/v1/clients') && 
     (response.status() === 200 || response.status() === 201),
     { timeout: 15000 }
   ).catch(() => null);
@@ -731,11 +716,11 @@ When('I save the patient changes', async function() {
   
   // Only wait if page is still open
   if (this.page && !this.page.isClosed()) {
-    await safeWait(this.page, 1000);
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   }
 });
 
-Then('I should see patient contact information', async function() {
+Then(/I should see client contact information/, async function() {
   const contactInfo = this.page.getByText(/email|phone/i).first();
   const count = await contactInfo.count();
   expect(count).toBeGreaterThan(0);
@@ -757,7 +742,7 @@ When('I upload an avatar image', async function() {
     const isAttached = await fileInput.evaluate((el) => el !== null).catch(() => false);
     if (!isAttached) {
       // Wait a bit for the file input to appear after clicking "Select Image"
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
     // Note: In a real test, you would do:
     // await fileInput.setInputFiles('path/to/test-image.jpg');
@@ -768,7 +753,7 @@ When('I upload an avatar image', async function() {
   }
 });
 
-Then('the patient avatar should be updated', async function() {
+Then(/the client avatar should be updated/, async function() {
   // Verify avatar was updated (might check for new image src or confirmation)
   // Look for avatar image in various ways
   let avatarImage = this.page.locator('img[data-testid*="avatar"]').first();
@@ -782,7 +767,7 @@ Then('the patient avatar should be updated', async function() {
   
   if (count === 0) {
     // Avatar might be in the AvatarPicker component - just verify we're still on the patient screen
-    const patientScreen = this.page.getByTestId('patient-screen');
+    const patientScreen = this.page.getByTestId('client-screen');
     const screenCount = await patientScreen.count();
     if (screenCount > 0) {
       // We're on the patient screen, which means the avatar picker is present
@@ -804,130 +789,86 @@ Then('I should see schedules for {string}', async function(patientName) {
   expect(count).toBeGreaterThan(0);
 });
 
-When('I submit the patient form', async function() {
-  const submitButton = this.page.getByTestId('patient-submit-button')
+When(/I submit the client form/, async function() {
+  const submitButton = this.page.getByTestId('save-client-button')
     .or(this.page.getByRole('button', { name: /submit|save|create/i }).first());
   
   await submitButton.waitFor({ state: 'visible', timeout: 10000 });
   
-  // Wait for API call
-  const submitPromise = this.page.waitForResponse(response => 
-    (response.url().includes('/v1/patients') && 
-     (response.status() === 201 || response.status() === 200)),
-    { timeout: 10000 }
-  ).catch(() => null);
+  const submitPromise = this.page.waitForResponse(response => {
+    if (!response.url().includes('/v1/clients')) return false;
+    if (response.status() === 401) {
+      throw new Error('Create client returned 401 Unauthorized - session may have been lost');
+    }
+    return response.status() === 201 || response.status() === 200;
+  }, { timeout: 15000 });
   
   await submitButton.click();
   await submitPromise;
   
-  // Wait for form submission
-        await safeWait(this.page, 1000);
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
 });
 
-Then('I should see the new patient in the list', async function() {
-  // After creating a patient, check if we're already on home screen
+Then(/I should see the new client in the list/, async function() {
   const currentUrl = this.page.url();
-  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === `${this.baseURL}/`;
-  
-  if (!isOnHomeScreen) {
-    // Navigate back to home screen to see the list
-    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-    
-    // Check if we got redirected to login (session lost)
-        await safeWait(this.page, 1000);
-    const newUrl = this.page.url();
-    if (newUrl.includes('/login') || newUrl.includes('/auth')) {
-    // Session was lost - re-login
-    const credentials = this.getCredentials('orgAdmin');
+  const base = (this.baseURL || '').replace(/\/$/, '');
+  const isOnLogin = currentUrl.includes('/login') || currentUrl.includes('/auth');
+  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === base || currentUrl === `${base}/`;
+
+  if (isOnLogin) {
+    // Already on login (e.g. create client returned 401). Re-login in place - no full reload to avoid rehydration race.
+    const credentials = this.credentials || this.getCredentials('caregiver');
     const loginInput = this.page.getByTestId('email-input');
+    await loginInput.waitFor({ state: 'visible', timeout: 10000 });
     await loginInput.fill(credentials.email);
     const passwordInput = this.page.getByTestId('password-input')
       .or(this.page.locator('input[type="password"]').first());
     await passwordInput.fill(credentials.password);
     const loginButton = this.page.getByTestId('login-button')
       .or(this.page.getByRole('button', { name: /login/i }).first());
-    
-    // Wait for login API call
-    const loginPromise = this.page.waitForResponse(response => 
-      response.url().includes('/v1/auth/login') && response.status() === 200,
-      { timeout: 10000 }
-    ).catch(() => null);
-    
+    const loginPromise = this.page.waitForResponse(response => {
+      if (!response.url().includes('/auth/login')) return false;
+      if (response.status() === 401) throw new Error('Re-login after session lost returned 401');
+      return response.status() === 200;
+    }, { timeout: 15000 });
     await loginButton.click();
     await loginPromise;
-    
-    // Wait for navigation after login
-    try {
-      if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
-    }
-    
-    // Check if we're still on login screen
-    const stillOnLogin = this.page.url().includes('/login') || this.page.url().includes('/auth');
-    if (stillOnLogin) {
-      // Navigate to home manually
+    await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  } else if (!isOnHomeScreen) {
+    // Not on home and not on login. Only do full reload if we're not already on the app (avoids rehydration → 401).
+    const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
+    const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
+    if (!alreadyOnApp || !listOrHomeVisible) {
       await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-      try {
-      if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
     }
-    }
-    }
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } else {
-    // Already on home screen - just wait for it to load
-        await safeWait(this.page, 1000);
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   }
-  
-  // Wait for home screen to load
+
   try {
     await this.page.waitForSelector('[data-testid="home-header"]', { timeout: 15000 });
   } catch (e) {
-    // Check if we're still on login screen
     const loginInput = await this.page.getByTestId('email-input').count();
     if (loginInput > 0) {
-      // Try one more time to navigate to home
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-      try {
-      if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
+      throw new Error('Session lost - still on login page after navigation. Create client may have returned 401.');
     }
-      const loginInput2 = await this.page.getByTestId('email-input').count();
-      if (loginInput2 > 0) {
-        throw new Error('Session lost - redirected to login page instead of home screen.');
-      }
-    }
-    // Home header might not be found, continue anyway
   }
   
-  // Wait for patients API call to complete
+  // Optionally wait for in-flight GET /clients (short timeout: list may already be loaded).
   try {
-    await this.page.waitForResponse(response => 
-      response.url().includes('/v1/patients') && response.status() === 200,
-      { timeout: 15000 }
+    await this.page.waitForResponse(response =>
+      response.url().includes('/v1/clients') && response.status() === 200,
+      { timeout: 2000 }
     );
-  } catch (e) {
-    console.log('Patients API response not detected, continuing...');
+  } catch (_) {
+    // Response often already completed; rely on UI below.
   }
-  
+
   // Wait briefly for list to update
   try {
     if (this.page && !this.page.isClosed()) {
-      await safeWait(this.page, 1000);
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
   } catch (e) {
     if (e.message && e.message.includes('closed')) {
@@ -938,8 +879,8 @@ Then('I should see the new patient in the list', async function() {
   // Look for the patient name in the list - try multiple selectors
   const patientName = this.currentPatientName;
   
-  // Try by testID first (more reliable) - format is patient-name-{name}
-  let patientItem = this.page.getByTestId(`patient-name-${patientName}`).first();
+  // Try by testID first (more reliable) - format is client-name-{name}
+  let patientItem = this.page.getByTestId(`client-name-${patientName}`).first();
   let count = await patientItem.count();
   
   if (count === 0) {
@@ -950,7 +891,7 @@ Then('I should see the new patient in the list', async function() {
   
   if (count === 0) {
     // Try in patient card
-    patientItem = this.page.locator(`[data-testid^="patient-card-"]`).filter({ hasText: patientName }).first();
+    patientItem = this.page.locator(`[data-testid^="client-card-"]`).filter({ hasText: patientName }).first();
     count = await patientItem.count();
   }
   
@@ -958,7 +899,7 @@ Then('I should see the new patient in the list', async function() {
   if (count === 0) {
     try {
       if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       }
     } catch (e) {
       if (e.message && e.message.includes('closed')) {
@@ -972,8 +913,8 @@ Then('I should see the new patient in the list', async function() {
   // Debug: Check what patients are actually in the list
   if (count === 0) {
     const allPatients = await this.page.evaluate(() => {
-      const patientCards = Array.from(document.querySelectorAll('[data-testid^="patient-card-"]'));
-      const patientNames = Array.from(document.querySelectorAll('[data-testid^="patient-name-"]'));
+      const patientCards = Array.from(document.querySelectorAll('[data-testid^="client-card-"]'));
+      const patientNames = Array.from(document.querySelectorAll('[data-testid^="client-name-"]'));
       return {
         cards: patientCards.map(c => ({
           testId: c.getAttribute('data-testid'),
@@ -1010,70 +951,61 @@ Then('I should see the new patient in the list', async function() {
   expect(count).toBeGreaterThan(0);
 });
 
-Then('the patient should have name {string}', async function(expectedName) {
-  const patientItem = this.page.getByText(expectedName).first();
-  const count = await patientItem.count();
+Then(/the client should have name "([^"]*)"/, async function(expectedName) {
+  // After save we may be on client detail (name in input) or list (name in card). Wait for UI to update.
+  await this.page.waitForTimeout(1500).catch(() => {});
+  let count = await this.page.getByTestId(`client-name-${expectedName}`).count();
+  if (count === 0) {
+    count = await this.page.getByText(expectedName, { exact: false }).first().count();
+  }
+  if (count === 0) {
+    const wrapper = this.page.getByTestId('client-name-input');
+    const inInput = await wrapper.inputValue().catch(() => '') ||
+      await wrapper.locator('input').first().inputValue().catch(() => '') ||
+      (await wrapper.textContent().catch(() => '') || '').trim();
+    if (inInput && inInput.trim() === expectedName) {
+      count = 1;
+    }
+  }
+  if (count === 0) {
+    count = await this.page.getByDisplayValue(expectedName).count().catch(() => 0);
+  }
   expect(count).toBeGreaterThan(0);
 });
 
-When('I click on the patient {string}', async function(patientName) {
-  // First, ensure we navigate to the patients screen (home screen where patient list is)
-  // This is important because the patient might have been created via API and we need to see the updated list
-  // Also, after creating a patient, the app navigates to the schedules screen, so we need to navigate back
+When(/I click on the client "([^"]*)"/, async function(patientName) {
   const currentUrl = this.page.url();
-  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === `${this.baseURL}/`;
+  const base = (this.baseURL || '').replace(/\/$/, '');
+  const isOnHomeScreen = currentUrl.includes('/MainTabs/Home') || currentUrl.includes('/HomeDetail') || currentUrl === base || currentUrl === `${base}/`;
   const isOnSchedulesScreen = currentUrl.includes('/Schedules') || currentUrl.includes('/schedules');
-  
+
   if (!isOnHomeScreen || isOnSchedulesScreen) {
-    // Navigate to home screen (patients list)
-    // If we're on schedules screen, we need to go back to home to see the patient list
-    console.log(`[DEBUG] Not on home screen (URL: ${currentUrl}), navigating to home...`);
-    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
-    
-    // Check if we got redirected to login (session lost)
-    try {
-      if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
-      }
-    } catch (e) {
-      if (e.message && e.message.includes('closed')) {
-        throw new Error('Browser was closed during test execution');
-      }
+    const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
+    const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
+    if (!alreadyOnApp || !listOrHomeVisible) {
+      console.log(`[DEBUG] Not on home screen (URL: ${currentUrl}), navigating to home...`);
+      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
     }
-    
     const newUrl = this.page.url();
     if (newUrl.includes('/login') || newUrl.includes('/auth')) {
-      // Session was lost - re-login
-      const credentials = this.getCredentials('orgAdmin');
+      const credentials = this.credentials || this.getCredentials('orgAdmin');
       const loginInput = this.page.getByTestId('email-input');
+      await loginInput.waitFor({ state: 'visible', timeout: 10000 });
       await loginInput.fill(credentials.email);
       const passwordInput = this.page.getByTestId('password-input')
         .or(this.page.locator('input[type="password"]').first());
       await passwordInput.fill(credentials.password);
       const loginButton = this.page.getByTestId('login-button')
         .or(this.page.getByRole('button', { name: /login/i }).first());
-      
-      const loginPromise = this.page.waitForResponse(response => 
-        response.url().includes('/v1/auth/login') && response.status() === 200,
-        { timeout: 10000 }
-      ).catch(() => null);
-      
+      const loginPromise = this.page.waitForResponse(response =>
+        response.url().includes('/auth/login') && response.status() === 200,
+        { timeout: 15000 }
+      );
       await loginButton.click();
       await loginPromise;
-      
-      // Wait for navigation after login
-      try {
-        if (this.page && !this.page.isClosed()) {
-          await safeWait(this.page, 2000);
-        }
-      } catch (e) {
-        if (e.message && e.message.includes('closed')) {
-          throw new Error('Browser was closed during test execution');
-        }
-      }
-      
-      // Navigate to home again
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    } else {
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   }
   
@@ -1092,33 +1024,31 @@ When('I click on the patient {string}', async function(patientName) {
       if (store && store.getState) {
         const state = store.getState();
         const currentUser = state?.auth?.currentUser || state?.auth?.user;
-        const userPatients = currentUser?.id ? (state?.patient?.patients?.[currentUser.id] || []) : [];
-        const hasPatient = patientId ? userPatients.some((p) => p.id === patientId) : false;
-        // Check if the patient we're looking for is in the list
-        const patientIndex = patientId ? userPatients.findIndex((p) => p.id === patientId) : -1;
+        const userClients = currentUser?.id ? (state?.client?.clients?.[currentUser.id] || []) : [];
+        const hasClient = patientId ? userClients.some((c) => c.id === patientId) : false;
+        const clientIndex = patientId ? userClients.findIndex((c) => c.id === patientId) : -1;
         return {
           hasStore: true,
           accessMethod,
           currentUserId: currentUser?.id || null,
           currentUserName: currentUser?.name || null,
-          patientCount: userPatients.length,
-          patientIds: userPatients.slice(-10).map((p) => p.id), // Last 10 IDs
-          patientNames: userPatients.slice(-10).map((p) => p.name), // Last 10 names
-          lookingForPatientId: patientId,
-          hasPatient: hasPatient,
-          patientIndex: patientIndex,
-          allPatientIds: userPatients.map((p) => p.id), // All IDs for debugging
+          clientCount: userClients.length,
+          clientIds: userClients.slice(-10).map((c) => c.id),
+          clientNames: userClients.slice(-10).map((c) => c.name),
+          lookingForClientId: patientId,
+          hasClient,
+          clientIndex,
+          allClientIds: userClients.map((c) => c.id),
         };
       }
       return { hasStore: false, accessMethod };
     }, this.createdPatientId);
     console.log(`[DEBUG] Redux state check:`, JSON.stringify(reduxState, null, 2));
     if (this.createdPatientId && reduxState.hasStore) {
-      console.log(`[DEBUG] Created patient ${this.createdPatientId} ${reduxState.hasPatient ? 'IS' : 'IS NOT'} in Redux (checked ${reduxState.patientCount} patients)`);
-      if (!reduxState.hasPatient && reduxState.patientCount > 0) {
-        console.log(`[DEBUG] Patient not found in last 10, checking full list...`);
-        // Check if it's in the full list (might be earlier in the list)
-        const fullCheck = await this.page.evaluate((patientId) => {
+      console.log(`[DEBUG] Created client ${this.createdPatientId} ${reduxState.hasClient ? 'IS' : 'IS NOT'} in Redux (checked ${reduxState.clientCount} clients)`);
+      if (!reduxState.hasClient && reduxState.clientCount > 0) {
+        console.log(`[DEBUG] Client not found in last 10, checking full list...`);
+        const fullCheck = await this.page.evaluate((clientId) => {
           let store = null;
           if (window.__REDUX_STORE__) {
             store = window.__REDUX_STORE__;
@@ -1128,12 +1058,12 @@ When('I click on the patient {string}', async function(patientName) {
           if (store && store.getState) {
             const state = store.getState();
             const currentUser = state?.auth?.currentUser || state?.auth?.user;
-            const userPatients = currentUser?.id ? (state?.patient?.patients?.[currentUser.id] || []) : [];
-            const foundIndex = userPatients.findIndex((p) => p.id === patientId);
+            const userClients = currentUser?.id ? (state?.client?.clients?.[currentUser.id] || []) : [];
+            const foundIndex = userClients.findIndex((c) => c.id === clientId);
             return {
               found: foundIndex !== -1,
               foundIndex,
-              totalCount: userPatients.length,
+              totalCount: userClients.length,
             };
           }
           return { found: false };
@@ -1145,13 +1075,13 @@ When('I click on the patient {string}', async function(patientName) {
     console.log(`[DEBUG] Could not check Redux state: ${e.message}`);
   }
   
-  // Wait briefly for patient list to be visible and render (optional - might not be visible if empty)
-  await this.page.getByTestId('patient-list').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {
+  // Wait briefly for client list to be visible and render (optional - might not be visible if empty)
+  await this.page.getByTestId('client-list').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {
     // List might not be visible yet or might be empty
   });
-  await safeWait(this.page, 500); // Give cards time to render
+  await this.page.locator('[data-testid="client-list"], [data-testid="client-form"], [data-testid="client-name-input"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {}); // Give cards time to render
   
-  // After navigating, ensure we're logged in and wait for the patient list to load
+  // After navigating, ensure we're logged in and wait for the client list to load
   // This is especially important if a patient was just created via API
   try {
     if (this.page && !this.page.isClosed()) {
@@ -1176,25 +1106,19 @@ When('I click on the patient {string}', async function(patientName) {
         
         await loginButton.click();
         await loginPromise;
-        await safeWait(this.page, 2000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         
         // Navigate to home after login
         await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
       }
       
-      // Wait for patients API call to ensure list is loaded
       try {
-        await this.page.waitForResponse(response => 
-          response.url().includes('/v1/patients') && response.status() === 200,
-          { timeout: 15000 }
+        await this.page.waitForResponse(response =>
+          response.url().includes('/v1/clients') && response.status() === 200,
+          { timeout: 2000 }
         );
-        // Wait a bit more for UI to update
-        await safeWait(this.page, 2000);
-      } catch (e) {
-        console.log('Patients API response not detected, continuing...');
-        // Still wait a bit for UI to render
-        await safeWait(this.page, 2000);
-      }
+      } catch (_) {}
+      await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
   } catch (e) {
     if (e.message && e.message.includes('closed') || (this.page && this.page.isClosed())) {
@@ -1211,31 +1135,28 @@ When('I click on the patient {string}', async function(patientName) {
   if (isOnSchedulesScreen) {
     console.log(`[DEBUG] Was on schedules screen, waiting for home screen to load...`);
     // Wait for home screen elements to appear
-    await this.page.waitForSelector('[data-testid="home-header"], [data-testid="patient-list"], [data-testid="add-patient-button"]', { timeout: 10000 }).catch(() => {});
-    await safeWait(this.page, 2000);
+    await this.page.waitForSelector('[data-testid="home-header"], [data-testid="client-list"], [data-testid="add-client-button"]', { timeout: 10000 }).catch(() => {});
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     
-    // Also wait for patients API to reload the list
     try {
-      await this.page.waitForResponse(response => 
-        response.url().includes('/v1/patients') && response.status() === 200,
-        { timeout: 15000 }
+      await this.page.waitForResponse(response =>
+        response.url().includes('/v1/clients') && response.status() === 200,
+        { timeout: 2000 }
       );
-      await safeWait(this.page, 2000);
-    } catch (e) {
-      console.log('[DEBUG] Patients API response not detected after navigating from schedules, continuing...');
-    }
+    } catch (_) {}
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   }
   
-  // Wait briefly for patient list to render
-  await this.page.getByTestId('patient-list').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+  // Wait briefly for client list to render
+  await this.page.getByTestId('client-list').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   
   // Wait for React to re-render after Redux updates - give it more time
   // Especially important after navigating from schedules screen
-  await safeWait(this.page, 3000);
+  await this.page.locator('[data-testid="client-screen"], [data-testid="client-list"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   
-  // Verify we can see patient cards
-  const patientCardsVisible = await this.page.locator('[data-testid^="patient-card-"]').count();
-  console.log(`[DEBUG] Found ${patientCardsVisible} patient cards after navigation`);
+  // Verify we can see client cards
+  const clientCardsVisible = await this.page.locator('[data-testid^="client-card-"]').count();
+  console.log(`[DEBUG] Found ${clientCardsVisible} client cards after navigation`);
   
   // Retry loop to wait for patient to appear in UI
   let editButton = null;
@@ -1245,13 +1166,13 @@ When('I click on the patient {string}', async function(patientName) {
   while (attempts < maxAttempts) {
     // First try by patient ID (most reliable - unique)
     if (this.createdPatientId) {
-      editButton = this.page.getByTestId(`edit-patient-button-${this.createdPatientId}`);
+      editButton = this.page.getByTestId(`edit-client-button-${this.createdPatientId}`);
       const editCount = await editButton.count();
       if (editCount > 0) {
-        console.log(`[DEBUG] Found edit button for patient ${this.createdPatientId} on attempt ${attempts + 1}`);
+        console.log(`[DEBUG] Found edit button for client ${this.createdPatientId} on attempt ${attempts + 1}`);
         
         // Try clicking the patient card instead - it's more reliable than the edit button
-        const patientCard = this.page.getByTestId(`patient-card-${this.createdPatientId}`);
+        const patientCard = this.page.getByTestId(`client-card-${this.createdPatientId}`);
         const cardCount = await patientCard.count();
         if (cardCount > 0) {
           try {
@@ -1275,17 +1196,16 @@ When('I click on the patient {string}', async function(patientName) {
               return true;
             }
             return false;
-          }, `edit-patient-button-${this.createdPatientId}`);
+          }, `edit-client-button-${this.createdPatientId}`);
           
           if (clicked) {
-            // Wait for navigation
-            await this.page.waitForTimeout(1000);
+            await this.page.locator('[data-testid="client-name-input"], [data-testid="client-screen"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
             const currentUrl = this.page.url();
             if (currentUrl.includes('/Patient') || currentUrl.includes('/patient')) {
               return; // Success!
             }
             // Also check for patient form
-            const nameInput = this.page.getByTestId('patient-name-input');
+            const nameInput = this.page.getByTestId('client-name-input');
             const inputCount = await nameInput.count().catch(() => 0);
             if (inputCount > 0) {
               return; // Success - we're on patient screen
@@ -1299,9 +1219,9 @@ When('I click on the patient {string}', async function(patientName) {
     }
     
     // Check if any patient cards are visible
-    const allCards = await this.page.locator('[data-testid^="patient-card-"]').count();
-    const allEditButtons = await this.page.locator('[data-testid^="edit-patient-button-"]').count();
-    console.log(`[DEBUG] Attempt ${attempts + 1}: Found ${allCards} patient cards and ${allEditButtons} edit buttons`);
+    const allCards = await this.page.locator('[data-testid^="client-card-"]').count();
+    const allEditButtons = await this.page.locator('[data-testid^="edit-client-button-"]').count();
+    console.log(`[DEBUG] Attempt ${attempts + 1}: Found ${allCards} client cards and ${allEditButtons} edit buttons`);
     
     if (allCards > 0 && allEditButtons > 0 && attempts >= 5) {
       // Patient cards are visible, but our specific patient isn't found yet
@@ -1310,13 +1230,13 @@ When('I click on the patient {string}', async function(patientName) {
     }
     
     // Wait before retrying
-    await safeWait(this.page, 500);
+    await this.page.locator('[data-testid="client-list"], [data-testid="client-form"], [data-testid="client-name-input"]').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
     attempts++;
   }
   
   // Fallback: find by patient name - try multiple approaches
   // Try clicking patient name text directly
-  const patientNameText = this.page.getByTestId(`patient-name-${patientName}`).first()
+  const patientNameText = this.page.getByTestId(`client-name-${patientName}`).first()
     .or(this.page.getByText(patientName).first());
   const nameCount = await patientNameText.count();
   if (nameCount > 0) {
@@ -1327,18 +1247,18 @@ When('I click on the patient {string}', async function(patientName) {
       await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
       return; // Success!
     } catch (e) {
-      console.log(`[DEBUG] Patient name click failed: ${e.message}`);
+      console.log(`[DEBUG] Client name click failed: ${e.message}`);
     }
   }
   
   // Try patient card by name
-  const patientCard = this.page.locator('[data-testid^="patient-card-"]').filter({ hasText: patientName }).first();
+  const patientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName }).first();
   const patientCardCount = await patientCard.count();
   if (patientCardCount > 0) {
     try {
       // Use evaluate to click programmatically - more reliable
       await this.page.evaluate((name) => {
-        const cards = Array.from(document.querySelectorAll('[data-testid^="patient-card-"]'));
+        const cards = Array.from(document.querySelectorAll('[data-testid^="client-card-"]'));
         const card = cards.find(c => c.textContent && c.textContent.includes(name));
         if (card) {
           card.click();
@@ -1361,7 +1281,7 @@ When('I click on the patient {string}', async function(patientName) {
   
   // Last resort: try edit button by ID if we have it
   if (this.createdPatientId) {
-    editButton = this.page.getByTestId(`edit-patient-button-${this.createdPatientId}`);
+    editButton = this.page.getByTestId(`edit-client-button-${this.createdPatientId}`);
     const editCountById = await editButton.count();
     if (editCountById > 0) {
       // Use evaluate to click programmatically
@@ -1371,7 +1291,7 @@ When('I click on the patient {string}', async function(patientName) {
           if (button) {
             button.click();
           }
-        }, `edit-patient-button-${this.createdPatientId}`);
+        }, `edit-client-button-${this.createdPatientId}`);
         await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
         return; // Success!
       } catch (e) {
@@ -1381,7 +1301,7 @@ When('I click on the patient {string}', async function(patientName) {
   }
   
   // Last resort: try to find patient by name and extract ID from testID, then click
-  const allPatientCards = this.page.locator('[data-testid^="patient-card-"]');
+  const allPatientCards = this.page.locator('[data-testid^="client-card-"]');
   const totalCardCount = await allPatientCards.count();
   
   for (let i = 0; i < totalCardCount; i++) {
@@ -1390,7 +1310,7 @@ When('I click on the patient {string}', async function(patientName) {
     if (cardText && cardText.includes(patientName)) {
       // Found the patient card - get its testID to extract patient ID
       const testId = await card.getAttribute('data-testid').catch(() => '');
-      const match = testId.match(/patient-card-(.+)/);
+      const match = testId.match(/client-card-(.+)/);
       if (match && match[1]) {
         const patientId = match[1];
         console.log(`[DEBUG] Found patient "${patientName}" with ID ${patientId} from card testID`);
@@ -1406,7 +1326,7 @@ When('I click on the patient {string}', async function(patientName) {
         }
         
         // Try edit button with the extracted ID
-        const editBtn = this.page.getByTestId(`edit-patient-button-${patientId}`);
+        const editBtn = this.page.getByTestId(`edit-client-button-${patientId}`);
         const editBtnCount = await editBtn.count();
         if (editBtnCount > 0) {
           try {
@@ -1415,7 +1335,7 @@ When('I click on the patient {string}', async function(patientName) {
               if (button) {
                 button.click();
               }
-            }, `edit-patient-button-${patientId}`);
+            }, `edit-client-button-${patientId}`);
             await this.page.waitForURL(url => url.pathname.includes('/Patient') || url.pathname.includes('/patient'), { timeout: 5000 });
             return; // Success!
           } catch (e) {
@@ -1427,16 +1347,16 @@ When('I click on the patient {string}', async function(patientName) {
   }
   
   // Not found - fail fast with debug info
-  const allEditButtons = await this.page.locator('[data-testid^="edit-patient-button-"]').count();
-  const allCards = await this.page.locator('[data-testid^="patient-card-"]').count();
-  throw new Error(`Could not find edit button for patient "${patientName}". Found ${allEditButtons} edit buttons and ${allCards} patient cards. Patient ID: ${this.createdPatientId || 'unknown'}`);
+  const allEditButtons = await this.page.locator('[data-testid^="edit-client-button-"]').count();
+  const allCards = await this.page.locator('[data-testid^="client-card-"]').count();
+  throw new Error(`Could not find edit button for client "${patientName}". Found ${allEditButtons} edit buttons and ${allCards} client cards. Client ID: ${this.createdPatientId || 'unknown'}`);
 });
 
-Then('I should see the patient details screen', async function() {
+Then(/I should see the (?:client|patient) details screen/, async function() {
   // Wait for navigation to patient screen
   try {
       if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       }
     } catch (e) {
       if (e.message && e.message.includes('closed')) {
@@ -1446,27 +1366,27 @@ Then('I should see the patient details screen', async function() {
   
   // Check if we're on the patient screen by looking for patient form fields
   // This is more reliable than checking URL or testID
-  let nameInput = this.page.getByTestId('patient-name-input');
+  let nameInput = this.page.getByTestId('client-name-input');
   let count = await nameInput.count();
   
   if (count === 0) {
     // Wait a bit more - navigation might still be in progress
     try {
       if (this.page && !this.page.isClosed()) {
-        await safeWait(this.page, 1000);
+        await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       }
     } catch (e) {
       if (e.message && e.message.includes('closed')) {
         throw new Error('Browser was closed during test execution');
       }
     }
-    nameInput = this.page.getByTestId('patient-name-input');
+    nameInput = this.page.getByTestId('client-name-input');
     count = await nameInput.count();
   }
   
   if (count === 0) {
-    // Try alternative - check for patient-screen testID
-    const detailsScreen = this.page.getByTestId('patient-screen');
+    // Try alternative - check for client-screen testID
+    const detailsScreen = this.page.getByTestId('client-screen');
     count = await detailsScreen.count();
   }
   
@@ -1480,7 +1400,7 @@ Then('I should see the patient details screen', async function() {
   
   // If still not found, check if patient form fields exist (email, phone inputs)
   if (count === 0) {
-    const emailInput = this.page.getByTestId('patient-email-input');
+    const emailInput = this.page.getByTestId('client-email-input');
     const emailCount = await emailInput.count();
     if (emailCount > 0) {
       count = 1; // We have patient form fields, so we're on patient screen
@@ -1502,9 +1422,9 @@ Then('I should see the patient details screen', async function() {
   expect(count).toBeGreaterThan(0);
 });
 
-Then('I should see patient name {string}', async function(expectedName) {
+Then(/I should see (?:client|patient) name "([^"]*)"/, async function(expectedName) {
   // Fast check - just verify the name input has the value
-  const nameInput = this.page.getByTestId('patient-name-input');
+  const nameInput = this.page.getByTestId('client-name-input');
   await nameInput.waitFor({ state: 'visible', timeout: 3000 });
   
   const inputValue = await nameInput.inputValue();

@@ -7,12 +7,12 @@ const mongoose = require('mongoose');
 
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Patient, Caregiver, Org, Conversation, Message, Call } = require('../../src/models');
+const { Client, Caregiver, Org, Conversation, Message, Call } = require('../../src/models');
 const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
 
 let accessToken;
-let patientId;
+let clientId;
 let orgId;
 let caregiverId;
 
@@ -43,8 +43,8 @@ beforeAll(async () => {
   await caregiver.save();
   caregiverId = caregiver._id;
 
-  const patient = new Patient({
-    name: 'Medical Test Patient',
+  const patient = new Client({
+    name: 'Medical Test Client',
     email: 'medical.patient@example.com',
     phone: '+16045624265',
     org: orgId,
@@ -52,15 +52,15 @@ beforeAll(async () => {
     isActive: true
   });
   await patient.save();
-  patientId = patient._id;
+  clientId = patient._id;
   
-  // Ensure caregiver has access to the patient
-  caregiver.patients.push(patientId);
+  // Ensure caregiver has access to the client
+  caregiver.clients.push(clientId);
   await caregiver.save();
 
   // Create test calls first (required for conversations)
   const call1 = new Call({
-    patientId: patientId,
+    clientId,
     callSid: 'medical-test-call-1',
     status: 'completed',
     direction: 'outbound',
@@ -69,7 +69,7 @@ beforeAll(async () => {
   await call1.save();
 
   const call2 = new Call({
-    patientId: patientId,
+    clientId,
     callSid: 'medical-test-call-2',
     status: 'completed',
     direction: 'outbound',
@@ -79,7 +79,7 @@ beforeAll(async () => {
 
   // Create some test conversations with medical content
   const conversation1 = new Conversation({
-    patientId: patientId,
+    clientId,
     callId: call1._id,
     callSid: 'medical-test-call-1',
     messages: [], // Will add message IDs after creating messages
@@ -96,7 +96,7 @@ beforeAll(async () => {
 
   // Create messages for conversation1
   const message1 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'I have been feeling dizzy and having headaches lately',
     messageType: 'text',
     conversationId: conversation1._id
@@ -116,7 +116,7 @@ beforeAll(async () => {
   await conversation1.save();
 
   const conversation2 = new Conversation({
-    patientId: patientId,
+    clientId,
     callId: call2._id,
     callSid: 'medical-test-call-2',
     messages: [], // Will add message IDs after creating messages
@@ -133,7 +133,7 @@ beforeAll(async () => {
 
   // Create messages for conversation2
   const message3 = new Message({
-    role: 'patient',
+    role: 'client',
     content: 'My memory has been getting worse, I keep forgetting things',
     messageType: 'text',
     conversationId: conversation2._id
@@ -163,10 +163,10 @@ afterAll(async () => {
 });
 
 describe('Medical Analysis API', () => {
-  describe('GET /medical-analysis/results/:patientId', () => {
+  describe('GET /medical-analysis/results/:clientId', () => {
     it('should return 200 and medical analysis results for a patient', async () => {
       const res = await request(app)
-        .get(`/v1/medical-analysis/results/${patientId}`)
+        .get(`/v1/medical-analysis/results/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ limit: 10 })
         .expect(httpStatus.OK);
@@ -179,7 +179,7 @@ describe('Medical Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .get(`/v1/medical-analysis/results/${patientId}`)
+        .get(`/v1/medical-analysis/results/${clientId}`)
         .expect(httpStatus.UNAUTHORIZED);
     });
 
@@ -198,10 +198,10 @@ describe('Medical Analysis API', () => {
     });
   });
 
-  describe('GET /medical-analysis/trend/:patientId', () => {
+  describe('GET /medical-analysis/trend/:clientId', () => {
     it('should return 200 and medical analysis trend for a patient', async () => {
       const res = await request(app)
-        .get(`/v1/medical-analysis/trend/${patientId}`)
+        .get(`/v1/medical-analysis/trend/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .query({ timeRange: 'month' })
         .expect(httpStatus.OK);
@@ -215,7 +215,7 @@ describe('Medical Analysis API', () => {
       
       for (const timeRange of timeRanges) {
         const res = await request(app)
-          .get(`/v1/medical-analysis/trend/${patientId}`)
+          .get(`/v1/medical-analysis/trend/${clientId}`)
           .set('Authorization', `Bearer ${accessToken}`)
           .query({ timeRange })
           .expect(httpStatus.OK);
@@ -227,15 +227,15 @@ describe('Medical Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .get(`/v1/medical-analysis/trend/${patientId}`)
+        .get(`/v1/medical-analysis/trend/${clientId}`)
         .expect(httpStatus.UNAUTHORIZED);
     });
   });
 
-  describe('GET /medical-analysis/:patientId/summary', () => {
+  describe('GET /medical-analysis/:clientId/summary', () => {
     it('should return 200 and medical analysis summary for a patient', async () => {
       const res = await request(app)
-        .get(`/v1/medical-analysis/${patientId}/summary`)
+        .get(`/v1/medical-analysis/${clientId}/summary`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.OK);
 
@@ -246,12 +246,12 @@ describe('Medical Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .get(`/v1/medical-analysis/${patientId}/summary`)
+        .get(`/v1/medical-analysis/${clientId}/summary`)
         .expect(httpStatus.UNAUTHORIZED);
     });
   });
 
-  describe('GET /medical-analysis/:patientId/baseline', () => {
+  describe('GET /medical-analysis/:clientId/baseline', () => {
     it('should return 200 and baseline data for a patient', async () => {
       // First establish a baseline
       const baselineMetrics = {
@@ -263,13 +263,13 @@ describe('Medical Analysis API', () => {
       };
 
       await request(app)
-        .post(`/v1/medical-analysis/${patientId}/baseline`)
+        .post(`/v1/medical-analysis/${clientId}/baseline`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ metrics: baselineMetrics });
 
       // Then retrieve it
       const res = await request(app)
-        .get(`/v1/medical-analysis/${patientId}/baseline`)
+        .get(`/v1/medical-analysis/${clientId}/baseline`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.OK);
 
@@ -279,15 +279,15 @@ describe('Medical Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .get(`/v1/medical-analysis/${patientId}/baseline`)
+        .get(`/v1/medical-analysis/${clientId}/baseline`)
         .expect(httpStatus.UNAUTHORIZED);
     });
   });
 
-  describe('POST /medical-analysis/trigger-patient/:patientId', () => {
+  describe('POST /medical-analysis/trigger-client/:clientId', () => {
     it('should handle trigger medical analysis for a patient (may fail due to scheduler)', async () => {
       const res = await request(app)
-        .post(`/v1/medical-analysis/trigger-patient/${patientId}`)
+        .post(`/v1/medical-analysis/trigger-client/${clientId}`)
         .set('Authorization', `Bearer ${accessToken}`);
 
       // May return 500 due to Agenda scheduler mock limitations in integration tests
@@ -302,7 +302,7 @@ describe('Medical Analysis API', () => {
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .post(`/v1/medical-analysis/trigger-patient/${patientId}`)
+        .post(`/v1/medical-analysis/trigger-client/${clientId}`)
         .expect(httpStatus.UNAUTHORIZED);
     });
 
@@ -310,7 +310,7 @@ describe('Medical Analysis API', () => {
       const nonExistentPatientId = new mongoose.Types.ObjectId();
 
       await request(app)
-        .post(`/v1/medical-analysis/trigger-patient/${nonExistentPatientId}`)
+        .post(`/v1/medical-analysis/trigger-client/${nonExistentPatientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.NOT_FOUND);
     });
@@ -359,7 +359,7 @@ describe('Medical Analysis API', () => {
     });
   });
 
-  describe('POST /medical-analysis/:patientId/baseline', () => {
+  describe('POST /medical-analysis/:clientId/baseline', () => {
     it('should establish baseline for a patient', async () => {
       const baselineMetrics = {
         vocabularyScore: 85,
@@ -370,20 +370,20 @@ describe('Medical Analysis API', () => {
       };
 
       const res = await request(app)
-        .post(`/v1/medical-analysis/${patientId}/baseline`)
+        .post(`/v1/medical-analysis/${clientId}/baseline`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ metrics: baselineMetrics })
         .expect(httpStatus.OK);
 
       expect(res.body).toHaveProperty('success', true);
       expect(res.body).toHaveProperty('data');
-      expect(res.body.data).toHaveProperty('patientId');
+      expect(res.body.data).toHaveProperty('clientId');
       expect(res.body.data).toHaveProperty('metrics');
     });
 
     it('should return 401 without authentication', async () => {
       await request(app)
-        .post(`/v1/medical-analysis/${patientId}/baseline`)
+        .post(`/v1/medical-analysis/${clientId}/baseline`)
         .expect(httpStatus.UNAUTHORIZED);
     });
   });

@@ -1,38 +1,38 @@
 #!/usr/bin/env node
 
 /**
- * Fix Caregiver-Patient Relationship Script
+ * Fix Caregiver-Client Relationship Script
  * Ensures bidirectional relationship exists for emergency alerts
  * 
- * Usage: node src/scripts/fix-caregiver-relationship.js <patientId> <caregiverId>
- * Or: node src/scripts/fix-caregiver-relationship.js <patientEmail> <caregiverEmail>
+ * Usage: node src/scripts/fix-caregiver-relationship.js <clientId> <caregiverId>
+ * Or: node src/scripts/fix-caregiver-relationship.js <clientEmail> <caregiverEmail>
  */
 
 const mongoose = require('mongoose');
 const config = require('../config/config');
-const { Patient, Caregiver } = require('../models');
-const { assignCaregiver } = require('../services/patient.service');
+const { Client, Caregiver } = require('../models');
+const { assignCaregiver } = require('../services/client.service');
 const logger = require('../config/logger');
 
-async function fixRelationship(patientIdOrEmail, caregiverIdOrEmail) {
-  console.log('\n=== Fixing Caregiver-Patient Relationship ===\n');
+async function fixRelationship(clientIdOrEmail, caregiverIdOrEmail) {
+  console.log('\n=== Fixing Caregiver-Client Relationship ===\n');
   
   try {
-    // Find patient
-    let patient;
-    if (mongoose.Types.ObjectId.isValid(patientIdOrEmail)) {
-      patient = await Patient.findById(patientIdOrEmail);
+    // Find client
+    let client;
+    if (mongoose.Types.ObjectId.isValid(clientIdOrEmail)) {
+      client = await Client.findById(clientIdOrEmail);
     } else {
-      patient = await Patient.findOne({ email: patientIdOrEmail });
+      client = await Client.findOne({ email: clientIdOrEmail });
     }
     
-    if (!patient) {
-      console.log('❌ Patient not found:', patientIdOrEmail);
+    if (!client) {
+      console.log('❌ Client not found:', clientIdOrEmail);
       return;
     }
-    console.log('✅ Patient found:', patient.name || patient.preferredName || patient.email);
-    console.log(`   - ID: ${patient._id}`);
-    console.log(`   - Current caregivers: ${patient.caregivers?.length || 0}`);
+    console.log('✅ Client found:', client.name || client.preferredName || client.email);
+    console.log(`   - ID: ${client._id}`);
+    console.log(`   - Current caregivers: ${client.caregivers?.length || 0}`);
     
     // Find caregiver
     let caregiver;
@@ -49,21 +49,21 @@ async function fixRelationship(patientIdOrEmail, caregiverIdOrEmail) {
     console.log('✅ Caregiver found:', caregiver.name || caregiver.email);
     console.log(`   - ID: ${caregiver._id}`);
     console.log(`   - Phone: ${caregiver.phone || 'MISSING'}`);
-    console.log(`   - Current patients: ${caregiver.patients?.length || 0}`);
+    console.log(`   - Current clients: ${caregiver.clients?.length || 0}`);
     
     // Check if relationship exists
-    const patientHasCaregiver = patient.caregivers?.some(
+    const clientHasCaregiver = client.caregivers?.some(
       cg => cg.toString() === caregiver._id.toString()
     );
-    const caregiverHasPatient = caregiver.patients?.some(
-      pt => pt.toString() === patient._id.toString()
+    const caregiverHasClient = caregiver.clients?.some(
+      c => c.toString() === client._id.toString()
     );
     
     console.log('\n📊 Current Relationship Status:');
-    console.log(`   - Patient has caregiver: ${patientHasCaregiver ? '✅' : '❌'}`);
-    console.log(`   - Caregiver has patient: ${caregiverHasPatient ? '✅' : '❌'}`);
+    console.log(`   - Client has caregiver: ${clientHasCaregiver ? '✅' : '❌'}`);
+    console.log(`   - Caregiver has client: ${caregiverHasClient ? '✅' : '❌'}`);
     
-    if (patientHasCaregiver && caregiverHasPatient) {
+    if (clientHasCaregiver && caregiverHasClient) {
       console.log('\n✅ Relationship is already bidirectional!');
       
       // Check if caregiver has phone
@@ -80,25 +80,24 @@ async function fixRelationship(patientIdOrEmail, caregiverIdOrEmail) {
     // Fix the relationship
     console.log('\n🔧 Fixing relationship...');
     
-    // Use the assignCaregiver service method which ensures bidirectional relationship
-    await assignCaregiver(caregiver._id, patient._id);
+    await assignCaregiver(caregiver._id, client._id);
     
     // Verify it worked
-    await patient.populate('caregivers');
-    await caregiver.populate('patients');
+    await client.populate('caregivers');
+    await caregiver.populate('clients');
     
-    const patientHasCaregiverAfter = patient.caregivers?.some(
+    const clientHasCaregiverAfter = client.caregivers?.some(
       cg => cg._id.toString() === caregiver._id.toString()
     );
-    const caregiverHasPatientAfter = caregiver.patients?.some(
-      pt => pt._id.toString() === patient._id.toString()
+    const caregiverHasClientAfter = caregiver.clients?.some(
+      c => c._id.toString() === client._id.toString()
     );
     
     console.log('\n📊 Relationship After Fix:');
-    console.log(`   - Patient has caregiver: ${patientHasCaregiverAfter ? '✅' : '❌'}`);
-    console.log(`   - Caregiver has patient: ${caregiverHasPatientAfter ? '✅' : '❌'}`);
+    console.log(`   - Client has caregiver: ${clientHasCaregiverAfter ? '✅' : '❌'}`);
+    console.log(`   - Caregiver has client: ${caregiverHasClientAfter ? '✅' : '❌'}`);
     
-    if (patientHasCaregiverAfter && caregiverHasPatientAfter) {
+    if (clientHasCaregiverAfter && caregiverHasClientAfter) {
       console.log('\n✅ Relationship fixed successfully!');
       
       if (!caregiver.phone) {
@@ -114,7 +113,7 @@ async function fixRelationship(patientIdOrEmail, caregiverIdOrEmail) {
     // Test emergency processor
     console.log('\n🧪 Testing emergency processor...');
     const { emergencyProcessor } = require('../services/emergencyProcessor.service');
-    const caregivers = await emergencyProcessor.getPatientCaregivers(patient._id);
+    const caregivers = await emergencyProcessor.getClientCaregivers(client._id);
     console.log(`   Found ${caregivers.length} caregiver(s) with phone numbers`);
     
     if (caregivers.length === 0) {
@@ -139,12 +138,12 @@ async function fixRelationship(patientIdOrEmail, caregiverIdOrEmail) {
 }
 
 // Main execution
-const patientIdOrEmail = process.argv[2];
+const clientIdOrEmail = process.argv[2];
 const caregiverIdOrEmail = process.argv[3];
 
-if (!patientIdOrEmail || !caregiverIdOrEmail) {
-  console.error('Usage: node src/scripts/fix-caregiver-relationship.js <patientId/Email> <caregiverId/Email>');
-  console.error('Example: node src/scripts/fix-caregiver-relationship.js patient@example.com caregiver@example.com');
+if (!clientIdOrEmail || !caregiverIdOrEmail) {
+  console.error('Usage: node src/scripts/fix-caregiver-relationship.js <clientId/Email> <caregiverId/Email>');
+  console.error('Example: node src/scripts/fix-caregiver-relationship.js client@example.com caregiver@example.com');
   process.exit(1);
 }
 
@@ -152,7 +151,7 @@ if (!patientIdOrEmail || !caregiverIdOrEmail) {
 mongoose.connect(config.mongoose.url, config.mongoose.options)
   .then(() => {
     console.log('Connected to MongoDB');
-    return fixRelationship(patientIdOrEmail, caregiverIdOrEmail);
+    return fixRelationship(clientIdOrEmail, caregiverIdOrEmail);
   })
   .catch((error) => {
     console.error('Failed to connect to MongoDB:', error);

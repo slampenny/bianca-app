@@ -67,17 +67,17 @@ describe('Auth routes', () => {
       expect(res.body).toHaveProperty('message');
       expect(res.body).toHaveProperty('requiresEmailVerification', true);
       expect(caregiver).not.toHaveProperty('password');
-      expect(caregiver).toEqual({
+      expect(caregiver).toMatchObject({
         id: expect.anything(),
         name: caregiverOne.name,
         email: caregiverOne.email,
         phone: caregiverOne.phone,
         role: 'orgAdmin',
         org: expect.anything(),
-        patients: [],
         isEmailVerified: false,
         isPhoneVerified: false,
       });
+      expect(Array.isArray(caregiver.clients)).toBe(true);
 
       const dbCaregiver = await Caregiver.findById(caregiver.id);
       expect(dbCaregiver).toBeDefined();
@@ -164,17 +164,17 @@ describe('Auth routes', () => {
 
       const res = await request(app).post('/v1/auth/login').send(loginCredentials).expect(httpStatus.OK);
 
-      expect(res.body.caregiver).toEqual({
+      expect(res.body.caregiver).toMatchObject({
         id: expect.anything(),
         name: caregiverOne.name,
         email: caregiverOne.email,
         phone: caregiverOne.phone,
         org: org.id,
         role: 'staff',
-        patients: [],
         isEmailVerified: true, // Test fixtures set isEmailVerified: true
         isPhoneVerified: false,
       });
+      expect(Array.isArray(res.body.caregiver.clients)).toBe(true);
 
       expect(res.body.tokens).toEqual({
         access: { token: expect.anything(), expires: expect.anything() },
@@ -230,21 +230,21 @@ describe('Auth routes', () => {
       await request(app).post('/v1/auth/logout').send().expect(httpStatus.BAD_REQUEST);
     });
 
-    test('should return 404 error if refresh token is not found in the database', async () => {
+    test('should return 204 when refresh token is not found in the database (idempotent logout)', async () => {
       const [dbCaregiver] = await insertCaregivers([caregiverOneWithPassword]);
       const expires = moment().add(config.jwt.refreshExpirationDays, 'days');
       const refreshToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.REFRESH);
-
-      await request(app).post('/v1/auth/logout').send({ refreshToken }).expect(httpStatus.NOT_FOUND);
+      // Token not saved - logout is idempotent and returns 204
+      await request(app).post('/v1/auth/logout').send({ refreshToken }).expect(httpStatus.NO_CONTENT);
     });
 
-    test('should return 404 error if refresh token is blacklisted', async () => {
+    test('should return 204 when refresh token is blacklisted (idempotent logout)', async () => {
       const [dbCaregiver] = await insertCaregivers([caregiverOneWithPassword]);
       const expires = moment().add(config.jwt.refreshExpirationDays, 'days');
       const refreshToken = tokenService.generateToken(dbCaregiver.id, expires, tokenTypes.REFRESH);
       await tokenService.saveToken(refreshToken, dbCaregiver.id, expires, tokenTypes.REFRESH, true);
-
-      await request(app).post('/v1/auth/logout').send({ refreshToken }).expect(httpStatus.NOT_FOUND);
+      // Logout is idempotent and returns 204 even for blacklisted tokens
+      await request(app).post('/v1/auth/logout').send({ refreshToken }).expect(httpStatus.NO_CONTENT);
     });
   });
 

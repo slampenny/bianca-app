@@ -6,20 +6,20 @@
  * To suppress it, run tests with: yarn test --forceExit
  */
 import { EnhancedStore } from "@reduxjs/toolkit"
-import { orgApi, patientApi, scheduleApi } from "../" // Adjust the import path to your scheduleApi
+import { orgApi, clientApi, scheduleApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
 import { newSchedule } from "../../../../test/fixtures/schedule.fixture"
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
-import { registerNewOrgAndCaregiver, createPatientInOrg } from "../../../../test/helpers"
-import { Org, Schedule, Patient } from "../api.types"
+import { registerNewOrgAndCaregiver, createClientInOrg } from "../../../../test/helpers"
+import { Org, Schedule, Client } from "../api.types"
 
 describe("scheduleApi", () => {
   let store: EnhancedStore<RootState>
-  let patient: Patient
+  let client: Client
   let schedule: Schedule
   let org: Org
   let orgId: string
-  let patientId: string
+  let clientId: string
   let scheduleId: string
 
   beforeEach(async () => {
@@ -34,20 +34,16 @@ describe("scheduleApi", () => {
     org = response.org
     orgId = response.org.id as string
 
-    const result = (await createPatientInOrg(
+    const result = await createClientInOrg(
       org,
       testCaregiver.email,
       testCaregiver.password,
-    )) as Patient
-    if ("error" in result) {
-      throw new Error(`Create patient failed with error: ${JSON.stringify(result.error)}`)
-    } else {
-      patient = result
-      patientId = patient.id as string
-    }
+    )
+    client = result
+    clientId = client.id as string
 
     const resultSchedule = await scheduleApi.endpoints.createSchedule.initiate({
-      patientId,
+      clientId,
       data: newSchedule(),
     })(store.dispatch, store.getState, {})
     if ("data" in resultSchedule && resultSchedule.data) {
@@ -75,7 +71,7 @@ describe("scheduleApi", () => {
     }
 
     const result = await scheduleApi.endpoints.createSchedule.initiate({
-      patientId,
+      clientId,
       data: newSchedulePayload,
     })(store.dispatch, store.getState, {})
 
@@ -92,46 +88,39 @@ describe("scheduleApi", () => {
         time: newSchedulePayload.time,
       })
 
-      // Wait a bit for the patient document to be updated with the new schedule
+      // Wait a bit for the client document to be updated with the new schedule
       // Use a shorter delay to avoid cleanup warnings
       await new Promise(resolve => setTimeout(resolve, 300))
       
-      // Fetch the patient again to get updated schedules
-      const resultPatient = await patientApi.endpoints.getPatient.initiate({ id: patientId })(
+      // Fetch the client again to get updated schedules
+      const resultClient = await clientApi.endpoints.getClient.initiate({ id: clientId })(
         store.dispatch,
         store.getState,
         {},
       )
-      if ("data" in resultPatient && resultPatient.data) {
-        // The patient should have a schedules property (even if empty initially)
-        // If schedules exists, verify it contains our new schedule
-        if (resultPatient.data.schedules && Array.isArray(resultPatient.data.schedules)) {
-          // Find the schedule we just created by matching frequency and time
-          const createdSchedule = resultPatient.data.schedules.find(
-            (s: Schedule) => s.frequency === newSchedulePayload.frequency && s.time === newSchedulePayload.time
-          )
-          
-          expect(createdSchedule).toBeDefined()
-          if (createdSchedule) {
-            expect(createdSchedule).toMatchObject({
-              id: expect.any(String),
-              frequency: newSchedulePayload.frequency,
-              intervals: expect.arrayContaining([
-                expect.objectContaining({
-                  day: 3,
-                  weeks: 1,
-                }),
-              ]),
-              time: newSchedulePayload.time,
-            })
-          }
-        } else {
-          // If schedules is not in the response, that's okay - the schedule was still created successfully
-          // We've already verified the schedule creation above, so this is just a bonus check
-          console.warn('Patient response does not include schedules array - schedule was still created successfully')
+      if ("data" in resultClient && resultClient.data) {
+        // Client GET response must include schedules (backend getClientById populates schedules)
+        expect(resultClient.data.schedules).toBeDefined()
+        expect(Array.isArray(resultClient.data.schedules)).toBe(true)
+        const createdSchedule = resultClient.data.schedules.find(
+          (s: Schedule) => s.frequency === newSchedulePayload.frequency && s.time === newSchedulePayload.time
+        )
+        expect(createdSchedule).toBeDefined()
+        if (createdSchedule) {
+          expect(createdSchedule).toMatchObject({
+            id: expect.any(String),
+            frequency: newSchedulePayload.frequency,
+            intervals: expect.arrayContaining([
+              expect.objectContaining({
+                day: 3,
+                weeks: 1,
+              }),
+            ]),
+            time: newSchedulePayload.time,
+          })
         }
       } else {
-        throw new Error(`Get patient failed: ${JSON.stringify(resultPatient.error || 'Unknown error')}`)
+        throw new Error(`Get client failed: ${JSON.stringify(resultClient.error || 'Unknown error')}`)
       }
     } else {
       throw new Error(`Create schedule failed with error: ${JSON.stringify(result)}`)
@@ -191,7 +180,6 @@ describe("scheduleApi", () => {
       store.getState,
       {},
     )
-    console.log(`result: ${JSON.stringify(result)}`)
     if ("data" in result) {
       expect(result.data).toBeNull()
     } else {

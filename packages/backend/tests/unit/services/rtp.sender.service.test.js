@@ -11,6 +11,18 @@ jest.mock('dgram', () => ({
   createSocket: jest.fn(() => mockSocket)
 }));
 
+// Mock logger to avoid expected error/warn output when tests trigger error paths (socket errors, etc.)
+jest.mock('../../../src/config/logger', () => {
+  const noop = () => {};
+  return {
+    info: jest.fn(noop),
+    warn: jest.fn(noop),
+    error: jest.fn(noop),
+    debug: jest.fn(noop),
+    child: jest.fn(function () { return this; }),
+  };
+});
+
 const dgram = require('dgram');
 const { Buffer } = require('buffer');
 const EventEmitter = require('events');

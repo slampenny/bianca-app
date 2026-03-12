@@ -114,6 +114,7 @@ const palette = {
   biancaSuccessBackground: "#D1FAE5",   // Solid light green background (was rgba) - meets WCAG AA
   biancaExplanation: "#737373",          // Modern warm gray
   biancaBorder: "#E5E5E5",              // Modern warm gray border
+  biancaPrimary: "#6366F1",             // Same as primary500 for compatibility
 
   // Legacy angry colors (for backward compatibility)
   angry100: "#FEE2E2",        // Updated to match error100

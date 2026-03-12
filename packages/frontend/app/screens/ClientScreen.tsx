@@ -15,15 +15,15 @@ import AvatarPicker from "../components/AvatarPicker"
 import { CaregiverAssignmentModal } from "../components/CaregiverAssignmentModal"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
-import { getPatient, setPatient, setPatientsForCaregiver, getPatientsForCaregiver } from "../store/patientSlice"
+import { getClient, setClient, setClientsForCaregiver, getClientsForCaregiver } from "../store/clientSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { store } from "../store/store"
 import {
-  useCreatePatientMutation,
-  useUpdatePatientMutation,
-  useDeletePatientMutation,
-  useUploadPatientAvatarMutation,
-} from "../services/api/patientApi"
+  useCreateClientMutation,
+  useUpdateClientMutation,
+  useDeleteClientMutation,
+  useUploadClientAvatarMutation,
+} from "../services/api/clientApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
 import { Button, TextField, PhoneInputWeb } from "app/components"
@@ -53,10 +53,10 @@ const extractErrorMessage = (error: any): string => {
   return "An unknown error occurred."
 }
 
-function PatientScreen() {
+function ClientScreen() {
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
   const dispatch = useDispatch()
-  const patient = useSelector(getPatient)
+  const client = useSelector(getClient)
   const { colors, isLoading: themeLoading } = useTheme()
 
   // Local form data state
@@ -76,36 +76,38 @@ function PatientScreen() {
 
   // Ref to store the timeout ID
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => { isMountedRef.current = false }
+  }, [])
+
   // Get current user for role-based access control
   const currentUser = useSelector(getCurrentUser)
   
-  // Check if user has permission to create or edit patients
-  const canCreateOrEditPatient = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
-  
-  // Check if user has permission to manage caregivers
+  // Check if user has permission to create or edit clients
+  const canCreateOrEditClient = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
   const canManageCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
 
-  // --- RTK Query Hooks ---
-  const [updatePatient, { isLoading: isUpdating, error: updateError }] = useUpdatePatientMutation()
-  const [createPatient, { isLoading: isCreating, error: createError }] = useCreatePatientMutation()
-  const [deletePatient, { isLoading: isDeleting, error: deleteError }] = useDeletePatientMutation()
+  const [updateClient, { isLoading: isUpdating, error: updateError }] = useUpdateClientMutation()
+  const [createClient, { isLoading: isCreating, error: createError }] = useCreateClientMutation()
+  const [deleteClient, { isLoading: isDeleting, error: deleteError }] = useDeleteClientMutation()
   const [uploadAvatar, { isLoading: isUploading, error: uploadError }] =
-    useUploadPatientAvatarMutation()
+    useUploadClientAvatarMutation()
 
   // --- Effects ---
 
-  // Sync local form data with Redux patient whenever it changes
+  // Sync local form data with Redux client whenever it changes
   useEffect(() => {
-    if (patient) {
-      setName(patient.name)
-      setEmail(patient.email)
+    if (client) {
+      setName(client.name)
+      setEmail(client.email)
       // Format phone number for display (remove +1 country code if present)
-      const formattedPhone = patient.phone?.replace(/^\+1/, '').replace(/\D/g, '')
+      const formattedPhone = client.phone?.replace(/^\+1/, '').replace(/\D/g, '')
       setPhone(formattedPhone || '')
-      setAvatar(patient.avatar || defaultAvatarUrl) // Ensure default if avatar is null/empty
-      setPreferredLanguage(patient.preferredLanguage || DEFAULT_LANGUAGE)
-      // Reset errors and success message when patient changes
+      setAvatar(client.avatar || defaultAvatarUrl) // Ensure default if avatar is null/empty
+      setPreferredLanguage(client.preferredLanguage || DEFAULT_LANGUAGE)
+      // Reset errors and success message when client changes
       setEmailError("")
       setPhoneError("")
       setApiError("")
@@ -113,7 +115,7 @@ function PatientScreen() {
       setAvatarBlob(undefined) // Clear any previously selected blob
       setConfirmDelete(false) // Reset delete confirmation
     } else {
-      // Reset form for new patient
+      // Reset form for new client
       setName("")
       setEmail("")
       setPhone("")
@@ -126,7 +128,7 @@ function PatientScreen() {
       setAvatarBlob(undefined)
       setConfirmDelete(false)
     }
-  }, [patient])
+  }, [client])
 
   // Effect to clear the success message after a delay
   useEffect(() => {
@@ -195,20 +197,20 @@ function PatientScreen() {
   }
 
   const handleDelete = () => {
-    if (confirmDelete && patient && patient.id) {
+    if (confirmDelete && client && client.id) {
       // Use async/await to avoid race conditions
-      deletePatient({ id: patient.id })
+      void deleteClient({ id: client.id })
         .unwrap()
         .then(() => {
           // Check if component is still mounted before updating state
-          if (isMounted()) {
-            dispatch(setPatient(null)) // Clear patient from Redux
-            navigation.navigate("Home") // Navigate away on delete
+          if (isMountedRef.current) {
+            dispatch(setClient(null))
+            ;(navigation as { navigate: (name: string) => void }).navigate("Home") // Navigate away on delete
           }
         })
-        .catch((err) => {
-          if (isMounted()) {
-            logger.error("Delete Patient Error", err)
+        .catch((err: unknown) => {
+          if (isMountedRef.current) {
+            logger.error("Delete Client Error", err)
             // Error handled by the useEffect hook for deleteError
           }
         })
@@ -237,28 +239,27 @@ function PatientScreen() {
     }
 
     try {
-      if (patient && patient.id) {
-        // --- Existing patient update flow ---
-        const updatedPatientData = {
-          id: patient.id, // Keep the ID separate for the update mutation argument
-          patient: {
-            // Patient data object for the payload
-            ...patient, // Spread existing patient data first
+      if (client && client.id) {
+        // --- Existing client update flow ---
+        const updatedClientData = {
+          id: client.id,
+          client: {
+            ...client,
             name,
             email,
             phone,
             preferredLanguage,
-            avatar: patient.avatar, // Start with the current avatar
+            avatar: client.avatar,
           },
         }
 
         // 1. Upload Avatar if changed
-        let uploadedAvatarUrl = patient.avatar // Keep track of the potentially new URL
-        if (avatar !== patient.avatar && avatarBlob) {
+        let uploadedAvatarUrl = client.avatar // Keep track of the potentially new URL
+        if (avatar !== client.avatar && avatarBlob) {
           try {
-            const uploadResult = await uploadAvatar({ id: patient.id, avatar: avatarBlob }).unwrap()
+            const uploadResult = await uploadAvatar({ id: client.id, avatar: avatarBlob }).unwrap()
             uploadedAvatarUrl = uploadResult.avatar // Get the new URL from backend
-            updatedPatientData.patient.avatar = uploadedAvatarUrl // Update payload
+            updatedClientData.client.avatar = uploadedAvatarUrl // Update payload
             setAvatarBlob(undefined) // Clear the blob after successful upload
           } catch (err) {
             logger.error("Avatar upload error during update:", err)
@@ -266,19 +267,19 @@ function PatientScreen() {
             // Optionally set a specific message: setApiError(`Avatar upload failed: ${extractErrorMessage(err)}`);
             return // Stop the save process if avatar upload fails
           }
-        } else if (avatar !== patient.avatar && !avatarBlob) {
+        } else if (avatar !== client.avatar && !avatarBlob) {
           // Handle case where user picked a new avatar from gallery *then* maybe cleared it or encountered an issue getting blob
           // This might mean reverting to the default or previous avatar depending on UX choice
           // For now, let's assume if URI changed but no blob, we keep the *original* avatar from redux state
-          updatedPatientData.patient.avatar = patient.avatar
+          updatedClientData.client.avatar = client.avatar
           // Optionally, reset the displayed avatar URI back to original
-          // setAvatar(patient.avatar);
+          // setAvatar(client.avatar);
         }
 
-        // 2. Update Patient Data (including potentially new avatar URL)
-        const result = await updatePatient(updatedPatientData).unwrap()
-        dispatch(setPatient(result)) // Update Redux with the final patient data
-        setSuccessMessage("Patient updated successfully!") // Show success message
+        // 2. Update Client Data (including potentially new avatar URL)
+        const result = await updateClient(updatedClientData).unwrap()
+        dispatch(setClient(result))
+        setSuccessMessage("Client updated successfully!")
         
         // Clear any existing timeout
         if (successTimeoutRef.current) {
@@ -287,93 +288,74 @@ function PatientScreen() {
         
         // Navigate back to home screen after successful update
         successTimeoutRef.current = setTimeout(() => {
-          navigation.navigate("Home")
+          (navigation.navigate as (name: string) => void)("Home")
           successTimeoutRef.current = null
         }, TIMEOUTS.NAVIGATION_DELAY)
       } else {
-        // --- New patient creation flow ---
-
-        // 1. Create Patient record (potentially without final avatar URL yet)
-        console.log('[PATIENT SCREEN] Creating patient with data:', { name, email, phone, preferredLanguage })
-        const createdPatient = await createPatient({
-          patient: {
-            // id is assigned by backend
+        // --- New client creation flow ---
+        console.log('[CLIENT SCREEN] Creating client with data:', { name, email, phone, preferredLanguage })
+        const createdClient = await createClient({
+          client: {
             name,
             email,
             phone,
             preferredLanguage,
-            // Send undefined for avatar if not set, to match type expectations
-            avatar: undefined, // Or defaultAvatarUrl - depends on backend logic
+            avatar: undefined,
           },
         }).unwrap()
-        console.log('[PATIENT SCREEN] Patient created, response:', JSON.stringify(createdPatient, null, 2))
-        console.log('[PATIENT SCREEN] Created patient caregivers array:', createdPatient.caregivers)
+        console.log('[CLIENT SCREEN] Client created, response:', JSON.stringify(createdClient, null, 2))
+        console.log('[CLIENT SCREEN] Created client caregivers array:', createdClient.caregivers)
+        let finalClient = createdClient
 
-        let finalPatient = createdPatient // This holds the patient data *after* creation
-
-        // 2. Upload Avatar if selected for the new patient
-        if (avatarBlob && createdPatient.id) {
+        // 2. Upload Avatar if selected for the new client
+        if (avatarBlob && createdClient.id) {
           try {
             const uploadResult = await uploadAvatar({
-              id: createdPatient.id,
+              id: createdClient.id,
               avatar: avatarBlob,
             }).unwrap()
             if (uploadResult && uploadResult.avatar) {
-              // 3. Update the newly created patient record with the final avatar URL
-              finalPatient = await updatePatient({
-                id: createdPatient.id,
-                patient: { ...createdPatient, avatar: uploadResult.avatar }, // Update only avatar field
+              // 3. Update the newly created client record with the final avatar URL
+              finalClient = await updateClient({
+                id: createdClient.id,
+                client: { ...createdClient, avatar: uploadResult.avatar }, // Update only avatar field
               }).unwrap()
               setAvatarBlob(undefined) // Clear blob after successful upload and final update
             }
           } catch (err) {
             logger.error("Avatar upload/update error during create:", err)
-            // Error captured by hooks. Patient *might* be created without avatar.
-            // Inform the user the main record was created but avatar failed.
-            setApiError(`Patient created, but avatar upload failed: ${extractErrorMessage(err)}`)
-            // Dispatch the patient *without* the failed avatar
-            dispatch(setPatient(finalPatient))
+            setApiError(`Client created, but avatar upload failed: ${extractErrorMessage(err)}`)
+            dispatch(setClient(finalClient))
             // Still show partial success, but with error context
             return // Stop further processing in this block
           }
         }
 
-        // 4. Update Redux with the final patient data (either with or without uploaded avatar)
-        console.log('[PATIENT SCREEN] Dispatching setPatient with:', JSON.stringify(finalPatient, null, 2))
-        dispatch(setPatient(finalPatient))
-        
-        // 5. Ensure patient is added to current user's patient list
+        console.log('[CLIENT SCREEN] Dispatching setClient with:', JSON.stringify(finalClient, null, 2))
+        dispatch(setClient(finalClient))
         // The reducer and onQueryStarted callback should handle this via the caregivers array
         // But as a fallback, we'll also add it here if the caregivers array includes the current user
-        console.log('[PATIENT SCREEN] Current user:', currentUser?.id, currentUser?.name)
-        console.log('[PATIENT SCREEN] Final patient caregivers:', finalPatient.caregivers)
-        if (currentUser && currentUser.id && finalPatient) {
+        console.log('[CLIENT SCREEN] Current user:', currentUser?.id, currentUser?.name)
+        console.log('[CLIENT SCREEN] Final client caregivers:', finalClient.caregivers)
+        if (currentUser && currentUser.id && finalClient) {
           // Get current state from store
           const state = store.getState()
-          const userPatients = getPatientsForCaregiver(state, currentUser.id)
-          console.log(`[PATIENT SCREEN] Current user ${currentUser.id} has ${userPatients.length} patients in Redux`)
-          console.log(`[PATIENT SCREEN] Current user patient IDs:`, userPatients.map(p => p.id))
-          
-          const existingIndex = userPatients.findIndex((p) => p.id === finalPatient.id)
+          const userClients = getClientsForCaregiver(state, currentUser.id)
+          console.log(`[CLIENT SCREEN] Current user ${currentUser.id} has ${userClients.length} clients in Redux`)
+          const existingIndex = userClients.findIndex((p) => p.id === finalClient.id)
           if (existingIndex === -1) {
-            console.log(`[PATIENT SCREEN] Patient ${finalPatient.id} not in Redux, adding it...`)
-            dispatch(setPatientsForCaregiver({
+            dispatch(setClientsForCaregiver({
               caregiverId: currentUser.id,
-              patients: [...userPatients, finalPatient],
+              clients: [...userClients, finalClient],
             }))
             // Check state after dispatch
             const newState = store.getState()
-            const newUserPatients = getPatientsForCaregiver(newState, currentUser.id)
-            console.log(`[PATIENT SCREEN] After dispatch, user ${currentUser.id} has ${newUserPatients.length} patients`)
-            console.log(`[PATIENT SCREEN] After dispatch, patient IDs:`, newUserPatients.map(p => p.id))
-          } else {
-            console.log(`[PATIENT SCREEN] Patient ${finalPatient.id} already in Redux at index ${existingIndex}`)
+            const newUserClients = getClientsForCaregiver(newState, currentUser.id)
+            console.log(`[CLIENT SCREEN] After dispatch, user ${currentUser.id} has ${newUserClients.length} clients`)
           }
-        } else {
-          console.log('[PATIENT SCREEN] Cannot add patient - missing currentUser or finalPatient')
         }
         
-        setSuccessMessage("Patient created successfully!") // Show success message
+        setSuccessMessage("Client created successfully!")
         
         // Clear any existing timeout
         if (successTimeoutRef.current) {
@@ -381,10 +363,10 @@ function PatientScreen() {
         }
         
         // Navigate to schedule screen after successful creation (immediately, no delay)
-        navigation.navigate("Schedule", { isNewPatient: true })
+        navigation.navigate("Schedule", { isNewClient: true })
       }
     } catch (error) {
-      // Errors from createPatient or updatePatient are caught here
+      // Errors from createClient or updateClient are caught here
       // These are already handled by the RTK Query error states and the useEffect hook
       console.error("Overall Save/Create Error", error)
       // setApiError is handled by the useEffect listening to mutation errors
@@ -393,13 +375,13 @@ function PatientScreen() {
 
   // --- Navigation Handlers ---
   const handleManageSchedules = () => {
-    if (patient && patient.id) {
+    if (client && client.id) {
       navigation.navigate("Schedule") // Assuming "Schedule" is a valid route name
     }
   }
 
   const handleManageConversations = () => {
-    if (patient && patient.id) {
+    if (client && client.id) {
       navigation.navigate("Conversations") // Assuming "Conversations" is a valid route name
     }
   }
@@ -417,13 +399,13 @@ function PatientScreen() {
       <LoadingScreen
         message={
           isCreating
-            ? "Creating Patient..."
+            ? "Creating Client..."
             : isUploading
             ? "Uploading Avatar..."
             : isUpdating
             ? "Saving Changes..."
             : isDeleting
-            ? "Deleting Patient..."
+            ? "Deleting Client..."
             : "Loading..."
         }
       />
@@ -436,13 +418,13 @@ function PatientScreen() {
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
-        accessibilityLabel="patient-screen"
-        testID="patient-screen"
+        accessibilityLabel="client-screen"
+        testID="client-screen"
       >
         {/* Display Success Message */}
-        {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+        {successMessage ? <Text style={styles.success} testID="client-saved">{successMessage}</Text> : null}
 
-        <View style={styles.formCard}>
+        <View style={styles.formCard} testID="client-avatar-picker">
           <AvatarPicker
             // Use local avatar state which defaults correctly
             initialAvatar={avatar}
@@ -450,26 +432,26 @@ function PatientScreen() {
           />
 
           <TextField
-            label={translate("patientScreen.nameLabel")}
-            placeholder={translate("patientScreen.namePlaceholder")}
+            label={translate("clientScreen.nameLabel")}
+            placeholder={translate("clientScreen.namePlaceholder")}
             value={name}
             onChangeText={handleNameChange}
             onFocus={clearMessages}
-            testID="patient-name-input"
+            testID="client-name-input"
             containerStyle={styles.inputContainer}
             inputWrapperStyle={styles.inputWrapper}
             style={styles.input}
           />
 
           <TextField
-            label={translate("patientScreen.emailLabel")}
-            placeholder={translate("patientScreen.emailPlaceholder")}
+            label={translate("clientScreen.emailLabel")}
+            placeholder={translate("clientScreen.emailPlaceholder")}
             value={email}
             onChangeText={validateEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             onFocus={clearMessages}
-            testID="patient-email-input"
+            testID="client-email-input"
             status={emailError ? "error" : undefined}
             helper={emailError || undefined}
             containerStyle={styles.inputContainer}
@@ -481,12 +463,12 @@ function PatientScreen() {
           {apiError ? <Text style={styles.apiError}>{apiError}</Text> : null}
 
           <PhoneInputWeb
-            label={translate("patientScreen.phoneLabel")}
-            placeholder={translate("patientScreen.phonePlaceholder")}
+            label={translate("clientScreen.phoneLabel")}
+            placeholder={translate("clientScreen.phonePlaceholder")}
             value={phone}
             onChangeText={validatePhone}
             onFocus={clearMessages}
-            testID="patient-phone-input"
+            testID="client-phone-input"
             status={phoneError ? "error" : undefined}
             helper={phoneError || undefined}
             containerStyle={styles.inputContainer}
@@ -496,7 +478,7 @@ function PatientScreen() {
 
           {/* Language Picker Field */}
           <View style={styles.inputContainer}>
-            <Text style={styles.fieldLabel}>{translate("patientScreen.preferredLanguageLabel")}</Text>
+            <Text style={styles.fieldLabel}>{translate("clientScreen.preferredLanguageLabel")}</Text>
             <Pressable
               style={styles.languagePicker}
               onPress={() => setShowLanguagePicker(true)}
@@ -514,11 +496,11 @@ function PatientScreen() {
 
           {/* --- Action Buttons --- */}
           <Button
-            text={patient && patient.id ? translate("patientScreen.updatePatient") : translate("patientScreen.createPatient")}
+            text={client && client.id ? translate("clientScreen.updateClient") : translate("clientScreen.createClient")}
             onPress={handleSave}
-            accessibilityHint={patient && patient.id ? "Saves changes to this patient" : "Creates a new patient"}
+            accessibilityHint={client && client.id ? "Saves changes to this client" : "Creates a new client"}
             disabled={
-              !canCreateOrEditPatient ||
+              !canCreateOrEditClient ||
               !name ||
               !email ||
               !phone ||
@@ -526,33 +508,33 @@ function PatientScreen() {
               !!phoneError ||
               isLoading
             }
-            testID="save-patient-button"
+            testID="save-client-button"
             preset="primary"
-            style={[styles.button, styles.saveButton, (!canCreateOrEditPatient || !name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined]}
+            style={[styles.button, styles.saveButton, (!canCreateOrEditClient || !name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined]}
             textStyle={styles.buttonText}
           />
 
-          {/* Show Delete, Schedules, Conversations only for existing patients */}
-          {patient && patient.id && (
+          {/* Show Delete, Schedules, Conversations only for existing clients */}
+          {client && client.id && (
             <>
               <Button
-                text={translate("patientScreen.manageSchedules")}
+                text={translate("clientScreen.manageSchedules")}
                 onPress={handleManageSchedules}
                 disabled={isLoading}
                 testID="manage-schedules-button"
-                accessibilityHint="Opens screen to manage patient schedules"
+                accessibilityHint="Opens screen to manage client schedules"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
               />
 
               <Button
-                text={translate("patientScreen.manageConversations")}
+                text={translate("clientScreen.manageConversations")}
                 onPress={handleManageConversations}
                 disabled={isLoading}
                 testID="manage-conversations-button"
-                accessibilityLabel={translate("patientScreen.manageConversations") || "Manage conversations"}
-                accessibilityHint="Opens screen to view and manage patient conversations"
+                accessibilityLabel={translate("clientScreen.manageConversations") || "Manage conversations"}
+                accessibilityHint="Opens screen to view and manage client conversations"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
@@ -560,7 +542,7 @@ function PatientScreen() {
 
               {canManageCaregivers && (
                 <Button
-                  text={translate("patientScreen.manageCaregivers")}
+                  text={translate("clientScreen.manageCaregivers")}
                   onPress={() => setShowCaregiverModal(true)}
                   disabled={isLoading}
                   testID="manage-caregivers-button"
@@ -571,11 +553,11 @@ function PatientScreen() {
               )}
 
               <Button
-                text={confirmDelete ? translate("patientScreen.confirmDelete") : translate("patientScreen.deletePatient")}
+                text={confirmDelete ? translate("clientScreen.confirmDelete") : translate("clientScreen.deleteClient")}
                 onPress={handleDelete}
                 disabled={isLoading}
-                testID="delete-patient-button"
-                accessibilityHint={confirmDelete ? "Permanently deletes this patient. This action cannot be undone." : "Tap once to confirm deletion, tap again to permanently delete this patient"}
+                testID="delete-client-button"
+                accessibilityHint={confirmDelete ? "Permanently deletes this client. This action cannot be undone." : "Tap once to confirm deletion, tap again to permanently delete this client"}
                 preset="danger"
                 style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
                 textStyle={styles.buttonText}
@@ -641,9 +623,9 @@ function PatientScreen() {
       </Modal>
 
       {/* Caregiver Assignment Modal */}
-      {patient && patient.id && (
+      {client && client.id && (
         <CaregiverAssignmentModal
-          patient={patient}
+          client={client}
           isVisible={showCaregiverModal}
           onClose={() => setShowCaregiverModal(false)}
         />
@@ -855,4 +837,4 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 })
 
-export { PatientScreen }
+export { ClientScreen }

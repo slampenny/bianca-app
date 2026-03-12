@@ -34,12 +34,11 @@ describe('orgService', () => {
   });
 
   it('should create a new org and a caregiver', async () => {
-    const org = await orgService.createOrg(orgOne, caregiverOneWithPassword);
+    const { org, caregiver } = await orgService.createOrg(orgOne, caregiverOneWithPassword);
     expect(org).toHaveProperty('id');
     expect(org).toHaveProperty('name', orgOne.name);
     expect(org).toHaveProperty('email', orgOne.email);
 
-    const caregiver = await Caregiver.findOne({ email: caregiverOne.email });
     expect(caregiver).toHaveProperty('id');
     expect(caregiver).toHaveProperty('name', caregiverOne.name);
     expect(caregiver).toHaveProperty('email', caregiverOne.email);

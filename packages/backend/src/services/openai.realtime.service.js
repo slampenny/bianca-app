@@ -351,7 +351,7 @@ class OpenAIRealtimeService {
   /**
    * Initialize a connection to OpenAI for a call. Uses callSid as the primary key.
    */
-  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt, patientId = null) {
+  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt, clientId = null) {
     const callId = callSid || initialAsteriskChannelId; // Prefer callSid if available
     if (!callId) {
       logger.error('[OpenAI Realtime] Initialize: Critical - Missing call identifier.');
@@ -373,8 +373,8 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28')}`);
     logger.info(`[OpenAI Realtime] Transcription: ${config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe'}`);
     logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);
-    if (patientId) {
-      logger.info(`[OpenAI Realtime] Emergency detection enabled for patient: ${patientId}`);
+    if (clientId) {
+      logger.info(`[OpenAI Realtime] Emergency detection enabled for client: ${clientId}`);
     }
 
     // Ensure Conversation exists (for outbound calls, it might not exist yet)
@@ -392,7 +392,7 @@ class OpenAIRealtimeService {
             logger.warn(`[OpenAI Realtime] Conversation not found for call ${call._id}, creating fallback conversation`);
             conversation = await Conversation.create({
               callId: call._id,
-              patientId: call.patientId,
+              clientId: call.clientId,
             });
             
             // Update Call with conversation reference
@@ -416,7 +416,7 @@ class OpenAIRealtimeService {
       conversationId: finalConversationId,
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
-      patientId, // Store patient ID for emergency detection
+      clientId,
       preferredLanguage: null, // Will be loaded when needed
       webSocket: null,
       sessionReady: false,
@@ -1225,20 +1225,20 @@ class OpenAIRealtimeService {
               if (currentConn.pendingUserTranscript && currentConn.pendingUserTranscript.trim()) {
                 const transcript = currentConn.pendingUserTranscript.trim();
                 
-                // Get patient's preferred language for filler word detection (cache in connection)
+                // Get client's preferred language for filler word detection (cache in connection)
                 let preferredLanguage = currentConn.preferredLanguage || 'en'; // default to English
-                if (!currentConn.preferredLanguage && currentConn.patientId) {
+                if (!currentConn.preferredLanguage && currentConn.clientId) {
                   try {
-                    const { Patient } = require('../models');
-                    const patient = await Patient.findById(currentConn.patientId).select('preferredLanguage').lean();
-                    if (patient?.preferredLanguage) {
-                      preferredLanguage = patient.preferredLanguage;
+                    const { Client } = require('../models');
+                    const client = await Client.findById(currentConn.clientId).select('preferredLanguage').lean();
+                    if (client?.preferredLanguage) {
+                      preferredLanguage = client.preferredLanguage;
                       currentConn.preferredLanguage = preferredLanguage; // Cache it
                     } else {
                       currentConn.preferredLanguage = 'en'; // Cache default
                     }
                   } catch (err) {
-                    logger.warn(`[OpenAI Realtime] Could not get patient language for filler word detection: ${err.message}`);
+                    logger.warn(`[OpenAI Realtime] Could not get client language for filler word detection: ${err.message}`);
                     currentConn.preferredLanguage = 'en'; // Cache default on error
                   }
                 }
@@ -1285,7 +1285,7 @@ class OpenAIRealtimeService {
                 } else {
                   // No placeholder exists - this shouldn't happen, but create new message as fallback
                   logger.warn(`[OpenAI Realtime] No active user message ID - creating new message (this may break queue order)`);
-                  await this.saveCompleteMessage(callId, 'patient', transcript);
+                  await this.saveCompleteMessage(callId, 'client', transcript);
                   userMessageFinalized = true;
                 }
                 
@@ -1381,20 +1381,20 @@ class OpenAIRealtimeService {
 
               // Check if pending transcript is only filler words - if so, wait for more substantial speech
               if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
-                // Get patient's preferred language for filler word detection (cache in connection)
+                // Get client's preferred language for filler word detection (cache in connection)
                 let preferredLanguage = conn.preferredLanguage || 'en'; // default to English
-                if (!conn.preferredLanguage && conn.patientId) {
+                if (!conn.preferredLanguage && conn.clientId) {
                   try {
-                    const { Patient } = require('../models');
-                    const patient = await Patient.findById(conn.patientId).select('preferredLanguage').lean();
-                    if (patient?.preferredLanguage) {
-                      preferredLanguage = patient.preferredLanguage;
+                    const { Client } = require('../models');
+                    const client = await Client.findById(conn.clientId).select('preferredLanguage').lean();
+                    if (client?.preferredLanguage) {
+                      preferredLanguage = client.preferredLanguage;
                       conn.preferredLanguage = preferredLanguage; // Cache it
                     } else {
                       conn.preferredLanguage = 'en'; // Cache default
                     }
                   } catch (err) {
-                    logger.warn(`[OpenAI Realtime] Could not get patient language for filler word detection: ${err.message}`);
+                    logger.warn(`[OpenAI Realtime] Could not get client language for filler word detection: ${err.message}`);
                     conn.preferredLanguage = 'en'; // Cache default on error
                   }
                 }
@@ -1845,7 +1845,7 @@ class OpenAIRealtimeService {
               } else {
                 // No placeholder - create new message (shouldn't happen, but fallback)
                 logger.warn(`[Transcript Cleanup] No placeholder exists - creating new message (may break queue order)`);
-                await this.saveCompleteMessage(callId, 'patient', transcriptToSave);
+                await this.saveCompleteMessage(callId, 'client', transcriptToSave);
               }
               
               // Only clear if it hasn't changed
@@ -1893,12 +1893,12 @@ class OpenAIRealtimeService {
     }
 
     // Track utterance in context window for context-aware emergency detection
-    if (conn.patientId) {
+    if (conn.clientId) {
       try {
         const contextWindow = getConversationContextWindow();
         const contextRole = role === 'assistant' ? 'assistant' : 'user';
-        contextWindow.addUtterance(conn.patientId, content.trim(), contextRole, Date.now());
-        logger.debug(`[Context Window] Added ${contextRole} utterance for patient ${conn.patientId}`);
+        contextWindow.addUtterance(conn.clientId, content.trim(), contextRole, Date.now());
+        logger.debug(`[Context Window] Added ${contextRole} utterance for patient ${conn.clientId}`);
       } catch (error) {
         logger.warn(`[Context Window] Failed to track utterance: ${error.message}`);
       }
@@ -1918,32 +1918,32 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Successfully saved ${role} message (${content.length} chars) to conversation ${conn.conversationId}`);
 
       // EMERGENCY DETECTION: Post-message analysis for user messages
-      if ((role === 'user' || role === 'patient') && conn.patientId && content && content.trim().length > 10) {
+      if ((role === 'user' || role === 'client') && conn.clientId && content && content.trim().length > 10) {
         try {
           logger.info(`[Emergency Detection] Processing utterance for emergency detection`, {
-            patientId: conn.patientId,
+            clientId: conn.clientId,
             text: content.substring(0, 100),
             callId
           });
           
           const emergencyResult = await emergencyProcessor.processUtterance(
-            conn.patientId,
+            conn.clientId,
             content,
             Date.now()
           );
 
           logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}`, {
-            patientId: conn.patientId,
+            clientId: conn.clientId,
             shouldAlert: emergencyResult.shouldAlert,
             reason: emergencyResult.reason,
             processing: emergencyResult.processing
           });
 
           if (emergencyResult.shouldAlert && !emergencyResult.processing.falsePositive) {
-            logger.warn(`[Emergency Detection] 🚨 EMERGENCY DETECTED for patient ${conn.patientId}: ${emergencyResult.reason}`);
+            logger.warn(`[Emergency Detection] 🚨 EMERGENCY DETECTED for client ${conn.clientId}: ${emergencyResult.reason}`);
             
             const alertResult = await emergencyProcessor.createAlert(
-              conn.patientId,
+              conn.clientId,
               emergencyResult.alertData,
               content
             );
@@ -1991,7 +1991,7 @@ class OpenAIRealtimeService {
       const conversationService = require('./conversation.service');
       const message = await conversationService.saveRealtimeMessage(
         conn.conversationId,
-        'patient', // Use 'patient' not 'user' - Message model enum only accepts 'patient', 'assistant', 'system', 'debug-user'
+        'client', // Message model enum: 'client', 'assistant', 'system', 'debug-user'
         '[Speaking...]', // Placeholder content
         'user_message'
       );
@@ -2058,13 +2058,13 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
 
     // EMERGENCY DETECTION: Real-time analysis of user transcript
-    logger.debug(`[Emergency Detection] Checking transcript - patientId: ${conn.patientId}, transcript length: ${message.transcript?.trim().length || 0}`);
+    logger.debug(`[Emergency Detection] Checking transcript - clientId: ${conn.clientId}, transcript length: ${message.transcript?.trim().length || 0}`);
     
-    if (conn.patientId && message.transcript && message.transcript.trim().length > 10) {
+    if (conn.clientId && message.transcript && message.transcript.trim().length > 10) {
       try {
         logger.info(`[Emergency Detection] Processing utterance for emergency detection: "${message.transcript.substring(0, 100)}..."`);
         const emergencyResult = await emergencyProcessor.processUtterance(
-          conn.patientId,
+          conn.clientId,
           message.transcript,
           Date.now()
         );
@@ -2072,13 +2072,13 @@ class OpenAIRealtimeService {
         logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}, reason: ${emergencyResult.reason}`);
 
         if (emergencyResult.shouldAlert) {
-          logger.warn(`[Emergency Detection] EMERGENCY DETECTED for patient ${conn.patientId}: ${emergencyResult.reason}`);
+          logger.warn(`[Emergency Detection] EMERGENCY DETECTED for client ${conn.clientId}: ${emergencyResult.reason}`);
           logger.warn(`[Emergency Detection] Alert data:`, emergencyResult.alertData);
           
           // Create alert and notify caregivers
-          logger.info(`[Emergency Detection] Calling createAlert for patient ${conn.patientId}`);
+          logger.info(`[Emergency Detection] Calling createAlert for client ${conn.clientId}`);
           const alertResult = await emergencyProcessor.createAlert(
-            conn.patientId,
+            conn.clientId,
             emergencyResult.alertData,
             message.transcript
           );
@@ -2113,7 +2113,7 @@ class OpenAIRealtimeService {
             
             // For CRITICAL emergencies, log warning for potential intervention
             if (emergencyResult.alertData.severity === 'CRITICAL') {
-              logger.warn(`[Emergency Detection] CRITICAL emergency - consider immediate intervention for patient ${conn.patientId}`);
+              logger.warn(`[Emergency Detection] CRITICAL emergency - consider immediate intervention for patient ${conn.clientId}`);
             }
           } else {
             logger.error(`[Emergency Detection] Failed to create alert: ${alertResult.error}`);
@@ -2129,8 +2129,8 @@ class OpenAIRealtimeService {
         // Don't let emergency detection errors break the conversation
       }
     } else {
-      if (!conn.patientId) {
-        logger.debug(`[Emergency Detection] Skipping - no patientId in connection for ${callId}`);
+      if (!conn.clientId) {
+        logger.debug(`[Emergency Detection] Skipping - no clientId in connection for ${callId}`);
       }
       if (!message.transcript || message.transcript.trim().length <= 10) {
         logger.debug(`[Emergency Detection] Skipping - transcript too short (${message.transcript?.trim().length || 0} chars) for ${callId}`);
@@ -3739,7 +3739,7 @@ class OpenAIRealtimeService {
             conn.activeUserMessageId = null;
           } else {
             // No placeholder - create new message
-            await this.saveCompleteMessage(callId, 'patient', conn.pendingUserTranscript);
+            await this.saveCompleteMessage(callId, 'client', conn.pendingUserTranscript);
           }
           
           conn.pendingUserTranscript = '';
@@ -3753,11 +3753,11 @@ class OpenAIRealtimeService {
         }
 
         // Clear context window for this patient when call ends
-        if (conn.patientId) {
+        if (conn.clientId) {
           try {
             const contextWindow = getConversationContextWindow();
-            contextWindow.clearPatientContext(conn.patientId);
-            logger.debug(`[Context Window] Cleared context for patient ${conn.patientId} at call end`);
+            contextWindow.clearClientContext(conn.clientId);
+            logger.debug(`[Context Window] Cleared context for patient ${conn.clientId} at call end`);
           } catch (error) {
             logger.warn(`[Context Window] Failed to clear context: ${error.message}`);
           }

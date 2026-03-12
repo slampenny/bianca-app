@@ -1,5 +1,5 @@
 const httpStatus = require('http-status');
-const { PrivacyRequest, ConsentRecord, PrivacyComplaint, Caregiver, Patient, Org } = require('../models');
+const { PrivacyRequest, ConsentRecord, PrivacyComplaint, Caregiver, Client, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const config = require('../config/config');
@@ -15,7 +15,7 @@ const { getJurisdiction } = require('../utils/jurisdiction.utils');
 const createAccessRequest = async (requestBody, requestorId, requestorModel = 'Caregiver') => {
   const request = await PrivacyRequest.create({
     requestType: 'access',
-    requestorType: requestorModel === 'Caregiver' ? 'caregiver' : 'patient',
+    requestorType: requestorModel === 'Caregiver' ? 'caregiver' : 'client',
     requestorId,
     requestorModel,
     informationRequested: requestBody.informationRequested || 'All personal information',
@@ -41,7 +41,7 @@ const createCorrectionRequest = async (requestBody, requestorId, requestorModel 
   
   const request = await PrivacyRequest.create({
     requestType: 'correction',
-    requestorType: requestorModel === 'Caregiver' ? 'caregiver' : 'patient',
+    requestorType: requestorModel === 'Caregiver' ? 'caregiver' : 'client',
     requestorId,
     requestorModel,
     informationRequested: requestBody.informationRequested || 'Correction request',
@@ -193,7 +193,7 @@ const updatePrivacyRequest = async (requestId, updateBody, updatedBy) => {
  */
 const createConsentRecord = async (consentBody, userId, userModel = 'Caregiver') => {
   const consent = await ConsentRecord.create({
-    userType: userModel === 'Caregiver' ? 'caregiver' : 'patient',
+    userType: userModel === 'Caregiver' ? 'caregiver' : 'client',
     userId,
     userModel,
     consentType: consentBody.consentType,
@@ -348,7 +348,7 @@ const processAccessRequest = async (requestId, processedBy) => {
   
   const caregiver = await Caregiver.findById(request.requestorId)
     .populate('org')
-    .populate('patients');
+    .populate('clients');
   
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
@@ -372,37 +372,38 @@ const processAccessRequest = async (requestId, processedBy) => {
       updatedAt: caregiver.updatedAt
     },
     patients: [],
+    clients: [],
     conversations: [],
     medicalAnalysis: [],
     consentHistory: []
   };
   
-  // Get all patients associated with this caregiver
-  if (caregiver.patients && caregiver.patients.length > 0) {
-    for (const patientId of caregiver.patients) {
-      const patient = await Patient.findById(patientId);
-      if (patient) {
-        userData.patients.push({
-          id: patient._id,
-          name: patient.name,
-          email: patient.email,
-          phone: patient.phone,
-          preferredName: patient.preferredName,
-          age: patient.age,
-          preferredLanguage: patient.preferredLanguage,
-          createdAt: patient.createdAt
+  // Get all clients associated with this caregiver
+  if (caregiver.clients && caregiver.clients.length > 0) {
+    for (const clientId of caregiver.clients) {
+      const client = await Client.findById(clientId);
+      if (client) {
+        userData.clients.push({
+          id: client._id,
+          name: client.name,
+          email: client.email,
+          phone: client.phone,
+          preferredName: client.preferredName,
+          age: client.age,
+          preferredLanguage: client.preferredLanguage,
+          createdAt: client.createdAt
         });
         
-        // Get conversations for this patient
-        const conversations = await Conversation.find({ patientId: patient._id })
+        // Get conversations for this client
+        const conversations = await Conversation.find({ clientId: client._id })
           .populate('messages')
           .sort({ startTime: -1 })
           .limit(100); // Limit to most recent 100
         
         userData.conversations.push(...conversations.map(c => ({
           id: c._id,
-          patientId: c.patientId,
-          patientName: patient.name,
+          clientId: c.clientId,
+          clientName: client.name,
           status: c.status,
           startTime: c.startTime,
           endTime: c.endTime,
@@ -410,15 +411,15 @@ const processAccessRequest = async (requestId, processedBy) => {
           summary: c.summary
         })));
         
-        // Get medical analysis for this patient
-        const analyses = await MedicalAnalysis.find({ patientId: patient._id })
+        // Get medical analysis for this client
+        const analyses = await MedicalAnalysis.find({ clientId: client._id })
           .sort({ createdAt: -1 })
           .limit(50);
         
         userData.medicalAnalysis.push(...analyses.map(a => ({
           id: a._id,
-          patientId: a.patientId,
-          patientName: patient.name,
+          clientId: a.clientId,
+          clientName: client.name,
           analysisDate: a.analysisDate,
           cognitiveMetrics: a.cognitiveMetrics,
           psychiatricMetrics: a.psychiatricMetrics,
@@ -521,11 +522,11 @@ const processCorrectionRequest = async (requestId, correctionData, processedBy) 
       caregiver[correctionData.field] = correctionData.value;
       await caregiver.save();
     }
-  } else if (request.requestorModel === 'Patient') {
-    const patient = await Patient.findById(request.requestorId);
-    if (patient && correctionData.field && correctionData.value) {
-      patient[correctionData.field] = correctionData.value;
-      await patient.save();
+  } else if (request.requestorModel === 'Client') {
+    const client = await Client.findById(request.requestorId);
+    if (client && correctionData.field && correctionData.value) {
+      client[correctionData.field] = correctionData.value;
+      await client.save();
     }
   }
   
@@ -560,7 +561,7 @@ const createComplaint = async (complaintBody, complainantId, complainantModel = 
   try {
     const user = complainantModel === 'Caregiver' 
       ? await Caregiver.findById(complainantId).populate('org')
-      : await Patient.findById(complainantId).populate('org');
+      : await Client.findById(complainantId).populate('org');
     
     if (user?.org) {
       organizationCountry = user.org.country || 'US';
@@ -574,7 +575,7 @@ const createComplaint = async (complaintBody, complainantId, complainantModel = 
   
   const complaint = await PrivacyComplaint.create({
     complaintType,
-    complainantType: complainantModel === 'Caregiver' ? 'caregiver' : 'patient',
+    complainantType: complainantModel === 'Caregiver' ? 'caregiver' : 'client',
     complainantId,
     complainantModel,
     subject: complaintBody.subject,

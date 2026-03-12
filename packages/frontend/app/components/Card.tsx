@@ -10,6 +10,7 @@ import {
 } from "react-native"
 import { spacing } from "../theme"
 import { useTheme } from "../theme/ThemeContext"
+import { platformShadow } from "../utils/styles"
 import { Text, TextProps } from "./Text"
 
 type Presets = "default" | "reversed"
@@ -131,24 +132,32 @@ interface CardProps extends TouchableOpacityProps {
 export function Card(props: CardProps) {
   const { colors } = useTheme()
   
-  const getContainerPresets = (colors: any) => ({
-    default: [
-      $containerBase,
-      {
-        backgroundColor: colors.palette.neutral100,
-        borderColor: colors.palette.neutral300,
-        shadowColor: colors.palette.neutral800,
-      },
-    ] as StyleProp<ViewStyle>,
-    reversed: [
-      $containerBase,
-      { 
-        backgroundColor: colors.palette.neutral800, 
-        borderColor: colors.palette.neutral500,
-        shadowColor: colors.palette.neutral800,
-      },
-    ] as StyleProp<ViewStyle>,
-  })
+  const getContainerPresets = (colors: any) => {
+    const shadowStyle = platformShadow({
+      color: colors.palette?.neutral800 ?? "#000",
+      offset: { width: 0, height: 12 },
+      opacity: 0.08,
+      radius: 12.81,
+    })
+    return {
+      default: [
+        $containerBase,
+        {
+          backgroundColor: colors.palette.neutral100,
+          borderColor: colors.palette.neutral300,
+          ...shadowStyle,
+        },
+      ] as StyleProp<ViewStyle>,
+      reversed: [
+        $containerBase,
+        {
+          backgroundColor: colors.palette.neutral800,
+          borderColor: colors.palette.neutral500,
+          ...shadowStyle,
+        },
+      ] as StyleProp<ViewStyle>,
+    }
+  }
 
   const getHeadingPresets = (colors: any) => ({
     default: {},
@@ -293,9 +302,6 @@ const $containerBase: ViewStyle = {
   borderRadius: spacing.md,
   padding: spacing.xs,
   borderWidth: 1,
-  shadowOffset: { width: 0, height: 12 },
-  shadowOpacity: 0.08,
-  shadowRadius: 12.81,
   elevation: 16,
   minHeight: 96,
   flexDirection: "row",

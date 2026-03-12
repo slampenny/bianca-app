@@ -11,7 +11,7 @@ const { tokenService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer } = require('../utils/mongodb-memory-server');
 const { caregiverOne, insertCaregiversAndAddToOrg } = require('../fixtures/caregiver.fixture');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
-const { patientOne, insertPatientsAndAddToCaregiver } = require('../fixtures/patient.fixture');
+const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
 const config = require('../../src/config/config');
 
 let mongoServer;
@@ -36,7 +36,7 @@ describe('OpenAI Realtime API Integration Tests', () => {
     // Setup test data
     [org] = await insertOrgs([orgOne]);
     [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
-    [patient] = await insertPatientsAndAddToCaregiver(caregiver, [patientOne]);
+    [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
     
     // Create auth token for caregiver
     caregiverToken = await tokenService.generateAuthTokens(caregiver);
@@ -92,7 +92,7 @@ describe('OpenAI Realtime API Integration Tests', () => {
   describe('Call Workflow with OpenAI Realtime', () => {
     it('should initiate call and create conversation', async () => {
       const callData = {
-        patientId: patient.id,
+        clientId: client.id,
         callNotes: `Test call with ${apiVersion} API`
       };
 
@@ -109,7 +109,7 @@ describe('OpenAI Realtime API Integration Tests', () => {
       // Verify conversation was created
       const conversation = await Conversation.findById(response.body.conversationId);
       expect(conversation).toBeTruthy();
-      expect(conversation.patientId.toString()).toBe(patient.id);
+      expect(conversation.clientId.toString()).toBe(client.id);
     });
   });
 });

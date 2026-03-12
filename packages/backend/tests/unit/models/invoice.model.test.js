@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Invoice, LineItem, Org, Patient } = require('../../../src/models');
+const { Invoice, LineItem, Org, Client } = require('../../../src/models');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
-const { patientOne, insertPatients } = require('../../fixtures/patient.fixture');
+const { clientOne, insertClients } = require('../../fixtures/client.fixture');
 
 describe('Invoice and LineItem Models', () => {
   let mongoServer;
   let org;
-  let patient;
+  let client;
 
   beforeAll(async () => {
     mongoServer = new MongoMemoryServer();
@@ -26,16 +26,16 @@ describe('Invoice and LineItem Models', () => {
     const [testOrg] = await insertOrgs([orgOne]);
     org = testOrg;
     
-    const patientData = { ...patientOne, org: org._id };
-    const [testPatient] = await insertPatients([patientData]);
-    patient = testPatient;
+    const clientData = { ...clientOne, org: org._id };
+    const [testClient] = await insertClients([clientData]);
+    client = testClient;
   });
 
   afterEach(async () => {
     await Invoice.deleteMany();
     await LineItem.deleteMany();
     await Org.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
   });
 
   describe('Invoice Model', () => {
@@ -132,7 +132,7 @@ describe('Invoice and LineItem Models', () => {
 
       // Create line items
       const lineItem1 = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 50.25,
         description: 'Service 1',
@@ -141,7 +141,7 @@ describe('Invoice and LineItem Models', () => {
       });
 
       const lineItem2 = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 75.75,
         description: 'Service 2',
@@ -166,7 +166,7 @@ describe('Invoice and LineItem Models', () => {
       await invoice.save();
 
       const lineItem = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 100,
         description: 'Test service',
@@ -197,7 +197,7 @@ describe('Invoice and LineItem Models', () => {
       await invoice.save();
 
       validLineItem = {
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 150.75,
         description: 'Wellness check consultation',
@@ -218,7 +218,7 @@ describe('Invoice and LineItem Models', () => {
       const savedLineItem = await lineItem.save();
       
       expect(savedLineItem._id).toBeDefined();
-      expect(savedLineItem.patientId.toString()).toBe(patient._id.toString());
+      expect(savedLineItem.clientId.toString()).toBe(client._id.toString());
       expect(savedLineItem.invoiceId.toString()).toBe(invoice._id.toString());
       expect(savedLineItem.amount).toBe(150.75);
       expect(savedLineItem.description).toBe('Wellness check consultation');
@@ -226,9 +226,9 @@ describe('Invoice and LineItem Models', () => {
       expect(savedLineItem.unitPrice).toBe(60.30);
     });
 
-    test('should require patientId field', async () => {
+    test('should require clientId field', async () => {
       const lineItemWithoutPatient = { ...validLineItem };
-      delete lineItemWithoutPatient.patientId;
+      delete lineItemWithoutPatient.clientId;
       
       const lineItem = new LineItem(lineItemWithoutPatient);
       await expect(lineItem.validate()).rejects.toThrow();
@@ -306,7 +306,7 @@ describe('Invoice and LineItem Models', () => {
 
     test('should create multiple line items for an invoice', async () => {
       const lineItem1 = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 50,
         description: 'Initial consultation',
@@ -315,7 +315,7 @@ describe('Invoice and LineItem Models', () => {
       });
 
       const lineItem2 = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 100,
         description: 'Follow-up session',
@@ -334,7 +334,7 @@ describe('Invoice and LineItem Models', () => {
 
     test('should calculate total correctly with multiple line items', async () => {
       const lineItem1 = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 75.50,
         description: 'Service A',
@@ -343,7 +343,7 @@ describe('Invoice and LineItem Models', () => {
       });
 
       const lineItem2 = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 125.25,
         description: 'Service B',
@@ -361,28 +361,28 @@ describe('Invoice and LineItem Models', () => {
       expect(invoice.totalAmount).toBe(200.75);
     });
 
-    test('should handle line items with different patients', async () => {
-      const patient2 = new Patient({
-        ...patientOne,
-        email: 'patient2@example.com',
+    test('should handle line items with different clients', async () => {
+      const client2 = new Client({
+        ...clientOne,
+        email: 'client2@example.com',
         org: org._id,
       });
-      await patient2.save();
+      await client2.save();
 
       const lineItem1 = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 50,
-        description: 'Patient 1 service',
+        description: 'Client 1 service',
         quantity: 1,
         unitPrice: 50,
       });
 
       const lineItem2 = new LineItem({
-        patientId: patient2._id,
+        clientId: client2._id,
         invoiceId: invoice._id,
         amount: 75,
-        description: 'Patient 2 service',
+        description: 'Client 2 service',
         quantity: 1,
         unitPrice: 75,
       });
@@ -392,13 +392,13 @@ describe('Invoice and LineItem Models', () => {
 
       const lineItems = await LineItem.find({ invoiceId: invoice._id });
       expect(lineItems).toHaveLength(2);
-      expect(lineItems[0].patientId.toString()).toBe(patient._id.toString());
-      expect(lineItems[1].patientId.toString()).toBe(patient2._id.toString());
+      expect(lineItems[0].clientId.toString()).toBe(client._id.toString());
+      expect(lineItems[1].clientId.toString()).toBe(client2._id.toString());
     });
 
     test('should populate line items when querying invoice', async () => {
       const lineItem = new LineItem({
-        patientId: patient._id,
+        clientId: client._id,
         invoiceId: invoice._id,
         amount: 100,
         description: 'Test service',

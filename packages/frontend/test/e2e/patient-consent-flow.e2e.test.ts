@@ -41,16 +41,17 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     await page.waitForTimeout(2000)
     
     // Find and toggle the "Require Patient Consent" toggle
-    const consentToggle = page.locator('[data-testid="require-patient-consent-toggle"]').or(
+    const consentToggle = page.locator('[data-testid="require-client-consent-toggle"]').or(
       page.locator('text=/require.*patient.*consent/i').locator('..').locator('input[type="checkbox"], [role="switch"]')
     ).first()
     
     // Try multiple ways to find the toggle
     let toggleFound = false
     const toggleSelectors = [
-      '[data-testid="require-patient-consent-toggle"]',
+      '[data-testid="require-client-consent-toggle"]',
+      'text=/require.*client.*consent/i',
       'text=/require.*patient.*consent/i',
-      'text=/patient.*consent/i',
+      'text=/client.*consent/i',
     ]
     
     for (const selector of toggleSelectors) {
@@ -78,9 +79,9 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     }
     
     if (!toggleFound) {
-      // Fallback: try to find any toggle in the patient consent section
-      const patientConsentSection = page.locator('text=/patient.*consent/i').locator('..').locator('..')
-      const toggleInSection = patientConsentSection.locator('input[type="checkbox"], [role="switch"], button').first()
+      // Fallback: try to find any toggle in the client consent section
+      const clientConsentSection = page.locator('text=/client.*consent|patient.*consent/i').locator('..').locator('..')
+      const toggleInSection = clientConsentSection.locator('input[type="checkbox"], [role="switch"], button').first()
       if (await toggleInSection.isVisible({ timeout: 2000 })) {
         await toggleInSection.click()
         toggleFound = true
@@ -107,18 +108,18 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     await navigateToHome(page)
     
     // Navigate to patient screen
-    const addPatientButton = page.locator('[data-testid="add-patient-button"]').first()
-    await addPatientButton.waitFor({ timeout: 10000, state: 'visible' })
-    await addPatientButton.click()
+    const addClientButton = page.locator('[data-testid="add-client-button"]').first()
+    await addClientButton.waitFor({ timeout: 10000, state: 'visible' })
+    await addClientButton.click()
     
     // Wait for patient screen
-    await page.waitForSelector('[data-testid="patient-screen"]', { timeout: 10000 }).catch(() => {})
+    await page.waitForSelector('[data-testid="client-screen"]', { timeout: 10000 }).catch(() => {})
     await page.waitForTimeout(2000)
     
     // Fill patient form
-    const nameInput = page.locator('[data-testid="patient-name-input"]').or(page.locator('input[placeholder*="name" i]')).first()
-    const emailInput = page.locator('[data-testid="patient-email-input"]').or(page.locator('input[type="email"]')).first()
-    const phoneInput = page.locator('[data-testid="patient-phone-input"]').or(page.locator('input[placeholder*="phone" i]')).first()
+    const nameInput = page.locator('[data-testid="client-name-input"]').or(page.locator('input[placeholder*="name" i]')).first()
+    const emailInput = page.locator('[data-testid="client-email-input"]').or(page.locator('input[type="email"]')).first()
+    const phoneInput = page.locator('[data-testid="client-phone-input"]').or(page.locator('input[placeholder*="phone" i]')).first()
     
     await nameInput.fill('Test Patient')
     await emailInput.fill(testPatientEmail)
@@ -170,11 +171,11 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     expect(token).toBeTruthy()
     
     // Step 7: Construct consent URL
-    const consentLink = getFrontendUrl(`/patient/consent?token=${token}`)
+    const consentLink = getFrontendUrl(`/client/consent?token=${token}`)
     
     // Verify link format
     expect(consentLink).toContain(new URL(FRONTEND_URL).hostname)
-    expect(consentLink).toContain('/patient/consent')
+    expect(consentLink).toContain('/client/consent')
     expect(consentLink).toContain('token=')
     expect(consentLink).not.toContain('localhost:3000')
     expect(consentLink).not.toContain('/v1')
@@ -205,7 +206,7 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
       page.getByText('Consent', { exact: false }),
       page.getByText('Thank you', { exact: false }),
       page.getByText('confirmed', { exact: false }),
-      page.locator('[data-testid="patient-consent-screen"]'),
+      page.locator('[data-testid="client-consent-screen"]'),
     ]
     
     let foundSuccess = false
@@ -272,19 +273,19 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
       return
     }
     
-    // Enable requirePatientConsent on org
+    // Enable requireClientConsent on org
     await page.request.patch(`${API_BASE_URL}/orgs/${org.id}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       data: {
-        requirePatientConsent: true,
+        requireClientConsent: true,
       },
     })
     
     // Create patient via API
-    const patientResponse = await page.request.post(`${API_BASE_URL}/patients`, {
+    const patientResponse = await page.request.post(`${API_BASE_URL}/clients`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
@@ -321,18 +322,18 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
       
       // Find the consent link in the email
       const frontendHost = new URL(FRONTEND_URL).host
-      const linkMatch = emailText.match(new RegExp(`http://${frontendHost}/patient/consent[?&]token=[^\\s"']+`)) ||
-                        emailHtml.match(new RegExp(`http://${frontendHost}/patient/consent[?&]token=[^"'\\s&<>]+`)) ||
-                        emailText.match(/patient\/consent[?&]token=([^\s"']+)/) ||
-                        emailHtml.match(/patient\/consent[?&]token=([^"'\s&<>]+)/)
+      const linkMatch = emailText.match(new RegExp(`http://${frontendHost}/client/consent[?&]token=[^\\s"']+`)) ||
+                        emailHtml.match(new RegExp(`http://${frontendHost}/client/consent[?&]token=[^"'\\s&<>]+`)) ||
+                        emailText.match(/client\/consent[?&]token=([^\s"']+)/) ||
+                        emailHtml.match(/client\/consent[?&]token=([^"'\s&<>]+)/)
       
       if (linkMatch) {
-        frontendLink = linkMatch[0].startsWith('http') ? linkMatch[0] : `${FRONTEND_URL}/patient/consent?token=${linkMatch[1] || linkMatch[0]}`
+        frontendLink = linkMatch[0].startsWith('http') ? linkMatch[0] : `${FRONTEND_URL}/client/consent?token=${linkMatch[1] || linkMatch[0]}`
       }
       
       // Also check if token was extracted directly
       if (email.tokens.consent) {
-        frontendLink = `${FRONTEND_URL}/patient/consent?token=${email.tokens.consent}`
+        frontendLink = `${FRONTEND_URL}/client/consent?token=${email.tokens.consent}`
       }
     } catch (error) {
       console.log('⚠️ Could not retrieve email from Ethereal:', error.message)
@@ -344,7 +345,7 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     
     // Verify link format
     const frontendHost = new URL(FRONTEND_URL).host
-    expect(frontendLink).toMatch(new RegExp(`^http://${frontendHost}/patient/consent[?&]token=.+$`))
+    expect(frontendLink).toMatch(new RegExp(`^http://${frontendHost}/client/consent[?&]token=.+$`))
     expect(frontendLink).not.toContain('localhost:3000')
     expect(frontendLink).not.toContain('/v1')
     
@@ -352,7 +353,7 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     const url = new URL(frontendLink!)
     expect(url.protocol).toBe('http:')
     expect(url.hostname).toBe('localhost')
-    expect(url.pathname).toBe('/patient/consent')
+    expect(url.pathname).toBe('/client/consent')
     const linkToken = url.searchParams.get('token')
     expect(linkToken).toBeTruthy()
     

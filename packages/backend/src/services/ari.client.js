@@ -7,7 +7,7 @@ const EventEmitter = require('events');
 const config = require('../config/config');
 const logger = require('../config/logger');
 const openAIService = require('./openai.realtime.service');
-const { Call, Conversation, Patient } = require('../models');
+const { Call, Conversation, Client } = require('../models');
 const channelTracker = require('./channel.tracker');
 const portManager = require('./port.manager.service');
 const rtpListenerService = require('./rtp.listener.service');
@@ -579,7 +579,7 @@ class AsteriskAriClient extends EventEmitter {
                 channel: channel,
                 mainChannel: channel,
                 twilioCallSid: null,
-                patientId: null,
+                clientId: null,
                 state: 'answered', // Initial high-level state
                 isReadStreamReady: false,
                 isWriteStreamReady: false,
@@ -587,14 +587,14 @@ class AsteriskAriClient extends EventEmitter {
             
             logger.info(`[ARI] Answered main channel: ${channelId}`);
 
-            const { twilioCallSid, patientId } = await this.extractCallParameters(channel, event);
+            const { twilioCallSid, clientId } = await this.extractCallParameters(channel, event);
             
-            if (!twilioCallSid || !patientId) {
-                throw new Error('Missing twilioCallSid or patientId');
+            if (!twilioCallSid || !clientId) {
+                throw new Error('Missing twilioCallSid or clientId');
             }
 
-            this.tracker.updateCall(channelId, { twilioCallSid, patientId });
-            await this.setupMediaPipeline(channel, twilioCallSid, patientId);
+            this.tracker.updateCall(channelId, { twilioCallSid, clientId });
+            await this.setupMediaPipeline(channel, twilioCallSid, clientId);
             
         } catch (err) {
             logger.error(`[ARI] Error in main channel setup for ${channelId}: ${err.message}`, err);
@@ -632,7 +632,7 @@ class AsteriskAriClient extends EventEmitter {
 
         return {
             twilioCallSid: paramMap.callSid,
-            patientId: paramMap.patientId
+            clientId: paramMap.clientId
         };
     }
 
@@ -2016,9 +2016,9 @@ async handleStasisStartForPlayback(channel, channelName, event) {
         this.emit('client_error', err);
     }
 
-    async setupMediaPipeline(channel, twilioCallSid, patientId) {
+    async setupMediaPipeline(channel, twilioCallSid, clientId) {
         const asteriskChannelId = channel.id;
-        logger.info(`[ARI Pipeline] Setting up for Asterisk ID: ${asteriskChannelId}, Twilio SID: ${twilioCallSid}, PatientID: ${patientId}`);
+        logger.info(`[ARI Pipeline] Setting up for Asterisk ID: ${asteriskChannelId}, Twilio SID: ${twilioCallSid}, ClientID: ${clientId}`);
         
         let mainBridge = null;
 
@@ -2051,16 +2051,16 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             const callType = this.extractCallTypeFromChannel(channel) || 'inbound';
 
             const conversationService = require('./conversation.service');
-            const enhancedPrompt = await conversationService.buildEnhancedPrompt(patientId, callType);
+            const enhancedPrompt = await conversationService.buildEnhancedPrompt(clientId, callType);
             
-            logger.info(`[ARI Pipeline] Built enhanced prompt for patient ${patientId} (${callType} call)`);
+            logger.info(`[ARI Pipeline] Built enhanced prompt for client ${clientId} (${callType} call)`);
 
             
             // Step 4: Create conversation record in database
-            const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, patientId, callType);
+            const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, clientId, callType);
 
             // Step 5: Initialize OpenAI service for this call
-            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, enhancedPrompt, patientId);
+            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, enhancedPrompt, clientId);
 
             // Step 6: Create the main bridge for mixing audio
             mainBridge = await this.client.bridges.create({
@@ -2153,32 +2153,32 @@ async handleStasisStartForPlayback(channel, channelName, event) {
         }
     }
 
-    async createConversationRecord(twilioCallSid, asteriskChannelId, patientId, callType = 'inbound') {
+    async createConversationRecord(twilioCallSid, asteriskChannelId, clientId, callType = 'inbound') {
         if (!twilioCallSid) {
             throw new Error('twilioCallSid is required for conversation record');
         }
 
         try {
-            // Resolve patient: prefer SIP URI patientId, fallback to Call record (outbound calls create Call at initiate with correct patientId)
-            let patientDoc = await Patient.findById(patientId).select('_id name').lean();
-            if (!patientDoc?._id && patientId) {
-                logger.warn(`[ARI Pipeline] Patient not found for SIP patientId ${patientId}, trying Call record by callSid`);
+            // Resolve client: prefer SIP URI clientId, fallback to Call record (outbound calls create Call at initiate with correct clientId)
+            let clientDoc = await Client.findById(clientId).select('_id name').lean();
+            if (!clientDoc?._id && clientId) {
+                logger.warn(`[ARI Pipeline] Client not found for SIP clientId ${clientId}, trying Call record by callSid`);
             }
-            if (!patientDoc?._id) {
-                const existingCall = await Call.findOne({ callSid: twilioCallSid }).select('patientId').lean();
-                if (existingCall?.patientId) {
-                    const resolvedId = existingCall.patientId?.toString?.() || existingCall.patientId;
-                    patientDoc = await Patient.findById(resolvedId).select('_id name').lean();
-                    if (patientDoc?._id) {
-                        logger.info(`[ARI Pipeline] Resolved patient from Call record: ${patientDoc._id} (SIP patientId was: ${patientId || 'missing'})`);
+            if (!clientDoc?._id) {
+                const existingCall = await Call.findOne({ callSid: twilioCallSid }).select('clientId').lean();
+                if (existingCall?.clientId) {
+                    const resolvedId = existingCall.clientId?.toString?.() || existingCall.clientId;
+                    clientDoc = await Client.findById(resolvedId).select('_id name').lean();
+                    if (clientDoc?._id) {
+                        logger.info(`[ARI Pipeline] Resolved client from Call record: ${clientDoc._id} (SIP clientId was: ${clientId || 'missing'})`);
                     }
                 }
             }
-            if (!patientDoc?._id) {
-                throw new Error(`Patient with ID ${patientId} not found`);
+            if (!clientDoc?._id) {
+                throw new Error(`Client with ID ${clientId} not found`);
             }
             
-            logger.info(`[ARI Pipeline] Found patient ${patientDoc._id} for patientId ${patientId}`);
+            logger.info(`[ARI Pipeline] Found client ${clientDoc._id} for clientId ${clientId}`);
 
             // First, find or create the Call record (Call tracks the phone call attempt)
             let call = await Call.findOne({ callSid: twilioCallSid });
@@ -2187,7 +2187,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
                 // Create Call record for inbound call
                 call = await Call.create({
                     callSid: twilioCallSid,
-                    patientId: patientDoc._id,
+                    clientId: clientDoc._id,
                     asteriskChannelId,
                     startTime: new Date(),
                     callStartTime: new Date(),
@@ -2212,7 +2212,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             if (!conversation) {
                 conversation = await Conversation.create({
                     callId: call._id,
-                    patientId: patientDoc._id,
+                    clientId: clientDoc._id,
                 });
                 
                 // Update call with conversation reference

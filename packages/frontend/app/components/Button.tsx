@@ -28,7 +28,7 @@ import { Text, TextProps } from "./Text"
  * - **reversed**: Dark themed buttons (rarely needed)
  * - **medical**: Healthcare-specific actions (rarely needed)
  */
-type PresetNames = "default" | "filled" | "reversed" | "primary" | "success" | "danger" | "warning" | "medical"
+type PresetNames = "default" | "filled" | "reversed" | "primary" | "success" | "danger" | "warning" | "medical" | "link"
 type Presets = PresetNames
 
 export interface ButtonAccessoryProps {
@@ -339,6 +339,8 @@ function getViewPresets(colors: any): Record<PresetNames, StyleProp<ViewStyle>> 
         borderWidth: 0,
       },
     ] as StyleProp<ViewStyle>,
+
+    link: [$baseViewStyle, { backgroundColor: 'transparent', borderWidth: 0 }] as StyleProp<ViewStyle>,
   }
 }
 
@@ -367,6 +369,7 @@ function getTextPresets(colors: any, fontScale: number): Record<PresetNames, Sty
     danger: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
     warning: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
     medical: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    link: [scaledBaseTextStyle, { color: colors.tint || colors.palette?.primary500 || "#007AFF" }],
   }
 }
 
@@ -380,6 +383,7 @@ function getPressedViewPresets(colors: any): Record<PresetNames, StyleProp<ViewS
     danger: { opacity: 0.8 },
     warning: { opacity: 0.8 },
     medical: { opacity: 0.8 },
+    link: { opacity: 0.8 },
   }
 }
 
@@ -398,5 +402,6 @@ function getPressedTextPresets(colors: any, fontScale: number): Record<PresetNam
     danger: { opacity: 0.9 },
     warning: { opacity: 0.9 },
     medical: { opacity: 0.9 },
+    link: { opacity: 0.9 },
   }
 }

@@ -16,7 +16,7 @@ import { store } from "../store/store"
 import AvatarPicker from "../components/AvatarPicker"
 import { translate } from "../i18n"
 import { LoadingButton, Button, PhoneInputWeb } from "app/components"
-import { PatientReassignmentModal } from "../components/PatientReassignmentModal"
+import { ClientReassignmentModal } from "../components/ClientReassignmentModal"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { OrgStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver, clearCaregiver } from "../store/caregiverSlice"
@@ -30,7 +30,7 @@ import {
   caregiverApi,
 } from "../services/api/caregiverApi"
 import { useSendInviteMutation } from "../services/api/orgApi"
-import { useGetUnassignedPatientsQuery, useAssignUnassignedPatientsMutation } from "../services/api/patientApi"
+import { useGetUnassignedClientsQuery, useAssignUnassignedClientsMutation } from "../services/api/clientApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
 
@@ -63,9 +63,8 @@ function CaregiverScreen() {
   // Mutation for inviting a new caregiver
   const [sendInvite, { isLoading: isInviting, error: inviteError }] = useSendInviteMutation()
 
-  // Queries and mutations for unassigned patients
-  const { data: unassignedPatients, isLoading: isLoadingUnassigned } = useGetUnassignedPatientsQuery()
-  const [assignUnassignedPatients, { isLoading: isAssigning }] = useAssignUnassignedPatientsMutation()
+  const { data: unassignedClients, isLoading: isLoadingUnassigned } = useGetUnassignedClientsQuery()
+  const [assignUnassignedClients, { isLoading: isAssigning }] = useAssignUnassignedClientsMutation()
 
   const [name, setName] = useState("")
   const [avatar, setAvatar] = useState("")
@@ -78,9 +77,8 @@ function CaregiverScreen() {
   const [successMessage, setSuccessMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
   
-  // State for unassigned patients panel
   const [showUnassignedPanel, setShowUnassignedPanel] = useState(false)
-  const [selectedPatients, setSelectedPatients] = useState<string[]>([])
+  const [selectedClients, setSelectedClients] = useState<string[]>([])
   const [assignmentSuccess, setAssignmentSuccess] = useState(false)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   
@@ -94,9 +92,8 @@ function CaregiverScreen() {
     }
   }, [])
   
-  // State for patient reassignment modal
   const [showReassignmentModal, setShowReassignmentModal] = useState(false)
-  const [patientsToReassign, setPatientsToReassign] = useState<any[]>([])
+  const [clientsToReassign, setClientsToReassign] = useState<any[]>([])
   
   // Animation for the panel
   const slideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current
@@ -140,14 +137,12 @@ function CaregiverScreen() {
 
   const handleDelete = () => {
     if (confirmDelete && caregiver && caregiver.id) {
-      // Check if the caregiver has patients
-      if (caregiver.patients && caregiver.patients.length > 0) {
-        // Show reassignment modal
-        setPatientsToReassign(caregiver.patients)
+      if (caregiver.clients && caregiver.clients.length > 0) {
+        setClientsToReassign(caregiver.clients)
         setShowReassignmentModal(true)
         setConfirmDelete(false)
       } else {
-        // No patients to reassign, proceed with deletion
+        // No clients to reassign, proceed with deletion
         deleteCaregiver({ id: caregiver.id })
           .unwrap()
           .then(() => {
@@ -167,7 +162,7 @@ function CaregiverScreen() {
   const handleReassignmentComplete = () => {
     // Close the reassignment modal
     setShowReassignmentModal(false)
-    setPatientsToReassign([])
+    setClientsToReassign([])
     
     // Now proceed with caregiver deletion
     if (caregiver && caregiver.id) {
@@ -182,14 +177,13 @@ function CaregiverScreen() {
 
   const handleReassignmentCancel = () => {
     setShowReassignmentModal(false)
-    setPatientsToReassign([])
+    setClientsToReassign([])
     setConfirmDelete(false)
   }
 
-  // Functions for unassigned patients assignment
-  const handleAssignUnassignedPatients = () => {
+  const handleAssignUnassignedClients = () => {
     setShowUnassignedPanel(true)
-    setSelectedPatients([])
+    setSelectedClients([])
     setAssignmentSuccess(false)
     // Animate panel in
     Animated.timing(slideAnim, {
@@ -199,23 +193,23 @@ function CaregiverScreen() {
     }).start()
   }
 
-  const handlePatientSelection = (patientId: string) => {
-    setSelectedPatients(prev => 
-      prev.includes(patientId) 
-        ? prev.filter(id => id !== patientId)
-        : [...prev, patientId]
+  const handleClientSelection = (clientId: string) => {
+    setSelectedClients(prev => 
+      prev.includes(clientId) 
+        ? prev.filter(id => id !== clientId)
+        : [...prev, clientId]
     )
   }
 
   const handleSelectAll = () => {
-    if (unassignedPatients) {
-      const allPatientIds = unassignedPatients.map(patient => patient.id || '').filter(id => id)
-      setSelectedPatients(allPatientIds)
+    if (unassignedClients) {
+      const allClientIds = unassignedClients.map(c => c.id || '').filter(id => id)
+      setSelectedClients(allClientIds)
     }
   }
 
   const handleDeselectAll = () => {
-    setSelectedPatients([])
+    setSelectedClients([])
   }
 
   const closeUnassignedPanel = () => {
@@ -225,22 +219,22 @@ function CaregiverScreen() {
       useNativeDriver: true,
     }).start(() => {
       setShowUnassignedPanel(false)
-      setSelectedPatients([])
+      setSelectedClients([])
       setAssignmentSuccess(false)
     })
   }
 
-  const handleAssignSelectedPatients = async () => {
-    if (selectedPatients.length === 0 || !caregiver?.id) return
+  const handleAssignSelectedClients = async () => {
+    if (selectedClients.length === 0 || !caregiver?.id) return
 
     try {
-      await assignUnassignedPatients({
+      await assignUnassignedClients({
         caregiverId: caregiver.id,
-        patientIds: selectedPatients
+        clientIds: selectedClients
       }).unwrap()
       
       setAssignmentSuccess(true)
-      setSuccessMessage(`${selectedPatients.length} patient(s) assigned successfully!`)
+      setSuccessMessage(`${selectedClients.length} client(s) assigned successfully!`)
       
       // Clear any existing timeout
       if (timeoutRef.current) {
@@ -255,7 +249,8 @@ function CaregiverScreen() {
       }, 2000)
     } catch (error: unknown) {
       console.error('Assignment error:', error)
-      const errorMessage = error?.data?.message || "Failed to assign patients. Please try again."
+      const err = error as { data?: { message?: string } }
+      const errorMessage = err?.data?.message || "Failed to assign clients. Please try again."
       setSuccessMessage(`Error: ${errorMessage}`)
       
       // Clear any existing timeout
@@ -359,13 +354,13 @@ function CaregiverScreen() {
             logger.error('Navigation to CaregiverInvited failed:', navError)
             // Fallback: try direct navigation
             try {
-              navigation.navigate("CaregiverInvited" as never, {
+              (navigation.navigate as (name: string, params?: object) => void)("CaregiverInvited", {
                 caregiver: {
                   id: invitedCaregiver.id || "",
                   name: invitedCaregiver.name,
                   email: invitedCaregiver.email,
                 }
-              } as never)
+              })
               logger.debug('Fallback navigation to CaregiverInvited called')
             } catch (fallbackError) {
               logger.error('Fallback navigation also failed:', fallbackError)
@@ -396,21 +391,22 @@ function CaregiverScreen() {
           }, 5000)
         }
       } catch (error: unknown) {
+        const inviteErr = error as { message?: string; data?: { message?: string }; status?: number; originalStatus?: number }
         logger.error('Invite error:', error)
         logger.error('Invite error details:', {
-          message: error?.message,
-          data: error?.data,
-          status: error?.status,
-          originalStatus: error?.originalStatus
+          message: inviteErr?.message,
+          data: inviteErr?.data,
+          status: inviteErr?.status,
+          originalStatus: inviteErr?.originalStatus
         })
         
         // Reset RTK Query error state to prevent duplicate error display
-        sendInvite.reset()
+        if ("reset" in sendInvite && typeof sendInvite.reset === "function") sendInvite.reset()
         
-        if (error?.data?.message === "Caregiver already invited") {
+        if (inviteErr?.data?.message === "Caregiver already invited") {
           setErrorMessage("This email is already invited.")
-        } else if (error?.data?.message) {
-          setErrorMessage(`Error: ${error.data.message}`)
+        } else if (inviteErr?.data?.message) {
+          setErrorMessage(`Error: ${inviteErr.data.message}`)
         } else {
           setErrorMessage("An error occurred while sending the invite.")
         }
@@ -533,13 +529,13 @@ function CaregiverScreen() {
             />
           )}
 
-          {/* Assign Unassigned Patients Button - Only show for orgAdmins */}
+          {/* Assign Unassigned Clients Button - Only show for orgAdmins */}
           {caregiver && caregiver.id && currentUser?.role === 'orgAdmin' && (
             <Button
-              text={translate("caregiverScreen.assignUnassignedPatients")}
-              onPress={handleAssignUnassignedPatients}
+              text={translate("caregiverScreen.assignUnassignedClients")}
+              onPress={handleAssignUnassignedClients}
               disabled={isLoadingUnassigned}
-              testID="assign-unassigned-patients-button"
+              testID="assign-unassigned-clients-button"
               preset="success"
               style={[
                 styles.button,
@@ -551,7 +547,7 @@ function CaregiverScreen() {
           )}
         </View>
 
-        {/* Unassigned Patients Panel */}
+        {/* Unassigned Clients Panel */}
         {showUnassignedPanel && (
           <Animated.View 
             style={[
@@ -565,9 +561,9 @@ function CaregiverScreen() {
               style={styles.panelBackdrop} 
               onPress={closeUnassignedPanel}
             />
-            <View style={styles.panelContent} testID="assign-unassigned-patients-modal">
+            <View style={styles.panelContent} testID="assign-unassigned-clients-modal">
               <View style={styles.panelHeader}>
-                <Text style={styles.panelTitle}>{translate("caregiverScreen.assignUnassignedPatientsTitle")}</Text>
+                <Text style={styles.panelTitle}>{translate("caregiverScreen.assignUnassignedClientsTitle")}</Text>
                 <Pressable
                   style={styles.panelCloseButton}
                   onPress={closeUnassignedPanel}
@@ -577,18 +573,18 @@ function CaregiverScreen() {
               </View>
               
               {isLoadingUnassigned ? (
-                <Text style={styles.loadingText} testID="unassigned-patients-loading">{translate("caregiverScreen.loadingUnassignedPatients")}</Text>
+                <Text style={styles.loadingText} testID="unassigned-clients-loading">{translate("caregiverScreen.loadingUnassignedClients")}</Text>
               ) : isAssigning ? (
-                <Text style={styles.loadingText}>{translate("caregiverScreen.assigningPatients")}</Text>
+                <Text style={styles.loadingText}>{translate("caregiverScreen.assigningClients")}</Text>
               ) : assignmentSuccess ? (
-                <Text style={styles.successText} testID="patients-assigned-success-message">{translate("caregiverScreen.patientsAssignedSuccess")}</Text>
-              ) : unassignedPatients && unassignedPatients.length > 0 ? (
+                <Text style={styles.successText} testID="clients-assigned-success-message">{translate("caregiverScreen.clientsAssignedSuccess")}</Text>
+              ) : unassignedClients && unassignedClients.length > 0 ? (
                 <>
                   <View style={styles.selectionControls}>
                     <Button
                       text={translate("caregiverScreen.selectAll")}
                       onPress={handleSelectAll}
-                      testID="select-all-patients-button"
+                      testID="select-all-clients-button"
                       style={styles.selectionButton}
                       textStyle={styles.selectionButtonText}
                       preset="default"
@@ -596,7 +592,7 @@ function CaregiverScreen() {
                     <Button
                       text={translate("caregiverScreen.deselectAll")}
                       onPress={handleDeselectAll}
-                      testID="deselect-all-patients-button"
+                      testID="deselect-all-clients-button"
                       style={styles.selectionButton}
                       textStyle={styles.selectionButtonText}
                       preset="default"
@@ -604,38 +600,38 @@ function CaregiverScreen() {
                   </View>
                   
                   <FlatList
-                    data={unassignedPatients}
+                    data={unassignedClients}
                     keyExtractor={(item) => item.id || ''}
                     renderItem={({ item }) => (
                       <Pressable
                         style={[
-                          styles.patientItem,
-                          selectedPatients.includes(item.id || '') && styles.selectedPatientItem
+                          styles.clientItem,
+                          selectedClients.includes(item.id || '') && styles.selectedClientItem
                         ]}
-                        onPress={() => handlePatientSelection(item.id || '')}
-                        testID={`unassigned-patient-item-${item.name}`}
+                        onPress={() => handleClientSelection(item.id || '')}
+                        testID={`unassigned-client-item-${item.name}`}
                       >
-                        <Text style={styles.patientName}>{item.name}</Text>
-                        <Text style={styles.patientEmail}>{item.email}</Text>
-                        {selectedPatients.includes(item.id || '') && (
+                        <Text style={styles.clientName}>{item.name}</Text>
+                        <Text style={styles.clientEmail}>{item.email}</Text>
+                        {selectedClients.includes(item.id || '') && (
                           <Text style={styles.selectedIndicator}>✓</Text>
                         )}
                       </Pressable>
                     )}
-                    style={styles.patientList}
+                    style={styles.clientList}
                   />
                   
                   <View style={styles.panelButtons}>
                     <Button
                       text={translate("caregiverScreen.assignSelected")}
-                      onPress={handleAssignSelectedPatients}
-                      disabled={selectedPatients.length === 0 || isAssigning}
-                      testID="assign-selected-patients-button"
+                      onPress={handleAssignSelectedClients}
+                      disabled={selectedClients.length === 0 || isAssigning}
+                      testID="assign-selected-clients-button"
                       preset="success"
                       style={[
                         styles.panelButton,
                         styles.assignButton,
-                        (selectedPatients.length === 0 || isAssigning) ? styles.buttonDisabled : undefined
+                        (selectedClients.length === 0 || isAssigning) ? styles.buttonDisabled : undefined
                       ]}
                       textStyle={styles.panelButtonText}
                     />
@@ -651,17 +647,16 @@ function CaregiverScreen() {
                   </View>
                 </>
               ) : (
-                <Text style={styles.noPatientsText} testID="no-unassigned-patients-message">{translate("caregiverScreen.noUnassignedPatientsFound")}</Text>
+                <Text style={styles.noClientsText} testID="no-unassigned-clients-message">{translate("caregiverScreen.noUnassignedClientsFound" as import("../i18n").TxKeyPath)}</Text>
               )}
             </View>
           </Animated.View>
         )}
         </ScrollView>
 
-        {/* Patient Reassignment Modal */}
         {currentOrg && (
-          <PatientReassignmentModal
-            patients={patientsToReassign}
+          <ClientReassignmentModal
+            clients={clientsToReassign}
             isVisible={showReassignmentModal}
             onClose={handleReassignmentCancel}
             onComplete={handleReassignmentComplete}
@@ -796,22 +791,22 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-  noPatientsText: {
+  noClientsText: {
     fontSize: 16,
     textAlign: "center",
   },
-  patientEmail: {
+  clientEmail: {
     fontSize: 14,
   },
-  patientItem: {
+  clientItem: {
     borderBottomColor: colors.palette.neutral300,
     borderBottomWidth: 1,
     padding: 10,
   },
-  patientList: {
+  clientList: {
     flex: 1,
   },
-  patientName: {
+  clientName: {
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -820,7 +815,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 10,
   },
-  selectedPatientItem: {
+  selectedClientItem: {
     backgroundColor: colors.palette.biancaSuccessBackground,
   },
   selectionButton: {

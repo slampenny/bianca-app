@@ -30,7 +30,7 @@ const privacyComplaintSchema = new mongoose.Schema(
     complainantType: {
       type: String,
       required: true,
-      enum: ['caregiver', 'patient', 'external'],
+      enum: ['caregiver', 'client', 'external'],
       index: true
     },
     
@@ -43,7 +43,7 @@ const privacyComplaintSchema = new mongoose.Schema(
     complainantModel: {
       type: String,
       required: true,
-      enum: ['Caregiver', 'Patient'],
+      enum: ['Caregiver', 'Client'],
       default: 'Caregiver'
     },
     

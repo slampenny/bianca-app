@@ -1,28 +1,28 @@
 import { test, expect } from './helpers/testHelpers'
 import { AuthWorkflow } from './workflows/auth.workflow'
-import { PatientDetailedWorkflow } from './workflows/patient-detailed.workflow'
+import { ClientDetailedWorkflow } from './workflows/patient-detailed.workflow'
 import { TEST_USERS } from './fixtures/testData'
 import { Page } from '@playwright/test'
 
 /**
  * Helper function to navigate to conversations screen
  */
-async function navigateToConversationsScreen(page: Page, patientWorkflow: PatientDetailedWorkflow) {
-  // Select patient and navigate to patient screen
-  const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-  expect(patientSelected).toBe(true)
+async function navigateToConversationsScreen(page: Page, clientWorkflow: ClientDetailedWorkflow) {
+  // Select client and navigate to client screen
+  const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+  expect(clientSelected).toBe(true)
   
-  const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+  const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
   if (await editButton.count() > 0) {
     await editButton.click()
     await page.waitForTimeout(2000)
   } else {
-    const patientCard = page.locator('[data-testid^="patient-card-"]').first()
-    await patientCard.click()
+    const clientCard = page.locator('[data-testid^="client-card-"]').first()
+    await clientCard.click()
     await page.waitForTimeout(2000)
   }
   
-  await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+  await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
   await page.waitForTimeout(1000)
   
   // Click conversations button
@@ -56,14 +56,14 @@ test.describe('Conversations Screen', () => {
   })
 
   test('should display conversations when patient is selected', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // First, select a patient (this sets patient in Redux)
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click edit button to open patient details screen
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     const editCount = await editButton.count()
     
     if (editCount > 0) {
@@ -71,13 +71,13 @@ test.describe('Conversations Screen', () => {
       await page.waitForTimeout(2000)
     } else {
       // Try clicking patient card directly
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
     
     // Wait for patient screen/form to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"], [data-testid="patient-form"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Look for conversations button on patient screen
@@ -97,7 +97,7 @@ test.describe('Conversations Screen', () => {
     } else {
       // Button not found - try using the workflow method or direct navigation
       console.log('Button not found, trying workflow method')
-      const accessed = await patientWorkflow.whenIAccessPatientConversations()
+      const accessed = await clientWorkflow.whenIAccessPatientConversations()
       if (!accessed) {
         console.log('Workflow method failed, trying direct navigation')
         // Last resort: navigate directly (patient should be in Redux)
@@ -113,16 +113,16 @@ test.describe('Conversations Screen', () => {
     // Wait for conversations screen to load
     // It might show error if no patient, or the actual screen
     const conversationsScreen = page.locator('[data-testid="conversations-screen"]')
-    const noPatientError = page.getByText(/no patient selected/i)
+    const noClientError = page.getByText(/no client selected/i)
     
     // Wait for either the screen or error to appear
     try {
       await conversationsScreen.waitFor({ state: 'visible', timeout: 10000 })
     } catch (e) {
       // Check if error is showing instead
-      const hasError = await noPatientError.isVisible({ timeout: 2000 }).catch(() => false)
+      const hasError = await noClientError.isVisible({ timeout: 2000 }).catch(() => false)
       if (hasError) {
-        throw new Error('Patient not set in Redux - conversations screen shows "no patient selected" error')
+        throw new Error('Client not set in Redux - conversations screen shows "no client selected" error')
       }
       throw e
     }
@@ -144,10 +144,10 @@ test.describe('Conversations Screen', () => {
   })
 
   test('should show dropdown arrows on conversation cards', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000) // Wait for conversations to load
     
     // Check for conversation cards
@@ -168,10 +168,10 @@ test.describe('Conversations Screen', () => {
   })
 
   test('should expand and collapse conversations when clicked', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000) // Wait for conversations to load
     
     // Find conversation cards
@@ -219,10 +219,10 @@ test.describe('Conversations Screen', () => {
   })
 
   test('should display messages when conversation is expanded', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000)
     
     const conversationCards = page.locator('[data-testid^="conversation-card-"]')
@@ -256,10 +256,10 @@ test.describe('Conversations Screen', () => {
   })
 
   test('should only expand one conversation at a time', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000)
     
     const conversationCards = page.locator('[data-testid^="conversation-card-"]')
@@ -297,10 +297,10 @@ test.describe('Conversations Screen', () => {
   })
 
   test('should handle empty conversations state gracefully', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to conversations screen
-    await navigateToConversationsScreen(page, patientWorkflow)
+    await navigateToConversationsScreen(page, clientWorkflow)
     await page.waitForTimeout(3000)
     
     // Screen should be visible even if empty

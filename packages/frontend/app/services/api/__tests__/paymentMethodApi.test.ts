@@ -27,8 +27,6 @@ describe("paymentMethodApi", () => {
     )
     org = response.org
     orgId = org.id as string
-    console.log(`caregiver role: ${response.caregiver.role}`)
-    console.log("Initial Org:", org)
   })
 
   afterEach(async () => {
@@ -40,7 +38,6 @@ describe("paymentMethodApi", () => {
 
   // --- Attach Payment Method Test ---
   it("should attach a payment method and return 201", async () => {
-    console.log("Testing: attachPaymentMethod endpoint")
     const paymentMethodId = createPaymentMethodId("card_visa")
     const result = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
@@ -50,7 +47,6 @@ describe("paymentMethodApi", () => {
     if ("error" in result) {
       throw new Error(`Attach payment method failed: ${JSON.stringify(result.error)}`)
     } else {
-      console.log("[paymentMethodSlice] attachPaymentMethod.matchFulfilled", result.data)
       expect(result.data).toMatchObject({
         id: expect.any(String),
         org: orgId,
@@ -69,7 +65,6 @@ describe("paymentMethodApi", () => {
 
   // --- Get All Payment Methods Test ---
   it("should get all payment methods for an org", async () => {
-    console.log("Testing: getPaymentMethods endpoint")
     const paymentMethodId = createPaymentMethodId("card_visa")
     await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
@@ -86,7 +81,6 @@ describe("paymentMethodApi", () => {
       throw new Error(`Get payment methods failed: ${JSON.stringify(result.error)}`)
     } else {
       const paymentMethods = result.data as PaymentMethod[]
-      console.log("[paymentMethodSlice] getPaymentMethods.matchFulfilled", paymentMethods)
       expect(paymentMethods.length).toBeGreaterThan(0)
       expect(paymentMethods[0]).toMatchObject({
         id: expect.any(String),
@@ -106,7 +100,6 @@ describe("paymentMethodApi", () => {
 
   // --- Get Payment Method By ID Test ---
   it("should get a payment method by id", async () => {
-    console.log("Testing: getPaymentMethod by ID")
     const paymentMethodId = createPaymentMethodId("card_visa")
     const attachResult = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
       orgId,
@@ -118,7 +111,6 @@ describe("paymentMethodApi", () => {
     }
 
     const createdPaymentMethodId: string = attachResult.data.id!
-    console.log(`Payment method attached with ID: ${createdPaymentMethodId}`)
 
     const result = await paymentMethodApi.endpoints.getPaymentMethod.initiate({
       orgId,
@@ -128,7 +120,6 @@ describe("paymentMethodApi", () => {
     if ("error" in result) {
       throw new Error(`Get payment method by id failed: ${JSON.stringify(result.error)}`)
     } else {
-      console.log("[paymentMethodSlice] getPaymentMethod.matchFulfilled", result.data)
       expect(result.data).toMatchObject({
         id: createdPaymentMethodId,
         org: orgId,
@@ -147,7 +138,6 @@ describe("paymentMethodApi", () => {
 
   // --- Set Default Payment Method Test ---
   it("should set a payment method as default", async () => {
-    console.log("Testing: setDefaultPaymentMethod endpoint")
     // Attach the first payment method.
     const firstPaymentMethodId = createPaymentMethodId("card_visa")
     await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
@@ -187,7 +177,6 @@ describe("paymentMethodApi", () => {
     if ("error" in updateResult) {
       throw new Error(`Set default payment method failed: ${JSON.stringify(updateResult.error)}`)
     } else {
-      console.log("[paymentMethodSlice] setDefaultPaymentMethod.matchFulfilled", updateResult.data)
       expect(updateResult.data).toMatchObject({
         id: secondId,
         org: orgId,
@@ -198,7 +187,6 @@ describe("paymentMethodApi", () => {
 
   // --- Detach Non-Default Payment Method Test ---
   it("should detach a non-default payment method", async () => {
-    console.log("Testing: detachPaymentMethod endpoint")
     // Attach the first payment method.
     const firstPaymentMethodId = createPaymentMethodId("card_visa")
     const firstResult = await paymentMethodApi.endpoints.attachPaymentMethod.initiate({
@@ -209,7 +197,6 @@ describe("paymentMethodApi", () => {
       throw new Error(`Attach first payment method failed: ${JSON.stringify(firstResult.error)}`)
     }
     const firstId: string = firstResult.data.id!
-    console.log(`First payment method attached with ID: ${firstId}`)
 
     // Attach the second payment method.
     const secondPaymentMethodId = createPaymentMethodId("card_mastercard")
@@ -229,7 +216,6 @@ describe("paymentMethodApi", () => {
     if ("error" in updateResult) {
       throw new Error(`Set default payment method failed: ${JSON.stringify(updateResult.error)}`)
     }
-    console.log("[paymentMethodApi] setDefaultPaymentMethod result:", updateResult.data)
 
     // Re-fetch the organization to ensure it has an updated stripeCustomerId.
     const orgResult = await orgApi.endpoints.getOrg.initiate({ orgId })(
@@ -251,7 +237,6 @@ describe("paymentMethodApi", () => {
     if ("error" in detachResult) {
       throw new Error(`Detach payment method failed: ${JSON.stringify(detachResult.error)}`)
     } else {
-      console.log("[paymentMethodApi] Detach result:", detachResult.data)
       expect(detachResult.data).toBeNull()
     }
   }, 30000)

@@ -16,7 +16,7 @@ class AlertDeduplicator {
     };
 
     // In-memory storage for tracking recent alerts
-    // Structure: { patientId: { alerts: [{ category, timestamp, text }], hourlyCount: number } }
+    // Structure: { clientId: { alerts: [{ category, timestamp, text }], hourlyCount: number } }
     this.alertHistory = new Map();
     
     // Store cleanup interval ID for proper cleanup
@@ -29,21 +29,21 @@ class AlertDeduplicator {
   /**
    * Check if we should send an alert for this patient and emergency type
    * Enhanced with multi-signal thresholds and cross-time deduplication
-   * @param {string} patientId - The patient ID
+   * @param {string} clientId - The client ID
    * @param {string} category - The emergency category (Medical, Safety, Physical, Request)
    * @param {string} text - The original text that triggered the emergency
    * @param {number} timestamp - Current timestamp (defaults to now)
    * @param {Object} options - Additional options (severity, contextWindow)
    * @returns {Object} - { shouldAlert: boolean, reason: string, confidence?: number }
    */
-  shouldAlert(patientId, category, text, timestamp = Date.now(), options = {}) {
+  shouldAlert(clientId, category, text, timestamp = Date.now(), options = {}) {
     try {
       // Validate inputs
-      if (!patientId || !category || !text) {
+      if (!clientId || !category || !text) {
         return { shouldAlert: false, reason: 'Invalid input parameters' };
       }
 
-      const patientHistory = this.alertHistory.get(patientId) || {
+      const patientHistory = this.alertHistory.get(clientId) || {
         alerts: [],
         hourlyCount: 0,
         hourlyWindowStart: timestamp,
@@ -156,19 +156,19 @@ class AlertDeduplicator {
 
   /**
    * Record that an alert was sent for this patient
-   * @param {string} patientId - The patient ID
+   * @param {string} clientId - The client ID
    * @param {string} category - The emergency category
    * @param {number} timestamp - When the alert was sent (defaults to now)
    * @param {string} text - The original text that triggered the emergency
    * @returns {Object} - Recorded alert data
    */
-  recordAlert(patientId, category, timestamp = Date.now(), text = '') {
+  recordAlert(clientId, category, timestamp = Date.now(), text = '') {
     try {
-      if (!patientId || !category) {
-        throw new Error('Patient ID and category are required');
+      if (!clientId || !category) {
+        throw new Error('Client ID and category are required');
       }
 
-      let patientHistory = this.alertHistory.get(patientId);
+      let patientHistory = this.alertHistory.get(clientId);
       
       if (!patientHistory) {
         patientHistory = {
@@ -187,7 +187,7 @@ class AlertDeduplicator {
         timestamp,
         text: text.substring(0, 200), // Limit text length for storage
         severity: null, // Can be set by caller
-        id: `${patientId}_${timestamp}_${category}`
+        id: `${clientId}_${timestamp}_${category}`
       };
 
       // Add to patient history
@@ -195,7 +195,7 @@ class AlertDeduplicator {
       patientHistory.hourlyCount++;
 
       // Store updated history
-      this.alertHistory.set(patientId, patientHistory);
+      this.alertHistory.set(clientId, patientHistory);
 
       return alertRecord;
     } catch (error) {
@@ -206,13 +206,13 @@ class AlertDeduplicator {
 
   /**
    * Get recent alerts for a patient
-   * @param {string} patientId - The patient ID
+   * @param {string} clientId - The client ID
    * @param {number} hoursBack - How many hours back to look (default: 24)
    * @returns {Array} - Array of recent alerts
    */
-  getRecentAlerts(patientId, hoursBack = 24) {
+  getRecentAlerts(clientId, hoursBack = 24) {
     try {
-      const patientHistory = this.alertHistory.get(patientId);
+      const patientHistory = this.alertHistory.get(clientId);
       if (!patientHistory) {
         return [];
       }
@@ -277,13 +277,13 @@ class AlertDeduplicator {
     try {
       const cutoffTime = Date.now() - (24 * 60 * 60 * 1000); // 24 hours ago
       
-      for (const [patientId, patientHistory] of this.alertHistory.entries()) {
+      for (const [clientId, patientHistory] of this.alertHistory.entries()) {
         const originalLength = patientHistory.alerts.length;
         patientHistory.alerts = patientHistory.alerts.filter(alert => alert.timestamp >= cutoffTime);
         
-        // Remove patient entry if no alerts remain
+        // Remove client entry if no alerts remain
         if (patientHistory.alerts.length === 0) {
-          this.alertHistory.delete(patientId);
+          this.alertHistory.delete(clientId);
         }
       }
     } catch (error) {
@@ -297,7 +297,7 @@ class AlertDeduplicator {
    */
   getStats() {
     try {
-      const totalPatients = this.alertHistory.size;
+      const totalClients = this.alertHistory.size;
       let totalAlerts = 0;
       let alertsInLastHour = 0;
       
@@ -309,7 +309,7 @@ class AlertDeduplicator {
       }
       
       return {
-        totalPatients,
+        totalClients,
         totalAlerts,
         alertsInLastHour,
         config: this.config

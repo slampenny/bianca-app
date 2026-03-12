@@ -36,20 +36,20 @@ const getCaregivers = catchAsync(async (req, res) => {
   }
 
   const result = await caregiverService.queryCaregivers(filter, options);
-  
-  // Debug logging for results
+  const results = (result.results || []).map((c) => CaregiverDTO(c));
+
   logger.debug('getCaregivers result:', {
     totalResults: result.totalResults,
-    resultsCount: result.results?.length || 0,
-    roles: result.results?.map(c => ({ id: c.id, name: c.name, role: c.role, email: c.email })) || []
+    resultsCount: results.length,
+    roles: results.map((c) => ({ id: c.id, name: c.name, role: c.role, email: c.email }))
   });
 
-  res.send(result);
+  res.send({ ...result, results });
 });
 
 const getCaregiver = catchAsync(async (req, res) => {
   if (req.params.caregiverId == req.caregiver.id) {
-    return res.status(httpStatus.OK).send(req.caregiver);
+    return res.status(httpStatus.OK).send(CaregiverDTO(req.caregiver));
   }
   if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
     return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
@@ -58,7 +58,7 @@ const getCaregiver = catchAsync(async (req, res) => {
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
-  res.send(caregiver);
+  res.send(CaregiverDTO(caregiver));
 });
 
 const createCaregiver = catchAsync(async (req, res) => {
@@ -136,32 +136,44 @@ const updateThemePreference = catchAsync(async (req, res) => {
 });
 
 const addPatient = catchAsync(async (req, res) => {
-  const { caregiverId, patientId } = req.params;
-  const updatedCaregiver = await caregiverService.addPatient(caregiverId, patientId);
+  const { caregiverId, clientId } = req.params;
+  const updatedCaregiver = await caregiverService.addPatient(caregiverId, clientId);
+  res.status(httpStatus.OK).send(updatedCaregiver);
+});
+
+const addClient = catchAsync(async (req, res) => {
+  const { caregiverId, clientId } = req.params;
+  const updatedCaregiver = await caregiverService.addPatient(caregiverId, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
 const removePatient = catchAsync(async (req, res) => {
-  const { caregiverId, patientId } = req.params;
-  const updatedCaregiver = await caregiverService.removePatient(caregiverId, patientId);
+  const { caregiverId, clientId } = req.params;
+  const updatedCaregiver = await caregiverService.removePatient(caregiverId, clientId);
+  res.status(httpStatus.OK).send(updatedCaregiver);
+});
+
+const removeClient = catchAsync(async (req, res) => {
+  const { caregiverId, clientId } = req.params;
+  const updatedCaregiver = await caregiverService.removePatient(caregiverId, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
 const updatePatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
-  const updatedCaregiver = await caregiverService.removePatient(req.caregiver, patientId);
+  const { clientId } = req.params;
+  const updatedCaregiver = await caregiverService.removePatient(req.caregiver, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
 const deletePatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
-  const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, patientId);
+  const { clientId } = req.params;
+  const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
 const getPatient = catchAsync(async (req, res) => {
-  const { patientId } = req.params;
-  const patients = await caregiverService.getPatient(req.caregiver, patientId);
+  const { clientId } = req.params;
+  const patients = await caregiverService.getPatient(req.caregiver, clientId);
   res.status(httpStatus.OK).send(patients);
 });
 
@@ -169,6 +181,12 @@ const getPatients = catchAsync(async (req, res) => {
   const { caregiverId } = req.params;
   const patients = await caregiverService.getPatients(caregiverId);
   res.status(httpStatus.OK).send(patients);
+});
+
+const getClients = catchAsync(async (req, res) => {
+  const { caregiverId } = req.params;
+  const clients = await caregiverService.getPatients(caregiverId);
+  res.status(httpStatus.OK).send(clients);
 });
 
 module.exports = {
@@ -180,9 +198,12 @@ module.exports = {
   deleteCaregiver,
   updateThemePreference,
   addPatient,
+  addClient,
   removePatient,
+  removeClient,
   updatePatient,
   deletePatient,
   getPatient,
   getPatients,
+  getClients,
 };

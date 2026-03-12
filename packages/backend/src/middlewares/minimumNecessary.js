@@ -21,23 +21,26 @@ const logger = require('../config/logger');
 const FIELD_ACCESS_RULES = {
   // Staff: Limited access - only fields needed for daily care
   staff: {
-    patient: [
+    client: [
       '_id',
+      'id',
       'name',
       'preferredName',
       'avatar',
       'language',
       'lastContact',
-      'status', // active, inactive, etc.
-      'assignedCaregivers', // Only their ID will be visible
-      // EXCLUDED: email, phone, dateOfBirth, medicalRecordNumber, address, emergencyContacts
+      'status',
+      'assignedCaregivers',
+      'caregivers',
+      'schedules', // For care coordination / schedule views
+      'org',
     ],
     
     conversation: [
       '_id',
       'id', // DTO transforms _id to id
-      'patient', // ID only
-      'patientId', // DTO uses patientId field
+      'client', // ID only
+      'clientId',
       'status',
       'duration',
       'startTime',
@@ -49,7 +52,7 @@ const FIELD_ACCESS_RULES = {
     
     medicalAnalysis: [
       '_id',
-      'patient', // ID only
+      'client', // ID only
       'summary', // High-level summary only
       'recommendations', // What to do, not detailed medical data
       'analysisDate',
@@ -58,39 +61,42 @@ const FIELD_ACCESS_RULES = {
     
     alert: [
       '_id',
-      'patient', // ID only
+      'client', // ID only
       'type',
       'severity',
       'message',
       'createdAt',
       'acknowledged',
-      // EXCLUDED: Full patient context, medical details
+      // EXCLUDED: Full client context, medical details
     ]
   },
 
   // OrgAdmin: Broader access for administrative purposes
   orgAdmin: {
-    patient: [
+    client: [
       '_id',
+      'id',
       'name',
       'preferredName',
-      'email', // Can contact patients
-      'phone', // Can contact patients
+      'email',
+      'phone',
       'avatar',
       'language',
       'lastContact',
       'status',
       'assignedCaregivers',
-      'dateOfBirth', // For verification
-      'address', // For service delivery
-      // EXCLUDED: medicalRecordNumber (unless billing admin)
+      'caregivers',
+      'schedules', // Needed for schedule management
+      'org',
+      'dateOfBirth',
+      'address',
     ],
     
     conversation: [
       '_id',
       'id', // DTO transforms _id to id
-      'patient',
-      'patientId', // DTO uses patientId field
+      'client',
+      'clientId',
       'status',
       'duration',
       'startTime',
@@ -104,7 +110,7 @@ const FIELD_ACCESS_RULES = {
     
     medicalAnalysis: [
       '_id',
-      'patient',
+      'client',
       'summary',
       'recommendations',
       'analysisDate',
@@ -118,7 +124,7 @@ const FIELD_ACCESS_RULES = {
 
   // SuperAdmin: Full access (system administration)
   superAdmin: {
-    patient: '*',
+    client: '*',
     conversation: '*',
     medicalAnalysis: '*',
     alert: '*',
@@ -195,8 +201,8 @@ const minimumNecessaryMiddleware = (resourceType) => {
       
       // Debug: Log before filtering
       const beforeSample = data && data.results && data.results[0] ? {
-        hasPatientId: 'patientId' in data.results[0],
-        patientIdValue: data.results[0].patientId,
+        hasClientId: 'clientId' in data.results[0],
+        clientIdValue: data.results[0].clientId,
         keys: Object.keys(data.results[0])
       } : null;
       
@@ -211,8 +217,8 @@ const minimumNecessaryMiddleware = (resourceType) => {
           
           // Debug: Log after filtering
           const afterSample = filteredData.results && filteredData.results[0] ? {
-            hasPatientId: 'patientId' in filteredData.results[0],
-            patientIdValue: filteredData.results[0].patientId,
+            hasClientId: 'clientId' in filteredData.results[0],
+            clientIdValue: filteredData.results[0].clientId,
             keys: Object.keys(filteredData.results[0])
           } : null;
           
@@ -277,7 +283,7 @@ const canAccessField = (userRole, resourceType, fieldName) => {
 
 /**
  * Add custom allowed fields for specific cases
- * (e.g., doctor needs full medical access for specific patient)
+ * (e.g., doctor needs full medical access for specific client)
  */
 const addFieldPermission = (userId, resourceType, fields) => {
   // TODO: Implement persistent field-level permissions
@@ -286,7 +292,7 @@ const addFieldPermission = (userId, resourceType, fields) => {
 };
 
 // Export field access rules for documentation
-const getFieldAccessRules = () => FIELD_ACCESS_RULES;
+const getFieldAccessRules = () => ({ ...FIELD_ACCESS_RULES });
 
 module.exports = {
   minimumNecessaryMiddleware,

@@ -14,13 +14,17 @@ const logger = require('../config/logger');
 
 // Define which routes contain PHI and should be audited
 const PHI_ROUTES = {
-  // Patient routes
-  'GET /v1/patients/:id': { action: 'READ', resource: 'patient', phiAccessed: true },
-  'GET /v1/patients': { action: 'READ', resource: 'patient', phiAccessed: true },
-  'POST /v1/patients': { action: 'CREATE', resource: 'patient', phiAccessed: true, highRisk: true },
-  'PATCH /v1/patients/:id': { action: 'UPDATE', resource: 'patient', phiAccessed: true },
-  'PUT /v1/patients/:id': { action: 'UPDATE', resource: 'patient', phiAccessed: true },
-  'DELETE /v1/patients/:id': { action: 'DELETE', resource: 'patient', phiAccessed: true, highRisk: true },
+  // Client routes
+  'GET /v1/clients/:id': { action: 'READ', resource: 'client', phiAccessed: true },
+  'GET /v1/clients/:clientId': { action: 'READ', resource: 'client', phiAccessed: true },
+  'GET /v1/clients': { action: 'READ', resource: 'client', phiAccessed: true },
+  'POST /v1/clients': { action: 'CREATE', resource: 'client', phiAccessed: true, highRisk: true },
+  'PATCH /v1/clients/:id': { action: 'UPDATE', resource: 'client', phiAccessed: true },
+  'PATCH /v1/clients/:clientId': { action: 'UPDATE', resource: 'client', phiAccessed: true },
+  'PUT /v1/clients/:id': { action: 'UPDATE', resource: 'client', phiAccessed: true },
+  'PUT /v1/clients/:clientId': { action: 'UPDATE', resource: 'client', phiAccessed: true },
+  'DELETE /v1/clients/:id': { action: 'DELETE', resource: 'client', phiAccessed: true, highRisk: true },
+  'DELETE /v1/clients/:clientId': { action: 'DELETE', resource: 'client', phiAccessed: true, highRisk: true },
 
   // Conversation routes (contain PHI)
   'GET /v1/conversations/:id': { action: 'READ', resource: 'conversation', phiAccessed: true },
@@ -30,19 +34,19 @@ const PHI_ROUTES = {
   'DELETE /v1/conversations/:id': { action: 'DELETE', resource: 'conversation', phiAccessed: true, highRisk: true },
 
   // Medical analysis routes (contain PHI)
-  'GET /v1/medical-analysis/:patientId': { action: 'READ', resource: 'medicalAnalysis', phiAccessed: true },
-  'POST /v1/medical-analysis/:patientId': { action: 'CREATE', resource: 'medicalAnalysis', phiAccessed: true },
-  'GET /v1/medical-analysis/:patientId/baseline': { action: 'READ', resource: 'medicalAnalysis', phiAccessed: true },
-  'POST /v1/medical-analysis/:patientId/baseline': { action: 'CREATE', resource: 'medicalAnalysis', phiAccessed: true },
+  'GET /v1/medical-analysis/:clientId': { action: 'READ', resource: 'medicalAnalysis', phiAccessed: true },
+  'POST /v1/medical-analysis/:clientId': { action: 'CREATE', resource: 'medicalAnalysis', phiAccessed: true },
+  'GET /v1/medical-analysis/:clientId/baseline': { action: 'READ', resource: 'medicalAnalysis', phiAccessed: true },
+  'POST /v1/medical-analysis/:clientId/baseline': { action: 'CREATE', resource: 'medicalAnalysis', phiAccessed: true },
 
   // Fraud/abuse analysis routes (contain PHI)
-  'GET /v1/fraud-abuse-analysis/:patientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
-  'GET /v1/fraud-abuse-analysis/results/:patientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
-  'POST /v1/fraud-abuse-analysis/trigger-patient/:patientId': { action: 'CREATE', resource: 'fraudAbuseAnalysis', phiAccessed: true },
+  'GET /v1/fraud-abuse-analysis/:clientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
+  'GET /v1/fraud-abuse-analysis/results/:clientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
+  'POST /v1/fraud-abuse-analysis/trigger-client/:clientId': { action: 'CREATE', resource: 'fraudAbuseAnalysis', phiAccessed: true },
 
   // Sentiment analysis routes
-  'GET /v1/sentiment/patient/:patientId/trend': { action: 'READ', resource: 'patient', phiAccessed: true },
-  'GET /v1/sentiment/patient/:patientId/summary': { action: 'READ', resource: 'patient', phiAccessed: true },
+  'GET /v1/sentiment/client/:clientId/trend': { action: 'READ', resource: 'client', phiAccessed: true },
+  'GET /v1/sentiment/client/:clientId/summary': { action: 'READ', resource: 'client', phiAccessed: true },
   'GET /v1/sentiment/conversation/:conversationId': { action: 'READ', resource: 'conversation', phiAccessed: true },
   'POST /v1/sentiment/conversation/:conversationId/analyze': { action: 'CREATE', resource: 'conversation', phiAccessed: true },
 
@@ -63,7 +67,7 @@ const PHI_ROUTES = {
   'POST /v1/reports': { action: 'CREATE', resource: 'report', phiAccessed: true },
 
   // Export/Download operations (high risk)
-  'GET /v1/patients/:id/export': { action: 'EXPORT', resource: 'patient', phiAccessed: true, highRisk: true },
+  'GET /v1/clients/:id/export': { action: 'EXPORT', resource: 'client', phiAccessed: true, highRisk: true },
   'GET /v1/conversations/:id/export': { action: 'EXPORT', resource: 'conversation', phiAccessed: true, highRisk: true },
   'POST /v1/reports/export': { action: 'EXPORT', resource: 'report', phiAccessed: true, highRisk: true },
 };
@@ -82,7 +86,8 @@ const AUTH_ROUTES = {
 function extractResourceId(req, config) {
   // Check params for common ID fields
   if (req.params.id) return req.params.id;
-  if (req.params.patientId) return req.params.patientId;
+  if (req.params.clientId) return req.params.clientId;
+  if (req.params.clientId) return req.params.clientId;
   if (req.params.conversationId) return req.params.conversationId;
   
   // For POST requests creating new resources, use "new" or "pending"

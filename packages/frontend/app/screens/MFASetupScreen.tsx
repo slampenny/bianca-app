@@ -8,7 +8,7 @@ import { translate } from "../i18n"
 import type { ThemeColors } from "../types"
 import { useNavigation } from "@react-navigation/native"
 
-type SetupStep = 'status' | 'enable' | 'verify' | 'enabled' | 'disable'
+type SetupStep = 'status' | 'enable' | 'verify' | 'enabled' | 'disable' | 'regenerate'
 
 export function MFASetupScreen() {
   const navigation = useNavigation()
@@ -43,7 +43,7 @@ export function MFASetupScreen() {
     } catch (error: unknown) {
       Alert.alert(
         translate("common.error") || "Error",
-        error?.data?.message || translate("mfa.enableFailed") || "Failed to enable MFA"
+        (error as { data?: { message?: string } })?.data?.message || translate("mfa.enableFailed") || "Failed to enable MFA"
       )
     }
   }
@@ -70,7 +70,7 @@ export function MFASetupScreen() {
     } catch (error: unknown) {
       Alert.alert(
         translate("common.error") || "Error",
-        error?.data?.message || translate("mfa.verificationFailed") || "Invalid code. Please try again."
+        (error as { data?: { message?: string } })?.data?.message || translate("mfa.verificationFailed") || "Invalid code. Please try again."
       )
       setVerificationToken("")
       verificationInput.current?.focus()
@@ -106,7 +106,7 @@ export function MFASetupScreen() {
             } catch (error: unknown) {
               Alert.alert(
                 translate("common.error") || "Error",
-                error?.data?.message || translate("mfa.disableFailed") || "Failed to disable MFA. Please check your code."
+                (error as { data?: { message?: string } })?.data?.message || translate("mfa.disableFailed") || "Failed to disable MFA. Please check your code."
               )
               setDisableToken("")
               disableInput.current?.focus()
@@ -145,7 +145,7 @@ export function MFASetupScreen() {
             } catch (error: unknown) {
               Alert.alert(
                 translate("common.error") || "Error",
-                error?.data?.message || translate("mfa.regenerateFailed") || "Failed to regenerate backup codes."
+                (error as { data?: { message?: string } })?.data?.message || translate("mfa.regenerateFailed") || "Failed to regenerate backup codes."
               )
             }
           }

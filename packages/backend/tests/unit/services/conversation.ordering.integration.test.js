@@ -56,7 +56,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Create a Call first (Conversation requires callId)
     const call = await Call.create({
       callSid: callSid,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       status: 'in-progress',
       duration: 0
     });
@@ -65,7 +65,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Create test conversation in database
     const conversation = new Conversation({
       _id: conversationId,
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       callId: call._id, // Use Call ObjectId, not callSid
       messages: []
     });
@@ -103,7 +103,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Setup connection - conversationId must be ObjectId, not string
     const conn = {
       conversationId: conversationId, // Keep as ObjectId, not string
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       pendingUserTranscript: '',
       activeUserMessageId: null,
       pendingAssistantTranscript: '',
@@ -133,7 +133,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     const userPlaceholder = await Message.findById(conn.activeUserMessageId);
     expect(userPlaceholder).toBeTruthy();
     expect(userPlaceholder.content).toBe('[Speaking...]');
-    expect(userPlaceholder.role).toBe('patient'); // Should be 'patient' not 'user'
+    expect(userPlaceholder.role).toBe('client'); // Message model uses 'client' for user/caller
     const userPlaceholderTimestamp = userPlaceholder.createdAt.getTime();
     expect(userPlaceholderTimestamp).toBeGreaterThanOrEqual(userStartTime - 100); // Allow 100ms tolerance
 
@@ -217,7 +217,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // CRITICAL VERIFICATION: Messages should be in chronological order
     expect(allMessages.length).toBe(2);
     
-    const userMessage = allMessages.find(m => m.role === 'patient');
+    const userMessage = allMessages.find(m => m.role === 'client');
     const aiMessage = allMessages.find(m => m.role === 'assistant');
     
     expect(userMessage).toBeTruthy();
@@ -228,7 +228,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     expect(aiMessage.createdAt.getTime()).toBe(aiPlaceholderTimestamp);
     
     // CRITICAL: User message should come BEFORE AI message (user spoke first)
-    expect(allMessages[0].role).toBe('patient');
+    expect(allMessages[0].role).toBe('client');
     expect(allMessages[0].content).toBe('Hello, how are you?');
     expect(allMessages[1].role).toBe('assistant');
     expect(allMessages[1].content).toBe('I am doing well, thank you for asking.');
@@ -245,7 +245,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
       createdAt: m.createdAt.toISOString()
     }));
     
-    expect(frontendMessages[0].role).toBe('patient');
+    expect(frontendMessages[0].role).toBe('client');
     expect(frontendMessages[1].role).toBe('assistant');
     expect(new Date(frontendMessages[0].createdAt).getTime()).toBeLessThan(
       new Date(frontendMessages[1].createdAt).getTime()
@@ -260,7 +260,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     // Setup connection - conversationId must be ObjectId, not string
     const conn = {
       conversationId: conversationId, // Keep as ObjectId, not string
-      patientId: new mongoose.Types.ObjectId(),
+      clientId: new mongoose.Types.ObjectId(),
       pendingUserTranscript: '',
       activeUserMessageId: null,
       pendingAssistantTranscript: '',
@@ -341,7 +341,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     expect(allMessages.length).toBe(2);
     expect(allMessages[0].role).toBe('assistant');
     expect(allMessages[0].content).toBe('How can I help you today?');
-    expect(allMessages[1].role).toBe('patient');
+    expect(allMessages[1].role).toBe('client');
     expect(allMessages[1].content).toBe('I need help with something');
     expect(allMessages[0].createdAt.getTime()).toBeLessThan(allMessages[1].createdAt.getTime());
   });

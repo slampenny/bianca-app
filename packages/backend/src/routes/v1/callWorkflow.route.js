@@ -10,8 +10,8 @@ const router = express.Router();
  * @swagger
  * /calls/initiate:
  *   post:
- *     summary: Initiate a call to a patient
- *     description: Start an outbound call to a patient and create a conversation
+ *     summary: Initiate a call to a client
+ *     description: Start an outbound call to a client and create a conversation
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []
@@ -22,11 +22,11 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - patientId
+ *               - clientId
  *             properties:
- *               patientId:
+ *               clientId:
  *                 type: string
- *                 description: Patient ID to call
+ *                 description: Client ID to call
  *               callNotes:
  *                 type: string
  *                 maxLength: 500
@@ -48,11 +48,11 @@ const router = express.Router();
  *                       type: string
  *                     callSid:
  *                       type: string
- *                     patientId:
+ *                     clientId:
  *                       type: string
- *                     patientName:
+ *                     clientName:
  *                       type: string
- *                     patientPhone:
+ *                     clientPhone:
  *                       type: string
  *                     agentId:
  *                       type: string
@@ -116,7 +116,7 @@ router.post('/initiate', auth(), validate(callWorkflowValidation.initiate), call
  *                       type: string
  *                     callNotes:
  *                       type: string
- *                     patient:
+ *                     client:
  *                       type: object
  *                     agent:
  *                       type: object
@@ -253,7 +253,7 @@ router.get('/active', auth(), callWorkflowController.getActiveCalls);
  * /calls/{conversationId}/conversation:
  *   get:
  *     summary: Get conversation with call details
- *     description: Retrieve conversation details including call status and patient info
+ *     description: Retrieve conversation details including call status and client info
  *     tags: [Calls]
  *     security:
  *       - bearerAuth: []

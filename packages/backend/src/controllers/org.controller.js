@@ -3,12 +3,13 @@ const pick = require('../utils/pick');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { orgService } = require('../services');
+const { OrgDTO } = require('../dtos');
 
 const createOrg = catchAsync(async (req, res) => {
   const orgData = req.body.org;
   const { caregiver } = req.body;
-  const org = await orgService.createOrg(orgData, caregiver);
-  res.status(httpStatus.CREATED).send(org);
+  const { org } = await orgService.createOrg(orgData, caregiver);
+  res.status(httpStatus.CREATED).send(OrgDTO(org));
 });
 
 const getOrgs = catchAsync(async (req, res) => {
@@ -23,13 +24,13 @@ const getOrg = catchAsync(async (req, res) => {
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
   }
-  res.send(org);
+  res.send(OrgDTO(org));
 });
 
 const updateOrg = catchAsync(async (req, res) => {
   const { ...orgData } = req.body;
   const org = await orgService.updateOrgById(req.params.orgId, orgData);
-  res.send(org);
+  res.send(OrgDTO(org));
 });
 
 const deleteOrg = catchAsync(async (req, res) => {
@@ -40,20 +41,20 @@ const deleteOrg = catchAsync(async (req, res) => {
 const addCaregiver = catchAsync(async (req, res) => {
   const { orgId, caregiverId } = req.params;
   const updatedOrg = await orgService.addCaregiver(orgId, caregiverId);
-  res.status(httpStatus.OK).send(updatedOrg);
+  res.status(httpStatus.OK).send(OrgDTO(updatedOrg));
 });
 
 const removeCaregiver = catchAsync(async (req, res) => {
   const { orgId, caregiverId } = req.params;
   const updatedOrg = await orgService.removeCaregiver(orgId, caregiverId);
-  res.status(httpStatus.OK).send(updatedOrg);
+  res.status(httpStatus.OK).send(OrgDTO(updatedOrg));
 });
 
 const setRole = catchAsync(async (req, res) => {
   const { orgId, caregiverId } = req.params;
   const { role } = req.body;
-  const updatedOrg = await orgService.setRole(orgId, caregiverId, role);
-  res.status(httpStatus.OK).send(updatedOrg);
+  const updatedCaregiver = await orgService.setRole(orgId, caregiverId, role);
+  res.status(httpStatus.OK).send(updatedCaregiver);
 });
 
 const sendInvite = catchAsync(async (req, res) => {

@@ -6,7 +6,7 @@ import { Button, Text } from "./"
 import { useTheme } from "../theme/ThemeContext"
 import { useDebugSentimentAnalysisMutation, useDebugConversationDataMutation, useGetSentimentSummaryQuery, sentimentApi } from "../services/api/sentimentApi"
 import { useSelector, useDispatch } from "react-redux"
-import { getPatient } from "../store/patientSlice"
+import { getClient } from "../store/clientSlice"
 import { translate } from "../i18n"
 import { logger } from "../utils/logger"
 
@@ -23,8 +23,8 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
   const [debugConversationData, { isLoading: isConversationDebugLoading }] = useDebugConversationDataMutation()
   const dispatch = useDispatch()
   
-  // Get current patient for testing
-  const currentPatient = useSelector(getPatient)
+  // Get current client for testing
+  const currentClient = useSelector(getClient)
   const styles = createStyles(colors)
   
   // Test the sentiment summary query directly
@@ -33,8 +33,8 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
     isLoading: isTestLoading,
     error: testError,
   } = useGetSentimentSummaryQuery(
-    { patientId: currentPatient?.id || "" },
-    { skip: !currentPatient?.id }
+    { clientId: currentClient?.id || "" },
+    { skip: !currentClient?.id }
   )
 
   const handleDebugSentiment = async () => {
@@ -50,19 +50,19 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       showInfo(`${translate("sentimentAnalysis.debugComplete")}: Found ${result.summary.totalConversations} conversations. Successfully analyzed ${result.summary.successfullyAnalyzed}, failed ${result.summary.failedAnalyses}.`)
     } catch (error: unknown) {
       console.error("Debug sentiment analysis failed:", error)
-      showError(`${translate("sentimentAnalysis.debugFailed")}: ${error?.data?.message || error?.message || "Unknown error occurred"}`)
+      showError(`${translate("sentimentAnalysis.debugFailed")}: ${(error as { data?: { message?: string }; message?: string })?.data?.message || (error as Error)?.message || "Unknown error occurred"}`)
     }
   }
 
   const handleDebugConversationData = async () => {
-    if (!currentPatient?.id) {
-      showError(translate("sentimentAnalysis.pleaseSelectPatient"))
+    if (!currentClient?.id) {
+      showError(translate("sentimentAnalysis.pleaseSelectClient"))
       return
     }
 
     try {
       const result = await debugConversationData({
-        patientId: currentPatient.id,
+        clientId: currentClient.id,
       }).unwrap()
 
       setConversationDebugResult(result)
@@ -74,7 +74,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       showInfo(`${translate("sentimentAnalysis.conversationDebugComplete")}: Total: ${result.summary.totalConversations}, Recent: ${result.summary.recentConversations}, With Sentiment: ${result.summary.conversationsWithSentiment}, Test Found: ${result.summary.testConversationFound}`)
     } catch (error: unknown) {
       console.error("Debug conversation data failed:", error)
-      showError(`${translate("sentimentAnalysis.debugFailed")}: ${error?.data?.message || error?.message || "Unknown error occurred"}`)
+      showError(`${translate("sentimentAnalysis.debugFailed")}: ${(error as { data?: { message?: string }; message?: string })?.data?.message || (error as Error)?.message || "Unknown error occurred"}`)
     }
   }
 
@@ -96,7 +96,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       <Button
         text={isConversationDebugLoading ? translate("sentimentAnalysis.loading") : translate("sentimentAnalysis.debugConversationData")}
         onPress={handleDebugConversationData}
-        disabled={isConversationDebugLoading || !currentPatient}
+        disabled={isConversationDebugLoading || !currentClient}
         style={[styles.debugButton, styles.conversationButton]}
         testID="debug-conversation-data-button"
       />
@@ -105,13 +105,13 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
         text={isTestLoading ? translate("sentimentAnalysis.testing") : translate("sentimentAnalysis.testDirectApiCall")}
         onPress={() => {
           logger.debug('=== DIRECT API TEST ===')
-          logger.debug('Current Patient:', currentPatient)
+          logger.debug('Current Client:', currentClient)
           logger.debug('Test Summary Data:', JSON.stringify(testSummaryData, null, 2))
           logger.debug('Test Error:', testError)
           logger.debug('=== END DIRECT TEST ===')
-          showInfo(`${translate("sentimentAnalysis.directApiTest")}: Patient: ${currentPatient?.name || 'None'}\nLoading: ${isTestLoading}\nError: ${testError ? 'Yes' : 'No'}\nData: ${testSummaryData ? 'Received' : 'None'}\n\nSummary Data:\n${JSON.stringify(testSummaryData, null, 2)}`)
+          showInfo(`${translate("sentimentAnalysis.directApiTest")}: Client: ${currentClient?.name || 'None'}\nLoading: ${isTestLoading}\nError: ${testError ? 'Yes' : 'No'}\nData: ${testSummaryData ? 'Received' : 'None'}\n\nSummary Data:\n${JSON.stringify(testSummaryData, null, 2)}`)
         }}
-        disabled={isTestLoading || !currentPatient}
+        disabled={isTestLoading || !currentClient}
         style={[styles.debugButton, styles.testButton]}
         testID="test-direct-api-button"
       />
@@ -129,10 +129,10 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           ]))
           
           // Also try to refetch the current queries
-          if (currentPatient?.id) {
+          if (currentClient?.id) {
             dispatch(sentimentApi.util.invalidateTags([
-              { type: "SentimentTrend", id: currentPatient.id },
-              { type: "SentimentSummary", id: currentPatient.id },
+              { type: "SentimentTrend", id: currentClient.id },
+              { type: "SentimentSummary", id: currentClient.id },
             ]))
           }
           
@@ -141,16 +141,16 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           
           showInfo(translate("sentimentAnalysis.cacheRefreshedMessage"))
         }}
-        disabled={!currentPatient}
+        disabled={!currentClient}
         style={[styles.debugButton, styles.refreshButton]}
         testID="force-refresh-cache-button"
       />
       
-      {/* Show current patient info */}
+      {/* Show current client info */}
       <View style={styles.patientInfo}>
-        <Text style={styles.patientInfoTitle}>{translate("sentimentAnalysis.currentPatient")}</Text>
+        <Text style={styles.patientInfoTitle}>{translate("sentimentAnalysis.currentClient")}</Text>
         <Text style={styles.patientInfoText}>
-          {currentPatient ? `${currentPatient.name} (${currentPatient.id})` : translate("sentimentAnalysis.noPatientSelected")}
+          {currentClient ? `${currentClient.name} (${currentClient.id})` : translate("sentimentAnalysis.noClientSelected")}
         </Text>
       </View>
 
@@ -177,7 +177,7 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           {debugResult.conversations.map((conv: any, index: number) => (
             <View key={conv.conversationId} style={styles.conversationItem}>
               <Text style={styles.conversationHeader}>
-                {index + 1}. {conv.patientName} ({conv.messageCount} {translate("sentimentAnalysis.messages")})
+                {index + 1}. {(conv as any).clientName ?? conv.patientName} ({conv.messageCount} {translate("sentimentAnalysis.messages")})
               </Text>
               <Text style={styles.conversationTime}>
                 {new Date(conv.endTime).toLocaleString()}

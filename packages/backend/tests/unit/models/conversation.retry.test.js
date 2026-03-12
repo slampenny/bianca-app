@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Call, Conversation, Patient, Org } = require('../../../src/models');
+const { Call, Conversation, Client, Org } = require('../../../src/models');
 
 let mongoServer;
 
@@ -18,7 +18,7 @@ afterAll(async () => {
 
 describe('Call Model - Retry Fields', () => {
   let org;
-  let patient;
+  let client;
 
   beforeAll(async () => {
     org = await Org.create({
@@ -27,9 +27,9 @@ describe('Call Model - Retry Fields', () => {
       country: 'US',
     });
 
-    patient = await Patient.create({
-      name: 'Test Patient',
-      email: 'patient@example.com',
+    client = await Client.create({
+      name: 'Test Client',
+      email: 'client@example.com',
       phone: '5551234567',
       org: org._id,
     });
@@ -43,7 +43,7 @@ describe('Call Model - Retry Fields', () => {
   it('should create call with default retryAttempt of 0', async () => {
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -55,7 +55,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow setting retryAttempt', async () => {
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -68,7 +68,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow setting originalCallId', async () => {
     const originalCall = await Call.create({
       callSid: 'CA1111111111',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'failed',
@@ -76,7 +76,7 @@ describe('Call Model - Retry Fields', () => {
 
     const retryCall = await Call.create({
       callSid: 'CA2222222222',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -91,7 +91,7 @@ describe('Call Model - Retry Fields', () => {
     const scheduledTime = new Date(Date.now() + 15 * 60 * 1000);
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -104,7 +104,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow setting maxRetries', async () => {
     const call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -117,7 +117,7 @@ describe('Call Model - Retry Fields', () => {
   it('should enforce minimum retryAttempt of 0', async () => {
     const call = new Call({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -130,7 +130,7 @@ describe('Call Model - Retry Fields', () => {
   it('should allow querying calls by originalCallId', async () => {
     const originalCall = await Call.create({
       callSid: 'CA1111111111',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'failed',
@@ -138,7 +138,7 @@ describe('Call Model - Retry Fields', () => {
 
     const retry1 = await Call.create({
       callSid: 'CA2222222222',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',
@@ -148,7 +148,7 @@ describe('Call Model - Retry Fields', () => {
 
     const retry2 = await Call.create({
       callSid: 'CA3333333333',
-      patientId: patient._id,
+      clientId: client._id,
       startTime: new Date(),
       callType: 'wellness-check',
       status: 'initiated',

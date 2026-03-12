@@ -31,7 +31,7 @@ const analyzeConversationAndGenerateReport = async (conversationId) => {
 
   // Generate and save a report based on the analysis
   const report = new Report({
-    patientId: conversation.patientId,
+    clientId: conversation.clientId,
     content: `Analysis Results: ${analysisResults}`, // Example content
     analysisDetails: analysisResults,
   });

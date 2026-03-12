@@ -17,7 +17,7 @@ async function seedAlerts(caregiver, patients = [], conversations = []) {
   if (conversations.length > 0 && patients.length > 0) {
     const conversationAlertThree = {
       ...alertThree,
-      relatedPatient: patients[0]._id,
+      relatedClient: patients[0]._id,
       relatedConversation: conversations[0]?._id,
     };
     

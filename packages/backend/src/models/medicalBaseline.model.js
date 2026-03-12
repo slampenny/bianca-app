@@ -7,9 +7,9 @@ const mongoose = require('mongoose');
  * Stores patient baseline metrics for comparison with current analysis
  */
 const medicalBaselineSchema = new mongoose.Schema({
-  patientId: {
+  clientId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Patient',
+    ref: 'Client',
     required: true,
     index: true
   },
@@ -171,8 +171,8 @@ const medicalBaselineSchema = new mongoose.Schema({
 });
 
 // Indexes
-medicalBaselineSchema.index({ patientId: 1, status: 1 });
-medicalBaselineSchema.index({ patientId: 1, type: 1, lastUpdated: -1 });
+medicalBaselineSchema.index({ clientId: 1, status: 1 });
+medicalBaselineSchema.index({ clientId: 1, type: 1, lastUpdated: -1 });
 medicalBaselineSchema.index({ establishedDate: -1 });
 
 // Virtual for data point count
@@ -230,7 +230,7 @@ medicalBaselineSchema.methods.calculateConfidence = function() {
 // Method to get baseline summary
 medicalBaselineSchema.methods.getSummary = function() {
   return {
-    patientId: this.patientId,
+    clientId: this.clientId,
     type: this.type,
     establishedDate: this.establishedDate,
     lastUpdated: this.lastUpdated,
@@ -251,22 +251,20 @@ medicalBaselineSchema.methods.getSummary = function() {
 };
 
 // Static method to get active baseline for patient
-medicalBaselineSchema.statics.getActiveBaseline = function(patientId) {
+medicalBaselineSchema.statics.getActiveBaseline = function(clientId) {
   return this.findOne({ 
-    patientId, 
+    clientId, 
     status: 'active' 
   }).sort({ lastUpdated: -1 });
 };
 
-// Static method to get all baselines for patient
-medicalBaselineSchema.statics.getPatientBaselines = function(patientId) {
-  return this.find({ patientId }).sort({ lastUpdated: -1 });
+medicalBaselineSchema.statics.getClientBaselines = function(clientId) {
+  return this.find({ clientId }).sort({ lastUpdated: -1 });
 };
 
-// Static method to get baselines by date range
-medicalBaselineSchema.statics.getBaselinesByDateRange = function(patientId, startDate, endDate) {
+medicalBaselineSchema.statics.getBaselinesByDateRange = function(clientId, startDate, endDate) {
   return this.find({
-    patientId,
+    clientId,
     establishedDate: { $gte: startDate, $lte: endDate },
     status: 'active'
   }).sort({ establishedDate: -1 });

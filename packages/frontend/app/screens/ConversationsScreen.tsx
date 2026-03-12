@@ -2,12 +2,13 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { View, StyleSheet, ActivityIndicator, FlatList, RefreshControl } from "react-native"
 import { Text } from "../components"
 import { useSelector, useDispatch } from "react-redux"
-import { useGetConversationsByPatientQuery } from "../services/api/conversationApi"
-import { getPatient } from "../store/patientSlice"
+import { useGetConversationsByClientQuery } from "../services/api/conversationApi"
+import { getClient } from "../store/clientSlice"
 import { getConversations, clearConversations, getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall } from "../store/callSlice"
 import { Conversation, Message } from "../services/api/api.types"
 import { useTheme } from "app/theme/ThemeContext"
+import type { ThemeColors } from "../types"
 import { SentimentIndicator } from "../components/SentimentIndicator"
 import { ConversationMessages } from "../components/ConversationMessages"
 import { Screen } from "../components/Screen"
@@ -154,7 +155,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
 })
 
 export function ConversationsScreen() {
-  const patient = useSelector(getPatient)
+  const client = useSelector(getClient)
   const conversations = useSelector(getConversations)
   const currentConversation = useSelector(getConversation)
   const activeCall = useSelector(getActiveCall)
@@ -171,15 +172,15 @@ export function ConversationsScreen() {
     error,
     isLoading,
     refetch,
-  } = useGetConversationsByPatientQuery(
+  } = useGetConversationsByClientQuery(
     { 
-      patientId: patient?.id as string,
+      clientId: client?.id as string,
       page,
       limit: 10,
       sortBy: 'startTime:desc'
     },
     { 
-      skip: !patient?.id,
+      skip: !client?.id,
       // Force refetch on mount to ensure fresh data
       refetchOnMountOrArgChange: true,
     },
@@ -209,18 +210,18 @@ export function ConversationsScreen() {
   }, [error])
 
   useEffect(() => {
-    if (patient?.id) {
+    if (client?.id) {
       setPage(1)
       setHasMore(true)
-      // Force refetch when patient changes to ensure we get fresh data
+      // Force refetch when client changes to ensure we get fresh data
       // Don't clear conversations here - let the API response handle it
       // This prevents conversations from disappearing during the API call
       refetch()
     } else {
-      // If no patient, clear conversations
+      // If no client, clear conversations
       dispatch(clearConversations())
     }
-  }, [patient?.id, refetch, dispatch])
+  }, [client?.id, refetch, dispatch])
 
   // Debug logging for Redux state
   useEffect(() => {
@@ -317,12 +318,12 @@ export function ConversationsScreen() {
 
   const styles = createStyles(colors)
 
-  if (!patient) {
+  if (!client) {
     return (
       <View style={styles.container}>
         <Header title={translate("conversationsScreen.title")} colors={colors} />
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{translate("conversationsScreen.noPatientSelected")}</Text>
+          <Text style={styles.errorText}>{translate("conversationsScreen.noClientSelected")}</Text>
         </View>
       </View>
     )

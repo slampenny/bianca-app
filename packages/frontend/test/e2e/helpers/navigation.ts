@@ -2,49 +2,86 @@ import { Page, expect } from "@playwright/test"
 import { loginUserViaUI } from "./testHelpers"
 import { TEST_USERS } from "../fixtures/testData"
 
-export async function navigateToRegister(page: Page) {
+/** Persona for onboarding flow. Default 'caregiver' for shortest path (no Org Info step). */
+export type OnboardingPersona = "organization" | "caregiver" | "agingInPlace"
+
+/**
+ * Go through onboarding (About you → How Bianca works → [Org info if organization]) to reach the Register screen.
+ * Call this after clicking the Register button from login; the app now shows onboarding first.
+ */
+export async function goThroughOnboardingToRegister(
+  page: Page,
+  persona: OnboardingPersona = "caregiver",
+  orgName?: string
+): Promise<void> {
+  // Wait for either About You (new flow) or Register screen (e.g. deep link)
+  const aboutYou = page.getByTestId("onboarding-about-you-screen")
+  const registerName = page.locator('input[data-testid="register-name"]')
+  await Promise.race([
+    aboutYou.waitFor({ state: "visible", timeout: 10000 }),
+    registerName.waitFor({ state: "visible", timeout: 10000 }),
+  ])
+
+  const onAboutYou = await aboutYou.isVisible().catch(() => false)
+  if (!onAboutYou) {
+    // Already on Register screen
+    return
+  }
+
+  // About You: select persona and continue
+  const personaTestId =
+    persona === "organization"
+      ? "onboarding-persona-organization"
+      : persona === "caregiver"
+        ? "onboarding-persona-caregiver"
+        : "onboarding-persona-agingInPlace"
+  await page.getByTestId(personaTestId).click()
+  await page.getByTestId("onboarding-about-you-continue").click()
+
+  // How Bianca works: click Next / Get started
+  await page.getByTestId("onboarding-how-it-works-next").waitFor({ state: "visible", timeout: 10000 })
+  await page.getByTestId("onboarding-how-it-works-next").click()
+
+  if (persona === "organization") {
+    // Org info: fill org name (country/timezone use defaults), continue
+    await page.getByTestId("onboarding-org-info-screen").waitFor({ state: "visible", timeout: 10000 })
+    const orgNameInput = page.locator('input[data-testid="onboarding-org-name"]')
+    await orgNameInput.waitFor({ state: "visible", timeout: 5000 })
+    await orgNameInput.fill(orgName ?? "Test Org")
+    await page.getByTestId("onboarding-org-info-continue").click()
+  }
+
+  // Wait for Register screen
+  await registerName.waitFor({ state: "visible", timeout: 10000 })
+}
+
+export async function navigateToRegister(
+  page: Page,
+  options?: { persona?: OnboardingPersona; orgName?: string }
+): Promise<void> {
   await page.goto("/")
-  // Wait for login screen to load - use data-testid for React Native Web
   await page.waitForSelector('input[data-testid="email-input"]', { timeout: 10000 })
-  await page.waitForTimeout(1000) // Small delay to ensure form is ready
-  
-  // Click register button - use data-testid (LoginForm uses "register-button" testID)
-  // Button component should map testID to data-testid automatically
-  // Try getByTestId first, fallback to locator
-  let registerButton = page.getByTestId('register-button')
+  await page.waitForTimeout(1000)
+
+  let registerButton = page.getByTestId("register-button")
   let buttonCount = await registerButton.count().catch(() => 0)
-  
   if (buttonCount === 0) {
-    // Fallback: try locator
     registerButton = page.locator('[data-testid="register-button"]').first()
     buttonCount = await registerButton.count().catch(() => 0)
   }
-  
   if (buttonCount === 0) {
-    // Last resort: find by text
     registerButton = page.getByText(/register|create account/i).first()
   }
-  
-  await registerButton.waitFor({ state: 'visible', timeout: 10000 })
-  console.log('Register button found, clicking...')
+
+  await registerButton.waitFor({ state: "visible", timeout: 10000 })
   await registerButton.click()
-  console.log('Register button clicked, waiting for navigation...')
-  
-  // Wait for navigation - use Promise.race to fail fast (5 second total timeout)
-  try {
-    await Promise.race([
-      page.waitForSelector('[data-testid="register-screen"]', { timeout: 5000 }),
-      page.waitForSelector('input[data-testid="register-name"]', { timeout: 5000 }),
-      page.waitForSelector('[data-testid^="register-"]', { timeout: 5000 }),
-    ])
-    console.log('Found register screen')
-  } catch {
-    // Quick debug
-    const currentUrl = page.url()
-    const stillOnLogin = await page.locator('input[data-testid="email-input"]').isVisible({ timeout: 1000 }).catch(() => false)
-    console.error(`Failed to find register screen. URL: ${currentUrl}, Still on login: ${stillOnLogin}`)
-    throw new Error('Register screen not found after clicking register button')
-  }
+
+  await goThroughOnboardingToRegister(
+    page,
+    options?.persona ?? "caregiver",
+    options?.orgName
+  )
+  console.log("Reached register screen")
 }
 
 export async function navigateToHome(page: Page, user?: { email: string; password: string }) {
@@ -110,8 +147,8 @@ export async function isHomeScreen(page: Page) {
 
   // Try multiple indicators that we're on the home screen
   const homeIndicators = [
-    page.getByText("Add Patient", { exact: true }),
-    page.getByTestId('add-patient-button'),
+    page.getByText("Add Client", { exact: true }),
+    page.getByTestId('add-client-button'),
     page.getByTestId('home-header'),
     page.locator('[data-testid="home-screen"]'),
     page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
@@ -164,36 +201,29 @@ export async function isHomeScreen(page: Page) {
 }
 
 export async function isPatientScreen(page: Page) {
-  console.log("Checking if on Patient Screen...")
-  // Look for either CREATE PATIENT or UPDATE PATIENT button which is specific to the patient screen
-  // Also check for other patient screen indicators as fallbacks
+  console.log("Checking if on Client Screen...")
+  // Look for either CREATE CLIENT or UPDATE CLIENT button (or legacy CREATE/UPDATE PATIENT)
   try {
-    await expect(page.getByText("CREATE PATIENT")).toBeVisible({ timeout: 5000 })
-    console.log("Confirmed on Patient Screen (Create mode).")
+    await expect(page.getByText(/CREATE CLIENT|CREATE PATIENT/i)).toBeVisible({ timeout: 5000 })
+    console.log("Confirmed on Client Screen (Create mode).")
     return
   } catch {
-    // Try UPDATE PATIENT
     try {
-      await expect(page.getByText("UPDATE PATIENT")).toBeVisible({ timeout: 5000 })
-      console.log("Confirmed on Patient Screen (Update mode).")
+      await expect(page.getByText(/UPDATE CLIENT|UPDATE PATIENT/i)).toBeVisible({ timeout: 5000 })
+      console.log("Confirmed on Client Screen (Update mode).")
       return
     } catch {
-      // Fallback: Check for other patient screen indicators
-      const saveButton = page.locator('[data-testid="save-patient-button"]')
-      const nameInput = page.locator('[data-testid="patient-name-input"], input[placeholder*="name" i]')
-      const patientScreen = page.locator('[data-testid="patient-screen"], [aria-label*="patient" i]')
-      
+      const saveButton = page.locator('[data-testid="save-client-button"]')
+      const nameInput = page.locator('[data-testid="client-name-input"], input[placeholder*="name" i]')
+      const clientScreen = page.locator('[data-testid="client-screen"], [aria-label*="client" i]')
       const hasSaveButton = await saveButton.count() > 0
       const hasNameInput = await nameInput.count() > 0
-      const hasPatientScreen = await patientScreen.count() > 0
-      
-      if (hasSaveButton || hasNameInput || hasPatientScreen) {
-        console.log("Confirmed on Patient Screen (via fallback indicators).")
+      const hasClientScreen = await clientScreen.count() > 0
+      if (hasSaveButton || hasNameInput || hasClientScreen) {
+        console.log("Confirmed on Client Screen (via fallback indicators).")
         return
       }
-      
-      // If none of the indicators are found, throw the original error
-      throw new Error("Could not confirm Patient Screen - no indicators found")
+      throw new Error("Could not confirm Client Screen - no indicators found")
     }
   }
 }
@@ -219,36 +249,30 @@ export async function isCaregiversScreen(page: Page) {
 
 export async function navigateToSchedules(page: Page) {
   console.log("Navigating to Schedules...")
-  // IMPORTANT: Schedules can only be accessed through the patient screen
+  // IMPORTANT: Schedules can only be accessed through the client screen
   // First, ensure we're on the home screen
   await isHomeScreen(page)
   
-  // Find a patient card to navigate to patient screen
-  const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]')
-  const patientCardCount = await patientCard.count()
+  // Find a client card to navigate to client screen
+  const clientCard = page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]')
+  const clientCardCount = await clientCard.count()
   
-  if (patientCardCount === 0) {
-    throw new Error('Cannot navigate to schedules: No patients found. Schedules can only be accessed through an existing patient.')
+  if (clientCardCount === 0) {
+    throw new Error('Cannot navigate to schedules: No clients found. Schedules can only be accessed through an existing client.')
   }
   
-  // Click on a patient to navigate to patient screen
-  // Prefer edit button if available (for existing patients)
-  const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+  const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
   const editButtonCount = await editButton.count()
   
   if (editButtonCount > 0) {
     await editButton.click({ timeout: 10000 })
   } else {
-    // Fallback: click patient card
-    await patientCard.first().click({ timeout: 10000 })
+    await clientCard.first().click({ timeout: 10000 })
   }
   
-  // Wait for patient screen to load
   await isPatientScreen(page)
   await page.waitForTimeout(1000) // Give time for form to populate
   
-  // Now look for the "Manage Schedules" button on the patient screen
-  // This button only appears for existing patients (not new patient mode)
   const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"]')
   // Wait for the button to appear or timeout, then count
   try {
@@ -259,12 +283,11 @@ export async function navigateToSchedules(page: Page) {
   const buttonCount = await manageSchedulesButton.count()
   
   if (buttonCount === 0) {
-    // Check if we're in new patient mode
-    const isNewPatient = await page.getByText(/CREATE PATIENT/i).count() > 0
-    if (isNewPatient) {
-      throw new Error('Cannot navigate to schedules: Currently in new patient mode. Schedules can only be accessed for existing patients.')
+    const isNewClient = await page.getByText(/CREATE CLIENT|CREATE PATIENT/i).count() > 0
+    if (isNewClient) {
+      throw new Error('Cannot navigate to schedules: Currently in new client mode. Schedules can only be accessed for existing clients.')
     }
-    throw new Error('BUG: Manage schedules button not found on patient screen!')
+    throw new Error('BUG: Manage schedules button not found on client screen!')
   }
   
   // Click the manage schedules button
@@ -275,7 +298,7 @@ export async function navigateToSchedules(page: Page) {
   // Verify we're on the schedule screen
   const scheduleScreen = page.locator('[data-testid="schedules-screen"]')
   await expect(scheduleScreen).toBeVisible({ timeout: 10000 })
-  console.log("Successfully navigated to Schedules via Patient screen")
+  console.log("Successfully navigated to Schedules via Client screen")
 }
 
 export async function isSchedulesScreen(page: Page) {
@@ -424,38 +447,36 @@ export async function navigateToReportsTab(page: Page) {
 }
 
 export async function navigateToPatientScreen(page: Page, patientName?: string) {
-  console.log("Navigating to Patient screen...")
+  console.log("Navigating to Client screen...")
   await isHomeScreen(page)
   
   if (patientName) {
-    // Find specific patient by name
-    const patientCard = page.locator('[data-testid^="patient-card-"], [data-testid^="edit-patient-button-"]').filter({ hasText: patientName })
-    const count = await patientCard.count()
+    const clientCard = page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]').filter({ hasText: patientName })
+    const count = await clientCard.count()
     if (count > 0) {
-      await patientCard.first().click({ timeout: 10000 })
+      await clientCard.first().click({ timeout: 10000 })
     } else {
-      throw new Error(`Patient "${patientName}" not found`)
+      throw new Error(`Client "${patientName}" not found`)
     }
   } else {
-    // Click first available patient
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     const editButtonCount = await editButton.count()
     
     if (editButtonCount > 0) {
       await editButton.click({ timeout: 10000 })
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
-      const patientCount = await patientCard.count()
-      if (patientCount === 0) {
-        throw new Error('No patients found - cannot navigate to patient screen')
+      const clientCard = page.locator('[data-testid^="client-card-"]').first()
+      const clientCount = await clientCard.count()
+      if (clientCount === 0) {
+        throw new Error('No clients found - cannot navigate to client screen')
       }
-      await patientCard.first().click({ timeout: 10000 })
+      await clientCard.first().click({ timeout: 10000 })
     }
   }
   
   await isPatientScreen(page)
   await page.waitForTimeout(1000) // Give time for form to populate
-  console.log("Successfully navigated to Patient screen")
+  console.log("Successfully navigated to Client screen")
 }
 
 export async function navigateToCaregiversScreen(page: Page) {

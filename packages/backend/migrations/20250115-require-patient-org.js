@@ -9,7 +9,7 @@
 
 const mongoose = require('mongoose');
 const config = require('../src/config/config');
-const { Patient, Caregiver, Org, Schedule } = require('../src/models');
+const { Client, Caregiver, Org, Schedule } = require('../src/models');
 const logger = require('../src/config/logger');
 
 module.exports = {
@@ -27,7 +27,7 @@ module.exports = {
     }
     
     // Find all patients without an org
-    const patientsWithoutOrg = await Patient.find({
+    const patientsWithoutOrg = await Client.find({
       $or: [
         { org: { $exists: false } },
         { org: null },
@@ -46,14 +46,14 @@ module.exports = {
     let errorCount = 0;
     const patientsNeedingManualReview = [];
 
-    for (const patient of patientsWithoutOrg) {
+    for (const client of patientsWithoutOrg) {
       try {
         let orgToAssign = null;
 
-        // Strategy 1: Get org from patient's caregivers
-        if (patient.caregivers && patient.caregivers.length > 0) {
+        // Strategy 1: Get org from client's caregivers
+        if (client.caregivers && client.caregivers.length > 0) {
           // Populate caregivers if they're not already populated
-          const caregivers = patient.caregivers.map(cg => 
+          const caregivers = client.caregivers.map(cg => 
             cg._id ? cg : null
           ).filter(Boolean);
 
@@ -73,13 +73,13 @@ module.exports = {
           }
         }
 
-        // Strategy 2: If still no org, try to find org from patient's schedules
-        if (!orgToAssign && patient.schedules && patient.schedules.length > 0) {
-          const schedule = await Schedule.findById(patient.schedules[0])
-            .populate('patient.org');
+        // Strategy 2: If still no org, try to find org from client's schedules
+        if (!orgToAssign && client.schedules && client.schedules.length > 0) {
+          const schedule = await Schedule.findById(client.schedules[0])
+            .populate('client.org');
           
-          if (schedule && schedule.patient && schedule.patient.org) {
-            orgToAssign = schedule.patient.org;
+          if (schedule && schedule.client && schedule.client.org) {
+            orgToAssign = schedule.client.org;
           }
         }
 
@@ -87,15 +87,15 @@ module.exports = {
           // Verify org exists
           const orgExists = await Org.findById(orgToAssign);
           if (orgExists) {
-            patient.org = orgToAssign;
-            await patient.save();
+            client.org = orgToAssign;
+            await client.save();
             updatedCount++;
-            logger.info(`[Migration] ✅ Updated patient ${patient._id} (${patient.name}) with org ${orgExists.name}`);
+            logger.info(`[Migration] ✅ Updated client ${client._id} (${client.name}) with org ${orgExists.name}`);
           } else {
-            logger.warn(`[Migration] ⚠️  Org ${orgToAssign} not found for patient ${patient._id}`);
+            logger.warn(`[Migration] ⚠️  Org ${orgToAssign} not found for client ${client._id}`);
             patientsNeedingManualReview.push({
-              patientId: patient._id,
-              patientName: patient.name,
+              clientId: client._id,
+              clientName: client.name,
               reason: `Org ${orgToAssign} not found in database`,
             });
             errorCount++;
@@ -103,21 +103,21 @@ module.exports = {
         } else {
           // No org found - needs manual review
           patientsNeedingManualReview.push({
-            patientId: patient._id,
-            patientName: patient.name,
-            email: patient.email,
-            caregiversCount: patient.caregivers?.length || 0,
+            clientId: client._id,
+            clientName: client.name,
+            email: client.email,
+            caregiversCount: client.caregivers?.length || 0,
             reason: 'No caregivers with orgs found',
           });
           skippedCount++;
-          logger.warn(`[Migration] ⚠️  Patient ${patient._id} (${patient.name}) has no org and no caregivers with orgs - needs manual assignment`);
+          logger.warn(`[Migration] ⚠️  Client ${client._id} (${client.name}) has no org and no caregivers with orgs - needs manual assignment`);
         }
       } catch (error) {
         errorCount++;
-        logger.error(`[Migration] ❌ Error processing patient ${patient._id}: ${error.message}`, error);
+        logger.error(`[Migration] ❌ Error processing client ${client._id}: ${error.message}`, error);
         patientsNeedingManualReview.push({
-          patientId: patient._id,
-          patientName: patient.name,
+          clientId: client._id,
+          clientName: client.name,
           reason: `Error: ${error.message}`,
         });
       }
@@ -125,15 +125,15 @@ module.exports = {
 
     // Summary
     logger.info('[Migration] 📊 Migration Summary:');
-    logger.info(`[Migration]    ✅ Updated: ${updatedCount} patient(s)`);
-    logger.info(`[Migration]    ⚠️  Skipped (needs manual review): ${skippedCount} patient(s)`);
-    logger.info(`[Migration]    ❌ Errors: ${errorCount} patient(s)`);
+    logger.info(`[Migration]    ✅ Updated: ${updatedCount} client(s)`);
+    logger.info(`[Migration]    ⚠️  Skipped (needs manual review): ${skippedCount} client(s)`);
+    logger.info(`[Migration]    ❌ Errors: ${errorCount} client(s)`);
 
-    // Report patients needing manual review
+    // Report clients needing manual review
     if (patientsNeedingManualReview.length > 0) {
-      logger.warn('[Migration] ⚠️  Patients requiring manual org assignment:');
+      logger.warn('[Migration] ⚠️  Clients requiring manual org assignment:');
       patientsNeedingManualReview.forEach((p) => {
-        logger.warn(`[Migration]    - ${p.patientName} (${p.patientId}): ${p.reason}`);
+        logger.warn(`[Migration]    - ${p.clientName} (${p.clientId}): ${p.reason}`);
         if (p.email) {
           logger.warn(`[Migration]      Email: ${p.email}`);
         }
@@ -144,7 +144,7 @@ module.exports = {
     }
 
     // Verify migration
-    const remainingPatientsWithoutOrg = await Patient.find({
+    const remainingPatientsWithoutOrg = await Client.find({
       $or: [
         { org: { $exists: false } },
         { org: null },

@@ -1,7 +1,7 @@
 const m2s = require('mongoose-to-swagger');
 const config = require('../config/config');
 const { version } = require('../../package.json');
-const { Alert, Caregiver, Conversation, Call, Message, Org, Patient, Report, Schedule, Token } = require('../models');
+const { Alert, Caregiver, Conversation, Call, Message, Org, Client, Report, Schedule, Token } = require('../models');
 
 const swaggerDef = {
   openapi: '3.0.0',
@@ -24,7 +24,7 @@ const swaggerDef = {
       Conversation: m2s(Conversation),
       Call: m2s(Call),
       Org: m2s(Org),
-      Patient: m2s(Patient),
+      Client: m2s(Client),
       Token: m2s(Token),
       AuthToken: {
         title: 'AuthToken',

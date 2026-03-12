@@ -5,13 +5,14 @@ import { colors as colorblindColors } from "./colors.colorblind"
 import { colors as darkColors } from "./colors.dark"
 import { colors as highContrastColors } from "./colors.highcontrast"
 import { logger } from "../utils/logger"
+import type { ThemeColors } from "../types"
 
 export type ThemeType = "healthcare" | "colorblind" | "dark" | "highcontrast"
 
 export interface Theme {
   name: string
   description: string
-  colors: typeof healthcareColors | typeof colorblindColors | typeof darkColors | typeof highContrastColors
+  colors: ThemeColors
   accessibility: {
     wcagLevel: "AA" | "AAA"
     colorblindFriendly: boolean
@@ -25,7 +26,7 @@ export const themes: Record<ThemeType, Theme> = {
   healthcare: {
     name: "Healthcare",
     description: "Professional medical theme with blue and green colors",
-    colors: healthcareColors,
+    colors: healthcareColors as ThemeColors,
     accessibility: {
       wcagLevel: "AA",
       colorblindFriendly: false,
@@ -37,7 +38,7 @@ export const themes: Record<ThemeType, Theme> = {
   colorblind: {
     name: "Color-Blind Friendly",
     description: "High contrast theme optimized for color vision deficiency",
-    colors: colorblindColors,
+    colors: colorblindColors as ThemeColors,
     accessibility: {
       wcagLevel: "AAA",
       colorblindFriendly: true,
@@ -49,7 +50,7 @@ export const themes: Record<ThemeType, Theme> = {
   dark: {
     name: "Dark Mode",
     description: "Dark theme optimized for low-light environments",
-    colors: darkColors,
+    colors: darkColors as ThemeColors,
     accessibility: {
       wcagLevel: "AA",
       colorblindFriendly: false,
@@ -61,7 +62,7 @@ export const themes: Record<ThemeType, Theme> = {
   highcontrast: {
     name: "High Contrast",
     description: "Maximum contrast theme for vision impairment (WCAG AAA)",
-    colors: highContrastColors,
+    colors: highContrastColors as ThemeColors,
     accessibility: {
       wcagLevel: "AAA",
       colorblindFriendly: true,
@@ -77,7 +78,7 @@ export const defaultTheme: ThemeType = "healthcare"
 interface ThemeContextType {
   currentTheme: ThemeType
   setTheme: (theme: ThemeType) => void
-  colors: typeof healthcareColors | typeof colorblindColors | typeof darkColors | typeof highContrastColors
+  colors: ThemeColors
   themeInfo: Theme
   isLoading: boolean
   fontScale: number

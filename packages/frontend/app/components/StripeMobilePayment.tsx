@@ -5,24 +5,11 @@ import Toast from './Toast'
 import ConfirmationModal from './ConfirmationModal'
 import { Text, Button, Card, ListItem } from 'app/components'
 import { colors, spacing } from 'app/theme'
+import Config from '../config'
 import { useGetPaymentMethodsQuery, useSetDefaultPaymentMethodMutation, useDetachPaymentMethodMutation, useCreateSetupIntentMutation } from 'app/services/api/paymentMethodApi'
 import { translate } from 'app/i18n'
 import { logger } from '../utils/logger'
-
-interface PaymentMethod {
-  id: string
-  type: string
-  brand?: string
-  last4?: string
-  expMonth?: number
-  expYear?: number
-  isDefault: boolean
-  billingDetails?: {
-    name?: string
-    email?: string
-    phone?: string
-  }
-}
+import type { PaymentMethod } from 'app/services/api/api.types'
 
 interface StripeMobilePaymentProps {
   orgId: string
@@ -71,7 +58,7 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
   if (stripeLoading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading payment system...</Text>
+        <Text style={styles.message}>Loading payment system...</Text>
       </View>
     )
   }
@@ -80,7 +67,7 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
   if (!stripeHook) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Failed to load payment system</Text>
+        <Text style={styles.errorMessage}>Failed to load payment system</Text>
       </View>
     )
   }
@@ -92,7 +79,7 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
 
   const initializePaymentSheet = async () => {
     try {
-      if (!Config.stripe.publishableKey) {
+      if (!(Config as { stripe?: { publishableKey?: string } }).stripe?.publishableKey) {
         throw new Error('Stripe configuration error')
       }
 
@@ -208,8 +195,8 @@ const StripeMobilePayment: React.FC<StripeMobilePaymentProps> = ({
       {paymentMethods.length > 0 && (
         <View style={styles.existingMethods}>
           <Text style={styles.sectionTitle}>Existing Payment Methods</Text>
-          {paymentMethods.map((method: PaymentMethod) => (
-            <Card key={method.id} style={styles.paymentMethodCard}>
+          {paymentMethods.map((method: PaymentMethod, index: number) => (
+            <Card key={method.id ?? `pm-${index}`} style={styles.paymentMethodCard}>
               <ListItem
                 text={`${method.brand?.toUpperCase() || method.type} •••• ${method.last4}`}
                 subText={method.isDefault ? 'Default' : ''}

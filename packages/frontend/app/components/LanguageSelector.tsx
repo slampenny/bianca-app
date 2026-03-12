@@ -9,6 +9,7 @@ import { useLanguage } from "../hooks/useLanguage"
 import { useSelector } from "react-redux"
 import { getCaregiver } from "../store/caregiverSlice"
 import { useUpdateCaregiverMutation } from "../services/api/caregiverApi"
+import { isAuthCancelledError } from "../services/api/baseQueryWithAuth"
 import { logger } from "../utils/logger"
 
 interface LanguageSelectorProps {
@@ -129,7 +130,9 @@ export function LanguageSelector({ style, testID }: LanguageSelectorProps) {
         }).unwrap()
         logger.debug("Language preference saved to backend:", languageCode)
       } catch (error) {
-        console.error("Failed to save language preference to backend:", error)
+        if (!isAuthCancelledError(error)) {
+          console.error("Failed to save language preference to backend:", error)
+        }
         // Don't block the UI - language change still works locally
       }
     }

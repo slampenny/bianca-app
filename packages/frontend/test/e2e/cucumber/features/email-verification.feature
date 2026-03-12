@@ -4,7 +4,7 @@ Feature: Email Verification
   So that I can access all features
 
   Background:
-    Given the frontend is running on "http://localhost:8082"
+    Given the frontend is running on "http://localhost:8084"
     And the backend is running on "http://localhost:3000"
 
   Scenario: Register and receive verification email

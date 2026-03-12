@@ -7,28 +7,26 @@ export const sentimentApi = createApi({
   baseQuery: baseQueryWithReauth(),
   tagTypes: ["SentimentTrend", "SentimentSummary", "SentimentAnalysis"],
   endpoints: (builder) => ({
-    // Get sentiment trend for a patient over time
     getSentimentTrend: builder.query<
       SentimentTrend,
-      { patientId: string; timeRange?: "lastCall" | "month" | "lifetime" }
+      { clientId: string; timeRange?: "lastCall" | "month" | "lifetime" }
     >({
-      query: ({ patientId, timeRange = "lastCall" }) => ({
-        url: `/sentiment/patient/${patientId}/trend`,
+      query: ({ clientId, timeRange = "lastCall" }) => ({
+        url: `/sentiment/client/${clientId}/trend`,
         params: { timeRange },
       }),
-      providesTags: (result, error, { patientId, timeRange }) => [
-        { type: "SentimentTrend", id: `${patientId}-${timeRange}` },
+      providesTags: (result, error, { clientId, timeRange }) => [
+        { type: "SentimentTrend", id: `${clientId}-${timeRange}` },
         { type: "SentimentTrend", id: "LIST" },
       ],
     }),
 
-    // Get sentiment summary for a patient
-    getSentimentSummary: builder.query<SentimentSummary, { patientId: string }>({
-      query: ({ patientId }) => ({
-        url: `/sentiment/patient/${patientId}/summary`,
+    getSentimentSummary: builder.query<SentimentSummary, { clientId: string }>({
+      query: ({ clientId }) => ({
+        url: `/sentiment/client/${clientId}/summary`,
       }),
-      providesTags: (result, error, { patientId }) => [
-        { type: "SentimentSummary", id: patientId },
+      providesTags: (result, error, { clientId }) => [
+        { type: "SentimentSummary", id: clientId },
         { type: "SentimentSummary", id: "LIST" },
       ],
     }),
@@ -92,12 +90,12 @@ export const sentimentApi = createApi({
           thirtyDaysAgo: string
         }
       },
-      { patientId: string }
+      { clientId: string }
     >({
-      query: ({ patientId }) => ({
+      query: ({ clientId }) => ({
         url: `/test/debug-conversation-data`,
         method: "POST",
-        body: { patientId },
+        body: { clientId },
       }),
     }),
 
@@ -114,7 +112,7 @@ export const sentimentApi = createApi({
         }
         conversations: Array<{
           conversationId: string
-          patientName: string
+          clientName: string
           endTime: string
           hadSentiment: boolean
           messageCount: number

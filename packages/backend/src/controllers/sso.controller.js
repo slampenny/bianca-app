@@ -6,7 +6,7 @@ const config = require('../config/config');
 const logger = require('../config/logger');
 const catchAsync = require('../utils/catchAsync');
 const { tokenService, orgService, emailService, alertService } = require('../services');
-const { CaregiverDTO, OrgDTO, PatientDTO, AlertDTO } = require('../dtos');
+const { CaregiverDTO, OrgDTO, ClientDTO, AlertDTO } = require('../dtos');
 
 const login = catchAsync(async (req, res) => {
   try {
@@ -19,11 +19,11 @@ const login = catchAsync(async (req, res) => {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Missing required SSO fields: provider, email, name, and id are required');
     }
 
-    // Check if caregiver exists with this email - populate patients and org
+    // Check if caregiver exists with this email - populate clients and org
     let caregiver = await Caregiver.findOne({ email })
       .populate('org')
       .populate({
-        path: 'patients',
+        path: 'clients',
         populate: {
           path: 'schedules',
           model: 'Schedule',
@@ -66,11 +66,11 @@ const login = catchAsync(async (req, res) => {
           // Wait a tick to ensure MongoDB write is committed before populate
           await new Promise(resolve => setImmediate(resolve));
           
-          // Populate caregiver with org and patients - use fresh query with populated org
+          // Populate caregiver with org and clients - use fresh query with populated org
           caregiver = await Caregiver.findById(caregiver._id)
             .populate('org')
             .populate({
-              path: 'patients',
+              path: 'clients',
               populate: {
                 path: 'schedules',
                 model: 'Schedule',
@@ -103,54 +103,44 @@ const login = catchAsync(async (req, res) => {
         // Neither org nor caregiver exists - create both
         logger.info('SSO login creating new org and caregiver', { email, name, provider });
         try {
-          // Create new user through the proper registration workflow
-          const org = await orgService.createOrg(
-          {
-            email: email,
-            name: `${name}'s Organization`,
-            // phone will be set later when user completes profile
-          },
-          {
-            email: email,
-            name: name,
-            // phone will be set later when user completes profile
-            password: null, // SSO users don't have passwords
-            ssoProvider: provider,
-            ssoProviderId: providerId,
-            avatar: picture,
-            isEmailVerified: true, // SSO users are pre-verified
-            role: 'orgAdmin', // User creating the org should be orgAdmin from the start
-          }
+          // Create new user through the proper registration workflow (returns { org, caregiver })
+          const { org: createdOrg, caregiver: createdCaregiver } = await orgService.createOrg(
+            {
+              email: email,
+              name: `${name}'s Organization`,
+              // phone will be set later when user completes profile
+            },
+            {
+              email: email,
+              name: name,
+              // phone will be set later when user completes profile
+              password: null, // SSO users don't have passwords
+              ssoProvider: provider,
+              ssoProviderId: providerId,
+              avatar: picture,
+              isEmailVerified: true, // SSO users are pre-verified
+              role: 'orgAdmin', // User creating the org should be orgAdmin from the start
+            }
           );
-
-          // Wait a tick to ensure MongoDB write is committed
-          await new Promise(resolve => setImmediate(resolve));
-
-          // Fetch the caregiver with full population to ensure we have complete data
-          const caregiverId = org.caregivers && org.caregivers.length > 0 ? org.caregivers[0] : null;
-          if (!caregiverId) {
+          if (!createdCaregiver) {
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to retrieve caregiver after org creation');
           }
-
-          caregiver = await Caregiver.findById(caregiverId)
+          caregiver = await Caregiver.findById(createdCaregiver._id)
             .populate('org')
             .populate({
-              path: 'patients',
+              path: 'clients',
               populate: {
                 path: 'schedules',
                 model: 'Schedule',
               },
             });
-
           if (!caregiver) {
             throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Failed to find caregiver after creation');
           }
-
-          // Fetch org separately to ensure it's fully populated
-          orgForDTO = await Org.findById(org._id);
+          orgForDTO = createdOrg ? await Org.findById(createdOrg._id) : null;
           
           logger.info('SSO login successfully created new org and caregiver', { 
-            orgId: org._id, 
+            orgId: createdOrg?._id ?? caregiver.org?.id ?? caregiver.org, 
             caregiverId: caregiver._id,
             hasOrg: !!caregiver.org,
             orgPopulated: !!(caregiver.org && caregiver.org.name)
@@ -228,9 +218,9 @@ const login = catchAsync(async (req, res) => {
     const alerts = await alertService.getAlerts(caregiverId);
     const alertDTOs = alerts.map((alert) => AlertDTO(alert));
     
-    // Get patients from caregiver (already populated)
-    const patients = caregiver.patients || [];
-    const patientDTOs = patients.map((patient) => PatientDTO(patient));
+    // Get clients from caregiver (already populated)
+    const clients = caregiver.clients || [];
+    const clientDTOs = clients.map((c) => ClientDTO(c));
 
     // Generate DTOs
     let caregiverDTO, orgDTO;
@@ -274,7 +264,7 @@ const login = catchAsync(async (req, res) => {
       tokens,
       caregiver: caregiverDTO,
       org: orgDTO,
-      patients: patientDTOs,
+      clients: clientDTOs,
       alerts: alertDTOs
     };
 

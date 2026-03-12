@@ -1,21 +1,21 @@
 const scheduleFixture = require('../../../tests/fixtures/schedule.fixture');
 
 /**
- * Seed schedules for patients
- * @param {Array} patients - Array of patients to seed schedules for
+ * Seed schedules for clients
+ * @param {Array} clients - Array of clients to seed schedules for
  * @returns {Promise<Array>} Array of created schedules
  */
-async function seedSchedules(patients) {
+async function seedSchedules(clients) {
   console.log('Seeding Schedules...');
-  const { scheduleOne, scheduleTwo, insertScheduleAndAddToPatient } = scheduleFixture;
+  const { scheduleOne, scheduleTwo, insertScheduleAndAddToClient } = scheduleFixture;
   
   const schedules = [];
-  if (patients.length > 0) {
-    await insertScheduleAndAddToPatient(patients[0], scheduleOne);
+  if (clients.length > 0) {
+    await insertScheduleAndAddToClient(clients[0], scheduleOne);
     schedules.push(scheduleOne);
   }
-  if (patients.length > 1) {
-    await insertScheduleAndAddToPatient(patients[1], scheduleTwo);
+  if (clients.length > 1) {
+    await insertScheduleAndAddToClient(clients[1], scheduleTwo);
     schedules.push(scheduleTwo);
   }
   

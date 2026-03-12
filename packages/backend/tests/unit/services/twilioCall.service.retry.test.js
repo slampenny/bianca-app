@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Call, Conversation, Patient, Org, Caregiver } = require('../../../src/models');
+const { Call, Conversation, Client, Org, Caregiver } = require('../../../src/models');
 
 // Mock Twilio library (external service)
 jest.mock('twilio', () => {
@@ -76,7 +76,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
   beforeEach(async () => {
     // Clean up
     await Org.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Caregiver.deleteMany({});
@@ -95,8 +95,8 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     });
 
     // Create patient
-    patient = await Patient.create({
-      name: 'Test Patient',
+    patient = await Client.create({
+      name: 'Test Client',
       email: 'patient@example.com',
       phone: '5551234567',
       org: org._id,
@@ -105,7 +105,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     // Create Call record (Call tracks call metadata, not Conversation)
     call = await Call.create({
       callSid: 'CA1234567890',
-      patientId: patient._id,
+      clientId: patient._id,
       startTime: new Date(),
       callStartTime: new Date(),
       callType: 'wellness-check',
@@ -126,7 +126,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
         'retryMissedCall',
         {
           callId: call._id.toString(),
-          patientId: patient._id.toString(),
+          clientId: patient._id.toString(),
           retryAttempt: 1,
           originalCallId: call._id.toString(),
         }
@@ -302,8 +302,8 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       expect(alertService.createAlert).toHaveBeenCalled();
     });
 
-    it('should correctly use populated patientId and retrieve org settings', async () => {
-      // This test verifies that we're correctly using the already-populated patientId
+    it('should correctly use populated clientId and retrieve org settings', async () => {
+      // This test verifies that we're correctly using the already-populated clientId
       // and that org settings are properly retrieved for alert logic
       org.callRetrySettings.alertOnAllMissedCalls = true;
       org.callRetrySettings.retryCount = 3;
@@ -325,8 +325,8 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       // Verify alert was created (proving org settings were correctly retrieved)
       expect(alertService.createAlert).toHaveBeenCalled();
       const alertCall = alertService.createAlert.mock.calls[0][0];
-      expect(alertCall.relatedPatient.toString()).toBe(patient._id.toString());
-      expect(alertCall.alertType).toBe('patient');
+      expect(alertCall.relatedClient.toString()).toBe(patient._id.toString());
+      expect(alertCall.alertType).toBe('client');
     });
 
     it('should correctly retrieve org settings from populated patient', async () => {
@@ -348,7 +348,7 @@ describe('TwilioCallService - Call Retry Functionality', () => {
       // Verify alert was created with correct settings
       expect(alertService.createAlert).toHaveBeenCalled();
       const alertCall = alertService.createAlert.mock.calls[0][0];
-      expect(alertCall.relatedPatient.toString()).toBe(patient._id.toString());
+      expect(alertCall.relatedClient.toString()).toBe(patient._id.toString());
     });
 
     it('should cancel remaining retries when retry call succeeds', async () => {

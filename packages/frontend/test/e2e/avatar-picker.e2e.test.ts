@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/testHelpers'
 import { AuthWorkflow } from './workflows/auth.workflow'
-import { PatientDetailedWorkflow } from './workflows/patient-detailed.workflow'
+import { ClientDetailedWorkflow } from './workflows/patient-detailed.workflow'
 import { TEST_USERS } from './fixtures/testData'
 import { Page } from '@playwright/test'
 
@@ -23,25 +23,25 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should display default avatar when no avatar is set', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Check for avatar display
@@ -56,25 +56,25 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should allow avatar upload', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Look for avatar picker or change avatar button
@@ -93,25 +93,25 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should update avatar after upload', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Get initial avatar (if any)
@@ -130,25 +130,25 @@ test.describe.skip('Avatar Picker', () => {
   })
 
   test('should handle avatar upload errors gracefully', async ({ page }) => {
-    const patientWorkflow = new PatientDetailedWorkflow(page)
+    const clientWorkflow = new ClientDetailedWorkflow(page)
     
     // Navigate to patient screen
-    const patientSelected = await patientWorkflow.givenIHaveSelectedAPatient()
-    expect(patientSelected).toBe(true)
+    const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
+    expect(clientSelected).toBe(true)
     
     // Click on patient to open details
-    const editButton = page.locator('[data-testid^="edit-patient-button-"]').first()
+    const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     if (await editButton.count() > 0) {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      const patientCard = page.locator('[data-testid^="patient-card-"]').first()
+      const patientCard = page.locator('[data-testid^="client-card-"]').first()
       await patientCard.click()
       await page.waitForTimeout(2000)
     }
     
     // Wait for patient screen to load
-    await page.waitForSelector('[data-testid="patient-name-input"], [data-testid="patient-screen"]', { timeout: 10000 })
+    await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
     // Check for error messages related to avatar upload

@@ -88,7 +88,7 @@ const breachLogSchema = new mongoose.Schema(
     // Impact Assessment
     affectedResourceType: {
       type: String,
-      enum: ['patient', 'conversation', 'medicalAnalysis', 'caregiver', 'org', 'system', 'multiple'],
+      enum: ['client', 'conversation', 'medicalAnalysis', 'caregiver', 'org', 'system', 'multiple'],
     },
     
     affectedResourceIds: [{

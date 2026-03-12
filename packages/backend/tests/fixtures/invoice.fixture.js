@@ -55,8 +55,8 @@ const insertInvoices = async (patient, invoicesArray) => {
 
       // Create line items for this invoice
       const lineItems = [
-        { ...lineItemOne, patientId: patient._id, invoiceId: newInvoice._id },
-        { ...lineItemTwo, patientId: patient._id, invoiceId: newInvoice._id },
+        { ...lineItemOne, clientId: patient._id, invoiceId: newInvoice._id },
+        { ...lineItemTwo, clientId: patient._id, invoiceId: newInvoice._id },
       ];
 
       await LineItem.insertMany(lineItems);

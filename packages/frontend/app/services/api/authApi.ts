@@ -1,6 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import { getDefaultApiConfig } from "./api"
-import { Alert, Org, Caregiver, Patient, AuthTokens } from "./api.types"
+import { Alert, Org, Caregiver, Client, AuthTokens, OnboardingPersona } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const authApi = createApi({
@@ -37,7 +37,7 @@ export const authApi = createApi({
       }),
     }),
     login: builder.mutation<
-      { org: Org; caregiver: Caregiver; patients: Patient[]; alerts: Alert[]; tokens: any } | { requireMFA: true; tempToken: string; message: string },
+      { org: Org; caregiver: Caregiver; clients: Client[]; alerts: Alert[]; tokens: any } | { requireMFA: true; tempToken: string; message: string },
       { email: string; password: string; mfaToken?: string }
     >({
       query: (data) => ({
@@ -90,6 +90,16 @@ export const authApi = createApi({
         body: data,
       }),
     }),
+    completeOnboarding: builder.mutation<
+      { caregiver: Caregiver; message: string },
+      { persona: OnboardingPersona; acceptTerms: boolean; singleConsentState?: boolean }
+    >({
+      query: (data) => ({
+        url: "/auth/onboarding/complete",
+        method: "POST",
+        body: data,
+      }),
+    }),
     setPasswordForSSO: builder.mutation<{ message: string; success: boolean }, { email: string; password: string; confirmPassword: string }>({
       query: (data) => ({
         url: "/auth/set-password-for-sso",
@@ -104,7 +114,7 @@ export const authApi = createApi({
       caregiver?: any;
       tokens?: any;
       org?: any;
-      patients?: any[];
+      clients?: any[];
     }, { token: string }>({
       query: ({ token }) => ({
         url: `/auth/verify-email?token=${encodeURIComponent(token)}`,
@@ -124,7 +134,7 @@ export const authApi = createApi({
               caregiver: json.caregiver,
               tokens: json.tokens,
               org: json.org,
-              patients: json.patients,
+              clients: json.clients,
               status: response.status 
             }
           } else {
@@ -182,6 +192,7 @@ export const {
   useForgotPasswordMutation,
   useSendVerificationEmailMutation,
   useResendVerificationEmailMutation,
+  useCompleteOnboardingMutation,
   useSetPasswordForSSOMutation,
   useVerifyEmailMutation,
   useSendPhoneVerificationCodeMutation,

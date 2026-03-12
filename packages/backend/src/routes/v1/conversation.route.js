@@ -15,18 +15,18 @@ const router = express.Router();
 
 /**
  * @swagger
- * /conversations/patient/{patientId}:
+ * /conversations/client/{clientId}:
  *   post:
- *     summary: Create a conversation for a patient
+ *     summary: Create a conversation for a client
  *     description: Only authorized patients can create conversations.
  *     tags: [Conversations]
  *     parameters:
  *       - in: path
- *         name: patientId
+ *         name: clientId
  *         required: true
  *         schema:
  *           type: string
- *         description: The patient ID
+ *         description: The client ID
  *     responses:
  *       "201":
  *         description: Conversation created
@@ -36,11 +36,11 @@ const router = express.Router();
  *         description: Unauthorized
  */
 router
-  .route('/patient/:patientId')
+  .route('/client/:clientId')
   .post(
     auth('updateAny:conversation'),
-    validate(conversationValidation.createConversationForPatient),
-    conversationController.createConversationForPatient
+    validate(conversationValidation.createConversationForClient),
+    conversationController.createConversationForClient
   );
 
 /**
@@ -71,7 +71,7 @@ router
  *             properties:
  *               role:
  *                 type: string
- *                 enum: [patient, assistant, system, debug-user]
+ *                 enum: [client, assistant, system, debug-user]
  *                 description: The role of the message sender
  *               content:
  *                 type: string
@@ -110,16 +110,16 @@ router
  * /conversations:
  *   get:
  *     summary: Get conversations (query)
- *     description: Get conversations with optional query parameters (patientId, status, etc.)
+ *     description: Get conversations with optional query parameters (clientId, status, etc.)
  *     tags: [Conversations]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: patientId
+ *         name: clientId
  *         schema:
  *           type: string
- *         description: Filter by patient ID
+ *         description: Filter by client ID
  *       - in: query
  *         name: status
  *         schema:

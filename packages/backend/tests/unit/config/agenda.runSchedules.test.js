@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Patient, Org, Schedule } = require('../../../src/models');
+const { Client, Org, Schedule } = require('../../../src/models');
 
 // Mock config and logger before requiring agenda
 jest.mock('../../../src/config/config', () => ({
@@ -56,9 +56,8 @@ const mockTwilioCallService = {
   initiateCall: jest.fn().mockResolvedValue('CA1234567890abcdef1234567890abcdef'),
 };
 
-const mockPatientService = {
-  getPatientById: jest.fn(),
-  checkPatientConsent: jest.fn().mockResolvedValue(true), // Default to consent granted
+const mockClientService = {
+  checkClientConsent: jest.fn().mockResolvedValue(true), // Default to consent granted
 };
 
 const mockAlertService = {
@@ -66,7 +65,7 @@ const mockAlertService = {
 };
 
 jest.mock('../../../src/services', () => ({
-  patientService: mockPatientService,
+  clientService: mockClientService,
   twilioCallService: mockTwilioCallService,
   alertService: mockAlertService,
   paymentService: {},
@@ -90,11 +89,11 @@ afterAll(async () => {
 
 describe('Agenda - runSchedules', () => {
   let org;
-  let patient;
+  let client;
 
   beforeEach(async () => {
     await Org.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Schedule.deleteMany({});
     jest.clearAllMocks();
 
@@ -105,16 +104,13 @@ describe('Agenda - runSchedules', () => {
       country: 'US',
     });
 
-    // Create patient
-    patient = await Patient.create({
-      name: 'Test Patient',
-      email: 'testpatient@example.com',
+    // Create client
+    client = await Client.create({
+      name: 'Test Client',
+      email: 'testclient@example.com',
       phone: '1234567890',
       org: org._id,
     });
-
-    // Setup mock patient service
-    mockPatientService.getPatientById.mockResolvedValue(patient);
   });
 
   // Helper function to mock Date consistently
@@ -145,7 +141,7 @@ describe('Agenda - runSchedules', () => {
       // Create schedule with nextCallDate, then update it directly in DB to bypass validation
       // Create schedule - let the hook set nextCallDate, then update it directly in DB
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -210,23 +206,21 @@ describe('Agenda - runSchedules', () => {
       expect(testSchedules.length).toBeGreaterThan(0);
       expect(testSchedules[0]._id.toString()).toBe(schedule._id.toString());
 
-      // Ensure patient has org populated in the database
-      const patientWithOrg = await Patient.findById(patient._id).populate('org');
-      expect(patientWithOrg.org).toBeDefined();
-      expect(patientWithOrg.org._id.toString()).toBe(org._id.toString());
+      // Ensure client has org populated in the database
+      const clientWithOrg = await Client.findById(client._id).populate('org');
+      expect(clientWithOrg.org).toBeDefined();
+      expect(clientWithOrg.org._id.toString()).toBe(org._id.toString());
       
-      // Mock checkPatientConsent to return true (consent granted)
-      mockPatientService.checkPatientConsent.mockResolvedValue(true);
+      // Mock checkClientConsent to return true (consent granted)
+      mockClientService.checkClientConsent.mockResolvedValue(true);
 
       await runSchedules();
 
-      // checkPatientConsent doesn't call getPatientById, it calls Patient.findById directly
-      // But we should verify that the call was initiated
-      // initiateCall receives schedule.patient which is an ObjectId
+      // checkClientConsent doesn't call getClientById, it uses Client.findById
+      // Verify that the call was initiated with schedule.client (ObjectId)
       expect(mockTwilioCallService.initiateCall).toHaveBeenCalled();
-      // schedule.patient is an ObjectId, which can be compared as string or ObjectId
       const callArgs = mockTwilioCallService.initiateCall.mock.calls[0];
-      expect(callArgs[0].toString()).toBe(patient._id.toString());
+      expect(callArgs[0].toString()).toBe(client._id.toString());
       expect(mockAlertService.createAlert).toHaveBeenCalled();
 
       // Restore Date
@@ -241,7 +235,7 @@ describe('Agenda - runSchedules', () => {
 
       // Create schedule - let the hook set nextCallDate, then update it directly in DB
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -273,7 +267,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const inactiveSchedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'daily',
         intervals: [],
         isActive: false, // Inactive
@@ -303,7 +297,7 @@ describe('Agenda - runSchedules', () => {
       futureDate.setUTCHours(2, 0, 0, 0);
 
       const futureSchedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -348,7 +342,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'weekly',
         intervals: [{ day: 1, weeks: 1 }], // Monday
         isActive: true,
@@ -358,9 +352,9 @@ describe('Agenda - runSchedules', () => {
       
       const OriginalDate = mockDate(mockTimestamp);
 
-      // Ensure patient has org populated
-      const patientWithOrg = await Patient.findById(patient._id).populate('org');
-      expect(patientWithOrg.org).toBeDefined();
+      // Ensure client has org populated
+      const clientWithOrg = await Client.findById(client._id).populate('org');
+      expect(clientWithOrg.org).toBeDefined();
 
       await runSchedules();
 
@@ -375,7 +369,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'weekly',
         intervals: [{ day: 1, weeks: 1 }], // Monday
         isActive: true,
@@ -411,7 +405,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'monthly',
         intervals: [{ day: 15, weeks: 0 }],
         isActive: true,
@@ -439,13 +433,13 @@ describe('Agenda - runSchedules', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle errors when patient is not found', async () => {
+    it('should handle errors when client is not found', async () => {
       const now = new Date();
       const pastDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: new mongoose.Types.ObjectId(), // Non-existent patient
+        client: new mongoose.Types.ObjectId(), // Non-existent client
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -453,7 +447,7 @@ describe('Agenda - runSchedules', () => {
       });
       await Schedule.updateOne({ _id: schedule._id }, { $set: { nextCallDate: pastDate } });
 
-      mockPatientService.getPatientById.mockResolvedValue(null);
+      // Schedule has non-existent client id; Client.findById returns null in agenda
 
       const mockNow = new Date();
       mockNow.setUTCHours(2, 5, 0, 0);
@@ -477,7 +471,7 @@ describe('Agenda - runSchedules', () => {
       pastDate.setUTCHours(2, 0, 0, 0);
 
       const schedule = await Schedule.create({
-        patient: patient._id,
+        client: client._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -511,19 +505,19 @@ describe('Agenda - runSchedules', () => {
     });
   });
 
-  describe('Patient consent checks', () => {
-    it('should skip call and alert caregivers when org requires consent but patient has not consented', async () => {
-      // Create org that requires patient consent
+  describe('Client consent checks', () => {
+    it('should skip call and alert caregivers when org requires consent but client has not consented', async () => {
+      // Create org that requires client consent
       const consentOrg = await Org.create({
         name: 'Consent Required Org',
         email: 'consent@example.com',
         country: 'US',
-        requirePatientConsent: true,
+        requireClientConsent: true,
       });
 
-      // Create patient without consent
-      const unconsentedPatient = await Patient.create({
-        name: 'Unconsented Patient',
+      // Create client without consent
+      const unconsentedClient = await Client.create({
+        name: 'Unconsented Client',
         email: 'unconsented@example.com',
         phone: '1234567891',
         org: consentOrg._id,
@@ -537,7 +531,7 @@ describe('Agenda - runSchedules', () => {
       const mockNow = new Date(baseDate.getTime() + 5 * 60 * 1000); // 2:05 AM UTC (5 minutes past, within 15 min window)
 
       const schedule = await Schedule.create({
-        patient: unconsentedPatient._id,
+        client: unconsentedClient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -551,8 +545,8 @@ describe('Agenda - runSchedules', () => {
         { $set: { nextCallDate: pastDate } }
       );
 
-      // Mock checkPatientConsent to return false
-      mockPatientService.checkPatientConsent = jest.fn().mockResolvedValue(false);
+      // Mock checkClientConsent to return false
+      mockClientService.checkClientConsent = jest.fn().mockResolvedValue(false);
 
       // Verify the schedule exists and nextCallDate is in the past
       const foundSchedule = await Schedule.findById(schedule._id);
@@ -586,18 +580,18 @@ describe('Agenda - runSchedules', () => {
       });
     });
 
-    it('should make call when org requires consent and patient has consented', async () => {
-      // Create org that requires patient consent
+    it('should make call when org requires consent and client has consented', async () => {
+      // Create org that requires client consent
       const consentOrg = await Org.create({
         name: 'Consent Required Org',
         email: 'consent@example.com',
         country: 'US',
-        requirePatientConsent: true,
+        requireClientConsent: true,
       });
 
-      // Create patient with consent
-      const consentedPatient = await Patient.create({
-        name: 'Consented Patient',
+      // Create client with consent
+      const consentedClient = await Client.create({
+        name: 'Consented Client',
         email: 'consented@example.com',
         phone: '1234567892',
         org: consentOrg._id,
@@ -610,7 +604,7 @@ describe('Agenda - runSchedules', () => {
       const mockNow = new Date(baseDate.getTime() + 5 * 60 * 1000); // 2:05 AM UTC
 
       const schedule = await Schedule.create({
-        patient: consentedPatient._id,
+        client: consentedClient._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -623,17 +617,17 @@ describe('Agenda - runSchedules', () => {
         { $set: { nextCallDate: pastDate } }
       );
 
-      // Mock checkPatientConsent to return true
-      mockPatientService.checkPatientConsent = jest.fn().mockResolvedValue(true);
+      // Mock checkClientConsent to return true
+      mockClientService.checkClientConsent = jest.fn().mockResolvedValue(true);
       
       // Reset initiateCall mock to ensure it's not throwing an error from a previous test
       mockTwilioCallService.initiateCall.mockReset();
       mockTwilioCallService.initiateCall.mockResolvedValue('CA1234567890abcdef1234567890abcdef');
 
-      // Ensure patient has org populated
-      const patientWithOrg = await Patient.findById(consentedPatient._id).populate('org');
-      expect(patientWithOrg.org).toBeDefined();
-      expect(patientWithOrg.org._id.toString()).toBe(consentOrg._id.toString());
+      // Ensure client has org populated
+      const clientWithOrg = await Client.findById(consentedClient._id).populate('org');
+      expect(clientWithOrg.org).toBeDefined();
+      expect(clientWithOrg.org._id.toString()).toBe(consentOrg._id.toString());
 
       // Mock Date constructor and Date.now
       const mockTimestamp = mockNow.getTime();
@@ -644,33 +638,33 @@ describe('Agenda - runSchedules', () => {
       // Restore Date
       global.Date = OriginalDate;
 
-      // Should initiate call (check that it was called with the patient ID)
+      // Should initiate call (check that it was called with the client ID)
       expect(mockTwilioCallService.initiateCall).toHaveBeenCalled();
       const callArgs = mockTwilioCallService.initiateCall.mock.calls[0][0];
-      expect(callArgs.toString()).toBe(consentedPatient._id.toString());
+      expect(callArgs.toString()).toBe(consentedClient._id.toString());
       
       // Should create success alert
       expect(mockAlertService.createAlert).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.stringContaining('Called'),
           importance: 'low',
-          alertType: 'patient',
+          alertType: 'client',
         })
       );
     });
 
-    it('should make call when org does not require consent regardless of patient consent status', async () => {
-      // Create org that does NOT require patient consent
+    it('should make call when org does not require consent regardless of client consent status', async () => {
+      // Create org that does NOT require client consent
       const noConsentOrg = await Org.create({
         name: 'No Consent Required Org',
         email: 'noconsent@example.com',
         country: 'US',
-        requirePatientConsent: false,
+        requireClientConsent: false,
       });
 
-      // Create patient without consent (but org doesn't require it)
-      const patientNoConsent = await Patient.create({
-        name: 'Patient No Consent',
+      // Create client without consent (but org doesn't require it)
+      const clientNoConsent = await Client.create({
+        name: 'Client No Consent',
         email: 'noconsent@example.com',
         phone: '1234567893',
         org: noConsentOrg._id,
@@ -683,7 +677,7 @@ describe('Agenda - runSchedules', () => {
       const mockNow = new Date(baseDate.getTime() + 5 * 60 * 1000); // 2:05 AM UTC
 
       const schedule = await Schedule.create({
-        patient: patientNoConsent._id,
+        client: clientNoConsent._id,
         frequency: 'daily',
         intervals: [],
         isActive: true,
@@ -696,8 +690,8 @@ describe('Agenda - runSchedules', () => {
         { $set: { nextCallDate: pastDate } }
       );
 
-      // Mock checkPatientConsent to return true (because org doesn't require it)
-      mockPatientService.checkPatientConsent = jest.fn().mockResolvedValue(true);
+      // Mock checkClientConsent to return true (because org doesn't require it)
+      mockClientService.checkClientConsent = jest.fn().mockResolvedValue(true);
 
       // Mock Date constructor and Date.now
       const mockTimestamp = mockNow.getTime();
@@ -708,10 +702,10 @@ describe('Agenda - runSchedules', () => {
       // Restore Date
       global.Date = OriginalDate;
 
-      // Should initiate call even though patient hasn't consented (org doesn't require it)
+      // Should initiate call even though client hasn't consented (org doesn't require it)
       expect(mockTwilioCallService.initiateCall).toHaveBeenCalled();
       const callArgs = mockTwilioCallService.initiateCall.mock.calls[0][0];
-      expect(callArgs.toString()).toBe(patientNoConsent._id.toString());
+      expect(callArgs.toString()).toBe(clientNoConsent._id.toString());
     });
   });
 });

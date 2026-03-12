@@ -102,7 +102,7 @@ class RepetitionMemoryAnalyzer {
     conversations.forEach(conversation => {
       if (conversation.messages && Array.isArray(conversation.messages)) {
         conversation.messages.forEach(message => {
-          if (message.role === 'patient' && message.content && message.content.trim()) {
+          if (message.role === 'client' && message.content && message.content.trim()) {
             messages.push({
               content: message.content.trim(),
               timestamp: message.createdAt || conversation.createdAt,
@@ -237,7 +237,7 @@ class RepetitionMemoryAnalyzer {
     conversations.forEach(conversation => {
       if (conversation.messages && conversation.messages.length > 1) {
         const patientMessages = conversation.messages
-          .filter(msg => msg.role === 'patient' && msg.content)
+          .filter(msg => msg.role === 'client' && msg.content)
           .map(msg => msg.content.trim());
 
         if (patientMessages.length > 1) {

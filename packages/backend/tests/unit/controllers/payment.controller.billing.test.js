@@ -1,11 +1,23 @@
 // Import integration setup first to ensure proper mocking
 require('../../utils/integration-setup');
 
+// Mock logger so expected error paths (e.g. 404 Organization not found) don't flood test output
+jest.mock('../../../src/config/logger', () => {
+  const noop = () => {};
+  return {
+    info: jest.fn(noop),
+    warn: jest.fn(noop),
+    error: jest.fn(noop),
+    debug: jest.fn(noop),
+    child: jest.fn(function () { return this; }),
+  };
+});
+
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../../utils/integration-app');
-const { Org, Patient, Call, Conversation, Invoice, LineItem, Caregiver } = require('../../../src/models');
+const { Org, Client, Call, Conversation, Invoice, LineItem, Caregiver } = require('../../../src/models');
 const { tokenService } = require('../../../src/services');
 
 // Mock Stripe usage service
@@ -25,8 +37,8 @@ jest.mock('../../../src/services/stripeUsage.service', () => ({
 describe('Payment Controller - Billing', () => {
   let mongoServer;
   let org;
-  let patient1;
-  let patient2;
+  let client1;
+  let client2;
   let call1;
   let call2;
   let call3;
@@ -49,7 +61,7 @@ describe('Payment Controller - Billing', () => {
     await Call.deleteMany({});
     await Call.deleteMany({});
     await Conversation.deleteMany({});
-    await Patient.deleteMany({});
+    await Client.deleteMany({});
     await Org.deleteMany({});
     await Invoice.deleteMany({});
     await LineItem.deleteMany({});
@@ -64,14 +76,14 @@ describe('Payment Controller - Billing', () => {
       stripeSubscriptionId: 'sub_test123', // Required for getUnbilledCostsByOrg
     });
 
-    patient1 = await Patient.create({
+    client1 = await Client.create({
       name: 'John Doe',
       email: 'john@test.com',
       phone: '+12345678901',
       org: org._id
     });
 
-    patient2 = await Patient.create({
+    client2 = await Client.create({
       name: 'Jane Smith',
       email: 'jane@test.com',
       phone: '+12345678902',
@@ -90,7 +102,7 @@ describe('Payment Controller - Billing', () => {
 
     call1 = await Call.create({
       callSid: 'CA11111111111111111111111111111111',
-      patientId: patient1._id,
+      clientId: client1._id,
       duration: 120, // 2 minutes
       cost: 0.20,
       status: 'completed',
@@ -101,7 +113,7 @@ describe('Payment Controller - Billing', () => {
 
     call2 = await Call.create({
       callSid: 'CA22222222222222222222222222222222',
-      patientId: patient1._id,
+      clientId: client1._id,
       duration: 180, // 3 minutes
       cost: 0.30,
       status: 'completed',
@@ -112,7 +124,7 @@ describe('Payment Controller - Billing', () => {
 
     call3 = await Call.create({
       callSid: 'CA33333333333333333333333333333333',
-      patientId: patient2._id,
+      clientId: client2._id,
       duration: 90, // 1.5 minutes
       cost: 0.15,
       status: 'completed',
@@ -146,23 +158,23 @@ describe('Payment Controller - Billing', () => {
       expect(res.body.orgId).toBe(org._id.toString());
       expect(res.body.orgName).toBe('Test Healthcare Org');
       expect(res.body.totalUnbilledCost).toBe(0.65); // 0.20 + 0.30 + 0.15
-      expect(res.body.patientCosts).toHaveLength(2);
+      expect(res.body.clientCosts).toHaveLength(2);
       
-      // Check patient 1 (John Doe)
-      const patient1Cost = res.body.patientCosts.find(p => p.patientId === patient1._id.toString());
-      expect(patient1Cost).toBeDefined();
-      expect(patient1Cost.patientName).toBe('John Doe');
-      expect(patient1Cost.callCount).toBe(2);
-      expect(patient1Cost.totalCost).toBe(0.50); // 0.20 + 0.30
-      expect(patient1Cost.calls).toHaveLength(2);
+      // Check client 1 (John Doe)
+      const client1Cost = res.body.clientCosts.find(p => p.clientId === client1._id.toString());
+      expect(client1Cost).toBeDefined();
+      expect(client1Cost.clientName).toBe('John Doe');
+      expect(client1Cost.callCount).toBe(2);
+      expect(client1Cost.totalCost).toBe(0.50); // 0.20 + 0.30
+      expect(client1Cost.calls).toHaveLength(2);
       
-      // Check patient 2 (Jane Smith)
-      const patient2Cost = res.body.patientCosts.find(p => p.patientId === patient2._id.toString());
-      expect(patient2Cost).toBeDefined();
-      expect(patient2Cost.patientName).toBe('Jane Smith');
-      expect(patient2Cost.callCount).toBe(1);
-      expect(patient2Cost.totalCost).toBe(0.15);
-      expect(patient2Cost.calls).toHaveLength(1);
+      // Check client 2 (Jane Smith)
+      const client2Cost = res.body.clientCosts.find(p => p.clientId === client2._id.toString());
+      expect(client2Cost).toBeDefined();
+      expect(client2Cost.clientName).toBe('Jane Smith');
+      expect(client2Cost.callCount).toBe(1);
+      expect(client2Cost.totalCost).toBe(0.15);
+      expect(client2Cost.calls).toHaveLength(1);
     });
 
     it('should accept custom days parameter', async () => {
@@ -189,7 +201,7 @@ describe('Payment Controller - Billing', () => {
         orgId: org._id.toString(),
         orgName: 'Test Healthcare Org',
         totalUnbilledCost: 0,
-        patientCosts: []
+        clientCosts: []
       });
 
       // Restore unbilled status for other tests
@@ -231,10 +243,10 @@ describe('Payment Controller - Billing', () => {
     });
   });
 
-  describe('POST /payments/patients/:patientId/invoices', () => {
+  describe('POST /payments/clients/:clientId/invoices', () => {
     it('should create invoice from patient calls', async () => {
       const res = await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${client1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(201);
 
@@ -248,7 +260,7 @@ describe('Payment Controller - Billing', () => {
       expect(res.body.invoiceNumber).toMatch(/^INV-\d{6}$/);
       if (res.body.lineItems) {
         expect(res.body.lineItems).toHaveLength(1);
-        expect(res.body.lineItems[0].patientId).toBe(patient1._id.toString());
+        expect(res.body.lineItems[0].clientId).toBe(client1._id.toString());
         expect(res.body.lineItems[0].amount).toBe(0.50);
         if (res.body.lineItems[0].description) {
           expect(res.body.lineItems[0].description).toContain('Billing for 300 seconds');
@@ -259,44 +271,44 @@ describe('Payment Controller - Billing', () => {
 
     it('should mark calls as billed after creating invoice', async () => {
       // Reset calls to unbilled state
-      await Call.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
+      await Call.updateMany({ clientId: client1._id }, { $unset: { lineItemId: 1 } });
 
       await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${client1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(201);
 
-      const updatedCalls = await Call.find({ patientId: patient1._id });
+      const updatedCalls = await Call.find({ clientId: client1._id });
       expect(updatedCalls.every(call => call.lineItemId !== null)).toBe(true);
     });
 
     it('should return 404 when no unbilled calls exist', async () => {
       // Mark all calls as billed
-      await Call.updateMany({ patientId: patient1._id }, { 
+      await Call.updateMany({ clientId: client1._id }, { 
         lineItemId: new mongoose.Types.ObjectId() 
       });
 
       await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${client1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(404);
 
       // Restore unbilled status
-      await Call.updateMany({ patientId: patient1._id }, { $unset: { lineItemId: 1 } });
+      await Call.updateMany({ clientId: client1._id }, { $unset: { lineItemId: 1 } });
     });
 
     it('should return 404 for non-existent patient', async () => {
       const nonExistentPatientId = new mongoose.Types.ObjectId();
       
       await request(app)
-        .post(`/v1/payments/patients/${nonExistentPatientId}/invoices`)
+        .post(`/v1/payments/clients/${nonExistentPatientId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(404);
     });
 
     it('should require authentication', async () => {
       await request(app)
-        .post(`/v1/payments/patients/${patient1._id}/invoices`)
+        .post(`/v1/payments/clients/${client1._id}/invoices`)
         .expect(401);
     });
   });
@@ -318,14 +330,14 @@ describe('Payment Controller - Billing', () => {
       // Create line items
       await LineItem.create([
         {
-          patientId: patient1._id,
+          clientId: client1._id,
           invoiceId: invoice._id,
           amount: 0.50,
           description: 'Billing for patient 1',
           quantity: 2
         },
         {
-          patientId: patient2._id,
+          clientId: client2._id,
           invoiceId: invoice._id,
           amount: 0.15,
           description: 'Billing for patient 2',
@@ -407,7 +419,7 @@ describe('Payment Controller - Billing', () => {
     });
   });
 
-  describe('GET /payments/patients/:patientId/invoices', () => {
+  describe('GET /payments/clients/:clientId/invoices', () => {
     let invoice;
 
     beforeEach(async () => {
@@ -421,9 +433,9 @@ describe('Payment Controller - Billing', () => {
         totalAmount: 0.50
       });
 
-      // Create line item for patient1
+      // Create line item for client1
       await LineItem.create({
-        patientId: patient1._id,
+        clientId: client1._id,
         invoiceId: invoice._id,
         amount: 0.50,
         description: 'Billing for patient 1',
@@ -438,7 +450,7 @@ describe('Payment Controller - Billing', () => {
 
     it('should return invoices for patient', async () => {
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices`)
+        .get(`/v1/payments/clients/${client1._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -454,14 +466,14 @@ describe('Payment Controller - Billing', () => {
 
     it('should filter invoices by status', async () => {
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices?status=pending`)
+        .get(`/v1/payments/clients/${client1._id}/invoices?status=pending`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
       expect(res.body).toHaveLength(1);
 
       const paidRes = await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices?status=paid`)
+        .get(`/v1/payments/clients/${client1._id}/invoices?status=paid`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -470,7 +482,7 @@ describe('Payment Controller - Billing', () => {
 
     it('should return empty array for patient with no invoices', async () => {
       const res = await request(app)
-        .get(`/v1/payments/patients/${patient2._id}/invoices`)
+        .get(`/v1/payments/clients/${client2._id}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
@@ -479,7 +491,7 @@ describe('Payment Controller - Billing', () => {
 
     it('should require authentication', async () => {
       await request(app)
-        .get(`/v1/payments/patients/${patient1._id}/invoices`)
+        .get(`/v1/payments/clients/${client1._id}/invoices`)
         .expect(401);
     });
   });

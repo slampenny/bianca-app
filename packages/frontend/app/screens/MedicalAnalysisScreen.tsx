@@ -19,7 +19,7 @@ import {
   MedicalAnalysisConfidence,
 } from "../services/api/api.types"
 import { HomeStackParamList } from "../navigators/navigationTypes"
-import { getPatient } from "../store/patientSlice"
+import { getClient } from "../store/clientSlice"
 import { logger } from "../utils/logger"
 import { formatDate as formatDateLocalized } from "../utils/formatDate"
 
@@ -30,15 +30,12 @@ export function MedicalAnalysisScreen() {
   const { toast, showError, showSuccess, hideToast } = useToast()
   const navigation = useNavigation()
   
-  // Get patient from route params (when accessed from Patient screen) or Redux state (when accessed from Reports)
-  const routePatientId = route.params?.patientId
-  const routePatientName = route.params?.patientName
-  const selectedPatient = useSelector(getPatient)
+  const routeClientId = route.params?.clientId
+  const routeClientName = route.params?.clientName
+  const selectedClient = useSelector(getClient)
   const { colors, isLoading: themeLoading } = useTheme()
-  
-  // Prioritize route params (from Patient screen) over Redux state (from Reports)
-  const patientId = routePatientId || selectedPatient?.id
-  const patientName = routePatientName || selectedPatient?.name
+  const clientId = routeClientId || selectedClient?.id
+  const clientName = routeClientName || selectedClient?.name
 
   // Expandable sections state
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['cognitive', 'psychiatric', 'vocabulary']))
@@ -50,16 +47,10 @@ export function MedicalAnalysisScreen() {
     error: analysisError,
     refetch: refetchResults
   } = useGetMedicalAnalysisResultsQuery(
-    { patientId: patientId || '', limit: 5 },
+    { clientId: clientId || '', limit: 5 },
     { 
-      skip: !patientId,
-      // Don't retry on 403 errors (permission denied)
-      retry: (failureCount, error: any) => {
-        if (error?.status === 403) {
-          return false
-        }
-        return failureCount < 3
-      }
+      skip: !clientId,
+      ...({ retry: (failureCount: number, error: unknown) => ((e: { status?: number }) => (e?.status === 403 ? false : failureCount < 3))((error as { status?: number })) } as Record<string, unknown>)
     }
   )
 
@@ -68,16 +59,10 @@ export function MedicalAnalysisScreen() {
     isLoading: isTrendLoading,
     error: trendError
   } = useGetMedicalAnalysisTrendQuery(
-    { patientId: patientId || '', timeRange: 'month' },
+    { clientId: clientId || '', timeRange: 'month' },
     { 
-      skip: !patientId,
-      // Don't retry on 403 errors (permission denied)
-      retry: (failureCount, error: any) => {
-        if (error?.status === 403) {
-          return false
-        }
-        return failureCount < 3
-      }
+      skip: !clientId,
+      ...({ retry: (failureCount: number, error: unknown) => ((e: { status?: number }) => (e?.status === 403 ? false : failureCount < 3))((error as { status?: number })) } as Record<string, unknown>)
     }
   )
 
@@ -116,13 +101,13 @@ export function MedicalAnalysisScreen() {
 
   const styles = createStyles(colors)
 
-  if (!patientId) {
+  if (!clientId) {
     return (
       <Screen preset="scroll" style={styles.container}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color={colors.palette.neutral600} />
-          <Text style={styles.errorText}>{translate("medicalAnalysis.noPatientSelected")}</Text>
-          <Text style={styles.errorSubtext}>{translate("medicalAnalysis.selectPatientToView")}</Text>
+          <Text style={styles.errorText}>{translate("medicalAnalysis.noClientSelected")}</Text>
+          <Text style={styles.errorSubtext}>{translate("medicalAnalysis.selectClientToView")}</Text>
         </View>
       </Screen>
     )
@@ -250,7 +235,7 @@ export function MedicalAnalysisScreen() {
     <Screen preset="scroll" style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>{translate("medicalAnalysis.title")}</Text>
-        <Text style={styles.patientName}>{patientName}</Text>
+        <Text style={styles.clientName}>{clientName}</Text>
       </View>
 
       {/* Medical Disclaimer */}
@@ -329,7 +314,7 @@ export function MedicalAnalysisScreen() {
           >
             <View style={styles.sectionHeader}>
               <View style={styles.sectionHeaderLeft}>
-                <Ionicons name="brain" size={24} color={colors.palette.primary500} />
+                <Ionicons name={"brain" as React.ComponentProps<typeof Ionicons>["name"]} size={24} color={colors.palette.primary500} />
                 <Text style={styles.sectionTitle}>{translate("medicalAnalysis.cognitiveHealth")}</Text>
               </View>
               <Ionicons 
@@ -631,7 +616,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.palette.biancaHeader,
     marginBottom: 4,
   },
-  patientName: {
+  clientName: {
     fontSize: 16,
     color: colors.palette.neutral600,
   },

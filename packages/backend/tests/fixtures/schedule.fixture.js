@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const faker = require('faker');
-const { Patient, Schedule } = require('../../src/models');
+const { Client, Schedule } = require('../../src/models');
 
 // Example schedules for testing
 const scheduleOne = {
@@ -21,39 +21,33 @@ const insertSchedules = async (schedules) => {
   return await Schedule.insertMany(dbSchedules.map((schedule) => schedule.toObject()));
 };
 
-const insertScheduleAndAddToPatient = async (patient, scheduleParam) => {
-  // Create the schedule with the patient field
-  const [schedule] = await insertSchedules([{ patient: patient._id, ...scheduleParam }]);
+const insertScheduleAndAddToClient = async (client, scheduleParam) => {
+  const [schedule] = await insertSchedules([{ client: client._id, ...scheduleParam }]);
 
-  // Update the patient document with the new schedule's _id
-  patient.schedules.push(schedule._id);
-  await patient.save();
+  client.schedules.push(schedule._id);
+  await client.save();
 
   return schedule;
 };
 
-// const prepareSchedulesWithPatients = async () => {
-//   const [patient1, patient2] = await insertPatients([patientOne, patientTwo]);
+// const prepareSchedulesWithClients = async () => {
+//   const [client1, client2] = await insertClients([clientOne, clientTwo]);
+//   scheduleOne.client = client1._id;
+//   scheduleTwo.client = client2._id;
 
-//   // Assign patient IDs to the schedules
-//   scheduleOne.patientId = patient1._id;
-//   scheduleTwo.patientId = patient2._id;
-
-//   // Insert the schedules
 //   const insertedSchedules = await insertSchedules([scheduleOne, scheduleTwo]);
-
-//   // Add schedule IDs to patients
-//   patient1.schedules.push(insertedSchedules[0]._id);
-//   patient2.schedules.push(insertedSchedules[1]._id);
-//   await Patient.findByIdAndUpdate(patient1._id, { $set: { schedules: patient1.schedules } });
-//   await Patient.findByIdAndUpdate(patient2._id, { $set: { schedules: patient2.schedules } });
-
-//   return { insertedPatients: [patient1, patient2], insertedSchedules };
+//   client1.schedules.push(insertedSchedules[0]._id);
+//   client2.schedules.push(insertedSchedules[1]._id);
+//   await Client.findByIdAndUpdate(client1._id, { $set: { schedules: client1.schedules } });
+//   await Client.findByIdAndUpdate(client2._id, { $set: { schedules: client2.schedules } });
+//   return { insertedClients: [client1, client2], insertedSchedules };
 // };
 
 module.exports = {
   scheduleOne,
   scheduleTwo,
   insertSchedules,
-  insertScheduleAndAddToPatient,
+  insertScheduleAndAddToClient,
+  /** @deprecated Use insertScheduleAndAddToClient */
+  insertScheduleAndAddToPatient: insertScheduleAndAddToClient,
 };
