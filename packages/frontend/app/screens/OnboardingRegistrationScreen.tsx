@@ -31,6 +31,7 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [singleConsentState, setSingleConsentState] = useState(false)
   const [showWhyImportant, setShowWhyImportant] = useState(false)
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
 
   const showConsent = persona === "organization" || persona === "caregiver"
 
@@ -54,9 +55,16 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
 
   const stylesWithColors = createStyles(colors)
   const canSubmit = acceptTerms && name.trim() && email.trim()
+  const nameInvalid = attemptedSubmit && !name.trim()
+  const emailInvalid = attemptedSubmit && !email.trim()
+  const termsInvalid = attemptedSubmit && !acceptTerms
 
   const handleSave = async () => {
-    if (!canSubmit || !currentUser?.id) return
+    if (!currentUser?.id) return
+    if (!canSubmit) {
+      setAttemptedSubmit(true)
+      return
+    }
     try {
       const updates: { name?: string; phone?: string } = {}
       if (name.trim() !== (currentUser.name || "")) updates.name = name.trim()
@@ -91,20 +99,24 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
           <View style={styles.field}>
             <TextField
               value={name}
-              onChangeText={setName}
+              onChangeText={(t) => { setName(t); if (nameInvalid) setAttemptedSubmit(false) }}
               labelTx="registerScreen.nameFieldLabel"
               placeholderTx="registerScreen.nameFieldPlaceholder"
+              status={nameInvalid ? "error" : undefined}
+              helper={nameInvalid ? translate("onboarding.registration.nameRequired") : undefined}
               testID="onboarding-reg-name"
             />
           </View>
           <View style={styles.field}>
             <TextField
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(t) => { setEmail(t); if (emailInvalid) setAttemptedSubmit(false) }}
               labelTx="registerScreen.emailFieldLabel"
               placeholderTx="registerScreen.emailFieldPlaceholder"
               keyboardType="email-address"
               autoCapitalize="none"
+              status={emailInvalid ? "error" : undefined}
+              helper={emailInvalid ? translate("onboarding.registration.emailRequired") : undefined}
               testID="onboarding-reg-email"
             />
           </View>
@@ -127,10 +139,13 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
           </View>
 
           {/* Terms */}
-          <View style={styles.termsSection}>
+          <View style={[styles.termsSection, termsInvalid && stylesWithColors.termsSectionError]}>
+            {termsInvalid && (
+              <Text style={stylesWithColors.fieldErrorText}>{translate("onboarding.registration.termsRequired")}</Text>
+            )}
             <Pressable
               style={styles.termsRow}
-              onPress={() => setAcceptTerms((v) => !v)}
+              onPress={() => { setAcceptTerms((v) => !v); if (termsInvalid) setAttemptedSubmit(false) }}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: acceptTerms }}
             >
@@ -187,6 +202,8 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
               disabled={!canSubmit}
               loading={isCompleting}
               style={stylesWithColors.primaryButton}
+              disabledStyle={stylesWithColors.primaryButtonDisabled}
+              disabledTextStyle={stylesWithColors.primaryButtonDisabledText}
             />
           </View>
         </View>
@@ -263,5 +280,24 @@ const createStyles = (colors: any) =>
     primaryButton: {
       borderRadius: 20,
       paddingVertical: 14,
+    },
+    primaryButtonDisabled: {
+      opacity: 0.5,
+      backgroundColor: (colors.palette as any)?.neutral400 ?? "#a3a3a3",
+    },
+    primaryButtonDisabledText: {
+      color: (colors.palette as any)?.neutral600 ?? "#525252",
+    },
+    termsSectionError: {
+      borderWidth: 1,
+      borderColor: colors.palette?.error500 ?? "#dc2626",
+      borderRadius: 8,
+      padding: 12,
+      backgroundColor: (colors.palette as any)?.error50 ?? "#fef2f2",
+    },
+    fieldErrorText: {
+      fontSize: 14,
+      color: colors.palette?.error600 ?? "#b91c1c",
+      marginBottom: 6,
     },
   })

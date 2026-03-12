@@ -314,6 +314,13 @@ const es: LocaleTranslations = {
       caregiver: "Añade las personas a las que cuidas, elige cuándo Bianca les llama, y sigue su estado a través de conversaciones e informes. Te mantienes informado sin estar en cada llamada.",
       agingInPlace: "Bianca te llama según tu horario para chequeos amigables. Puedes revisar tu bienestar e informes en cualquier momento. Es como tener una compañera siempre disponible cuando la necesitas.",
     },
+    registration: {
+      title: "Tus datos",
+      subtitle: "Confirma tu información y acepta los términos para continuar.",
+      nameRequired: "El nombre es obligatorio.",
+      emailRequired: "El correo electrónico es obligatorio.",
+      termsRequired: "Debes aceptar los Términos de servicio y la Política de privacidad para continuar.",
+    },
   },
   common: {
     cancel: "Cancelar",

@@ -608,6 +608,13 @@ const pt: LocaleTranslations = {
       caregiver: "Adicione as pessoas de quem você cuida, escolha quando a Bianca liga para elas e acompanhe como estão por conversas e relatórios. Você fica informado sem precisar estar em cada ligação.",
       agingInPlace: "A Bianca liga para você no seu horário para check-ins amigáveis. Você pode consultar seu bem-estar e relatórios a qualquer momento. É como ter uma companheira sempre presente quando precisar.",
     },
+    registration: {
+      title: "Seus dados",
+      subtitle: "Confirme suas informações e aceite os termos para continuar.",
+      nameRequired: "O nome é obrigatório.",
+      emailRequired: "O e-mail é obrigatório.",
+      termsRequired: "Você deve aceitar os Termos de serviço e a Política de privacidade para continuar.",
+    },
   },
   orgScreen: {
     namePlaceholder: "Nome",

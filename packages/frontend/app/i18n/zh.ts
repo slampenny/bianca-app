@@ -608,6 +608,13 @@ const zh: LocaleTranslations = {
       caregiver: "添加您照顾的人，选择 Bianca 何时给他们打电话，通过对话和报告了解他们的近况。您无需参与每次通话也能掌握情况。",
       agingInPlace: "Bianca 按您的日程致电进行友好问候。您可随时查看自己的健康和报告。就像有一位在您需要时总在身边的伙伴。",
     },
+    registration: {
+      title: "您的资料",
+      subtitle: "确认您的信息并接受条款以继续。",
+      nameRequired: "姓名为必填项。",
+      emailRequired: "电子邮箱为必填项。",
+      termsRequired: "您必须接受服务条款和隐私政策才能继续。",
+    },
   },
   themes: {
     healthcare: {

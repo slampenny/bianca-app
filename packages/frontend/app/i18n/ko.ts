@@ -405,6 +405,13 @@ const ko: LocaleTranslations = {
       caregiver: "돌보는 분들을 추가하고, Bianca가 언제 전화할지 선택하고, 대화와 보고서로 그들의 상태를 확인하세요. 매 통화에 참여하지 않아도 상황을 파악할 수 있습니다.",
       agingInPlace: "Bianca가 귀하의 일정에 맞춰 친근한 체크인 전화를 합니다. 언제든 자신의 웰니스와 보고서를 확인할 수 있습니다. 필요할 때 항상 곁에 있는 동반자와 같습니다.",
     },
+    registration: {
+      title: "귀하의 정보",
+      subtitle: "정보를 확인하고 계속하려면 약관에 동의하세요.",
+      nameRequired: "이름은 필수입니다.",
+      emailRequired: "이메일은 필수입니다.",
+      termsRequired: "계속하려면 서비스 약관 및 개인정보 처리방침에 동의해야 합니다.",
+    },
   },
   legalLinks: {
     privacyPolicy: "개인정보 보호정책",

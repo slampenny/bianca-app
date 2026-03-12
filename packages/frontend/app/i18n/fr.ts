@@ -133,6 +133,13 @@ const fr: LocaleTranslations = {
       caregiver: "Ajoutez les personnes dont vous prenez soin, choisissez quand Bianca les appelle, et suivez leur état via les conversations et rapports. Vous restez informé sans être à chaque appel.",
       agingInPlace: "Bianca vous appelle selon votre emploi du temps pour des points réguliers. Vous pouvez consulter votre bien-être et vos rapports à tout moment. C'est comme avoir une compagne toujours là quand vous en avez besoin.",
     },
+    registration: {
+      title: "Vos coordonnées",
+      subtitle: "Confirmez vos informations et acceptez les conditions pour continuer.",
+      nameRequired: "Le nom est obligatoire.",
+      emailRequired: "L'adresse e-mail est obligatoire.",
+      termsRequired: "Vous devez accepter les conditions d'utilisation et la politique de confidentialité pour continuer.",
+    },
   },
   headers: {
     home: "Accueil",

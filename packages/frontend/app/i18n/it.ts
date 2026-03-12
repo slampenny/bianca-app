@@ -135,6 +135,13 @@ const it: LocaleTranslations = {
       caregiver: "Aggiungi le persone di cui ti prendi cura, scegli quando Bianca le chiama e segui il loro stato attraverso conversazioni e report. Resti aggiornato senza essere in ogni chiamata.",
       agingInPlace: "Bianca ti chiama in base al tuo programma per check-in amichevoli. Puoi consultare il tuo benessere e i report in qualsiasi momento. È come avere una compagna sempre presente quando ne hai bisogno.",
     },
+    registration: {
+      title: "I tuoi dati",
+      subtitle: "Conferma le tue informazioni e accetta i termini per continuare.",
+      nameRequired: "Il nome è obbligatorio.",
+      emailRequired: "L'email è obbligatoria.",
+      termsRequired: "Devi accettare i Termini di servizio e l'Informativa sulla privacy per continuare.",
+    },
   },
   headers: {
     home: "Home",

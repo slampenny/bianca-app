@@ -608,6 +608,13 @@ const ja: LocaleTranslations = {
       caregiver: "お世話している方を追加し、Biancaがいつ電話するか選び、会話とレポートで様子を確認できます。毎回の電話に同席しなくても把握できます。",
       agingInPlace: "Biancaがあなたのスケジュールに合わせてフレンドリーなチェックインの電話をします。いつでも自分のウェルネスやレポートを確認できます。必要な時にいつでもそばにいてくれる伴侶のような存在です。",
     },
+    registration: {
+      title: "あなたの詳細",
+      subtitle: "情報を確認し、続行するには規約に同意してください。",
+      nameRequired: "名前は必須です。",
+      emailRequired: "メールアドレスは必須です。",
+      termsRequired: "続行するには利用規約とプライバシーポリシーに同意する必要があります。",
+    },
   },
   orgScreen: {
     namePlaceholder: "名前",

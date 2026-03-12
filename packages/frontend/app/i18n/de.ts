@@ -135,6 +135,13 @@ const de: LocaleTranslations = {
       caregiver: "Fügen Sie die Menschen hinzu, die Sie betreuen, wählen Sie, wann Bianca sie anruft, und erfahren Sie durch Gespräche und Berichte, wie es ihnen geht. Sie bleiben auf dem Laufenden, ohne bei jedem Anruf dabei zu sein.",
       agingInPlace: "Bianca ruft Sie nach Ihrem Zeitplan für freundliche Check-ins an. Sie können Ihr Wohlbefinden und Berichte jederzeit einsehen. Wie ein Begleiter, der immer da ist, wenn Sie ihn brauchen.",
     },
+    registration: {
+      title: "Ihre Angaben",
+      subtitle: "Bestätigen Sie Ihre Daten und akzeptieren Sie die Bedingungen, um fortzufahren.",
+      nameRequired: "Name ist erforderlich.",
+      emailRequired: "E-Mail ist erforderlich.",
+      termsRequired: "Sie müssen die Nutzungsbedingungen und die Datenschutzrichtlinie akzeptieren, um fortzufahren.",
+    },
   },
   headers: {
     home: "Start",

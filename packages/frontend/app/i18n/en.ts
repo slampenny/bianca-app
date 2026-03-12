@@ -409,6 +409,9 @@ const en = {
     registration: {
       title: "Your details",
       subtitle: "Confirm your information and accept the terms to continue.",
+      nameRequired: "Name is required.",
+      emailRequired: "Email is required.",
+      termsRequired: "You must accept the Terms of Service and Privacy Policy to continue.",
     },
     termsAndConsent: {
       title: "Terms and consent",
