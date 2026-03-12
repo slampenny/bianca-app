@@ -21,7 +21,7 @@ export function OnboardingTermsAndConsentScreen({
   const { persona } = (route.params || {}) as { persona?: import("app/services/api/api.types").OnboardingPersona }
   const { colors, isLoading: themeLoading } = useTheme()
   const [acceptTerms, setAcceptTerms] = useState(false)
-  const [singleConsentState, setSingleConsentState] = useState(true)
+  const [singleConsentState, setSingleConsentState] = useState(false)
   const [showWhyImportant, setShowWhyImportant] = useState(false)
   const [completeOnboarding, { isLoading }] = useCompleteOnboardingMutation()
 

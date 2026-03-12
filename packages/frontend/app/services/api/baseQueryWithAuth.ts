@@ -118,11 +118,11 @@ function baseQueryWithReauth(
       const url = typeof args === 'string' ? args : (args as FetchArgs).url || ''
       const isLoginEndpoint = url.includes('/auth/login') || url.includes('/v1/auth/login')
       const isVerifyEmailEndpoint = url.includes('/auth/verify-email') || url.includes('/v1/auth/verify-email')
+      const isRefreshTokensEndpoint = url.includes('/auth/refresh-tokens') || url.includes('/v1/auth/refresh-tokens')
       
-      if (isLoginEndpoint || isVerifyEmailEndpoint) {
-        // Login endpoint 401 = invalid credentials, not expired token
-        // Verify-email endpoint 401 = invalid/expired verification token, not expired auth token
-        // Let the error propagate so the respective handlers can handle it
+      if (isLoginEndpoint || isVerifyEmailEndpoint || isRefreshTokensEndpoint) {
+        // Login 401 = invalid credentials. Verify-email 401 = invalid verification token.
+        // Refresh-tokens 401 = don't show modal (e.g. COOP/popup left stale token); keep session so SSO can complete.
         return result
       }
       

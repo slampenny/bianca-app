@@ -34,6 +34,7 @@ import Config from "./config"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { ViewStyle, Platform, View } from "react-native"
 import useRefreshToken from "./effects/useRefreshToken"
+import { SSOCallbackGate } from "./components/SSOCallbackGate"
 import { useLanguage } from "./hooks/useLanguage"
 import { AuthModalProvider } from "./contexts/AuthModalContext"
 import { useSelector } from "react-redux"
@@ -72,8 +73,6 @@ interface AppProps {
 
 function InnerApp() {
   useRefreshToken()
-  // Set up language change listener to trigger app-wide re-renders
-  // This must be inside the Redux Provider
   useLanguage()
   
   return null
@@ -206,12 +205,14 @@ function App(props: AppProps) {
                       onBeforeLift={onBeforeLiftPersistGate}
                       persistor={persistor}
                     >
-                      <AppNavigator
-                        linking={linking}
-                        initialState={initialNavigationState}
-                        onStateChange={onNavigationStateChange}
-                      />
-                      <InnerApp />
+                      <SSOCallbackGate>
+                        <AppNavigator
+                          linking={linking}
+                          initialState={initialNavigationState}
+                          onStateChange={onNavigationStateChange}
+                        />
+                        <InnerApp />
+                      </SSOCallbackGate>
                     </PersistGate>
                   </AuthModalProvider>
                 </ThemedWebContainer>

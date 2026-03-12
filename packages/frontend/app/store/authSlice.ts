@@ -92,11 +92,11 @@ export const authSlice = createSlice({
       logger.debug("refreshed tokens", JSON.stringify(payload.tokens))
       state.tokens = payload.tokens
     })
-    // Add this block
+    // Do NOT clear state on refresh failure: a 401 on refresh can be due to COOP/popup issues
+    // or a one-off failure. Clearing here would log the user out right after SSO. If tokens
+    // are truly invalid, the next authenticated API call will 401 and we show the auth modal.
     builder.addMatcher(authApi.endpoints.refreshTokens.matchRejected, (state) => {
-      logger.warn("Failed to refresh tokens")
-      state.tokens = null
-      state.currentUser = null
+      logger.warn("Failed to refresh tokens (keeping current session until next 401)")
     })
     builder.addMatcher(
       caregiverApi.endpoints.updateCaregiver.matchFulfilled,

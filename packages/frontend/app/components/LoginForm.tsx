@@ -14,6 +14,7 @@ import { navigationRef } from "../navigators/navigationUtilities"
 import { logger } from "../utils/logger"
 import { AuthModalContext } from "../contexts/AuthModalContext"
 import Config from "../config"
+import { consumeSSORedirectError } from "../effects/useSSORedirectCompletion"
 
 // Temporary interfaces to avoid import issues
 interface SSOUser {
@@ -85,6 +86,12 @@ export const LoginForm: FC<LoginFormProps> = ({
       setErrorMessage(initialErrorMessage)
     }
   }, [initialErrorMessage])
+
+  // On web, show SSO redirect error if we landed back after a failed redirect flow
+  useEffect(() => {
+    const ssoError = consumeSSORedirectError()
+    if (ssoError) setErrorMessage(ssoError)
+  }, [])
 
   useEffect(() => {
     // No default credentials for production

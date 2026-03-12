@@ -27,9 +27,9 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
-  const [country, setCountry] = useState("US")
+  const [country, setCountry] = useState("CA")
   const [acceptTerms, setAcceptTerms] = useState(false)
-  const [singleConsentState, setSingleConsentState] = useState(true)
+  const [singleConsentState, setSingleConsentState] = useState(false)
   const [showWhyImportant, setShowWhyImportant] = useState(false)
 
   const showConsent = persona === "organization" || persona === "caregiver"
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 24 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   centeredContent: { justifyContent: "center", minHeight: "100%" },
-  contentBlock: { maxWidth: 440, width: "100%", alignSelf: "center" },
+  contentBlock: { maxWidth: 440, width: "100%", alignSelf: "center", paddingTop: 24 },
   field: { marginBottom: 18 },
   pickerContainer: { marginBottom: 0 },
   termsSection: { marginTop: 8, marginBottom: 20 },
