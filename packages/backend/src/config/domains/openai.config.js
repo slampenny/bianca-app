@@ -63,6 +63,7 @@ const validateOpenAIEnvVars = (envVars) => {
 };
 
 const applyOpenAISecrets = (config, secrets) => {
+  const logger = require('../logger');
   if (secrets.OPENAI_API_KEY) config.openai.apiKey = secrets.OPENAI_API_KEY;
   
   // Update useGA flag from secrets (secrets are already in process.env at this point)
@@ -76,6 +77,7 @@ const applyOpenAISecrets = (config, secrets) => {
       useGA = secrets.OPENAI_REALTIME_USE_GA.toLowerCase() === 'true';
     }
     config.openai.useGA = useGA;
+    logger.info(`[OpenAI Config] Applied OPENAI_REALTIME_USE_GA from secrets: ${secrets.OPENAI_REALTIME_USE_GA} -> useGA: ${useGA}`);
     
     // Update model based on useGA flag (unless explicitly overridden)
     if (!secrets.OPENAI_REALTIME_MODEL) {

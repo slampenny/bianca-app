@@ -370,6 +370,7 @@ class OpenAIRealtimeService {
     const apiVersion = useGA ? 'GA' : 'Beta';
     logger.info(`[OpenAI Realtime] Initializing for callId: ${callId} (Initial Asterisk ID: ${initialAsteriskChannelId})`);
     logger.info(`[OpenAI Realtime] Using ${apiVersion} API (useGA: ${useGA})`);
+    logger.info(`[OpenAI Realtime] Config check - process.env.OPENAI_REALTIME_USE_GA: ${process.env.OPENAI_REALTIME_USE_GA}, config.openai.useGA: ${config.openai.useGA}`);
     logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28')}`);
     logger.info(`[OpenAI Realtime] Transcription: ${config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe'}`);
     logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);

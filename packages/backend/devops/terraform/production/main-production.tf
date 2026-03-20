@@ -266,7 +266,18 @@ data "aws_route53_zone" "myphonefriend" {
   private_zone = false
 }
 
+data "aws_route53_zone" "primary" {
+  name         = "biancawellness.com."
+  private_zone = false
+}
+
 data "aws_acm_certificate" "app_cert" {
+  domain      = "*.myphonefriend.com"
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
+
+data "aws_acm_certificate" "app_cert_legacy" {
   domain      = "*.myphonefriend.com"
   statuses    = ["ISSUED"]
   most_recent = true
@@ -880,7 +891,7 @@ resource "aws_instance" "asterisk" {
   monitoring = true
 
   # User data script to install Docker and run Asterisk
-  user_data = base64encode(templatefile("${path.module}/asterisk-userdata.sh", {
+  user_data = base64encode(templatefile("${path.module}/../asterisk-userdata.sh", {
     external_ip            = aws_eip.asterisk_eip.public_ip
     ari_password_secret    = data.aws_secretsmanager_secret.app_secret.arn
     bianca_password_secret = data.aws_secretsmanager_secret.app_secret.arn
@@ -1252,7 +1263,8 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "ASTERISK_MAX_RETRIES", value = "20" },          # Maximum retry attempts
         { name = "ASTERISK_HEALTH_CHECK_INTERVAL", value = "30000" },  # Health check every 30 seconds
         { name = "ASTERISK_CONNECTION_POOL_SIZE", value = "5" },   # Connection pool size
-        { name = "AWS_SECRET_ID", value = var.secrets_manager_secret_name }  # Explicitly set secret ID for loadSecrets()
+        { name = "AWS_SECRET_ID", value = var.secrets_manager_secret_name },  # Explicitly set secret ID for loadSecrets()
+        { name = "OPENAI_REALTIME_USE_GA", value = "true" }  # CRITICAL: Use GA API (Beta deprecated Feb 27, 2026)
       ]
       secrets = [
         { name = "JWT_SECRET", valueFrom = "${data.aws_secretsmanager_secret.app_secret.arn}:JWT_SECRET::" },
