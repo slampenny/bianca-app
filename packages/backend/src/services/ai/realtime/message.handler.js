@@ -28,85 +28,63 @@ class MessageHandler {
 
   /**
    * Build session configuration for session.update
-   * Supports both Beta and GA formats based on config.openai.useGA
+   * Always uses GA format
    * @param {Object} connection - Connection object
    * @returns {Object} Session configuration object
    */
   static buildSessionConfig(connection) {
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
     const voice = config.openai.realtimeVoice || 'alloy';
-    const transcriptionModel = config.openai.realtimeTranscriptionModel || 
-      (useGA ? 'gpt-4o-mini-transcribe' : 'whisper-1');
+    const transcriptionModel = config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe';
     
     const baseConfig = {
       type: 'session.update',
       session: {
         instructions: connection.initialPrompt || 'You are Bianca, a helpful AI assistant. Always respond in English.',
-        // Turn detection location differs: GA uses audio.input.turn_detection, Beta uses session.turn_detection
-        // Will be set in the if/else block below
+        // GA format: Audio settings nested under session.audio
+        // GA requires session.type to be set
+        // GA uses audio/pcmu (not g711_ulaw) for μ-law format
+        type: 'realtime',
       },
     };
 
-    if (useGA) {
-      // GA format: Audio settings nested under session.audio
-      // GA requires session.type to be set
-      // GA uses audio/pcmu (not g711_ulaw) for μ-law format
-      baseConfig.session.type = 'realtime';
-      
-      // Get OpenAI noise reduction setting (near_field for phone calls, far_field for speakerphone, null to disable)
-      const openaiNoiseReduction = config.audio?.openaiNoiseReduction || 'near_field';
-      
-      // Get turn detection settings from config (with defaults)
-      const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
-      const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
-      const turnDetectionSilenceDuration = config.audio?.turnDetection?.silenceDurationMs ?? 1000;
-      
-      baseConfig.session.audio = {
-        input: {
-          format: {
-            type: 'audio/pcmu'  // GA uses audio/pcmu instead of g711_ulaw
-          },
-          transcription: {
-            model: transcriptionModel
-          },
-          // OpenAI built-in noise reduction (optimized for phone calls)
-          noise_reduction: openaiNoiseReduction !== 'null' && openaiNoiseReduction !== null ? openaiNoiseReduction : null,
-          // Turn detection is nested under audio.input for GA
-          turn_detection: {
-            type: 'server_vad',
-            threshold: turnDetectionThreshold,
-            prefix_padding_ms: turnDetectionPrefixPadding,
-            silence_duration_ms: turnDetectionSilenceDuration
-          }
+    // GA format: Audio settings nested under session.audio
+    // GA requires session.type to be set
+    // GA uses audio/pcmu (not g711_ulaw) for μ-law format
+    baseConfig.session.type = 'realtime';
+    
+    // Get OpenAI noise reduction setting (near_field for phone calls, far_field for speakerphone, null to disable)
+    const openaiNoiseReduction = config.audio?.openaiNoiseReduction || 'near_field';
+    
+    // Get turn detection settings from config (with defaults)
+    const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
+    const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
+    const turnDetectionSilenceDuration = config.audio?.turnDetection?.silenceDurationMs ?? 1000;
+    
+    baseConfig.session.audio = {
+      input: {
+        format: {
+          type: 'audio/pcmu'  // GA uses audio/pcmu instead of g711_ulaw
         },
-        output: {
-          format: {
-            type: 'audio/pcmu'  // GA uses audio/pcmu instead of g711_ulaw
-          },
-          voice: voice  // Voice is in audio.output for GA
+        transcription: {
+          model: transcriptionModel
+        },
+        // OpenAI built-in noise reduction (optimized for phone calls)
+        noise_reduction: openaiNoiseReduction !== 'null' && openaiNoiseReduction !== null ? openaiNoiseReduction : null,
+        // Turn detection is nested under audio.input for GA
+        turn_detection: {
+          type: 'server_vad',
+          threshold: turnDetectionThreshold,
+          prefix_padding_ms: turnDetectionPrefixPadding,
+          silence_duration_ms: turnDetectionSilenceDuration
         }
-      };
-    } else {
-      // Beta format: Audio settings at top level
-      baseConfig.session.modalities = ['text', 'audio'];
-      baseConfig.session.voice = voice;  // Voice is at top level for Beta
-      baseConfig.session.input_audio_format = 'g711_ulaw';
-      baseConfig.session.output_audio_format = 'g711_ulaw';
-      baseConfig.session.input_audio_transcription = {
-        model: transcriptionModel,
-      };
-      // Get turn detection settings from config (with defaults)
-      const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
-      const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
-      const turnDetectionSilenceDuration = config.audio?.turnDetection?.silenceDurationMs ?? 1000;
-      // Turn detection is at session level for Beta
-      baseConfig.session.turn_detection = {
-        type: 'server_vad',
-        threshold: turnDetectionThreshold,
-        prefix_padding_ms: turnDetectionPrefixPadding,
-        silence_duration_ms: turnDetectionSilenceDuration
-      };
-    }
+      },
+      output: {
+        format: {
+          type: 'audio/pcmu'  // GA uses audio/pcmu instead of g711_ulaw
+        },
+        voice: voice  // Voice is in audio.output for GA
+      }
+    };
 
     return baseConfig;
   }
@@ -119,8 +97,7 @@ class MessageHandler {
    * @returns {boolean} True if audio was processed
    */
   static handleResponseAudioDelta(connection, message, processAudioCallback) {
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const eventType = useGA ? 'response.output_audio.delta' : 'response.audio.delta';
+    const eventType = 'response.output_audio.delta'; // GA event name
     
     if (!message.delta || typeof message.delta !== 'string' || message.delta.length === 0) {
       logger.warn(`[Message Handler] Received '${eventType}' but 'message.delta' (audio data) is missing or empty.`);
@@ -133,8 +110,7 @@ class MessageHandler {
 
       // Log first few chunks for debugging
       if (connection._openaiChunkCount <= 5 || connection._openaiChunkCount % 50 === 0) {
-        const apiVersion = useGA ? 'GA' : 'Beta';
-        logger.info(`[Message Handler] Processing ${eventType} #${connection._openaiChunkCount} (${apiVersion}), data length: ${message.delta.length}`);
+        logger.info(`[Message Handler] Processing ${eventType} #${connection._openaiChunkCount} (GA), data length: ${message.delta.length}`);
       }
     }
 

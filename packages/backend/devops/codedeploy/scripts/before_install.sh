@@ -451,7 +451,6 @@ services:
     environment:
       - AWS_REGION=$AWS_REGION
       - AWS_SECRET_ID=MySecretsManagerSecret
-      - OPENAI_REALTIME_USE_GA=true
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - NODE_ENV=$NODE_ENV
       - API_BASE_URL=$API_BASE_URL

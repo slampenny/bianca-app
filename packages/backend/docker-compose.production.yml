@@ -6,8 +6,6 @@ services:
       - NODE_ENV=production
       - AWS_REGION=us-east-2
       - AWS_SECRET_ID=MySecretsManagerSecret
-      # CRITICAL: Use GA API (Beta deprecated Feb 27, 2026)
-      - OPENAI_REALTIME_USE_GA=true
       # Base URLs for production
       - API_BASE_URL=https://api.biancawellness.com
       - FRONTEND_URL=https://app.biancawellness.com

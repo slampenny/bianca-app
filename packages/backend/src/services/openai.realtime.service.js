@@ -366,12 +366,9 @@ class OpenAIRealtimeService {
       return existingConn.status !== 'error' && existingConn.status !== 'closed';
     }
 
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
     logger.info(`[OpenAI Realtime] Initializing for callId: ${callId} (Initial Asterisk ID: ${initialAsteriskChannelId})`);
-    logger.info(`[OpenAI Realtime] Using ${apiVersion} API (useGA: ${useGA})`);
-    logger.info(`[OpenAI Realtime] Config check - process.env.OPENAI_REALTIME_USE_GA: ${process.env.OPENAI_REALTIME_USE_GA}, config.openai.useGA: ${config.openai.useGA}`);
-    logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || (useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28')}`);
+    logger.info(`[OpenAI Realtime] Using GA API`);
+    logger.info(`[OpenAI Realtime] Model: ${config.openai.realtimeModel || 'gpt-realtime'}`);
     logger.info(`[OpenAI Realtime] Transcription: ${config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe'}`);
     logger.info(`[OpenAI Realtime] Initial prompt: "${initialPrompt?.substring(0, 100)}..."`);
     if (clientId) {
@@ -746,8 +743,8 @@ class OpenAIRealtimeService {
    * Handle WebSocket open event
    */
   async handleOpen(callId) {
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
+    // Always use GA API
+    const apiVersion = 'GA';
     logger.info(`[OpenAI Realtime] WebSocket opened for callId: ${callId} (${apiVersion} API)`);
     this.updateConnectionStatus(callId, 'connected');
     this.reconnectAttempts.set(callId, 0);
@@ -777,8 +774,8 @@ class OpenAIRealtimeService {
    */
   handleError(callId, error) {
     this.clearConnectionTimeout(callId);
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
+    // Always use GA API
+    const apiVersion = 'GA';
     logger.error(`[OpenAI Realtime] WebSocket error for ${callId} (${apiVersion}): ${error.message}`);
     this.notify(callId, 'openai_error', { message: error.message || 'WebSocket error' });
 
@@ -793,8 +790,8 @@ class OpenAIRealtimeService {
   handleClose(callId, code, reason) {
     this.clearConnectionTimeout(callId);
     const reasonStr = reason ? reason.toString() : 'No reason provided';
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
+    // Always use GA API
+    const apiVersion = 'GA';
     logger.info(`[OpenAI Realtime] WebSocket closed for ${callId} (${apiVersion}). Code: ${code}, Reason: ${reasonStr}`);
 
     const currentConnState = this.connections.get(callId);
@@ -1011,8 +1008,8 @@ class OpenAIRealtimeService {
     // CRITICAL: Add turn detection to prevent AI from talking over user
     // Use MessageHandler to build session config (supports both Beta and GA formats)
     const sessionConfig = MessageHandler.buildSessionConfig(conn);
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
+    // Always use GA API
+    const apiVersion = 'GA';
 
     logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId} (${apiVersion} format)`);
     logger.debug(`[OpenAI Realtime] Session config (${apiVersion}): ${JSON.stringify(sessionConfig.session, null, 2)}`);
@@ -1051,8 +1048,7 @@ class OpenAIRealtimeService {
     const message = MessageHandler.parseMessage(data);
     if (!message) {
       logger.error(`[OpenAI Realtime] Failed to parse message for ${callId}`);
-      const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-      logger.error(`[OpenAI Realtime] API Version: ${useGA ? 'GA' : 'Beta'}, Raw message (first 500 chars): ${data.toString().substring(0, 500)}`);
+      logger.error(`[OpenAI Realtime] API Version: GA, Raw message (first 500 chars): ${data.toString().substring(0, 500)}`);
       return;
     }
 
@@ -1064,8 +1060,8 @@ class OpenAIRealtimeService {
     conn.lastActivity = Date.now();
 
     // Log all message types for debugging
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
+    // Always use GA API
+    const apiVersion = 'GA';
     logger.info(`[OpenAI Realtime] RECEIVED from OpenAI (${callId}, ${apiVersion}): type=${message.type}`);
 
     // Enhanced debugging for response-related messages
@@ -1098,15 +1094,13 @@ class OpenAIRealtimeService {
           );
           break;
 
-        case 'response.audio.delta':  // Beta event name
+        case 'response.audio.delta':  // Beta event name (legacy, should not occur with GA)
         case 'response.output_audio.delta':  // GA event name
           {
-            const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-            const apiVersion = useGA ? 'GA' : 'Beta';
             const eventType = message.type;
             
             // Log that we received the event
-            logger.info(`[OpenAI Realtime] Received ${eventType} event for ${callId} (${apiVersion}), delta length: ${message.delta?.length || 0}`);
+            logger.info(`[OpenAI Realtime] Received ${eventType} event for ${callId} (GA), delta length: ${message.delta?.length || 0}`);
             
             // Track that AI is speaking
             if (conn && !conn._aiIsSpeaking) {
@@ -1549,8 +1543,8 @@ class OpenAIRealtimeService {
 
     // Use MessageHandler to build session config
     const sessionConfig = MessageHandler.buildSessionConfig(conn);
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
+    // Always use GA API
+    const apiVersion = 'GA';
 
     logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId} (${apiVersion} format)`);
     logger.debug(`[OpenAI Realtime] Session config (${apiVersion}): ${JSON.stringify(sessionConfig.session, null, 2)}`);
@@ -1571,8 +1565,8 @@ class OpenAIRealtimeService {
     const conn = this.connections.get(callId);
     if (!conn) return;
 
-    const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
-    const apiVersion = useGA ? 'GA' : 'Beta';
+    // Always use GA API
+    const apiVersion = 'GA';
     logger.info(`[OpenAI Realtime] Session UPDATED for ${callId} (${apiVersion})`);
     logger.debug(`[OpenAI Realtime] Session update response for ${callId} (${apiVersion}): ${JSON.stringify(message)}`);
 
@@ -3940,24 +3934,18 @@ class OpenAIRealtimeService {
       }, CONSTANTS.TEST_CONNECTION_TIMEOUT);
 
       try {
-        // Model is now set in config based on useGA flag (gpt-realtime for GA, gpt-realtime-2025-08-28 as fallback)
-        const model = config.openai.realtimeModel || (config.openai.useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28');
+        // Always use GA API - model is 'gpt-realtime'
+        const model = config.openai.realtimeModel || 'gpt-realtime';
         const voice = config.openai.realtimeVoice || 'alloy';
         const wsUrl = `wss://api.openai.com/v1/realtime?model=${model}&voice=${voice}`;
         logger.info(`[OpenAI TestConn] Connecting to ${wsUrl}`);
 
-        // Build headers - remove beta header if using GA
-        const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+        // Build headers - GA API does not use beta header
         const headers = {
           Authorization: `Bearer ${config.openai.apiKey}`,
         };
         
-        // Only add beta header if NOT using GA
-        if (!useGA) {
-          headers['OpenAI-Beta'] = 'realtime=v1';
-        }
-        
-        logger.info(`[OpenAI TestConn] Using ${useGA ? 'GA' : 'Beta'} API`);
+        logger.info(`[OpenAI TestConn] Using GA API`);
         
         wsClient = new WebSocket(wsUrl, { headers });
 

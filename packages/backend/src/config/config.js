@@ -118,18 +118,13 @@ const envVarsSchema = Joi.object({
   MICROSOFT_CLIENT_SECRET: Joi.string().optional(),
   MICROSOFT_TENANT_ID: Joi.string().optional(),
   // **NEW:** Realtime API specific variables
-  // Note: Model is auto-selected based on OPENAI_REALTIME_USE_GA:
-  // - GA: 'gpt-realtime' (default when useGA=true)
-  // - Fallback: 'gpt-realtime-2025-08-28' (default when useGA=false, preview models no longer work)
+  // Always uses GA API ('gpt-realtime' model) - old Beta/preview models are offline
   // Can be overridden via OPENAI_REALTIME_MODEL env var
   OPENAI_REALTIME_MODEL: Joi.string().optional(),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
   OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
   OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
   OPENAI_MODEL: Joi.string().default('gpt-4o-2025-01-12'),
-  // Feature flag for GA migration (default: false = use beta, true = use GA)
-  // Note: String values from AWS Secrets Manager are handled in openai.config.js
-  OPENAI_REALTIME_USE_GA: Joi.alternatives().try(Joi.boolean(), Joi.string().valid('true', 'false')).default(false),
   // Transcription model: 'gpt-4o-mini-transcribe' (latest, faster) or 'gpt-4o-transcribe' (higher accuracy) or 'whisper-1' (legacy)
   OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().default('gpt-4o-mini-transcribe'),
   

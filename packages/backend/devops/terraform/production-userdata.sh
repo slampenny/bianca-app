@@ -199,7 +199,6 @@ services:
       - AWS_SECRET_ID=MySecretsManagerSecret
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - NODE_ENV=production
-      - OPENAI_REALTIME_USE_GA=true
       - API_BASE_URL=https://api.biancawellness.com
       - WEBSOCKET_URL=wss://api.biancawellness.com
       - FRONTEND_URL=https://app.biancawellness.com

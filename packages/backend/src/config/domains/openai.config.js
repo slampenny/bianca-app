@@ -15,20 +15,9 @@ const buildOpenAIConfig = (envVars) => {
     realtimeSessionConfig = {};
   }
   
-  // Parse useGA flag - handle both boolean and string values from AWS Secrets Manager
-  let useGA = false;
-  if (envVars.OPENAI_REALTIME_USE_GA !== undefined) {
-    if (typeof envVars.OPENAI_REALTIME_USE_GA === 'boolean') {
-      useGA = envVars.OPENAI_REALTIME_USE_GA;
-    } else if (typeof envVars.OPENAI_REALTIME_USE_GA === 'string') {
-      // AWS Secrets Manager stores values as strings, so parse "true"/"false"
-      useGA = envVars.OPENAI_REALTIME_USE_GA.toLowerCase() === 'true';
-    }
-  }
-  
-  // GA uses 'gpt-realtime', fallback uses 'gpt-realtime-2025-08-28' (preview models no longer work)
-  // Allow override via env var, but default based on useGA flag
-  const defaultRealtimeModel = useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28';
+  // Always use GA API - old Beta/preview models are offline
+  // GA uses 'gpt-realtime' model
+  const defaultRealtimeModel = 'gpt-realtime';
   const realtimeModel = envVars.OPENAI_REALTIME_MODEL || defaultRealtimeModel;
   
   return {
@@ -40,7 +29,7 @@ const buildOpenAIConfig = (envVars) => {
       idleTimeout: envVars.OPENAI_IDLE_TIMEOUT || 300000,
       model: envVars.OPENAI_MODEL || 'gpt-4o-2025-01-12',
       sentimentModel: envVars.OPENAI_SENTIMENT_MODEL || 'gpt-4o', // Chat completions model for sentiment; OPENAI_MODEL may be realtime-only
-      useGA,
+      useGA: true, // Always true - GA API is the only option
       realtimeTranscriptionModel: envVars.OPENAI_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
       debugAudio: true,
     },
@@ -56,38 +45,22 @@ const validateOpenAIEnvVars = (envVars) => {
     OPENAI_IDLE_TIMEOUT: Joi.number().optional(),
     OPENAI_MODEL: Joi.string().optional(),
     OPENAI_SENTIMENT_MODEL: Joi.string().optional(),
-    OPENAI_REALTIME_USE_GA: Joi.boolean().optional(),
     OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().optional(),
   });
   return schema.validate(envVars, { allowUnknown: true });
 };
 
 const applyOpenAISecrets = (config, secrets) => {
-  const logger = require('../logger');
   if (secrets.OPENAI_API_KEY) config.openai.apiKey = secrets.OPENAI_API_KEY;
   
-  // Update useGA flag from secrets (secrets are already in process.env at this point)
-  // Re-parse useGA flag - handle both boolean and string values from AWS Secrets Manager
-  if (secrets.OPENAI_REALTIME_USE_GA !== undefined) {
-    let useGA = false;
-    if (typeof secrets.OPENAI_REALTIME_USE_GA === 'boolean') {
-      useGA = secrets.OPENAI_REALTIME_USE_GA;
-    } else if (typeof secrets.OPENAI_REALTIME_USE_GA === 'string') {
-      // AWS Secrets Manager stores values as strings, so parse "true"/"false"
-      useGA = secrets.OPENAI_REALTIME_USE_GA.toLowerCase() === 'true';
-    }
-    config.openai.useGA = useGA;
-    logger.info(`[OpenAI Config] Applied OPENAI_REALTIME_USE_GA from secrets: ${secrets.OPENAI_REALTIME_USE_GA} -> useGA: ${useGA}`);
-    
-    // Update model based on useGA flag (unless explicitly overridden)
-    if (!secrets.OPENAI_REALTIME_MODEL) {
-      config.openai.realtimeModel = useGA ? 'gpt-realtime' : 'gpt-realtime-2025-08-28';
-    }
-  }
+  // Always use GA API - ensure useGA is true
+  config.openai.useGA = true;
   
-  // Update model if explicitly provided in secrets
+  // Update model if explicitly provided in secrets, otherwise use GA default
   if (secrets.OPENAI_REALTIME_MODEL) {
     config.openai.realtimeModel = secrets.OPENAI_REALTIME_MODEL;
+  } else {
+    config.openai.realtimeModel = 'gpt-realtime';
   }
   
   // Update transcription model if provided
