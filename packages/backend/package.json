@@ -83,6 +83,7 @@
     "runschedules": "cross-env NODE_ENV=development node src/scripts/runSchedules.js",
     "testcall": "cross-env NODE_ENV=production node src/scripts/testCall.js",
     "test:sentiment:local": "cross-env NODE_ENV=development node scripts/test-sentiment-local.js",
+    "report:fraud-abuse-regression": "cross-env NODE_ENV=development node scripts/fraud-abuse-embedding-regression-report.js",
     "terraform:command": "cd devops/terraform && AWS_PROFILE=jordan AWS_DEFAULT_REGION=us-east-2 terraform",
     "terraform:destroy": "cd devops/terraform && AWS_PROFILE=jordan AWS_DEFAULT_REGION=us-east-2 terraform destroy --auto-approve",
     "terraform:taint": "cd devops/terraform && AWS_PROFILE=jordan AWS_DEFAULT_REGION=us-east-2 terraform taint",

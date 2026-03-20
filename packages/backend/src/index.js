@@ -77,7 +77,14 @@ async function startServer() {
         if (mongoose.connection.readyState === 1) {
           logger.info('Connected to MongoDB');
           mongoConnected = true;
-          
+
+          try {
+            const { embeddingAnchorService } = require('./services/ai/embeddingAnchor.service');
+            await embeddingAnchorService.ensureInitialized();
+          } catch (embErr) {
+            logger.warn(`[Startup] Embedding anchor preload skipped or failed: ${embErr.message}`);
+          }
+
           // Set up connection event handlers
           mongoose.connection.on('error', (err) => {
             logger.error(`MongoDB connection error: ${err.message}`);

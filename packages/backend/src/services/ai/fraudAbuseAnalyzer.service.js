@@ -53,14 +53,12 @@ class FraudAbuseAnalyzer {
         };
       }
 
-      // Perform financial exploitation analysis
-      const financialRisk = this.financialDetector.detectFinancialExploitation(
+      const financialRisk = await this.financialDetector.detectFinancialExploitation(
         patientMessages,
         combinedText
       );
-      
-      // Perform abuse/neglect analysis
-      const abuseRisk = this.abuseDetector.detectAbuseNeglect(
+
+      const abuseRisk = await this.abuseDetector.detectAbuseNeglect(
         patientMessages,
         combinedText
       );

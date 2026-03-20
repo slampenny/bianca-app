@@ -10,6 +10,7 @@ const alertService = require('./alert.service');
 const mongoose = require('mongoose');
 const { Client, Caregiver } = require('../models');
 const logger = require('../config/logger');
+const { classifyEmergencyTense } = require('./emergencyTenseGate.service');
 
 /**
  * Main Emergency Processing Pipeline
@@ -163,10 +164,23 @@ class EmergencyProcessor {
         );
       }
 
-      // Step 4: Determine if we should alert
-      const shouldAlert = emergencyResult.isEmergency && 
+      // Step 4: Determine if we should alert (pattern + dedup + FP filter)
+      let shouldAlert = emergencyResult.isEmergency && 
                          !falsePositiveResult.isFalsePositive && 
                          deduplicationResult.shouldAlert;
+
+      // Step 4b: LLM tense gate — only alert if utterance describes current situation
+      let tenseGateReason = null;
+      if (shouldAlert) {
+        const tense = await classifyEmergencyTense(text);
+        if (tense === 'past' || tense === 'hypothetical') {
+          shouldAlert = false;
+          tenseGateReason = `LLM tense gate: classified as ${tense}`;
+          if (config.logging.logFalsePositives || config.logging.logAlertDecisions) {
+            logger.info(`[Emergency Detection] ${tenseGateReason} for client ${clientId}`);
+          }
+        }
+      }
 
       // Step 5: Calculate confidence score
       const confidence = this.calculateConfidence(emergencyResult, falsePositiveResult);
@@ -182,7 +196,6 @@ class EmergencyProcessor {
           responseTimeSeconds: config.severityResponseTimes[emergencyResult.severity] || 900
         };
 
-        // Record the alert in deduplicator with severity
         const deduplicator = getAlertDeduplicator();
         const alertRecord = deduplicator.recordAlert(clientId, emergencyResult.category, timestamp, text);
         if (alertRecord) {
@@ -194,7 +207,7 @@ class EmergencyProcessor {
       const response = {
         shouldAlert,
         alertData,
-        reason: this.getReason(emergencyResult, falsePositiveResult, deduplicationResult),
+        reason: tenseGateReason || this.getReason(emergencyResult, falsePositiveResult, deduplicationResult),
         processing: {
           emergencyDetected: emergencyResult.isEmergency,
           falsePositive: falsePositiveResult.isFalsePositive,
