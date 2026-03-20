@@ -114,6 +114,15 @@ resource "aws_codebuild_project" "production_tests" {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     }
+    # RunTests pulls images from ECR; production Build pushes :production (not :staging)
+    environment_variable {
+      name  = "BIANCA_ECR_IMAGE_TAG"
+      value = "production"
+    }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-production-pipeline"
+    }
     # Inject STAGING secrets from Secrets Manager (CodeBuild handles permissions automatically)
     environment_variable {
       name  = "JWT_SECRET"

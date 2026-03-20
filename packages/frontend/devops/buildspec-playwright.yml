@@ -13,10 +13,15 @@ phases:
   pre_build:
     commands:
       - echo "Starting Playwright E2E test setup using Docker containers..."
+      # ECR image tag: staging pipeline uses :staging; production pipeline uses :production (Build stage does not push :staging)
+      - export BIANCA_ECR_IMAGE_TAG="${BIANCA_ECR_IMAGE_TAG:-staging}"
+      - export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+      - echo "Using ECR image tag for backend/frontend=$BIANCA_ECR_IMAGE_TAG (set BIANCA_ECR_IMAGE_TAG in CodeBuild for production)"
+      - echo "Using CodePipeline name=$CODEPIPELINE_NAME for sequential build / S3 upload"
       - echo "Getting sequential build number (read-only)..."
       - |
         # Read-only so tests don't increment the global counter
-        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" bianca-staging-pipeline read-only)
+        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" "$CODEPIPELINE_NAME" read-only)
         export SEQUENTIAL_BUILD_NUMBER
         echo "Sequential Build Number: $SEQUENTIAL_BUILD_NUMBER"
       - echo "Configuring Git to preserve binary files..."
@@ -56,10 +61,10 @@ phases:
         fi
       - echo "Pulling Docker images from ECR..."
       - |
-        # Pull the staging images that were just built
-        docker pull $ECR_REGISTRY/bianca-app-backend:staging
-        docker pull $ECR_REGISTRY/bianca-app-frontend:staging
-        echo "✅ Docker images pulled successfully"
+        # Pull images built by the pipeline's Build stage (tag matches BIANCA_ECR_IMAGE_TAG)
+        docker pull $ECR_REGISTRY/bianca-app-backend:$BIANCA_ECR_IMAGE_TAG
+        docker pull $ECR_REGISTRY/bianca-app-frontend:$BIANCA_ECR_IMAGE_TAG
+        echo "✅ Docker images pulled successfully ($BIANCA_ECR_IMAGE_TAG)"
       - echo "Installing Node.js 20 for Playwright..."
       - |
         # Install Node.js 20 using nvm (needed for Playwright)
@@ -142,7 +147,7 @@ phases:
           -e OPENAI_API_KEY="$OPENAI_API_KEY" \
           -e MFA_ENCRYPTION_KEY="$MFA_ENCRYPTION_KEY" \
           -e TWILIO_AUTHTOKEN="$TWILIO_AUTHTOKEN" \
-          $ECR_REGISTRY/bianca-app-backend:staging
+          $ECR_REGISTRY/bianca-app-backend:$BIANCA_ECR_IMAGE_TAG
         # Wait for backend to be ready
         i=1
         while [ $i -le 60 ]; do
@@ -282,7 +287,7 @@ phases:
           -p 8081:80 \
           -e NODE_ENV=test \
           -e API_BASE_URL=http://${HOST_IP}:3000/v1 \
-          $ECR_REGISTRY/bianca-app-frontend:staging
+          $ECR_REGISTRY/bianca-app-frontend:$BIANCA_ECR_IMAGE_TAG
         # Wait for frontend to be ready
         FRONTEND_READY=false
         i=1
@@ -585,7 +590,9 @@ phases:
       - echo "Getting sequential build number for test results..."
       - |
         # Get sequential build number from S3 (read-only, already incremented by build stage)
-        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" bianca-staging-pipeline read-only)
+        export BIANCA_ECR_IMAGE_TAG="${BIANCA_ECR_IMAGE_TAG:-staging}"
+        export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" "$CODEPIPELINE_NAME" read-only)
         export SEQUENTIAL_BUILD_NUMBER
         echo "Sequential Build Number: $SEQUENTIAL_BUILD_NUMBER"
       - echo "Uploading test results to S3 for easy access..."
@@ -593,7 +600,9 @@ phases:
         # Get the S3 bucket name from the artifact store
         # CodePipeline stores artifacts in: s3://bucket-name/pipeline-name/execution-id/artifact-name/
         # We'll upload to a dedicated test-results location
-        PIPELINE_NAME="bianca-staging-pipeline"
+        export BIANCA_ECR_IMAGE_TAG="${BIANCA_ECR_IMAGE_TAG:-staging}"
+        export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+        PIPELINE_NAME="$CODEPIPELINE_NAME"
         BUILD_ID="${CODEBUILD_BUILD_ID}"
         # Use sequential build number instead of CodeBuild's per-project number
         BUILD_NUMBER="${SEQUENTIAL_BUILD_NUMBER:-${CODEBUILD_BUILD_NUMBER}}"

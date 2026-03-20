@@ -350,8 +350,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-testing'
 process.env.TWILIO_ACCOUNTSID = process.env.TWILIO_ACCOUNTSID || 'test-twilio-account-sid';
 process.env.TWILIO_AUTHTOKEN = process.env.TWILIO_AUTHTOKEN || 'test-twilio-auth-token';
 process.env.TWILIO_PHONENUMBER = process.env.TWILIO_PHONENUMBER || '+15551234567'; // Required for twilioCallService (note: config uses TWILIO_PHONENUMBER)
-// OpenAI Realtime API configuration - can be overridden via env var for GA testing
-process.env.OPENAI_REALTIME_USE_GA = process.env.OPENAI_REALTIME_USE_GA || 'false';
+// OpenAI Realtime API: GA only (no env toggle)
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-openai-api-key';
 
 module.exports = {

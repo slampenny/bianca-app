@@ -576,6 +576,15 @@ resource "aws_codebuild_project" "staging_tests" {
       name  = "ECR_REGISTRY"
       value = "${var.aws_account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
     }
+    # Staging Build pushes :staging tags (buildspec-playwright defaults match this)
+    environment_variable {
+      name  = "BIANCA_ECR_IMAGE_TAG"
+      value = "staging"
+    }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-staging-pipeline"
+    }
     # Inject secrets from Secrets Manager (CodeBuild handles permissions automatically)
     environment_variable {
       name  = "JWT_SECRET"
