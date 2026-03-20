@@ -120,16 +120,151 @@ router.get('/service-status', auth(), async (req, res) => {
     }
   }
 
+  // Check migration status
+  try {
+    const mongoose = require('mongoose');
+    const fs = require('fs');
+    const path = require('path');
+    const MIGRATIONS_DIR = path.join(__dirname, '../../../migrations');
+    const MIGRATIONS_COLLECTION = 'migrations';
+    const CRITICAL_MIGRATIONS = [
+      '20260310-copy-patients-to-clients.js',
+      '20260310-message-role-patient-to-client.js',
+      '20260310-patient-to-client-enums.js',
+      '20260310-org-require-patient-consent-to-require-client-consent.js',
+    ];
+
+    const migrationFiles = fs.readdirSync(MIGRATIONS_DIR)
+      .filter(f => f.endsWith('.js') && f !== 'README.md')
+      .sort();
+
+    const db = mongoose.connection.db;
+    let ranMigrations = [];
+    try {
+      const migrationsColl = db.collection(MIGRATIONS_COLLECTION);
+      const docs = await migrationsColl.find({}).sort({ fileName: 1 }).toArray();
+      ranMigrations = docs.map(d => d.fileName);
+    } catch (err) {
+      // Collection doesn't exist - no migrations have run
+    }
+
+    const criticalMissing = CRITICAL_MIGRATIONS.filter(f => !ranMigrations.includes(f));
+    serviceStatus.migrations = {
+      total: migrationFiles.length,
+      ran: ranMigrations.length,
+      pending: migrationFiles.length - ranMigrations.length,
+      critical: {
+        total: CRITICAL_MIGRATIONS.length,
+        ran: CRITICAL_MIGRATIONS.filter(f => ranMigrations.includes(f)).length,
+        missing: criticalMissing,
+      },
+      healthy: criticalMissing.length === 0,
+    };
+  } catch (err) {
+    serviceStatus.migrations = { error: err.message };
+  }
+
   // Overall health
   const failedServices = Object.values(serviceStatus.services).filter((s) => !s.loaded || s.error).length;
+  const migrationsHealthy = serviceStatus.migrations?.healthy !== false;
   serviceStatus.health = {
     totalServices: 4,
     loadedServices: 4 - failedServices,
     failedServices: failedServices,
-    overallHealth: failedServices === 0 ? 'HEALTHY' : 'DEGRADED',
+    migrationsHealthy,
+    overallHealth: (failedServices === 0 && migrationsHealthy) ? 'HEALTHY' : 'DEGRADED',
   };
 
   res.json(serviceStatus);
+});
+
+/**
+ * @swagger
+ * /test/migration-status:
+ *   get:
+ *     summary: Get database migration status
+ *     description: Returns which migrations have run and which are pending, highlighting critical migrations
+ *     tags: [Test]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       "200":
+ *         description: Migration status information
+ *       "401":
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.get('/migration-status', auth(), async (req, res) => {
+  const mongoose = require('mongoose');
+  const fs = require('fs');
+  const path = require('path');
+
+  const MIGRATIONS_DIR = path.join(__dirname, '../../../migrations');
+  const MIGRATIONS_COLLECTION = 'migrations';
+  const CRITICAL_MIGRATIONS = [
+    '20260310-copy-patients-to-clients.js',
+    '20260310-message-role-patient-to-client.js',
+    '20260310-patient-to-client-enums.js',
+    '20260310-org-require-patient-consent-to-require-client-consent.js',
+  ];
+
+  try {
+    // Get all migration files
+    const migrationFiles = fs.readdirSync(MIGRATIONS_DIR)
+      .filter(f => f.endsWith('.js') && f !== 'README.md')
+      .sort();
+
+    // Get migration history from database
+    const db = mongoose.connection.db;
+    let ranMigrations = [];
+    try {
+      const migrationsColl = db.collection(MIGRATIONS_COLLECTION);
+      const docs = await migrationsColl.find({}).sort({ fileName: 1 }).toArray();
+      ranMigrations = docs.map(d => d.fileName);
+    } catch (err) {
+      if (err.codeName === 'NamespaceNotFound' || err.message?.includes('does not exist')) {
+        // Collection doesn't exist - no migrations have run
+      } else {
+        throw err;
+      }
+    }
+
+    // Build status for each migration
+    const migrations = migrationFiles.map(file => {
+      const hasRun = ranMigrations.includes(file);
+      const isCritical = CRITICAL_MIGRATIONS.includes(file);
+      return {
+        fileName: file,
+        hasRun,
+        isCritical,
+        status: hasRun ? 'completed' : 'pending',
+      };
+    });
+
+    const critical = {
+      total: CRITICAL_MIGRATIONS.length,
+      ran: migrations.filter(m => m.isCritical && m.hasRun).length,
+      missing: migrations.filter(m => m.isCritical && !m.hasRun).map(m => m.fileName),
+    };
+
+    const status = {
+      timestamp: new Date().toISOString(),
+      total: migrationFiles.length,
+      ran: ranMigrations.length,
+      pending: migrationFiles.length - ranMigrations.length,
+      critical,
+      migrations,
+      healthy: critical.missing.length === 0,
+    };
+
+    if (critical.missing.length > 0) {
+      status.warning = `CRITICAL: ${critical.missing.length} critical migration(s) have not run. The app may not work correctly.`;
+    }
+
+    res.json(status);
+  } catch (err) {
+    logger.error('Error checking migration status:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 /**

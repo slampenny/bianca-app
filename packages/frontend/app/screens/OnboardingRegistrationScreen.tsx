@@ -29,7 +29,7 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
   const [phone, setPhone] = useState("")
   const [country, setCountry] = useState("CA")
   const [acceptTerms, setAcceptTerms] = useState(false)
-  const [singleConsentState, setSingleConsentState] = useState(false)
+  const [singleConsentState, setSingleConsentState] = useState(true)
   const [showWhyImportant, setShowWhyImportant] = useState(false)
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
 

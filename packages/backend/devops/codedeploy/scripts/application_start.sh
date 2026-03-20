@@ -204,6 +204,16 @@ if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
     app \
     yarn migrate:up; then
     echo "   ✅ Migrations completed successfully"
+    echo "   🔍 Verifying migration status..."
+    if docker compose run --rm \
+      -e NODE_ENV="$MIGRATION_NODE_ENV" \
+      -e MONGODB_URL="$MONGODB_URL" \
+      app \
+      yarn migrate:check 2>&1; then
+      echo "   ✅ All critical migrations verified"
+    else
+      echo "   ⚠️  Warning: Migration check reported issues (see above)"
+    fi
   else
     MIGRATION_EXIT_CODE=$?
     echo "   ❌ ERROR: Migrations failed with exit code: $MIGRATION_EXIT_CODE" >&2
@@ -219,6 +229,16 @@ else
     app \
     yarn migrate:up; then
     echo "   ✅ Migrations completed successfully"
+    echo "   🔍 Verifying migration status..."
+    if docker-compose run --rm \
+      -e NODE_ENV="$MIGRATION_NODE_ENV" \
+      -e MONGODB_URL="$MONGODB_URL" \
+      app \
+      yarn migrate:check 2>&1; then
+      echo "   ✅ All critical migrations verified"
+    else
+      echo "   ⚠️  Warning: Migration check reported issues (see above)"
+    fi
   else
     MIGRATION_EXIT_CODE=$?
     echo "   ❌ ERROR: Migrations failed with exit code: $MIGRATION_EXIT_CODE" >&2

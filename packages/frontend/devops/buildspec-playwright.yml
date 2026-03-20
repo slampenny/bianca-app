@@ -464,6 +464,40 @@ phases:
           echo "✅ Cucumber E2E tests passed!"
         fi
         
+        # Step 4: Run OpenAI voice connection test (critical health check)
+        echo ""
+        echo "=========================================="
+        echo "Step 4: Running OpenAI Voice Connection Test"
+        echo "=========================================="
+        cd "$FRONTEND_DIR" || exit 1
+        
+        # Set frontend URL/port to match Docker container
+        export FRONTEND_URL="http://localhost:8081"
+        export FRONTEND_PORT="8081"
+        export BASE_URL="http://localhost:8081"
+        
+        set +e  # Don't exit on error, we'll handle it
+        # Run the OpenAI voice connection test
+        bash -lc 'set -o pipefail; NODE_ENV=test timeout 10m npx playwright test test/e2e/openai-voice-connection.e2e.test.ts --reporter=list 2>&1 | tee /tmp/openai-voice-test.log'
+        OPENAI_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show output
+        cat /tmp/openai-voice-test.log
+        echo ""
+        echo "OpenAI voice connection test exit code: $OPENAI_TEST_EXIT_CODE"
+        
+        if [ "$OPENAI_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ OpenAI voice connection test failed with exit code $OPENAI_TEST_EXIT_CODE"
+          echo "=== Backend Container Logs ==="
+          docker logs backend-test --tail 100 || true
+          echo "=== Frontend Container Logs ==="
+          docker logs frontend-test --tail 100 || true
+          OVERALL_EXIT_CODE=$OPENAI_TEST_EXIT_CODE
+        else
+          echo "✅ OpenAI voice connection test passed!"
+        fi
+        
         # Final summary
         echo ""
         echo "=========================================="
@@ -472,6 +506,7 @@ phases:
         echo "Backend Unit Tests: $([ $BACKEND_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
         echo "Frontend Unit Tests: $([ $FRONTEND_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
         echo "Cucumber E2E Tests: $([ $CUCUMBER_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo "OpenAI Voice Connection Test: $([ $OPENAI_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
         echo ""
         
         if [ "$OVERALL_EXIT_CODE" -ne 0 ]; then

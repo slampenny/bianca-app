@@ -57,6 +57,7 @@
     "migrate:down": "migrate-mongo down",
     "migrate:status": "migrate-mongo status",
     "migrate:list": "migrate-mongo list",
+    "migrate:check": "node scripts/check-migration-status.js",
     "coverage": "jest -i --coverage",
     "coverage:coveralls": "jest -i --coverage --coverageReporters=text-lcov | coveralls",
     "lint": "eslint .",

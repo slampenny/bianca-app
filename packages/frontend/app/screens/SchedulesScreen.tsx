@@ -185,6 +185,8 @@ export const SchedulesScreen = () => {
           }
           dispatch(setClient(updatedClient))
         }
+        // Navigate to home screen after successful save
+        ;(navigation.navigate as (name: string) => void)("Home")
       } else {
         // Create new schedule (no ID or ID is null/undefined)
         if (selectedClient && selectedClient.id && selectedSchedule) {
@@ -206,6 +208,8 @@ export const SchedulesScreen = () => {
           dispatch(setSchedules(currentSchedules))
           // Note: The schedule will be updated with an ID by Redux after creation
           // The useEffect watching selectedSchedule?.id will update initialScheduleRef
+          // Navigate to home screen after successful save
+          ;(navigation.navigate as (name: string) => void)("Home")
         }
       }
     } catch (error) {
