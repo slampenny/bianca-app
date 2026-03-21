@@ -1,8 +1,13 @@
 version: 0.2
 
-# CRITICAL: This buildspec is used by the RunTests stage
+# CRITICAL: This buildspec is used by the RunTests stage (staging AND production pipelines).
 # NODE_ENV=test ensures tests use test configuration (Ethereal Mail, test DB, etc.)
 # This is DIFFERENT from staging deploy which uses NODE_ENV=staging
+#
+# ISOLATION — does NOT use production database or production APIs:
+# - MongoDB runs in a disposable Docker container on the CodeBuild host (localhost:27017, bianca-app-test).
+# - Backend MONGODB_URL points only at that container; production EC2/ECS DB is never used here.
+# - CodeBuild uses staging/test secrets (see Terraform aws_codebuild_project.*_tests), not prod billing keys.
 env:
   variables:
     NODE_ENV: test

@@ -66,6 +66,8 @@ resource "aws_codebuild_project" "production_build" {
 # (e.g., Ethereal Mail instead of SES, test database, etc.)
 # This is DIFFERENT from the production deploy which uses NODE_ENV=production
 
+# RunTests for production pipeline: tests run in CodeBuild with disposable local MongoDB + NODE_ENV=test.
+# Does NOT connect to the production database on deployed instances (see buildspec-playwright.yml).
 resource "aws_codebuild_project" "production_tests" {
   name         = "bianca-production-tests"
   description  = "Runs unit tests (backend and frontend) and Cucumber E2E tests for production pipeline"
