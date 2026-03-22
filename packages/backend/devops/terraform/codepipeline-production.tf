@@ -141,11 +141,13 @@ resource "aws_codebuild_project" "production_tests" {
       type  = "SECRETS_MANAGER"
       value = "MySecretsManagerSecret-Staging:STRIPE_PUBLISHABLE_KEY::"
     }
-    # Use test key for tests - prevents hitting real OpenAI API during test runs
-    # Tests mock OpenAI services, but setting a test key provides extra safety
+    # Real OpenAI key from staging secret — required for /v1/test/openai-connection (Realtime WebSocket)
+    # in Playwright (openai-voice-connection.e2e.test.ts). A placeholder key causes invalid_api_key.
+    # Same source as bianca-staging-tests (still not production billing keys).
     environment_variable {
       name  = "OPENAI_API_KEY"
-      value = "test-openai-api-key-for-testing-only"
+      type  = "SECRETS_MANAGER"
+      value = "MySecretsManagerSecret-Staging:OPENAI_API_KEY::"
     }
     environment_variable {
       name  = "MFA_ENCRYPTION_KEY"
