@@ -99,3 +99,15 @@ So Asterisk connectivity from the internet is not blocked by the SG if the corre
 
 - Restart containers: `cd /opt/bianca-production && docker-compose up -d` (or `docker-compose` if that’s what the instance uses).
 - Or trigger a new CodeDeploy to production so the single instance gets a full deploy with Asterisk started and validated (validate_service.sh checks Asterisk when present in compose).
+
+## 9. Safe Docker cleanup (disk / stale containers)
+
+If the instance is low on disk or you suspect leftover images/containers after many deploys:
+
+- Script (prune **stopped** containers, **dangling** images, **build cache** only — **does not** `volume prune`):
+
+  `packages/backend/devops/scripts/cleanup-production-docker.sh`
+
+- Run on the box (SSH): `bash cleanup-production-docker.sh` after copying it, or paste the commands from that file.
+
+- **SSM note:** `send-command` sometimes stays `Delayed`; Session Manager interactive shell or SSH is more reliable for long `docker compose up` runs.
