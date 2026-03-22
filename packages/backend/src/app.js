@@ -53,6 +53,12 @@ app.get('/health', (req, res) => {
       ariStatus = { ready: false, status: 'Service not available' };
     }
 
+    // OpenAI: boolean only — helps ops confirm secret/env loaded (invalid key still fails at runtime)
+    const openaiKey = config.openai?.apiKey;
+    const openaiStatus = {
+      apiKeyConfigured: typeof openaiKey === 'string' && openaiKey.length > 0
+    };
+
     const healthData = {
       status: 'OK',
       timestamp: new Date().toISOString(),
@@ -63,7 +69,8 @@ app.get('/health', (req, res) => {
           status: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
         },
         email: emailStatus,
-        asterisk: ariStatus
+        asterisk: ariStatus,
+        openai: openaiStatus
       }
     };
 
@@ -73,11 +80,17 @@ app.get('/health', (req, res) => {
     
   } catch (error) {
     // Fallback if something goes wrong
+    const k = config.openai?.apiKey;
     res.status(200).json({
       status: 'OK',
       timestamp: new Date().toISOString(),
       environment: config.env,
-      error: 'Could not retrieve service status'
+      error: 'Could not retrieve service status',
+      services: {
+        openai: {
+          apiKeyConfigured: typeof k === 'string' && k.length > 0
+        }
+      }
     });
   }
 });

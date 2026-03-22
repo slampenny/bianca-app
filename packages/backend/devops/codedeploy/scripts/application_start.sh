@@ -102,6 +102,24 @@ if [ ! -f "nginx.conf" ]; then
   exit 1
 fi
 
+# Sync Asterisk SIP advertised address to this instance's current public IP (EIP).
+# After blue/green, EIP is associated in Step 6 but CodeDeploy may have written
+# docker-compose.yml earlier with a stale elastic/public IP; metadata always reflects
+# the address Twilio reaches via sip.<domain> DNS.
+echo ""
+echo "   🌐 Syncing EXTERNAL_ADDRESS / ASTERISK_PUBLIC_IP from instance metadata..."
+PUBLIC_IP_SYNC=$(curl -sS --max-time 5 http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || true)
+if [ -n "$PUBLIC_IP_SYNC" ] && grep -q "EXTERNAL_ADDRESS=" docker-compose.yml 2>/dev/null; then
+  cp -a docker-compose.yml "docker-compose.yml.bak.external-sync.$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+  sed -i \
+    -e "s|EXTERNAL_ADDRESS=[^[:space:]]*|EXTERNAL_ADDRESS=$PUBLIC_IP_SYNC|" \
+    -e "s|ASTERISK_PUBLIC_IP=[^[:space:]]*|ASTERISK_PUBLIC_IP=$PUBLIC_IP_SYNC|" \
+    docker-compose.yml
+  echo "   ✅ EXTERNAL_ADDRESS and ASTERISK_PUBLIC_IP set to $PUBLIC_IP_SYNC (current EIP/public IP)"
+else
+  echo "   ⚠️  Skipping EXTERNAL_ADDRESS sync (no public IP from metadata or no EXTERNAL_ADDRESS in compose)"
+fi
+
 # Determine which docker compose command to use
 # Prefer docker compose (plugin) - matches local development setup
 # Fallback to docker-compose (standalone) for backwards compatibility

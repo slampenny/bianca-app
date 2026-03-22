@@ -5,11 +5,11 @@ When Asterisk works in staging but not in production, use this checklist.
 ## 1. Pipeline and orphans
 
 - **Orphan cleanup**: Production uses the **same** `buildspec-swap-and-terminate.yml` as staging, including **Step 1.5** (deregister any target that isn’t the current green). So on each production swap, only the green instance stays in the ALB target groups.
-- **Orphaned production instances**: We already deregistered the two orphan production instances from the ALB; the only remaining target is the instance with **bianca-production-eip** (the one Terraform intends). If Asterisk still doesn’t connect, the problem is on that single instance, not traffic going to the wrong host.
+- **Two `bianca-production` instances = split MongoDB**: Each EC2 has its **own** Docker Mongo on `/opt/mongodb-data`. If the **ALB** sends HTTPS to instance **A** but the **SIP EIP** is on instance **B**, the API and voice paths see **different databases** (e.g. clients created in the UI don’t exist for calls). **Fix:** associate **`bianca-production-eip`** with the **same** instance ID that is registered in **`bianca-production-api-tg`**, run `EXTERNAL_ADDRESS` sync + restart Asterisk/app on that host, then **terminate** the stray instance.
 
 ## 2. Single production instance
 
-- **Intended instance**: The production EIP is attached to the instance that should serve all traffic. All services (app, Asterisk, nginx, etc.) must run on that instance.
+- **Intended instance**: Exactly **one** running `Name=bianca-production` instance. The production **EIP** must be attached to that instance (so `sip.*` and Twilio hit the same Mongo as `api.*` via the ALB).
 - **Containers**: App talks to Asterisk over the Docker network at `http://asterisk:8088` (ARI). If the Asterisk container isn’t running on that instance, the app will never connect.
 
 ## 3. Debug on the production instance
@@ -63,7 +63,12 @@ docker compose up -d asterisk app
 
 Then check: `docker logs production_asterisk --tail 20` (should show correct external address).
 
-**Pipeline fix**: Step 6 in `buildspec-swap-and-terminate.yml` now updates `EXTERNAL_ADDRESS` and `ASTERISK_PUBLIC_IP` in `docker-compose.yml` to the current public IP (EIP) and restarts Asterisk + app after associating the EIP. Step 6 uses `(docker compose ... || docker-compose ...)` so it works on both staging (standalone binary) and production (plugin). Future deploys will keep SIP correct.
+**Pipeline fix (two layers):**
+
+1. **Step 6** in `buildspec-swap-and-terminate.yml`: after associating the EIP with the new blue instance, SSM runs `sed` on `docker-compose.yml` and restarts Asterisk + app so SIP is correct **immediately** after swap (before the next app deploy).
+2. **`application_start.sh` (CodeDeploy)**: before `docker compose up`, syncs `EXTERNAL_ADDRESS` and `ASTERISK_PUBLIC_IP` from **instance metadata** (`public-ipv4`). That fixes drift whenever someone deploys—even if Step 6 SSM failed, the instance was fixed manually once, or the EIP changed outside Terraform.
+
+Step 6 uses `(docker compose ... || docker-compose ...)` so it works on both staging (standalone binary) and production (plugin).
 
 **Staging one-time fix** (if Asterisk stopped working after a blue-green deploy): SSH to the staging instance (or use SSM), then:
 

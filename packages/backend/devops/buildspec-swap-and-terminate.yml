@@ -307,6 +307,8 @@ phases:
             sleep 15
             # docker-compose was written at deploy time with the instance's pre-EIP IP. Update it to
             # the current public IP (now the EIP) so Asterisk SIP and the app use the correct address.
+            # CodeDeploy application_start.sh also syncs EXTERNAL_ADDRESS from metadata on every deploy
+            # (belt-and-suspenders if SSM fails or someone deploys before swap Step 6 runs).
             # Use docker-compose (standalone) or docker compose (plugin) so this works on both staging and production.
             DOCKER_DIR="/opt/bianca-${BLUE_TAG#bianca-}"
             CMD="cd $DOCKER_DIR && PUBLIC_IP=\$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && sed -i.bak -e 's|EXTERNAL_ADDRESS=[^[:space:]]*|EXTERNAL_ADDRESS='\$PUBLIC_IP'|' -e 's|ASTERISK_PUBLIC_IP=[^[:space:]]*|ASTERISK_PUBLIC_IP='\$PUBLIC_IP'|' docker-compose.yml && (docker compose up -d asterisk app 2>/dev/null || docker-compose up -d asterisk app)"

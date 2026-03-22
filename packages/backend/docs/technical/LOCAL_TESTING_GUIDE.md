@@ -279,6 +279,17 @@ Once local testing passes:
 2. Monitor logs for any differences
 3. Gradually roll out to production using feature flag
 
+## Production: pipeline green but “no OpenAI”
+
+CI (CodeBuild) and production EC2 are **different environments**:
+
+| Check | Why it matters |
+|--------|----------------|
+| **`GET /health`** → `services.openai.apiKeyConfigured` | Confirms the process has a non-empty `OPENAI_API_KEY` (does **not** prove the key is valid). |
+| **Deploy actually rolled** | CodeBuild tests run a fresh image; production must **pull the new image** (CodeDeploy / compose) or it may still run an older build without Realtime fixes. |
+| **`POST /v1/test/openai-connection`** (with JWT) on prod API | End-to-end Realtime handshake; if this fails, check CloudWatch for `[OpenAI Realtime]` and `invalid_api_key` / `session.update` errors. |
+| **Phone path ≠ test endpoint** | Live calls go **Twilio → Asterisk → ARI → OpenAI**. ARI not connected or SIP issues can look like “no AI” even when the test route works. |
+
 ## Related Documentation
 
 - [Migration Plan](../technical/OPENAI_REALTIME_BETA_TO_GA_MIGRATION.md)
