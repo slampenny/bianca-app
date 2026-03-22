@@ -200,8 +200,8 @@ const baselineConfig = {
       primarySpeakerVolumeReduction: parseFloat(process.env.AUDIO_PRIMARY_SPEAKER_VOLUME_REDUCTION) || 0.3, // Default: 0.3 (30% volume for non-primary)
       adaptiveNoiseReductionEnabled: process.env.AUDIO_ADAPTIVE_NOISE_REDUCTION_ENABLED === 'true', // Default: false (Stage 4)
     },
-    // OpenAI built-in noise reduction (for gpt-realtime GA model)
-    openaiNoiseReduction: process.env.AUDIO_OPENAI_NOISE_REDUCTION || 'near_field', // 'near_field' (phone calls), 'far_field' (speakerphone), or null to disable
+    // OpenAI built-in noise reduction (for gpt-realtime GA model); API expects { type: 'near_field' | 'far_field' }
+    openaiNoiseReduction: process.env.AUDIO_OPENAI_NOISE_REDUCTION || 'near_field', // near_field | far_field; use 'null' to disable (env string)
     // Turn detection settings (controls when Bianca responds after user stops speaking)
     turnDetection: {
       threshold: parseFloat(process.env.AUDIO_TURN_DETECTION_THRESHOLD) || 0.6, // Default: 0.6 (higher = more selective, ignores quiet background)

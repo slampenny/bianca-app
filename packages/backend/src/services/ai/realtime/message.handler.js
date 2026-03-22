@@ -53,8 +53,17 @@ class MessageHandler {
     baseConfig.session.type = 'realtime';
     
     // Get OpenAI noise reduction setting (near_field for phone calls, far_field for speakerphone, null to disable)
-    const openaiNoiseReduction = config.audio?.openaiNoiseReduction || 'near_field';
-    
+    // GA Realtime API expects an object { type: 'near_field' | 'far_field' }, not a bare string
+    const openaiNoiseReductionRaw = config.audio?.openaiNoiseReduction || 'near_field';
+    let noiseReductionObject = null;
+    if (openaiNoiseReductionRaw && openaiNoiseReductionRaw !== 'null') {
+      const mode =
+        openaiNoiseReductionRaw === 'near_field' || openaiNoiseReductionRaw === 'far_field'
+          ? openaiNoiseReductionRaw
+          : 'near_field';
+      noiseReductionObject = { type: mode };
+    }
+
     // Get turn detection settings from config (with defaults)
     const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
     const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
@@ -69,7 +78,7 @@ class MessageHandler {
           model: transcriptionModel
         },
         // OpenAI built-in noise reduction (optimized for phone calls)
-        noise_reduction: openaiNoiseReduction !== 'null' && openaiNoiseReduction !== null ? openaiNoiseReduction : null,
+        noise_reduction: noiseReductionObject,
         // Turn detection is nested under audio.input for GA
         turn_detection: {
           type: 'server_vad',
