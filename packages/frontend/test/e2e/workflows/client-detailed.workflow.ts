@@ -98,7 +98,7 @@ export class ClientDetailedWorkflow {
     return false
   }
 
-  async givenIAmOnPatientDetailsScreen(clientName?: string) {
+  async givenIAmOnClientDetailsScreen(clientName?: string) {
     const clientSelected = await this.givenIHaveSelectedAClient(clientName)
     if (!clientSelected) {
       throw new Error(`Failed to select client${clientName ? `: ${clientName}` : ''} - no client cards found or could not be clicked`)
@@ -125,9 +125,9 @@ export class ClientDetailedWorkflow {
   }
 
   // SCHEDULE MANAGEMENT WORKFLOWS
-  async whenIAccessPatientSchedules(patientName?: string) {
-    const patientSelected = await this.givenIHaveSelectedAClient(patientName)
-    if (!patientSelected) return false
+  async whenIAccessClientSchedules(clientName?: string) {
+    const clientSelected = await this.givenIHaveSelectedAClient(clientName)
+    if (!clientSelected) return false
 
     // Look for schedule access
     const scheduleElements = [
@@ -152,7 +152,7 @@ export class ClientDetailedWorkflow {
   }
 
   async whenICreateNewSchedule(scheduleData: any) {
-    // Create a new schedule for the patient
+    // Create a new schedule for the client
     const createScheduleElements = [
       this.page.getByTestId('create-schedule-button'),
       this.page.getByTestId('add-schedule-button'),
@@ -292,9 +292,9 @@ export class ClientDetailedWorkflow {
   }
 
   // CONVERSATION MANAGEMENT WORKFLOWS
-  async whenIAccessPatientConversations(patientName?: string) {
-    const patientSelected = await this.givenIHaveSelectedAClient(patientName)
-    if (!patientSelected) return false
+  async whenIAccessClientConversations(clientName?: string) {
+    const clientSelected = await this.givenIHaveSelectedAClient(clientName)
+    if (!clientSelected) return false
 
     // Look for conversation access
     const conversationElements = [
@@ -364,8 +364,8 @@ export class ClientDetailedWorkflow {
   }
 
   // AVATAR MANAGEMENT WORKFLOWS
-  async whenIAccessPatientAvatarSettings(patientName?: string) {
-    const onDetailsScreen = await this.givenIAmOnPatientDetailsScreen(patientName)
+  async whenIAccessClientAvatarSettings(clientName?: string) {
+    const onDetailsScreen = await this.givenIAmOnClientDetailsScreen(clientName)
     if (!onDetailsScreen) return false
 
     // Look for avatar management
@@ -382,7 +382,7 @@ export class ClientDetailedWorkflow {
     for (const element of avatarElements) {
       if (await element.count() > 0) {
         avatarAccessFound = true
-        console.log('Found patient avatar management interface')
+        console.log('Found client avatar management interface')
         break
       }
     }
@@ -390,8 +390,8 @@ export class ClientDetailedWorkflow {
     return avatarAccessFound
   }
 
-  async whenIUploadPatientAvatar(patientName?: string) {
-    const avatarAccessible = await this.whenIAccessPatientAvatarSettings(patientName)
+  async whenIUploadClientAvatar(clientName?: string) {
+    const avatarAccessible = await this.whenIAccessClientAvatarSettings(clientName)
     if (!avatarAccessible) return false
 
     // Look for avatar upload functionality
@@ -415,23 +415,23 @@ export class ClientDetailedWorkflow {
     return uploadFound
   }
 
-  async whenIChangePatientAvatar(patientName?: string) {
-    // Change existing patient avatar
-    return await this.whenIUploadPatientAvatar(patientName)
+  async whenIChangeClientAvatar(clientName?: string) {
+    // Change existing client avatar
+    return await this.whenIUploadClientAvatar(clientName)
   }
 
-  // PATIENT DETAILS MANAGEMENT
-  async whenIUpdatePatientDetails(patientData: any) {
-    // Update patient information
-    const patientFormFields = [
-      { testId: 'client-name-input', value: patientData.name },
-      { testId: 'client-email-input', value: patientData.email },
-      { testId: 'client-phone-input', value: patientData.phone },
-      { testId: 'language-picker-button', value: patientData.language }
+  // CLIENT DETAILS MANAGEMENT
+  async whenIUpdateClientDetails(clientData: any) {
+    // Update client information
+    const clientFormFields = [
+      { testId: 'client-name-input', value: clientData.name },
+      { testId: 'client-email-input', value: clientData.email },
+      { testId: 'client-phone-input', value: clientData.phone },
+      { testId: 'language-picker-button', value: clientData.language }
     ]
 
     let fieldsUpdated = 0
-    for (const field of patientFormFields) {
+    for (const field of clientFormFields) {
       const input = this.page.getByTestId(field.testId)
       if (await input.count() > 0) {
         await input.fill(field.value || '')
@@ -455,12 +455,12 @@ export class ClientDetailedWorkflow {
       }
     }
 
-    console.log(`Updated ${fieldsUpdated} patient form fields`)
+    console.log(`Updated ${fieldsUpdated} client form fields`)
     return fieldsUpdated
   }
 
   async whenIAssignCaregiverToClient(caregiverName: string) {
-    // Assign a caregiver to the patient
+    // Assign a caregiver to the client
     const caregiverAssignmentElements = [
       this.page.getByTestId('assign-caregiver-button'),
       this.page.getByTestId('caregiver-assignment'),
@@ -488,7 +488,7 @@ export class ClientDetailedWorkflow {
   }
 
   // THEN steps - Assertions
-  async thenIShouldSeePatientSchedules() {
+  async thenIShouldSeeClientSchedules() {
     const scheduleElements = [
       this.page.getByTestId('schedule-list'),
       this.page.getByTestId('manage-schedules-button'),
@@ -549,8 +549,8 @@ export class ClientDetailedWorkflow {
     return avatarOptionsFound
   }
 
-  async thenIShouldSeeUpdatedPatientInfo(expectedData: any) {
-    // Verify patient information was updated
+  async thenIShouldSeeUpdatedClientInfo(expectedData: any) {
+    // Verify client information was updated
     const updatedElements = [
       this.page.getByText(expectedData.name),
       this.page.getByText(expectedData.email),

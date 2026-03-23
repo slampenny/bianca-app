@@ -147,9 +147,9 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
       />
       
       {/* Show current client info */}
-      <View style={styles.patientInfo}>
-        <Text style={styles.patientInfoTitle}>{translate("sentimentAnalysis.currentClient")}</Text>
-        <Text style={styles.patientInfoText}>
+      <View style={styles.clientInfo}>
+        <Text style={styles.clientInfoTitle}>{translate("sentimentAnalysis.currentClient")}</Text>
+        <Text style={styles.clientInfoText}>
           {currentClient ? `${currentClient.name} (${currentClient.id})` : translate("sentimentAnalysis.noClientSelected")}
         </Text>
       </View>
@@ -177,7 +177,8 @@ export function SentimentDebugPanel({ style }: SentimentDebugPanelProps) {
           {debugResult.conversations.map((conv: any, index: number) => (
             <View key={conv.conversationId} style={styles.conversationItem}>
               <Text style={styles.conversationHeader}>
-                {index + 1}. {(conv as any).clientName ?? conv.patientName} ({conv.messageCount} {translate("sentimentAnalysis.messages")})
+                {index + 1}. {(conv as { clientName?: string }).clientName ?? "—"} ({conv.messageCount}{" "}
+                {translate("sentimentAnalysis.messages")})
               </Text>
               <Text style={styles.conversationTime}>
                 {new Date(conv.endTime).toLocaleString()}
@@ -256,19 +257,19 @@ const createStyles = (colors: any) => StyleSheet.create({
   refreshButton: {
     backgroundColor: colors.palette.biancaPrimary || colors.palette.primary500,
   },
-  patientInfo: {
+  clientInfo: {
     backgroundColor: colors.palette.neutral200,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
-  patientInfoTitle: {
+  clientInfoTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.palette.biancaHeader || colors.text,
     marginBottom: 4,
   },
-  patientInfoText: {
+  clientInfoText: {
     fontSize: 12,
     color: colors.textDim || colors.palette.neutral700 || colors.palette.neutral600,
   },

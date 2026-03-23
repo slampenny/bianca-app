@@ -1,5 +1,6 @@
 // src/services/openai.sentiment.service.js
-const OpenAI = require('openai');
+const { getOpenAIConstructor } = require('../utils/openaiSdk');
+const OpenAI = getOpenAIConstructor();
 const config = require('../config/config');
 const logger = require('../config/logger');
 

@@ -30,15 +30,95 @@ function extractTokens(emailText = '', emailHtml = '') {
                           emailHtml.match(/reset-password\?token=([^"'\s&]+)/);
   const resetToken = resetTokenMatch ? resetTokenMatch[1] : null;
   
-  const consentTokenMatch = emailText.match(/patient\/consent[?&]token=([^\s&]+)/) || 
-                            emailHtml.match(/patient\/consent[?&]token=([^"'\s&]+)/);
-  const consentToken = consentTokenMatch ? consentTokenMatch[1] : null;
+  // Support /client/consent (current) and legacy /patient/consent URLs
+  const consentTokenClient =
+    emailText.match(/client\/consent[?&]token=([^\s&]+)/) ||
+    emailHtml.match(/client\/consent[?&]token=([^"'\s&<>]+)/);
+  const consentTokenPatient =
+    emailText.match(/patient\/consent[?&]token=([^\s&]+)/) ||
+    emailHtml.match(/patient\/consent[?&]token=([^"'\s&<>]+)/);
+  const consentToken = consentTokenClient?.[1] || consentTokenPatient?.[1] || null;
 
   return {
     verification: verificationToken,
     invite: inviteToken,
     resetPassword: resetToken,
     consent: consentToken,
+  };
+}
+
+/** True if parsed mail is addressed to the given recipient (Ethereal inbox is shared). */
+function recipientMatchesParsed(parsed, recipientEmail) {
+  const lower = recipientEmail.toLowerCase().trim();
+  const values = parsed.to?.value;
+  if (Array.isArray(values) && values.length > 0) {
+    return values.some((v) => v.address && v.address.toLowerCase() === lower);
+  }
+  const text = parsed.to?.text || '';
+  return text.toLowerCase().includes(lower);
+}
+
+/** Pull body buffer from an imap-simple message and parse with mailparser. */
+async function parseImapMessageBody(latestMessage) {
+  const struct = latestMessage.attributes.struct;
+  const parts = getParts(struct);
+
+  let textPartId = null;
+  let htmlPartId = null;
+
+  for (const part of parts) {
+    if (part.disposition === null && part.id !== 'HEADER') {
+      if (part.type === 'text' && part.subtype === 'plain' && !textPartId) {
+        textPartId = part.id;
+      } else if (part.type === 'text' && part.subtype === 'html' && !htmlPartId) {
+        htmlPartId = part.id;
+      }
+    }
+  }
+
+  const bodyPartId = textPartId || htmlPartId || (parts.length > 0 ? parts[0].id : 'TEXT');
+
+  let bodyData = null;
+
+  if (latestMessage.parts && Array.isArray(latestMessage.parts)) {
+    const bodyPart = latestMessage.parts.find((part) => part.which === bodyPartId);
+    if (bodyPart && bodyPart.body) {
+      bodyData = bodyPart.body;
+    }
+  }
+
+  if (!bodyData && latestMessage.parts && latestMessage.parts.length > 0) {
+    for (const part of latestMessage.parts) {
+      if (part.body && part.which !== 'HEADER') {
+        bodyData = part.body;
+        break;
+      }
+    }
+  }
+
+  if (!bodyData && latestMessage.body) {
+    bodyData = latestMessage.body;
+  }
+
+  if (!bodyData) {
+    return null;
+  }
+
+  return simpleParser(bodyData);
+}
+
+function buildResultFromCaptured(captured) {
+  const emailText = captured.text || '';
+  const emailHtml = captured.html || '';
+  return {
+    subject: captured.subject,
+    from: captured.from,
+    to: captured.to,
+    text: emailText,
+    html: emailHtml,
+    date: captured.date,
+    tokens: extractTokens(emailText, emailHtml),
+    raw: captured,
   };
 }
 
@@ -50,24 +130,27 @@ function extractTokens(emailText = '', emailHtml = '') {
  */
 async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
   const emailStatus = emailService.getStatus();
-  
-  // In test, sendEmail() only captures; prefer captured emails so unit tests do not need IMAP.
-  if (process.env.NODE_ENV === 'test') {
-    const captured = emailService.getLastCapturedEmail(recipientEmail);
-    if (captured) {
-      const emailText = captured.text || '';
-      const emailHtml = captured.html || '';
-      return {
-        subject: captured.subject,
-        from: captured.from,
-        to: captured.to,
-        text: emailText,
-        html: emailHtml,
-        date: captured.date,
-        tokens: extractTokens(emailText, emailHtml),
-        raw: captured,
-      };
-    }
+
+  // Prefer in-memory capture when present (matches sendEmail when config.env === 'test').
+  // If config.env is not "test" but capture still has the message, return it before hitting empty IMAP.
+  const capturedFirst = emailService.getLastCapturedEmail(recipientEmail);
+  if (capturedFirst) {
+    return buildResultFromCaptured(capturedFirst);
+  }
+
+  // Must match email.service sendEmail(): when config.env === 'test', mail is only captured in memory (no IMAP).
+  let useCaptureOnly = false;
+  try {
+    useCaptureOnly =
+      require('../config/config').env === 'test' || process.env.E2E_CAPTURE_EMAILS === '1';
+  } catch {
+    useCaptureOnly = process.env.NODE_ENV === 'test' || process.env.E2E_CAPTURE_EMAILS === '1';
+  }
+
+  if (useCaptureOnly) {
+    throw new Error(
+      `No captured email for ${recipientEmail}. In test mode emails are not sent to Ethereal IMAP; ensure sendEmail ran for this address.`
+    );
   }
 
   if (!emailStatus.etherealAccount) {
@@ -146,79 +229,40 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
         await connection.end();
         throw new Error(`No emails found in inbox`);
       }
-      
-      // Get the most recent email (last in array, as they're sorted by date)
-      const latestMessage = allMessages[allMessages.length - 1];
-      
-      // Get the structure to find body parts
-      const struct = latestMessage.attributes.struct;
-      const parts = getParts(struct);
-      
-      // Find the text/html parts
-      let textPartId = null;
-      let htmlPartId = null;
-      
-      for (const part of parts) {
-        if (part.disposition === null && part.id !== 'HEADER') {
-          if (part.type === 'text' && part.subtype === 'plain' && !textPartId) {
-            textPartId = part.id;
-          } else if (part.type === 'text' && part.subtype === 'html' && !htmlPartId) {
-            htmlPartId = part.id;
+
+      // Inbox is shared across tests; walk newest → oldest until we find this recipient.
+      let parsed = null;
+      for (let i = allMessages.length - 1; i >= 0; i -= 1) {
+        const mailItem = allMessages[i];
+        try {
+          const candidate = await parseImapMessageBody(mailItem);
+          if (!candidate) {
+            logger.warn(`[Ethereal Email Retriever] Could not parse body for message index ${i}, skipping`);
+            continue;
           }
-        }
-      }
-      
-      // Get the body part ID (prefer text, fallback to html, then first part)
-      const bodyPartId = textPartId || htmlPartId || (parts.length > 0 ? parts[0].id : 'TEXT');
-      
-      // imap-simple returns parts in message.parts array
-      // Each part has a 'which' property matching the part ID
-      let bodyData = null;
-      
-      if (latestMessage.parts && Array.isArray(latestMessage.parts)) {
-        const bodyPart = latestMessage.parts.find(part => part.which === bodyPartId);
-        if (bodyPart && bodyPart.body) {
-          bodyData = bodyPart.body;
-        }
-      }
-      
-      // If not found, try to get the first available part
-      if (!bodyData && latestMessage.parts && latestMessage.parts.length > 0) {
-        for (const part of latestMessage.parts) {
-          if (part.body && part.which !== 'HEADER') {
-            bodyData = part.body;
+          if (recipientMatchesParsed(candidate, recipientEmail)) {
+            parsed = candidate;
             break;
           }
+        } catch (parseErr) {
+          logger.warn(`[Ethereal Email Retriever] Parse error for message index ${i}: ${parseErr.message}`);
         }
       }
-      
-      // If still not found, the body might be in the message itself (single part message)
-      if (!bodyData && latestMessage.body) {
-        bodyData = latestMessage.body;
+
+      if (!parsed) {
+        await connection.end();
+        throw new Error(
+          `No email found for recipient ${recipientEmail} in Ethereal inbox (checked ${allMessages.length} message(s); inbox may only contain mail for other addresses)`
+        );
       }
-      
-      if (!bodyData) {
-        logger.error('Message structure:', JSON.stringify(latestMessage, null, 2));
-        throw new Error('Could not find email body part');
-      }
-      
-      // Parse the email using mailparser - bodyData should be a Buffer
-      const parsed = await simpleParser(bodyData);
-      
-      // Verify recipient matches (optional check, but good for validation)
-      const toAddress = parsed.to?.text || parsed.to?.value?.[0]?.address || '';
-      if (toAddress && !toAddress.toLowerCase().includes(recipientEmail.toLowerCase())) {
-        logger.warn(`Most recent email is to ${toAddress}, not ${recipientEmail}. This might be from a previous test.`);
-      }
-      
+
       await connection.end();
-      
-      // Extract tokens from email content
+
       const emailText = parsed.text || '';
       const emailHtml = parsed.html || '';
-      
+
       logger.info(`[Ethereal Email Retriever] Retrieved email for ${recipientEmail}: ${parsed.subject}`);
-      
+
       return {
         subject: parsed.subject,
         from: parsed.from?.text || parsed.from?.value?.[0]?.address,
@@ -269,9 +313,14 @@ async function waitForEmail(recipientEmail, maxWaitMs = 30000, pollIntervalMs = 
         continue;
       }
     } catch (error) {
-      // Email not found yet, wait and retry
-      if (error.message.includes('No emails found') || error.message.includes('not found')) {
-        await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+      // Email not found yet, wait and retry (IMAP empty, wrong recipient in shared inbox, or slow delivery)
+      const msg = error.message || '';
+      if (
+        msg.includes('No emails found') ||
+        msg.includes('No email found for recipient') ||
+        msg.includes('not found')
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
         continue;
       }
       throw error;

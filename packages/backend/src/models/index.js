@@ -20,6 +20,7 @@ module.exports.FraudAbuseAnalysis = require('./fraudAbuseAnalysis.model');
 module.exports.PaymentMethod = require('./paymentMethod.model');
 module.exports.Report = require('./report.model');
 module.exports.Schedule = require('./schedule.model');
+module.exports.ClientMemory = require('./clientMemory.model').ClientMemory;
 
 // HIPAA Compliance
 module.exports.AuditLog = require('./auditLog.model');

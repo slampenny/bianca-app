@@ -35,7 +35,7 @@
 		"HIGH": "⚠️ 高優先度：%s - %s：%s",
 		"MEDIUM": "📢 アラート：%s - %s：%s"
 	},
-	"patientConsentEmail": {
+	"clientConsentEmail": {
 		"subject": "Bianca Wellness - 通話録音の同意が必要です",
 		"title": "通話録音の同意が必要です",
 		"greeting": "%s様",

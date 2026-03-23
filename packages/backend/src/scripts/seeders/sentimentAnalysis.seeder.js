@@ -92,7 +92,6 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
     sentimentScore: Math.round(sentimentScore * 100) / 100, // Round to 2 decimal places
     confidence,
     clientMood,
-    patientMood: clientMood, // legacy alias for API compat
     keyEmotions,
     concernLevel,
     satisfactionIndicators,

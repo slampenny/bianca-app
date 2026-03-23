@@ -3,7 +3,7 @@
 # Requires authentication token
 
 STAGING_API="https://staging-api.biancawellness.com"
-ENDPOINT="/v1/test/send-sms-patient-0"
+ENDPOINT="/v1/test/send-sms-client-0"
 
 if [ -z "$1" ]; then
   echo "Usage: $0 <auth-token>"

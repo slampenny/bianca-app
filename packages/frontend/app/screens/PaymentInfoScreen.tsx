@@ -287,7 +287,7 @@ function CurrentChargesScreen() {
     )
   }
 
-  const clientCosts = unbilledCosts?.clientCosts ?? unbilledCosts?.patientCosts ?? []
+  const clientCosts = unbilledCosts?.clientCosts ?? []
   if (!unbilledCosts || clientCosts.length === 0) {
     return (
       <View style={styles.screenContainer} testID="current-charges-container">
@@ -339,7 +339,8 @@ function CurrentChargesScreen() {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{translate("paymentScreen.clientsWithCharges" as import("../i18n").TxKeyPath)}</Text>
               <Text style={styles.summaryValue}>
-                {clientCosts.length} {clientCosts.length !== 1 ? translate("paymentScreen.patients") : translate("paymentScreen.patient")}
+                {clientCosts.length}{" "}
+                {clientCosts.length !== 1 ? translate("paymentScreen.clientsWord") : translate("paymentScreen.clientWord")}
               </Text>
             </View>
           </View>
@@ -347,35 +348,35 @@ function CurrentChargesScreen() {
       />
 
       {/* Client charges list */}
-      <View style={styles.patientChargesSection}>
-        <Text preset="subheading" style={styles.patientChargesTitle}>
+      <View style={styles.clientChargesSection}>
+        <Text preset="subheading" style={styles.clientChargesTitle}>
           {translate("paymentScreen.chargesByClient" as import("../i18n").TxKeyPath)}
         </Text>
         <FlatList
           data={clientCosts}
-          keyExtractor={(item) => (item as any).clientId ?? (item as any).patientId ?? ''}
+          keyExtractor={(item) => (item as { clientId?: string }).clientId ?? ""}
           renderItem={({ item }) => {
             const count = (item as any).callCount ?? (item as any).conversationCount ?? 0
             const totalCost = item.totalCost ?? 0
             return (
               <Card
                 preset="default"
-                style={styles.patientChargeCard}
+                style={styles.clientChargeCard}
                 ContentComponent={
-                  <View style={styles.patientChargeContent}>
-                    <View style={styles.patientChargeHeader}>
-                      <Text preset="bold" style={styles.patientName}>
-                        {(item as any).clientName ?? (item as any).patientName}
+                  <View style={styles.clientChargeContent}>
+                    <View style={styles.clientChargeHeader}>
+                      <Text preset="bold" style={styles.clientName}>
+                        {(item as { clientName?: string }).clientName ?? ""}
                       </Text>
-                      <Text preset="bold" style={styles.patientTotalCost}>
+                      <Text preset="bold" style={styles.clientTotalCost}>
                         {formatCurrency(totalCost)}
                       </Text>
                     </View>
-                    <View style={styles.patientChargeDetails}>
-                      <Text style={styles.patientChargeDetail}>
+                    <View style={styles.clientChargeDetails}>
+                      <Text style={styles.clientChargeDetail}>
                         {count} {count !== 1 ? translate("paymentScreen.conversations") : translate("paymentScreen.conversation")}
                       </Text>
-                      <Text style={styles.patientChargeDetail}>
+                      <Text style={styles.clientChargeDetail}>
                         {translate("paymentScreen.average")} {formatCurrency(count > 0 ? totalCost / count : 0)}
                       </Text>
                     </View>
@@ -384,7 +385,7 @@ function CurrentChargesScreen() {
               />
             )
           }}
-          contentContainerStyle={styles.patientChargesList}
+          contentContainerStyle={styles.clientChargesList}
           testID="client-charges-list"
           showsVerticalScrollIndicator={false}
         />
@@ -1004,20 +1005,20 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  // Patient Charges styles
-  patientChargesSection: {
+  // Client charges styles
+  clientChargesSection: {
     marginBottom: spacing.lg,
   },
-  patientChargesTitle: {
+  clientChargesTitle: {
     color: colors.palette.neutral800,
     marginBottom: spacing.md,
     fontSize: 18,
     fontWeight: '600',
   },
-  patientChargesList: {
+  clientChargesList: {
     paddingBottom: spacing.sm,
   },
-  patientChargeCard: {
+  clientChargeCard: {
     marginBottom: spacing.md,
     backgroundColor: colors.palette.neutral100,
     borderWidth: 1,
@@ -1032,11 +1033,11 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  patientChargeContent: {
+  clientChargeContent: {
     gap: spacing.sm,
     padding: spacing.sm,
   },
-  patientChargeHeader: {
+  clientChargeHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -1044,24 +1045,24 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.palette.neutral100,
   },
-  patientName: {
+  clientName: {
     color: colors.palette.neutral800,
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
   },
-  patientTotalCost: {
+  clientTotalCost: {
     color: colors.palette.secondary500,
     fontSize: 18,
     fontWeight: 'bold',
   },
-  patientChargeDetails: {
+  clientChargeDetails: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingTop: spacing.xs,
   },
-  patientChargeDetail: {
+  clientChargeDetail: {
     color: colors.palette.neutral600,
     fontSize: 14,
     fontWeight: '500',

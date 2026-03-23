@@ -278,7 +278,7 @@ const deleteCaregiverById = async (caregiverId) => {
  * @param {ObjectId} clientId
  * @returns {Promise<Caregiver>}
  */
-const addPatient = async (caregiverId, clientId) => {
+const addClient = async (caregiverId, clientId) => {
   const caregiver = await getCaregiverById(caregiverId);
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
@@ -295,9 +295,13 @@ const addPatient = async (caregiverId, clientId) => {
     ? new mongoose.Types.ObjectId(clientId)
     : clientId;
   const caregiverClientIds = caregiver.clients.map((id) => id.toString());
+  // Atomic $addToSet avoids VersionError when parallel requests / Jest integration tests update the same doc
   if (!caregiverClientIds.includes(clientObjectId.toString())) {
-    caregiver.clients.push(clientObjectId);
-    await caregiver.save();
+    await Caregiver.findByIdAndUpdate(
+      caregiverObjectId,
+      { $addToSet: { clients: clientObjectId } },
+      { new: true }
+    );
   }
   const clientCaregiverIds = client.caregivers.map((id) => id.toString());
   if (!clientCaregiverIds.includes(caregiverObjectId.toString())) {
@@ -305,7 +309,7 @@ const addPatient = async (caregiverId, clientId) => {
   }
   client.org = caregiver.org;
   await client.save();
-  return client;
+  return getClientById(clientId);
 };
 
 /**
@@ -314,7 +318,7 @@ const addPatient = async (caregiverId, clientId) => {
  * @param {ObjectId} clientId
  * @returns {Promise<Caregiver>}
  */
-const removePatient = async (caregiverId, clientId) => {
+const removeClient = async (caregiverId, clientId) => {
   const caregiver = await getCaregiverById(caregiverId);
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
@@ -332,11 +336,11 @@ const removePatient = async (caregiverId, clientId) => {
 };
 
 /**
- * Get patients for a caregiver
+ * Get clients for a caregiver
  * @param {ObjectId} caregiverId
  * @returns {Promise<Array<Client>>}
  */
-const getPatients = async (caregiverId) => {
+const getClients = async (caregiverId) => {
   const caregiver = await Caregiver.findById(caregiverId).populate('clients');
   if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
@@ -345,7 +349,7 @@ const getPatients = async (caregiverId) => {
   return caregiver.clients;
 };
 
-const checkCaregiverOwnsPatient = async (caregiverId, clientId) => {
+const checkCaregiverOwnsClient = async (caregiverId, clientId) => {
   const caregiver = await Caregiver.findById(caregiverId);
   if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
@@ -371,12 +375,8 @@ module.exports = {
   updateCaregiverById,
   deleteCaregiverById,
   getClientById,
-  addPatient,
-  addClient: addPatient,
-  removePatient,
-  removeClient: removePatient,
-  getPatients,
-  getClients: getPatients,
-  checkCaregiverOwnsPatient,
-  checkCaregiverOwnsClient: checkCaregiverOwnsPatient,
+  addClient,
+  removeClient,
+  getClients,
+  checkCaregiverOwnsClient,
 };

@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/testHelpers'
 import { AuthWorkflow } from './workflows/auth.workflow'
-import { ClientDetailedWorkflow } from './workflows/patient-detailed.workflow'
+import { ClientDetailedWorkflow } from './workflows/client-detailed.workflow'
 import { TEST_USERS } from './fixtures/testData'
 import { Page } from '@playwright/test'
 
@@ -17,8 +17,8 @@ async function navigateToConversationsScreen(page: Page, clientWorkflow: ClientD
     await editButton.click()
     await page.waitForTimeout(2000)
   } else {
-    const patientCard = page.locator('[data-testid^="client-card-"]').first()
-    await patientCard.click()
+    const clientCard = page.locator('[data-testid^="client-card-"]').first()
+    await clientCard.click()
     await page.waitForTimeout(2000)
   }
   
@@ -50,7 +50,7 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
   test.beforeEach(async ({ page }) => {
     const auth = new AuthWorkflow(page)
     await auth.givenIAmOnTheLoginScreen()
-    await auth.whenIEnterCredentials(TEST_USERS.WITH_PATIENTS.email, TEST_USERS.WITH_PATIENTS.password)
+    await auth.whenIEnterCredentials(TEST_USERS.WITH_CLIENTS.email, TEST_USERS.WITH_CLIENTS.password)
     await auth.whenIClickLoginButton()
     await auth.thenIShouldBeOnHomeScreen()
   })
@@ -229,8 +229,8 @@ test.describe.skip('Conversations Screen - Advanced Features', () => {
       await editButton.click()
       await page.waitForTimeout(1000)
     } else {
-      const patientCard = page.locator('[data-testid^="client-card-"]').first()
-      await patientCard.click()
+      const clientCard = page.locator('[data-testid^="client-card-"]').first()
+      await clientCard.click()
       await page.waitForTimeout(1000)
     }
     

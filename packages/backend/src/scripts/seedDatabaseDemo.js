@@ -6,7 +6,7 @@ const config = require('../config/config');
 // Import seeders
 const orgsSeeder = require('./seeders/orgs.seeder');
 const caregiversSeeder = require('./seeders/caregivers.seeder');
-const patientsSeeder = require('./seeders/patients.seeder');
+const clientsSeeder = require('./seeders/clients.seeder');
 const conversationsSeeder = require('./seeders/conversations.seeder');
 const schedulesSeeder = require('./seeders/schedules.seeder');
 const alertsSeeder = require('./seeders/alerts.seeder');
@@ -458,12 +458,12 @@ async function seedDatabaseDemo() {
       throw new Error('caregiverOne not found in inserted caregivers');
     }
 
-    // Seed base patients
-    const basePatients = await patientsSeeder.seedPatients(caregiverOneRecord);
-    const patient1 = basePatients[0];
-    const patient2 = basePatients[1];
+    // Seed base clients
+    const baseClients = await clientsSeeder.seedClients(caregiverOneRecord);
+    const client1 = baseClients[0];
+    const client2 = baseClients[1];
 
-    // Create fraud/abuse patient
+    // Create fraud/abuse test client
     const client3 = new Client({
       name: 'Margaret Thompson',
       email: 'vulnerable@example.org',
@@ -479,16 +479,16 @@ async function seedDatabaseDemo() {
 
     // Create additional demo clients
     const demoClients = await createDemoClients(caregiverOneRecord, org);
-    const allClients = [...basePatients, client3, ...demoClients];
+    const allClients = [...baseClients, client3, ...demoClients];
 
     // Seed base conversations
-    const baseConversations = await conversationsSeeder.seedConversations(patient1);
+    const baseConversations = await conversationsSeeder.seedConversations(client1);
     
     // Add additional conversation types
-    await conversationsSeeder.addDecliningPatientConversations(patient1._id);
-    await conversationsSeeder.addNormalPatientConversations(patient2._id);
-    await conversationsSeeder.addRecentPatientConversations(patient1._id);
-    await conversationsSeeder.addRecentPatientConversations(patient2._id);
+    await conversationsSeeder.addDecliningPatientConversations(client1._id);
+    await conversationsSeeder.addNormalPatientConversations(client2._id);
+    await conversationsSeeder.addRecentPatientConversations(client1._id);
+    await conversationsSeeder.addRecentPatientConversations(client2._id);
     
     // Add fraud/abuse pattern conversations for client3
     await conversationsSeeder.addFraudAbuseConversations(client3._id);
@@ -498,13 +498,13 @@ async function seedDatabaseDemo() {
     const allConversations = [...baseConversations, ...demoConversations];
 
     // Seed base schedules
-    await schedulesSeeder.seedSchedules(basePatients);
+    await schedulesSeeder.seedSchedules(baseClients);
 
     // Create additional demo schedules
     await createDemoSchedules(allClients);
 
     // Seed base alerts
-    await alertsSeeder.seedAlerts(caregiverOneRecord, basePatients, baseConversations);
+    await alertsSeeder.seedAlerts(caregiverOneRecord, baseClients, baseConversations);
 
     // Create additional demo alerts
     await createDemoAlerts(caregiverOneRecord, allClients, allConversations);
@@ -527,7 +527,7 @@ async function seedDatabaseDemo() {
     // Add sentiment analysis to conversations
     await sentimentAnalysisSeeder.seedSentimentAnalysis();
 
-    // Run medical analysis on seeded patient data
+    // Run medical analysis on seeded client data
     console.log('Running medical analysis on seeded client data...');
     try {
       const medicalAnalysisScheduler = require('../services/ai/medicalAnalysisScheduler.service');

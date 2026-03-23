@@ -61,7 +61,7 @@ const mockAlertService = {
 };
 
 jest.mock('../../../src/services', () => ({
-  patientService: {},
+  clientService: {},
   twilioCallService: {},
   alertService: mockAlertService,
   paymentService: {},

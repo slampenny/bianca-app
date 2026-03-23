@@ -2,9 +2,34 @@ import { test } from './helpers/testHelpers'
 import { expect } from '@playwright/test'
 import { navigateToHome, navigateToAlertTab } from "./helpers/navigation"
 import { TEST_USERS } from './fixtures/testData'
-import { Page } from '@playwright/test'
+import { Page, Locator } from '@playwright/test'
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
+
+function firstRelatedClientId(caregiver: any): string | null {
+  const list = caregiver?.clients ?? caregiver?.patients
+  if (!list?.length) return null
+  const c = list[0]
+  if (typeof c === 'string') return c
+  return c?.id ?? c?._id ?? null
+}
+
+/** One alert row (RN Web exposes testID; Playwright also maps getByTestId to accessibilityLabel) */
+function alertRowByMessage(page: Page, message: string) {
+  return page
+    .locator('[data-testid="alert-item"], [aria-label="alert-item"]')
+    .filter({ hasText: message })
+}
+
+/** Wait until the alert list shows this message (handles slow polling / RTK refetch) */
+async function waitForAlertRowVisible(page: Page, message: string) {
+  await expect(alertRowByMessage(page, message)).toBeVisible({ timeout: 40000 })
+}
+
+/** Toggle renders two nodes with data-testid=alert-checkbox; use the interactive checkbox */
+function alertCheckbox(alertItem: Locator) {
+  return alertItem.getByRole('checkbox').first()
+}
 
 /**
  * Create an alert in the database for a caregiver using the test endpoint
@@ -12,8 +37,8 @@ const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
 async function createAlertForCaregiver(page: Page, caregiverId: string, alertData: {
   message: string
   importance?: 'low' | 'medium' | 'high' | 'urgent'
-  alertType?: 'patient' | 'system' | 'conversation' | 'schedule'
-  relatedPatient?: string
+  alertType?: 'client' | 'system' | 'conversation' | 'schedule'
+  relatedClient?: string
 }) {
   try {
     const response = await page.request.post(`${API_BASE_URL}/test/create-alert`, {
@@ -24,8 +49,8 @@ async function createAlertForCaregiver(page: Page, caregiverId: string, alertDat
         caregiverId,
         message: alertData.message,
         importance: alertData.importance || 'medium',
-        alertType: alertData.alertType || 'patient',
-        relatedPatient: alertData.relatedPatient,
+        alertType: alertData.alertType || 'client',
+        relatedClient: alertData.relatedClient,
         visibility: 'allCaregivers',
         relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       },
@@ -44,7 +69,7 @@ async function createAlertForCaregiver(page: Page, caregiverId: string, alertDat
 }
 
 /**
- * Get caregiver data including patients
+ * Get caregiver data including clients
  */
 async function getCaregiverByEmail(page: Page, email: string): Promise<any | null> {
   try {
@@ -67,8 +92,18 @@ async function getCaregiverByEmail(page: Page, email: string): Promise<any | nul
 }
 
 test.describe("Alert Checkbox Toggle", () => {
+  // Same seeded user + shared alert list: parallel tests race and hide each other's rows
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeEach(async ({ page }) => {
-    await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem('playwright_test', '1')
+      } catch {
+        /* ignore */
+      }
+    })
+    await navigateToHome(page, TEST_USERS.WITH_CLIENTS)
   })
 
   test("should mark an unread alert as read when clicking checkbox", async ({ page }) => {
@@ -81,19 +116,16 @@ test.describe("Alert Checkbox Toggle", () => {
     ).toBeVisible({ timeout: 10000 })
     
     // Get caregiver data
-    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_PATIENTS.email)
+    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_CLIENTS.email)
     if (!caregiver) {
       throw new Error('Could not get caregiver')
     }
     const caregiverId = caregiver.id || caregiver._id
     
-    // Get a patient ID for the alert
-    const patientId = caregiver.patients && caregiver.patients.length > 0 
-      ? (caregiver.patients[0].id || caregiver.patients[0]._id || caregiver.patients[0])
-      : null
+    const clientId = firstRelatedClientId(caregiver)
     
-    if (!patientId) {
-      throw new Error('Caregiver has no patients')
+    if (!clientId) {
+      throw new Error('Caregiver has no clients')
     }
     
     // Create an unread alert
@@ -101,12 +133,11 @@ test.describe("Alert Checkbox Toggle", () => {
     await createAlertForCaregiver(page, caregiverId, {
       message: testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
     })
     
-    // Wait for alert to appear
-    await page.waitForTimeout(5000)
+    await waitForAlertRowVisible(page, testAlertMessage)
     
     // Click "All Alerts" tab to see all alerts including the new one
     const allAlertsTab = page.getByText('All Alerts').or(page.getByText(/all.*alerts/i))
@@ -116,11 +147,11 @@ test.describe("Alert Checkbox Toggle", () => {
     }
     
     // Find the alert item with our message
-    const alertItem = page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage })
-    await expect(alertItem).toBeVisible({ timeout: 10000 })
+    const alertItem = alertRowByMessage(page, testAlertMessage)
+    await expect(alertItem).toBeVisible({ timeout: 5000 })
     
     // Find the checkbox within this alert item
-    const checkbox = alertItem.locator('[data-testid="alert-checkbox"]')
+    const checkbox = alertCheckbox(alertItem)
     await expect(checkbox).toBeVisible()
     
     // Verify checkbox is initially unchecked (alert is unread)
@@ -149,19 +180,16 @@ test.describe("Alert Checkbox Toggle", () => {
     ).toBeVisible({ timeout: 10000 })
     
     // Get caregiver data
-    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_PATIENTS.email)
+    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_CLIENTS.email)
     if (!caregiver) {
       throw new Error('Could not get caregiver')
     }
     const caregiverId = caregiver.id || caregiver._id
     
-    // Get a patient ID for the alert
-    const patientId = caregiver.patients && caregiver.patients.length > 0 
-      ? (caregiver.patients[0].id || caregiver.patients[0]._id || caregiver.patients[0])
-      : null
+    const clientId = firstRelatedClientId(caregiver)
     
-    if (!patientId) {
-      throw new Error('Caregiver has no patients')
+    if (!clientId) {
+      throw new Error('Caregiver has no clients')
     }
     
     // Create an unread alert first
@@ -169,12 +197,11 @@ test.describe("Alert Checkbox Toggle", () => {
     await createAlertForCaregiver(page, caregiverId, {
       message: testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
     })
     
-    // Wait for alert to appear
-    await page.waitForTimeout(5000)
+    await waitForAlertRowVisible(page, testAlertMessage)
     
     // Click "All Alerts" tab
     const allAlertsTab = page.getByText('All Alerts').or(page.getByText(/all.*alerts/i))
@@ -184,11 +211,11 @@ test.describe("Alert Checkbox Toggle", () => {
     }
     
     // Find the alert item
-    const alertItem = page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage })
-    await expect(alertItem).toBeVisible({ timeout: 10000 })
+    const alertItem = alertRowByMessage(page, testAlertMessage)
+    await expect(alertItem).toBeVisible({ timeout: 5000 })
     
     // Find the checkbox
-    const checkbox = alertItem.locator('[data-testid="alert-checkbox"]')
+    const checkbox = alertCheckbox(alertItem)
     await expect(checkbox).toBeVisible()
     
     // Click checkbox to mark as read
@@ -222,19 +249,16 @@ test.describe("Alert Checkbox Toggle", () => {
     ).toBeVisible({ timeout: 10000 })
     
     // Get caregiver data
-    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_PATIENTS.email)
+    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_CLIENTS.email)
     if (!caregiver) {
       throw new Error('Could not get caregiver')
     }
     const caregiverId = caregiver.id || caregiver._id
     
-    // Get a patient ID
-    const patientId = caregiver.patients && caregiver.patients.length > 0 
-      ? (caregiver.patients[0].id || caregiver.patients[0]._id || caregiver.patients[0])
-      : null
+    const clientId = firstRelatedClientId(caregiver)
     
-    if (!patientId) {
-      throw new Error('Caregiver has no patients')
+    if (!clientId) {
+      throw new Error('Caregiver has no clients')
     }
     
     // Create an alert
@@ -242,12 +266,11 @@ test.describe("Alert Checkbox Toggle", () => {
     await createAlertForCaregiver(page, caregiverId, {
       message: testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
     })
     
-    // Wait for alert to appear
-    await page.waitForTimeout(5000)
+    await waitForAlertRowVisible(page, testAlertMessage)
     
     // Click "All Alerts" tab
     const allAlertsTab = page.getByText('All Alerts').or(page.getByText(/all.*alerts/i))
@@ -257,11 +280,11 @@ test.describe("Alert Checkbox Toggle", () => {
     }
     
     // Find the alert
-    const alertItem = page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage })
-    await expect(alertItem).toBeVisible({ timeout: 10000 })
+    const alertItem = alertRowByMessage(page, testAlertMessage)
+    await expect(alertItem).toBeVisible({ timeout: 5000 })
     
     // Find the checkbox
-    const checkbox = alertItem.locator('[data-testid="alert-checkbox"]')
+    const checkbox = alertCheckbox(alertItem)
     await expect(checkbox).toBeVisible()
     
     // Toggle 1: Unread -> Read
@@ -305,19 +328,16 @@ test.describe("Alert Checkbox Toggle", () => {
     ).toBeVisible({ timeout: 10000 })
     
     // Get caregiver data
-    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_PATIENTS.email)
+    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_CLIENTS.email)
     if (!caregiver) {
       throw new Error('Could not get caregiver')
     }
     const caregiverId = caregiver.id || caregiver._id
     
-    // Get a patient ID
-    const patientId = caregiver.patients && caregiver.patients.length > 0 
-      ? (caregiver.patients[0].id || caregiver.patients[0]._id || caregiver.patients[0])
-      : null
+    const clientId = firstRelatedClientId(caregiver)
     
-    if (!patientId) {
-      throw new Error('Caregiver has no patients')
+    if (!clientId) {
+      throw new Error('Caregiver has no clients')
     }
     
     // Create an alert
@@ -325,12 +345,11 @@ test.describe("Alert Checkbox Toggle", () => {
     await createAlertForCaregiver(page, caregiverId, {
       message: testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
     })
     
-    // Wait for alert to appear
-    await page.waitForTimeout(5000)
+    await waitForAlertRowVisible(page, testAlertMessage)
     
     // Check "Unread" tab - alert should be visible
     const unreadTab = page.getByText('Unread').or(page.getByText(/unread.*alerts/i)).first()
@@ -339,12 +358,12 @@ test.describe("Alert Checkbox Toggle", () => {
       await page.waitForTimeout(2000)
     }
     
-    let alertItem = page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage })
-    await expect(alertItem).toBeVisible({ timeout: 10000 })
+    let alertItem = alertRowByMessage(page, testAlertMessage)
+    await expect(alertItem).toBeVisible({ timeout: 15000 })
     console.log('Alert visible in Unread tab ✓')
     
     // Mark as read
-    const checkbox = alertItem.locator('[data-testid="alert-checkbox"]')
+    const checkbox = alertCheckbox(alertItem)
     await checkbox.click()
     await page.waitForTimeout(2000)
     
@@ -359,12 +378,12 @@ test.describe("Alert Checkbox Toggle", () => {
       await page.waitForTimeout(2000)
     }
     
-    alertItem = page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage })
-    await expect(alertItem).toBeVisible({ timeout: 10000 })
+    alertItem = alertRowByMessage(page, testAlertMessage)
+    await expect(alertItem).toBeVisible({ timeout: 15000 })
     console.log('Alert visible in All Alerts tab ✓')
     
     // Mark as unread again
-    const checkboxInAllTab = alertItem.locator('[data-testid="alert-checkbox"]')
+    const checkboxInAllTab = alertCheckbox(alertItem)
     await checkboxInAllTab.click()
     await page.waitForTimeout(2000)
     
@@ -374,8 +393,8 @@ test.describe("Alert Checkbox Toggle", () => {
       await page.waitForTimeout(2000)
     }
     
-    alertItem = page.locator('[data-testid="alert-item"]').filter({ hasText: testAlertMessage })
-    await expect(alertItem).toBeVisible({ timeout: 10000 })
+    alertItem = alertRowByMessage(page, testAlertMessage)
+    await expect(alertItem).toBeVisible({ timeout: 15000 })
     console.log('Alert reappeared in Unread tab after marking as unread ✓')
     
     console.log('✅ Alert visibility in tabs works correctly')

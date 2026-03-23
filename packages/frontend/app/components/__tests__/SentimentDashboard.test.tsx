@@ -43,10 +43,10 @@ describe("SentimentDashboard", () => {
           overallSentiment: "positive",
           sentimentScore: 0.7,
           confidence: 0.9,
-          patientMood: "cheerful",
+          clientMood: "cheerful",
           keyEmotions: ["happiness"],
           concernLevel: "low",
-          summary: "Patient shows positive sentiment",
+          summary: "Client shows positive sentiment",
           recommendations: "Continue current approach"
         },
         sentimentAnalyzedAt: "2024-01-15T10:05:00.000Z"
@@ -63,7 +63,7 @@ describe("SentimentDashboard", () => {
       trendDirection: "improving",
       confidence: 0.85,
       keyInsights: [
-        "Patient sentiment is generally positive",
+        "Client sentiment is generally positive",
         "Recent trend shows improvement"
       ]
     }
@@ -82,7 +82,7 @@ describe("SentimentDashboard", () => {
     trendDirection: "improving",
     confidence: 0.9,
     keyInsights: [
-      "Patient shows generally positive sentiment",
+      "Client shows generally positive sentiment",
       "Recent trend is improving"
     ],
     recentTrend: []

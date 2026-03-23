@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { Org, Caregiver, Client } = require('../../../src/models');
 const caregiverService = require('../../../src/services/caregiver.service');
-const patientService = require('../../../src/services/patient.service');
+const clientService = require('../../../src/services/client.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 const { caregiverOneWithPassword, insertCaregivers } = require('../../fixtures/caregiver.fixture');
 const { clientOne, insertClients } = require('../../fixtures/client.fixture');
@@ -81,7 +81,7 @@ describe('caregiverService', () => {
   it('should assign a client to a caregiver', async () => {
     const [org] = await insertOrgs([orgOne]);
     const clientData = { ...clientOne, org: org._id };
-    const client = await patientService.createPatient(clientData);
+    const client = await clientService.createClient(clientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     const addedClient = await caregiverService.addClient(caregiver.id, client.id);
     expect(addedClient.id).toEqual(client.id);
@@ -90,7 +90,7 @@ describe('caregiverService', () => {
   it('should remove a client from a caregiver', async () => {
     const [org] = await insertOrgs([orgOne]);
     const clientData = { ...clientOne, org: org._id };
-    const client = await patientService.createPatient(clientData);
+    const client = await clientService.createClient(clientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     await caregiverService.addClient(caregiver.id, client.id);
     const updatedCaregiver = await caregiverService.removeClient(caregiver.id, client.id);
@@ -100,7 +100,7 @@ describe('caregiverService', () => {
   it('should get clients by caregiver id', async () => {
     const [org] = await insertOrgs([orgOne]);
     const clientData = { ...clientOne, org: org._id };
-    const client = await patientService.createPatient(clientData);
+    const client = await clientService.createClient(clientData);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
     await caregiverService.addClient(caregiver.id, client.id);
     const clients = await caregiverService.getClients(caregiver.id);

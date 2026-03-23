@@ -12,8 +12,7 @@ describe('Client model', () => {
     await mongoServer.start();
     const mongoUri = await mongoServer.getUri();
     await mongoose.connect(mongoUri, {});
-    
-    // Create a test org for patient tests
+
     testOrg = await Org.create({
       name: 'Test Org',
       email: 'test@example.com',
@@ -26,75 +25,74 @@ describe('Client model', () => {
     await mongoServer.stop();
   });
 
-  describe('Patient validation', () => {
-    let newPatient;
+  describe('validation', () => {
+    let newClient;
     beforeEach(() => {
-      newPatient = {
+      newClient = {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
         isEmailVerified: false,
-        org: testOrg._id, // Required field
+        org: testOrg._id,
         caregiver: null,
         schedules: [],
       };
     });
 
-    test('should correctly validate a valid patient', async () => {
-      await expect(new Client(newPatient).validate()).resolves.toBeUndefined();
+    test('should correctly validate a valid client', async () => {
+      await expect(new Client(newClient).validate()).resolves.toBeUndefined();
     });
 
     test('should throw a validation error if email is invalid', async () => {
-      newPatient.email = 'invalidEmail';
-      await expect(new Client(newPatient).validate()).rejects.toThrow();
+      newClient.email = 'invalidEmail';
+      await expect(new Client(newClient).validate()).rejects.toThrow();
     });
 
     test('should throw a validation error if phone is invalid', async () => {
-      newPatient.phone = 'invalidPhone';
-      await expect(new Client(newPatient).validate()).rejects.toThrow();
+      newClient.phone = 'invalidPhone';
+      await expect(new Client(newClient).validate()).rejects.toThrow();
     });
   });
 
-  describe('Patient toJSON()', () => {
-    test('should not return patient password when toJSON is called', () => {
-      const newPatient = {
+  describe('toJSON()', () => {
+    test('should not return password when toJSON is called', () => {
+      const newClient = {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
         password: 'password1',
         phone: faker.phone.phoneNumberFormat(1),
         isEmailVerified: false,
-        org: testOrg._id, // Required field
+        org: testOrg._id,
         caregiver: null,
         schedules: [],
       };
-      expect(new Client(newPatient).toJSON()).not.toHaveProperty('password');
+      expect(new Client(newClient).toJSON()).not.toHaveProperty('password');
     });
   });
 
-  describe('Patient org requirement', () => {
+  describe('org requirement', () => {
     test('should require org field', async () => {
-      const patientWithoutOrg = {
+      const clientWithoutOrg = {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
         phone: faker.phone.phoneNumberFormat(1),
-        // org is missing
       };
-      
-      const patient = new Client(patientWithoutOrg);
-      await expect(patient.validate()).rejects.toThrow();
+
+      const client = new Client(clientWithoutOrg);
+      await expect(client.validate()).rejects.toThrow();
     });
 
     test('should accept valid org', async () => {
-      const patientWithOrg = {
+      const clientWithOrg = {
         name: faker.name.findName(),
         email: faker.internet.email().toLowerCase(),
         phone: faker.phone.phoneNumberFormat(1),
         org: testOrg._id,
       };
-      
-      const patient = new Client(patientWithOrg);
-      await expect(patient.validate()).resolves.toBeUndefined();
+
+      const client = new Client(clientWithOrg);
+      await expect(client.validate()).resolves.toBeUndefined();
     });
   });
 });

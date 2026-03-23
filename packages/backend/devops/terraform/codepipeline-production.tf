@@ -512,8 +512,8 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
   })
 }
 
-# NOTE: Production pipeline runs tests BEFORE deployment. Blue-green stages added in codepipeline-production-bluegreen.tf
-# Tests must pass before deployment proceeds to prevent deploying broken code
+# Production pipeline order: Source → Build → CreateGreenInstance → Deploy (green) → RunTests → PostDeployValidation → SwapAndTerminate.
+# RunTests and PostDeployValidation run against green before SwapAndTerminate (ALB traffic + Elastic IP move + blue termination).
 
 ################################################################################
 # CODEPIPELINE FOR PRODUCTION

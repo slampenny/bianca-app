@@ -6,14 +6,23 @@ import { Page } from '@playwright/test'
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
 
+/** First client id from caregiver payload (API may use `clients` or legacy `patients`). */
+function firstRelatedClientId(caregiver: any): string | null {
+  const list = caregiver?.clients ?? caregiver?.patients
+  if (!list?.length) return null
+  const c = list[0]
+  if (typeof c === 'string') return c
+  return c?.id ?? c?._id ?? null
+}
+
 /**
  * Create an alert in the database for a caregiver using the test endpoint
  */
 async function createAlertForCaregiver(page: Page, caregiverId: string, alertData: {
   message: string
   importance?: 'low' | 'medium' | 'high' | 'urgent'
-  alertType?: 'patient' | 'system' | 'conversation' | 'schedule'
-  relatedPatient?: string
+  alertType?: 'client' | 'system' | 'conversation' | 'schedule'
+  relatedClient?: string
 }) {
   try {
     // Use the test endpoint to create alert (bypasses auth in test mode)
@@ -25,8 +34,8 @@ async function createAlertForCaregiver(page: Page, caregiverId: string, alertDat
         caregiverId,
         message: alertData.message,
         importance: alertData.importance || 'medium',
-        alertType: alertData.alertType || 'patient',
-        relatedPatient: alertData.relatedPatient,
+        alertType: alertData.alertType || 'client',
+        relatedClient: alertData.relatedClient,
         visibility: 'allCaregivers', // Use allCaregivers so the alert is visible to all caregivers
         relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       },
@@ -70,7 +79,7 @@ async function getCaregiverIdByEmail(page: Page, email: string): Promise<string 
 }
 
 /**
- * Get caregiver data including patients
+ * Get caregiver data including clients
  */
 async function getCaregiverByEmail(page: Page, email: string): Promise<any | null> {
   try {
@@ -99,7 +108,7 @@ test.describe("Alert Polling", () => {
     await page.addInitScript(() => {
       localStorage.setItem('playwright_test', '1');
     });
-    await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
+    await navigateToHome(page, TEST_USERS.WITH_CLIENTS)
     
     // Also set it after navigation to ensure it persists
     await page.evaluate(() => {
@@ -128,23 +137,20 @@ test.describe("Alert Polling", () => {
     const initialAlertCount = await initialAlertItems.count()
     console.log(`Initial alert count: ${initialAlertCount}`)
     
-    // Get caregiver data including patients
-    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_PATIENTS.email)
+    // Get caregiver data including clients
+    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_CLIENTS.email)
     if (!caregiver) {
       throw new Error('Could not get caregiver - user may not exist in test database')
     }
     const caregiverId = caregiver.id || caregiver._id
     console.log(`Caregiver ID: ${caregiverId}`)
     
-    // Get a patient ID for the alert (required for patient-type alerts)
-    const patientId = caregiver.patients && caregiver.patients.length > 0 
-      ? (caregiver.patients[0].id || caregiver.patients[0]._id || caregiver.patients[0])
-      : null
+    const clientId = firstRelatedClientId(caregiver)
     
-    if (!patientId) {
-      throw new Error('Caregiver has no patients - cannot create patient alert')
+    if (!clientId) {
+      throw new Error('Caregiver has no clients - cannot create client-type alert')
     }
-    console.log(`Using patient ID: ${patientId}`)
+    console.log(`Using client ID: ${clientId}`)
     
     // WHEN: I create a new alert in the database
     const testAlertMessage = `Test Alert for Polling - ${Date.now()}`
@@ -153,15 +159,15 @@ test.describe("Alert Polling", () => {
     const newAlert = await createAlertForCaregiver(page, caregiverId, {
       message: testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
     })
     
     console.log(`✅ Alert created in database: ${newAlert.id || newAlert._id}`)
     console.log(`Created alert details:`, {
       id: newAlert.id || newAlert._id,
       createdBy: newAlert.createdBy,
-      relatedPatient: newAlert.relatedPatient,
+      relatedClient: newAlert.relatedClient,
       visibility: newAlert.visibility,
       message: newAlert.message
     })
@@ -327,20 +333,17 @@ test.describe("Alert Polling", () => {
     await homeTab.click()
     await page.waitForTimeout(1000)
     
-    // Get caregiver data including patients
-    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_PATIENTS.email)
+    // Get caregiver data including clients
+    const caregiver = await getCaregiverByEmail(page, TEST_USERS.WITH_CLIENTS.email)
     if (!caregiver) {
       throw new Error('Could not get caregiver')
     }
     const caregiverId = caregiver.id || caregiver._id
     
-    // Get a patient ID for the alert (required for patient-type alerts)
-    const patientId = caregiver.patients && caregiver.patients.length > 0 
-      ? (caregiver.patients[0].id || caregiver.patients[0]._id || caregiver.patients[0])
-      : null
+    const clientId = firstRelatedClientId(caregiver)
     
-    if (!patientId) {
-      throw new Error('Caregiver has no patients - cannot create patient alert')
+    if (!clientId) {
+      throw new Error('Caregiver has no clients - cannot create client-type alert')
     }
     
     const testAlertMessage = `Background Alert - ${Date.now()}`
@@ -349,8 +352,8 @@ test.describe("Alert Polling", () => {
     await createAlertForCaregiver(page, caregiverId, {
       message: testAlertMessage,
       importance: 'high',
-      alertType: 'patient',
-      relatedPatient: patientId,
+      alertType: 'client',
+      relatedClient: clientId,
     })
     
     // Wait for polling to occur (polling should continue even when screen is not active)

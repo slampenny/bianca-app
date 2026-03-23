@@ -13,8 +13,6 @@ describe("authApi", () => {
   let caregiver: Caregiver
   let authTokens: AuthTokens
 
-  jest.setTimeout(20000)
-
   beforeAll(async () => {
     await cleanTestDatabase()
   })

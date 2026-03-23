@@ -6,7 +6,7 @@ const httpStatus = require('http-status');
 const mongoose = require('mongoose');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Org, Patient, Token, Caregiver, Conversation, Message, Call } = require('../../src/models');
+const { Org, Client, Token, Caregiver, Conversation, Message, Call } = require('../../src/models');
 const { insertOrgs } = require('../fixtures/org.fixture');
 const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
 const {
@@ -35,7 +35,7 @@ describe('Conversation routes', () => {
   afterEach(async () => {
     await Org.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Token.deleteMany();
     await Conversation.deleteMany();
     await Message.deleteMany();
@@ -47,7 +47,7 @@ describe('Conversation routes', () => {
     const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
     const [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
     const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
-    return { org, accessToken, caregiver, patient };
+    return { org, accessToken, caregiver, client };
   };
 
   // Helper function to set up test data with different caregiver
@@ -56,12 +56,12 @@ describe('Conversation routes', () => {
     const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'staff');
     const [caregiver] = await insertCaregiversAndAddToOrg(org, [caregiverTwo]);
     const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
-    return { org, accessToken, caregiver, patient };
+    return { org, accessToken, caregiver, client };
   };
 
   describe('POST /v1/conversations/client/:clientId', () => {
-    test('should create a new conversation for a patient', async () => {
-      const { accessToken, patient } = await setupTestData();
+    test('should create a new conversation for a client', async () => {
+      const { accessToken, client } = await setupTestData();
 
       // Create a call first (required for conversation)
       const call = new Call({
@@ -102,13 +102,13 @@ describe('Conversation routes', () => {
       });
     });
 
-    test('should return 404 when patient does not exist', async () => {
+    test('should return 404 when client does not exist', async () => {
       const { accessToken } = await setupTestData();
-      const nonExistentPatientId = new mongoose.Types.ObjectId();
+      const nonExistentClientId = new mongoose.Types.ObjectId();
       
       // Create a call first
       const call = new Call({
-        clientId: nonExistentPatientId,
+        clientId: nonExistentClientId,
         callSid: 'test-call-sid-2',
         status: 'in-progress',
         startTime: new Date()
@@ -116,14 +116,14 @@ describe('Conversation routes', () => {
       await call.save();
       
       await request(app)
-        .post(`/v1/conversations/client/${nonExistentPatientId}`)
+        .post(`/v1/conversations/client/${nonExistentClientId}`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.NOT_FOUND);
     });
 
     test('should return 401 when no authorization token provided', async () => {
-      const { patient } = await setupTestData();
+      const { client } = await setupTestData();
 
       // Create a call first
       const call = new Call({
@@ -141,7 +141,7 @@ describe('Conversation routes', () => {
     });
 
     test('should return 403 when user lacks permission', async () => {
-      const { accessToken, patient } = await setupTestDataWithCaregiverTwo();
+      const { accessToken, client } = await setupTestDataWithCaregiverTwo();
 
       // Create a call first
       const call = new Call({
@@ -163,7 +163,7 @@ describe('Conversation routes', () => {
 
   describe('GET /v1/conversations/:conversationId', () => {
     test('should return 200 and a conversation if data is ok', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a call first
       const call = new Call({
@@ -223,7 +223,7 @@ describe('Conversation routes', () => {
     });
 
     test('should return 401 when no authorization token provided', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -248,7 +248,7 @@ describe('Conversation routes', () => {
     });
 
     test('should return 403 when user lacks permission', async () => {
-      const { accessToken, patient } = await setupTestDataWithCaregiverTwo();
+      const { accessToken, client } = await setupTestDataWithCaregiverTwo();
 
       // Create a call first
       const call = new Call({
@@ -267,7 +267,7 @@ describe('Conversation routes', () => {
         .expect(httpStatus.FORBIDDEN);
     });
 
-    test('should allow staff to read conversations of their own patients', async () => {
+    test('should allow staff to read conversations of their own clients', async () => {
       // Create unique caregivers for this test
       const [org] = await insertOrgs([admin]);
       
@@ -278,7 +278,7 @@ describe('Conversation routes', () => {
         phone: '+16045624263',
         role: 'orgAdmin',
         org: org._id,
-        patients: [],
+        clients: [],
         password: 'Password1'
       });
       await orgAdminCaregiver.save();
@@ -290,7 +290,7 @@ describe('Conversation routes', () => {
         phone: '+16045624263',
         role: 'staff',
         org: org._id,
-        patients: [],
+        clients: [],
         password: 'Password1'
       });
       await staffCaregiver.save();
@@ -300,18 +300,18 @@ describe('Conversation routes', () => {
       const orgAdminToken = orgAdminTokens.access.token;
       const staffToken = staffTokens.access.token;
       
-      // Create unique patient for this test
-      const patient = new Patient({
-        name: 'Test Patient 1',
-        email: 'patient1@test.com',
+      // Create unique client for this test
+      const client = new Client({
+        name: 'Test Client 1',
+        email: 'client1@test.com',
         phone: '+16045624263',
         caregiver: staffCaregiver._id,
         org: org._id,
         schedules: []
       });
-      await patient.save();
+      await client.save();
       
-      // Add patient to caregiver
+      // Add client to caregiver
       staffCaregiver.clients.push(client._id);
       await staffCaregiver.save();
 
@@ -340,7 +340,7 @@ describe('Conversation routes', () => {
         .expect(httpStatus.OK);
     });
 
-    test('should deny staff access to conversations of other patients', async () => {
+    test('should deny staff access to conversations of other clients', async () => {
       // Create unique caregivers for this test
       const [org] = await insertOrgs([admin]);
       
@@ -351,7 +351,7 @@ describe('Conversation routes', () => {
         phone: '+16045624263',
         role: 'orgAdmin',
         org: org._id,
-        patients: [],
+        clients: [],
         password: 'Password1'
       });
       await orgAdminCaregiver.save();
@@ -363,7 +363,7 @@ describe('Conversation routes', () => {
         phone: '+16045624263',
         role: 'staff',
         org: org._id,
-        patients: [],
+        clients: [],
         password: 'Password1'
       });
       await staffCaregiver1.save();
@@ -375,7 +375,7 @@ describe('Conversation routes', () => {
         phone: '+16045624263',
         role: 'staff',
         org: org._id,
-        patients: [],
+        clients: [],
         password: 'Password1'
       });
       await staffCaregiver2.save();
@@ -385,53 +385,53 @@ describe('Conversation routes', () => {
       const orgAdminToken = orgAdminTokens.access.token;
       const staffToken1 = staffTokens1.access.token;
       
-      // Create unique patients for this test
-      const patient1 = new Patient({
-        name: 'Test Patient 1',
-        email: 'patient1@test2.com',
+      // Create unique clients for this test
+      const client1 = new Client({
+        name: 'Test Client 1',
+        email: 'client1@test2.com',
         phone: '+16045624263',
         caregiver: staffCaregiver1._id,
         org: org._id,
         schedules: []
       });
-      await patient1.save();
+      await client1.save();
       
-      const patient2 = new Patient({
-        name: 'Test Patient 2',
-        email: 'patient2@test2.com',
+      const client2 = new Client({
+        name: 'Test Client 2',
+        email: 'client2@test2.com',
         phone: '+16045624263',
         caregiver: staffCaregiver2._id,
         org: org._id,
         schedules: []
       });
-      await patient2.save();
+      await client2.save();
       
-      // Add patients to caregivers
-      staffCaregiver1.clients.push(patient1._id);
+      // Add clients to caregivers
+      staffCaregiver1.clients.push(client1._id);
       await staffCaregiver1.save();
       
-      staffCaregiver2.clients.push(patient2._id);
+      staffCaregiver2.clients.push(client2._id);
       await staffCaregiver2.save();
 
       // Create a call first
       const call = new Call({
-        clientId: patient2._id,
+        clientId: client2._id,
         callSid: 'test-call-sid-staff-forbidden',
         status: 'in-progress',
         startTime: new Date()
       });
       await call.save();
 
-      // Create a conversation for patient2 using orgAdmin
+      // Create a conversation for client2 using orgAdmin
       const createRes = await request(app)
-        .post(`/v1/conversations/client/${patient2._id}`)
+        .post(`/v1/conversations/client/${client2._id}`)
         .set('Authorization', `Bearer ${orgAdminToken}`)
         .send({ callId: call._id.toString() })
         .expect(httpStatus.CREATED);
 
       const conversationId = createRes.body.id;
 
-      // Try to read it with staff1 token (should fail - different patient)
+      // Try to read it with staff1 token (should fail - different client)
       await request(app)
         .get(`/v1/conversations/${conversationId}`)
         .set('Authorization', `Bearer ${staffToken1}`)
@@ -442,7 +442,7 @@ describe('Conversation routes', () => {
 
   describe('POST /v1/conversations/:conversationId', () => {
     test('should add a message to a conversation', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -503,7 +503,7 @@ describe('Conversation routes', () => {
     });
 
     test('should add an assistant message to a conversation', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -543,7 +543,7 @@ describe('Conversation routes', () => {
     });
 
     test('should add a system message to a conversation', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -583,7 +583,7 @@ describe('Conversation routes', () => {
     });
 
     test('should return 400 when role is invalid', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -615,7 +615,7 @@ describe('Conversation routes', () => {
     });
 
     test('should return 400 when content is missing', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -647,7 +647,7 @@ describe('Conversation routes', () => {
     });
 
     test('should return 400 when role is missing', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -693,7 +693,7 @@ describe('Conversation routes', () => {
     });
 
     test('should return 401 when no authorization token provided', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first
@@ -725,7 +725,7 @@ describe('Conversation routes', () => {
 
     test('should return 403 when user lacks permission', async () => {
       // Create orgAdmin to create conversation, then staff to try to add message
-      const { accessToken: orgAdminToken, patient, org } = await setupTestData();
+      const { accessToken: orgAdminToken, client, org } = await setupTestData();
       // Create staff caregiver in the same org (use caregiverTwo to avoid duplicate email)
       const { accessToken: staffToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverTwo);
 
@@ -747,7 +747,7 @@ describe('Conversation routes', () => {
 
       const conversationId = createRes.body.id;
 
-      // Try to add message with staff role (should fail - staff doesn't have access to this patient)
+      // Try to add message with staff role (should fail - staff doesn't have access to this client)
       await request(app)
         .post(`/v1/conversations/${conversationId}`)
         .set('Authorization', `Bearer ${staffToken}`)
@@ -758,7 +758,7 @@ describe('Conversation routes', () => {
 
   describe('Multiple messages in conversation', () => {
     test('should handle multiple messages in a conversation', async () => {
-      const { accessToken, patient } = await setupTestData();
+      const { accessToken, client } = await setupTestData();
 
       // Create a conversation first
       // Create a call first

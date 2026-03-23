@@ -70,7 +70,7 @@ export const sentimentApi = createApi({
       ],
     }),
 
-    // Debug conversation data for a patient
+    // Debug conversation data for a client
     debugConversationData: builder.mutation<
       {
         success: boolean

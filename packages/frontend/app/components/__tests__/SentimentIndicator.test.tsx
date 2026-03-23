@@ -8,10 +8,10 @@ describe("SentimentIndicator", () => {
     overallSentiment: "positive",
     sentimentScore: 0.7,
     confidence: 0.9,
-    patientMood: "cheerful and optimistic",
+    clientMood: "cheerful and optimistic",
     keyEmotions: ["happiness", "satisfaction"],
     concernLevel: "low",
-    summary: "Patient shows positive sentiment",
+    summary: "Client shows positive sentiment",
     recommendations: "Continue current approach"
   }
 
@@ -19,10 +19,10 @@ describe("SentimentIndicator", () => {
     overallSentiment: "negative",
     sentimentScore: -0.5,
     confidence: 0.8,
-    patientMood: "frustrated",
+    clientMood: "frustrated",
     keyEmotions: ["frustration", "concern"],
     concernLevel: "medium",
-    summary: "Patient shows negative sentiment",
+    summary: "Client shows negative sentiment",
     recommendations: "Consider additional support"
   }
 
@@ -30,10 +30,10 @@ describe("SentimentIndicator", () => {
     overallSentiment: "neutral",
     sentimentScore: 0.1,
     confidence: 0.7,
-    patientMood: "calm",
+    clientMood: "calm",
     keyEmotions: ["neutrality"],
     concernLevel: "low",
-    summary: "Patient shows neutral sentiment",
+    summary: "Client shows neutral sentiment",
     recommendations: "Monitor for changes"
   }
 
@@ -41,10 +41,10 @@ describe("SentimentIndicator", () => {
     overallSentiment: "mixed",
     sentimentScore: 0.0,
     confidence: 0.6,
-    patientMood: "conflicted",
+    clientMood: "conflicted",
     keyEmotions: ["uncertainty", "hope"],
     concernLevel: "medium",
-    summary: "Patient shows mixed sentiment",
+    summary: "Client shows mixed sentiment",
     recommendations: "Provide reassurance"
   }
 

@@ -16,7 +16,7 @@ export class OrgWorkflow {
     await loginButton.click()
     
     // Wait for home screen
-    await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(this.page.getByText("Add Client", { exact: true })).toBeVisible({ timeout: 10000 })
   }
 
   async givenIAmOnOrgManagementScreen() {
@@ -32,8 +32,8 @@ export class OrgWorkflow {
     await this.page.waitForTimeout(2000) // Allow org screen to load
   }
 
-  async givenIHaveExistingPatients() {
-    // Verify patients exist in the system - try to navigate to home if not already there
+  async givenIHaveExistingClients() {
+    // Verify clients exist in the system - try to navigate to home if not already there
     const homeTab = this.page.locator('[data-testid="tab-home"]').first()
     const homeTabExists = await homeTab.count() > 0
     if (homeTabExists) {

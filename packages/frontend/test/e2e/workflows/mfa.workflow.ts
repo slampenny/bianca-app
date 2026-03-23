@@ -621,12 +621,12 @@ export class MFAWorkflow {
   async thenIShouldBeOnHomeScreen() {
     // Check for home screen indicators
     const homeHeader = this.page.locator('[data-testid="home-header"]')
-    const addPatient = this.page.getByText("Add Patient", { exact: true })
+    const addClient = this.page.getByText("Add Client", { exact: true })
     
     const headerVisible = await homeHeader.isVisible().catch(() => false)
-    const addPatientVisible = await addPatient.isVisible().catch(() => false)
+    const addClientVisible = await addClient.isVisible().catch(() => false)
     
-    expect(headerVisible || addPatientVisible).toBe(true)
+    expect(headerVisible || addClientVisible).toBe(true)
   }
 
   async thenIShouldBeOnProfileScreen() {

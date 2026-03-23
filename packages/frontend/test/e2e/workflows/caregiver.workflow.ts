@@ -16,7 +16,7 @@ export class CaregiverWorkflow {
     await loginButton.click()
     
     // Wait for home screen and navigate to org
-    await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
+    await expect(this.page.getByText("Add Client", { exact: true })).toBeVisible({ timeout: 10000 })
     // Use navigation helper - let errors propagate to fail the test
     await navigateToOrgScreen(this.page)
   }
@@ -275,14 +275,14 @@ export class CaregiverWorkflow {
     return fieldsUpdated > 0
   }
 
-  async whenIAssignCaregiverToPatients(caregiverName: string) {
+  async whenIAssignCaregiverToClients(caregiverName: string) {
     // Assign caregiver to clients
     await this.whenIEditCaregiver(caregiverName)
     
     // Wait for caregiver screen to load
     await this.page.waitForTimeout(1000)
     
-    // Look for the "Assign Unassigned Patients" button (the correct testID from CaregiverScreen.tsx)
+    // Look for the "Assign Unassigned Clients" button (the correct testID from CaregiverScreen.tsx)
     const assignButton = this.page.getByTestId('assign-unassigned-clients-button')
     const buttonCount = await assignButton.count().catch(() => 0)
     
@@ -322,10 +322,10 @@ export class CaregiverWorkflow {
       // Panel opened successfully - check if there are unassigned clients
       // If there are no unassigned clients, we'll see "No unassigned clients found" message
       // If there are clients, we'll see the client list
-      const noPatientsMessage = this.page.getByTestId('no-unassigned-clients-message')
-      const hasNoPatients = await noPatientsMessage.isVisible({ timeout: 2000 }).catch(() => false)
-      
-      if (hasNoPatients) {
+      const noClientsMessage = this.page.getByTestId('no-unassigned-clients-message')
+      const hasNoClients = await noClientsMessage.isVisible({ timeout: 2000 }).catch(() => false)
+
+      if (hasNoClients) {
         // Panel opened but no unassigned clients available
         // This is valid - the UI is accessible, just no data to assign
         // To properly test assignment, we'd need to create an unassigned client first
@@ -338,8 +338,8 @@ export class CaregiverWorkflow {
         return true // UI is accessible, which is what we're testing
       }
       
-      // There are unassigned patients - we could test selecting and assigning them
-      // For now, just verify the panel opened with patients
+      // There are unassigned clients - we could test selecting and assigning them
+      // For now, just verify the panel opened with clients
       const clientList = this.page.locator('[data-testid^="unassigned-client-item-"]')
       const clientCount = await clientList.count().catch(() => 0)
       
@@ -465,7 +465,7 @@ export class CaregiverWorkflow {
     return updatedInfoFound
   }
 
-  async thenIShouldSeePatientAssignmentInterface() {
+  async thenIShouldSeeClientAssignmentInterface() {
     const assignmentElements = [
       this.page.getByTestId('assign-unassigned-clients-modal'),
       this.page.getByTestId('assign-clients-form'),

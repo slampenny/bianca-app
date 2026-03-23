@@ -75,7 +75,9 @@ export class EmailTestHelper {
             avatar: '',
             phone: postData.phone,
             org: 'mock_org_id',
-            patients: []
+            clients: [],
+            // Legacy API shape
+            patients: [],
           },
           inviteToken: inviteToken
         })

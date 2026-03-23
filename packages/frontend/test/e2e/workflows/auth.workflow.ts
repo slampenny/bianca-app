@@ -200,7 +200,7 @@ export class AuthWorkflow {
   }
 
   async thenIShouldBeOnHomeScreen() {
-    // Wait for home screen to load - look for home header or add patient button
+    // Wait for home screen to load - look for home header or add client button
     await this.page.waitForTimeout(3000)
     
     // Check if we're on MFA verification screen (user might have MFA enabled)
@@ -230,9 +230,9 @@ export class AuthWorkflow {
       
       // Check if we're now on home screen (token was accepted) or still on MFA screen (token rejected)
       const isHomeNow = await this.page.locator('[data-testid="home-header"]').isVisible({ timeout: 3000 }).catch(() => false)
-      const isAddPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 3000 }).catch(() => false)
+      const isAddClient = await this.page.getByText("Add Client", { exact: true }).isVisible({ timeout: 3000 }).catch(() => false)
       
-      if (isHomeNow || isAddPatient) {
+      if (isHomeNow || isAddClient) {
         // MFA verification succeeded
         return
       }
@@ -247,8 +247,8 @@ export class AuthWorkflow {
     
     // Check multiple indicators that we're on the home screen
     const homeHeader = await this.page.locator('[data-testid="home-header"]').isVisible({ timeout: 5000 }).catch(() => false)
-    const addPatient = await this.page.getByText("Add Patient", { exact: true }).isVisible({ timeout: 5000 }).catch(() => false)
-    const addPatientButton = await this.page.getByTestId('add-client-button').isVisible({ timeout: 5000 }).catch(() => false)
+    const addClient = await this.page.getByText("Add Client", { exact: true }).isVisible({ timeout: 5000 }).catch(() => false)
+    const addClientButton = await this.page.getByTestId('add-client-button').isVisible({ timeout: 5000 }).catch(() => false)
     const homeScreen = await this.page.locator('[data-testid="home-screen"]').isVisible({ timeout: 5000 }).catch(() => false)
     const profileButton = await this.page.getByTestId('profile-button').isVisible({ timeout: 5000 }).catch(() => false)
     const homeTab = await this.page.locator('[data-testid="tab-home"], [aria-label="Home tab"]').isVisible({ timeout: 5000 }).catch(() => false)
@@ -260,8 +260,8 @@ export class AuthWorkflow {
     // Log what we found for debugging
     console.log('Home screen detection:', {
       homeHeader,
-      addPatient,
-      addPatientButton,
+      addClient,
+      addClientButton,
       homeScreen,
       profileButton,
       homeTab,
@@ -270,7 +270,7 @@ export class AuthWorkflow {
     })
     
     // If we're not on login screen and we can see any home elements, we're on home
-    let isOnHome = homeHeader || addPatient || addPatientButton || homeScreen || (profileButton && !loginScreen && !emailInput) || (homeTab && !loginScreen && !emailInput)
+    let isOnHome = homeHeader || addClient || addClientButton || homeScreen || (profileButton && !loginScreen && !emailInput) || (homeTab && !loginScreen && !emailInput)
     
     if (!isOnHome) {
       // Take a screenshot for debugging
@@ -288,12 +288,12 @@ export class AuthWorkflow {
       // Re-check with locators
       const homeHeaderLocator = this.page.locator('[data-testid="home-header"]')
       const tabHomeLocator = this.page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
-      const addPatientLocator = this.page.getByText("Add Patient", { exact: true })
+      const addClientLocator = this.page.getByText("Add Client", { exact: true })
       
       isOnHome = await Promise.race([
         homeHeaderLocator.isVisible({ timeout: 3000 }).catch(() => false),
         tabHomeLocator.isVisible({ timeout: 3000 }).catch(() => false),
-        addPatientLocator.isVisible({ timeout: 3000 }).catch(() => false),
+        addClientLocator.isVisible({ timeout: 3000 }).catch(() => false),
       ])
     }
     

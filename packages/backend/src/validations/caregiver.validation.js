@@ -9,7 +9,7 @@ const createCaregiver = {
     name: Joi.string().required(),
     phone: Joi.string().required(),
     password: Joi.string().required().custom(password),
-    patients: Joi.array().items(Joi.string().custom(objectId)),
+    clients: Joi.array().items(Joi.string().custom(objectId)),
   }),
 };
 
@@ -46,7 +46,7 @@ const updateCaregiver = {
       password: Joi.string().required().custom(password).optional(),
       themePreference: Joi.string().valid('healthcare', 'colorblind').optional(),
       preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar').optional(),
-      patients: Joi.array().items(Joi.string().custom(objectId)),
+      clients: Joi.array().items(Joi.string().custom(objectId)),
     })
     .min(1)
     .unknown(false), // Disallow fields that are not defined in the schema
@@ -64,21 +64,7 @@ const deleteCaregiver = {
   }),
 };
 
-const addPatient = {
-  params: Joi.object().keys({
-    caregiverId: Joi.required().custom(objectId),
-    clientId: Joi.required().custom(objectId),
-  }),
-};
-
 const addClient = {
-  params: Joi.object().keys({
-    caregiverId: Joi.required().custom(objectId),
-    clientId: Joi.required().custom(objectId),
-  }),
-};
-
-const removePatient = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
     clientId: Joi.required().custom(objectId),
@@ -101,19 +87,6 @@ const updateThemePreference = {
   }),
 };
 
-const getPatientsByCaregiver = {
-  params: Joi.object().keys({
-    caregiverId: Joi.required().custom(objectId),
-  }),
-};
-
-const getConversationsByPatient = {
-  params: Joi.object().keys({
-    caregiverId: Joi.required().custom(objectId),
-    clientId: Joi.required().custom(objectId),
-  }),
-};
-
 const getClients = {
   params: Joi.object().keys({
     caregiverId: Joi.required().custom(objectId),
@@ -127,11 +100,8 @@ module.exports = {
   updateCaregiver,
   uploadCaregiverAvatar,
   deleteCaregiver,
-  addPatient,
   addClient,
-  removePatient,
   removeClient,
   updateThemePreference,
-  getPatientsByCaregiver,
   getClients,
 };

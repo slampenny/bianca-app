@@ -22,10 +22,10 @@ const mockSentimentTrend: SentimentTrend = {
         overallSentiment: "positive",
         sentimentScore: 0.7,
         confidence: 0.9,
-        patientMood: "cheerful",
+        clientMood: "cheerful",
         keyEmotions: ["happiness", "satisfaction"],
         concernLevel: "low",
-        summary: "Patient shows positive sentiment",
+        summary: "Client shows positive sentiment",
         recommendations: "Continue current approach"
       },
       sentimentAnalyzedAt: "2024-01-15T10:05:00.000Z"
@@ -38,10 +38,10 @@ const mockSentimentTrend: SentimentTrend = {
         overallSentiment: "negative",
         sentimentScore: -0.3,
         confidence: 0.8,
-        patientMood: "frustrated",
+        clientMood: "frustrated",
         keyEmotions: ["frustration"],
         concernLevel: "medium",
-        summary: "Patient shows negative sentiment",
+        summary: "Client shows negative sentiment",
         recommendations: "Consider additional support"
       },
       sentimentAnalyzedAt: "2024-01-20T14:05:00.000Z"
@@ -58,7 +58,7 @@ const mockSentimentTrend: SentimentTrend = {
     trendDirection: "improving",
     confidence: 0.85,
     keyInsights: [
-      "Patient sentiment is generally positive",
+      "Client sentiment is generally positive",
       "Recent trend shows improvement",
       "Low concern level overall"
     ]
@@ -78,7 +78,7 @@ const mockSentimentSummary: SentimentSummary = {
   trendDirection: "improving",
   confidence: 0.9,
   keyInsights: [
-    "Patient shows generally positive sentiment",
+    "Client shows generally positive sentiment",
     "Recent trend is improving",
     "High confidence in analysis"
   ],
@@ -91,10 +91,10 @@ const mockSentimentSummary: SentimentSummary = {
         overallSentiment: "positive",
         sentimentScore: 0.6,
         confidence: 0.8,
-        patientMood: "content",
+        clientMood: "content",
         keyEmotions: ["happiness"],
         concernLevel: "low",
-        summary: "Patient is doing well",
+        summary: "Client is doing well",
         recommendations: "Continue current care"
       },
       sentimentAnalyzedAt: "2024-01-25T09:05:00.000Z"
@@ -106,14 +106,14 @@ const mockSentimentAnalysis: SentimentAnalysis = {
   overallSentiment: "positive",
   sentimentScore: 0.7,
   confidence: 0.9,
-  patientMood: "cheerful and optimistic",
+  clientMood: "cheerful and optimistic",
   keyEmotions: ["happiness", "satisfaction"],
   concernLevel: "low",
   satisfactionIndicators: {
     positive: ["expressed gratitude", "mentioned feeling good"],
     negative: []
   },
-  summary: "Patient shows positive sentiment with high confidence",
+  summary: "Client shows positive sentiment with high confidence",
   recommendations: "Continue current care approach"
 }
 
@@ -149,9 +149,7 @@ describe("sentimentApi", () => {
   beforeEach(async () => {
     global.fetch = originalFetch
     store = appStore
-    store.dispatch(sentimentApi.util.resetApiState())
-    store.dispatch(orgApi.util.resetApiState())
-    store.dispatch(clientApi.util.resetApiState())
+    // Register + create client first; clear RTK caches in afterEach (matches clientApi / alertApi).
     const testCaregiver = newCaregiver()
     const response = await registerNewOrgAndCaregiver(
       testCaregiver.name,
@@ -182,6 +180,7 @@ describe("sentimentApi", () => {
     store.dispatch(clientApi.util.resetApiState())
     global.fetch = originalFetch
     jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   describe("getSentimentTrend", () => {
@@ -234,7 +233,7 @@ describe("sentimentApi", () => {
 
     it("should handle API errors", async () => {
       const mockFetch = jest.fn().mockResolvedValue(
-        createMockResponse({ message: "Patient not found" }, { ok: false, status: 404 })
+        createMockResponse({ message: "Client not found" }, { ok: false, status: 404 })
       )
       global.fetch = mockFetch
 
@@ -277,7 +276,7 @@ describe("sentimentApi", () => {
 
     it("should handle API errors", async () => {
       const mockFetch = jest.fn().mockResolvedValue(
-        createMockResponse({ message: "Patient not found" }, { ok: false, status: 404 })
+        createMockResponse({ message: "Client not found" }, { ok: false, status: 404 })
       )
       global.fetch = mockFetch
 

@@ -6,8 +6,6 @@ import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 import { Caregiver } from "../api.types"
 
 describe("caregiverApi", () => {
-  jest.setTimeout(20000)
-
   let store: EnhancedStore<RootState>
   let caregiverId: string
   let orgId: string
@@ -163,7 +161,7 @@ describe("caregiverApi", () => {
   })
 })
 
-describe("caregiverApi - patients", () => {
+describe("caregiverApi - clients (caregiver client list)", () => {
   let store: EnhancedStore<RootState>
   let orgId: string
   let caregiverId: string
@@ -254,7 +252,7 @@ describe("caregiverApi - patients", () => {
   //   }
   // });
 
-  it("should get patients for a caregiver", async () => {
+  it("should get clients for a caregiver", async () => {
     const result = await caregiverApi.endpoints.getClientsForCaregiver.initiate(caregiverId)(
       store.dispatch,
       store.getState,
@@ -262,7 +260,7 @@ describe("caregiverApi - patients", () => {
     )
     if ("error" in result) {
       throw new Error(
-        `Get patients for caregiver failed with error: ${JSON.stringify(result.error)}`,
+        `Get clients for caregiver failed with error: ${JSON.stringify(result.error)}`,
       )
     } else {
       expect(result.data).toBeInstanceOf(Array)

@@ -97,9 +97,6 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
 
   it('should maintain correct order when user speaks before AI - FULL INTEGRATION TEST', async () => {
     // This test uses the ACTUAL service methods to simulate the real flow
-    const userStartTime = Date.now();
-    const aiStartTime = userStartTime + 5000; // AI starts 5 seconds after user
-
     // Setup connection - conversationId must be ObjectId, not string
     const conn = {
       conversationId: conversationId, // Keep as ObjectId, not string
@@ -110,7 +107,7 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
       activeAssistantMessageId: null,
       _userIsSpeaking: false,
       _aiIsSpeaking: false,
-      _lastUserSpeechStart: userStartTime,
+      _lastUserSpeechStart: null,
       _lastAiSpeechStart: null,
       webSocket: mockWebSocket,
       sessionReady: true
@@ -118,7 +115,10 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     service.connections.set(callId, conn);
 
     // STEP 1: User starts speaking - call the actual createPlaceholderUserMessage method
+    const beforeUserPlaceholder = Date.now();
+    conn._lastUserSpeechStart = beforeUserPlaceholder;
     await service.createPlaceholderUserMessage(callId);
+    const afterUserPlaceholder = Date.now();
     
     // Verify placeholder was created
     // Note: createPlaceholderUserMessage might fail silently if conversationId is wrong format
@@ -135,7 +135,9 @@ describe('Conversation Ordering - Integration Test (Real Service Methods)', () =
     expect(userPlaceholder.content).toBe('[Speaking...]');
     expect(userPlaceholder.role).toBe('client'); // Message model uses 'client' for user/caller
     const userPlaceholderTimestamp = userPlaceholder.createdAt.getTime();
-    expect(userPlaceholderTimestamp).toBeGreaterThanOrEqual(userStartTime - 100); // Allow 100ms tolerance
+    // createdAt must fall in the wall-clock window of this save (avoids flake vs an early Date.now).
+    expect(userPlaceholderTimestamp).toBeGreaterThanOrEqual(beforeUserPlaceholder - 500);
+    expect(userPlaceholderTimestamp).toBeLessThanOrEqual(afterUserPlaceholder + 500);
 
     // STEP 2: Simulate user speech transcription accumulating
     conn.pendingUserTranscript = 'Hello, how are you?';

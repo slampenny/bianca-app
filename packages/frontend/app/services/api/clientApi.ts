@@ -144,11 +144,11 @@ export const clientApi = createApi({
       query: ({ caregiverId, clientIds }) => ({
         url: "/clients/assign-unassigned",
         method: "POST",
-        body: { caregiverId, patientIds: clientIds },
+        body: { caregiverId, clientIds },
       }),
     }),
     verifyConsent: builder.mutation<
-      { success: boolean; message: string; alreadyConsented: boolean; patient: Client },
+      { success: boolean; message: string; alreadyConsented: boolean; client: Client },
       { token: string }
     >({
       query: ({ token }) => ({

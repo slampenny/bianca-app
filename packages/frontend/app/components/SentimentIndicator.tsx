@@ -64,9 +64,9 @@ export function SentimentIndicator({
           </Text>
         )}
         
-        {showMood && sentiment.patientMood && (
+        {showMood && sentiment.clientMood && (
           <Text style={[styles.mood, getMoodStyle(size)]} numberOfLines={2}>
-            {sentiment.patientMood}
+            {sentiment.clientMood}
           </Text>
         )}
       </View>

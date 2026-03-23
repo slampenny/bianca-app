@@ -5,7 +5,7 @@ const request = require('supertest');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
 const httpStatus = require('http-status');
-const { Patient, Token, Caregiver, Schedule, Org } = require('../../src/models');
+const { Client, Token, Caregiver, Schedule, Org } = require('../../src/models');
 const { insertOrgs } = require('../fixtures/org.fixture');
 const { clientOne, insertClients } = require('../fixtures/client.fixture');
 const {
@@ -31,7 +31,7 @@ describe('Schedule routes', () => {
   afterEach(async () => {
     await Org.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Schedule.deleteMany();
     await Token.deleteMany();
   });

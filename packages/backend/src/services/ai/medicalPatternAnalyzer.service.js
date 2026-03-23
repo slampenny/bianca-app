@@ -118,7 +118,7 @@ class MedicalPatternAnalyzer {
     const messages = [];
     const { Message } = require('../../models');
 
-    const addPatientContent = (message) => {
+    const addClientContent = (message) => {
       if (message && message.role === 'client' && message.content && message.content.trim()) {
         messages.push(message.content.trim());
       }
@@ -134,11 +134,11 @@ class MedicalPatternAnalyzer {
           const validIds = conversation.messages.filter((m) => m != null && isMessageId(m));
           if (validIds.length > 0) {
             const populatedMessages = await Message.find({ _id: { $in: validIds } });
-            populatedMessages.forEach(addPatientContent);
+            populatedMessages.forEach(addClientContent);
           }
         } else {
           // Messages are already populated (or plain objects in tests); guard against null/undefined
-          conversation.messages.forEach(addPatientContent);
+          conversation.messages.forEach(addClientContent);
         }
       }
     }

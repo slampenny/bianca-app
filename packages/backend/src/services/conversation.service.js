@@ -265,8 +265,19 @@ const buildEnhancedPrompt = async (clientId, callType = 'inbound') => {
       throw new ApiError(httpStatus.NOT_FOUND, `Client ${clientId} not found`);
     }
 
-    // Get conversation history
-    const conversationHistory = await getConversationHistory(clientId);
+    let clientFacts = [];
+    let factsBlock = '';
+    try {
+      const { getClientFacts, formatFactsForPrompt } = require('./clientMemory.service');
+      clientFacts = await getClientFacts(clientId, 25);
+      factsBlock = formatFactsForPrompt(clientFacts, client?.preferredName || client?.name);
+    } catch (memErr) {
+      logger.error(`[Enhanced Prompt] ClientMemory load failed for ${clientId}: ${memErr.message}`, memErr);
+    }
+
+    // Get conversation history (fallback when no ClientMemory facts yet)
+    const conversationHistory =
+      clientFacts.length === 0 ? await getConversationHistory(clientId) : null;
     
     // Get last contact time to avoid repetition
     const { callService } = require('.');
@@ -307,7 +318,11 @@ const buildEnhancedPrompt = async (clientId, callType = 'inbound') => {
       enhancedPrompt += `\n\nLast Contact Time: This appears to be your first conversation with this client, or no recent completed conversations found.`;
     }
 
-    // Add conversation history context if available
+    if (factsBlock && factsBlock.trim().length > 0) {
+      enhancedPrompt += `\n\n--- Client memory ---\n${factsBlock}\n--- End client memory ---`;
+    }
+
+    // Add conversation history context if available (transition: only when no ClientMemory facts)
     if (conversationHistory) {
       enhancedPrompt += `\n\nPrevious Conversation Context:
 ${conversationHistory}
@@ -521,6 +536,17 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
           err
         );
       });
+
+      // Extract and store client memory facts (async, don't wait)
+      if (clientIdForAnalysis && conversationText && conversationText !== 'No conversation content recorded.') {
+        const { extractAndStoreFacts } = require('./clientMemory.service');
+        extractAndStoreFacts(clientIdForAnalysis, conversationId, conversationText).catch((err) => {
+          logger.error(
+            `[Finalize] Error extracting memory facts for client ${clientIdForAnalysis}: ${err.message}`,
+            err
+          );
+        });
+      }
     }
     
     return {
@@ -1099,7 +1125,6 @@ module.exports = {
   buildEnhancedPrompt,
   saveRealtimeMessage,
   finalizeConversation,
-  getPatientContext: getClientContext,
   getClientContext,
   getMedicalBaseline,
   storeMedicalBaseline,
@@ -1109,11 +1134,6 @@ module.exports = {
   deleteOldMedicalAnalyses,
   getActiveClients,
   getConversationsByClientAndDateRange,
-  // Backward compat aliases
-  createConversationForPatient: createConversationForClient,
-  getConversationsByPatient: getConversationsByClient,
-  queryConversationsByPatient: queryConversationsByClient,
-  getConversationsByPatientAndDateRange: getConversationsByClientAndDateRange,
   calculateLinearTrend,
   calculateVariance,
 };

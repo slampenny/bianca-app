@@ -43,7 +43,7 @@ export const scheduleApi = createApi({
       async onQueryStarted({ scheduleId, data }, { dispatch, queryFulfilled }) {
         try {
           const result = await queryFulfilled
-          const clientId = result.data?.client ?? result.data?.patient
+          const clientId = result.data?.client
           if (clientId) {
             dispatch(clientApi.util.invalidateTags([{ type: "Client", id: clientId }]))
           }
@@ -65,7 +65,7 @@ export const scheduleApi = createApi({
       async onQueryStarted({ scheduleId, data }, { dispatch, queryFulfilled }) {
         try {
           const result = await queryFulfilled
-          const clientId = result.data?.client ?? result.data?.patient
+          const clientId = result.data?.client
           if (clientId) {
             dispatch(clientApi.util.invalidateTags([{ type: "Client", id: clientId }]))
           }
@@ -87,7 +87,7 @@ export const scheduleApi = createApi({
         const scheduleCache = scheduleApi.endpoints.getSchedule.select({ scheduleId: arg.scheduleId })(
           getState()
         )
-        const clientId = scheduleCache?.data?.client ?? scheduleCache?.data?.patient
+        const clientId = scheduleCache?.data?.client
 
         try {
           await queryFulfilled

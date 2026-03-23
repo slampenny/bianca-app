@@ -23,27 +23,31 @@ jest.mock('../../../src/config/agenda', () => {
 const authController = require('../../../src/controllers/auth.controller');
 const emailService = require('../../../src/services/email.service');
 
+// Must be set at load time — beforeAll cannot rely on setTimeout inside the hook (default hook timeout is 5s).
+jest.setTimeout(60000);
+
 let mongoServer;
 
 beforeAll(async () => {
-  jest.setTimeout(60000);
   // Set JWT_SECRET for token generation
   process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-testing';
-  
+
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, {});
-  
+
   // Initialize email service with Ethereal for tests
   if (!emailService.isReady()) {
     await emailService.initializeEmailTransport();
   }
-});
+}, 60000);
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
-});
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
+}, 60000);
 
 describe('Auth Controller - Email Verification', () => {
   let req, res, next;

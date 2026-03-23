@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
 const config = require('../../src/config/config');
-const { Invoice, LineItem, Patient, Org, Token, Caregiver, Conversation, Message, Call } = require('../../src/models');
+const { Invoice, LineItem, Client, Org, Token, Caregiver, Conversation, Message, Call } = require('../../src/models');
 const { clientOne, insertClients, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
 
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
@@ -39,7 +39,7 @@ describe('Payment routes', () => {
   afterEach(async () => {
     await Caregiver.deleteMany();
     await Org.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Invoice.deleteMany();
     await LineItem.deleteMany();
     await Token.deleteMany();
@@ -56,7 +56,7 @@ describe('Payment routes', () => {
       // Create messages first
       const message1 = await Message.create({
         role: 'client',
-        content: 'Test patient message',
+        content: 'Test client message',
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
 
@@ -66,8 +66,8 @@ describe('Payment routes', () => {
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
 
-      // Modify the conversation fixtures to use the patient ID and message IDs
-      const patientConversations = [
+      // Modify the conversation fixtures to use the client ID and message IDs
+      const clientConversations = [
         {
           ...conversationOne,
           clientId: client._id,
@@ -80,7 +80,7 @@ describe('Payment routes', () => {
       ];
 
       // Use your existing insertConversations helper
-      await insertConversations(patientConversations);
+      await insertConversations(clientConversations);
 
       const res = await request(app)
         .post(`/v1/payments/clients/${client.id}/invoices`)
@@ -100,26 +100,26 @@ describe('Payment routes', () => {
       });
     });
 
-    test('should create an invoice for a patient with no caregiver assigned and return 201', async () => {
+    test('should create an invoice for a client with no caregiver assigned and return 201', async () => {
       // Create a caregiver with orgAdmin role
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
-      // Create a patient without assigning to the caregiver (patient belongs to the org only)
+      // Create a client without assigning to the caregiver (client belongs to the org only)
       const [client] = await insertClients([{ ...clientOne, org: caregiver.org }]);
 
       // Create messages for the conversation
       const message1 = await Message.create({
         role: 'client',
-        content: 'Test patient message for unassigned patient',
+        content: 'Test client message for unassigned client',
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
       const message2 = await Message.create({
         role: 'assistant',
-        content: 'Test doctor response for unassigned patient',
+        content: 'Test doctor response for unassigned client',
         conversationId: new mongoose.Types.ObjectId(), // Temporary ID, will be updated
       });
 
-      const patientConversations = [
+      const clientConversations = [
         {
           ...conversationOne,
           clientId: client._id,
@@ -131,7 +131,7 @@ describe('Payment routes', () => {
         },
       ];
 
-      await insertConversations(patientConversations);
+      await insertConversations(clientConversations);
 
       const res = await request(app)
         .post(`/v1/payments/clients/${client.id}/invoices`)
@@ -151,13 +151,13 @@ describe('Payment routes', () => {
       });
     });
 
-    test('should return 404 when patient does not exist', async () => {
+    test('should return 404 when client does not exist', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
-      const nonExistentPatientId = new mongoose.Types.ObjectId();
+      const nonExistentClientId = new mongoose.Types.ObjectId();
 
       const res = await request(app)
-        .post(`/v1/payments/clients/${nonExistentPatientId}/invoices`)
+        .post(`/v1/payments/clients/${nonExistentClientId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.NOT_FOUND);
@@ -173,7 +173,7 @@ describe('Payment routes', () => {
       // Create a conversation that is already charged (has lineItemId)
       const message1 = await Message.create({
         role: 'client',
-        content: 'Test patient message',
+        content: 'Test client message',
         conversationId: new mongoose.Types.ObjectId(),
       });
 
@@ -233,7 +233,7 @@ describe('Payment routes', () => {
 
       const message1 = await Message.create({
         role: 'client',
-        content: 'Test patient message',
+        content: 'Test client message',
         conversationId: new mongoose.Types.ObjectId(),
       });
 
@@ -274,12 +274,12 @@ describe('Payment routes', () => {
   });
 
   describe('GET /v1/payments/clients/:clientId/invoices', () => {
-    test('should return 200 and all invoices for a patient', async () => {
+    test('should return 200 and all invoices for a client', async () => {
       // Use admin (orgAdmin role) instead of caregiverOne (staff role)
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
-      await insertInvoices(patient, [invoiceOne, invoiceTwo]);
+      await insertInvoices(client, [invoiceOne, invoiceTwo]);
 
       const res = await request(app)
         .get(`/v1/payments/clients/${client.id}/invoices`)
@@ -300,7 +300,7 @@ describe('Payment routes', () => {
         stripeSynced: false,
       });
       expect(first.org).toBeDefined();
-      const expectedOrgId = (patient.org && (patient.org._id || patient.org).toString()) || patient.org;
+      const expectedOrgId = (client.org && (client.org._id || client.org).toString()) || client.org;
       const actualOrgId = typeof first.org === 'string' ? first.org : (first.org && (first.org.id || first.org._id));
       expect(String(actualOrgId)).toBe(String(expectedOrgId));
     });
@@ -309,7 +309,7 @@ describe('Payment routes', () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
-      await insertInvoices(patient, [invoiceOne, invoiceTwo]);
+      await insertInvoices(client, [invoiceOne, invoiceTwo]);
 
       const res = await request(app)
         .get(`/v1/payments/clients/${client.id}/invoices?status=pending`)
@@ -331,7 +331,7 @@ describe('Payment routes', () => {
         ...invoiceOne,
         dueDate: today,
       };
-      await insertInvoices(patient, [todayInvoice, invoiceTwo]);
+      await insertInvoices(client, [todayInvoice, invoiceTwo]);
 
       const res = await request(app)
         .get(`/v1/payments/clients/${client.id}/invoices?dueDate=${today}`)
@@ -343,13 +343,13 @@ describe('Payment routes', () => {
       expect(res.body[0].dueDate).toContain(today);
     });
 
-    test('should return 404 when patient does not exist', async () => {
+    test('should return 404 when client does not exist', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
-      const nonExistentPatientId = new mongoose.Types.ObjectId();
+      const nonExistentClientId = new mongoose.Types.ObjectId();
 
       const res = await request(app)
-        .get(`/v1/payments/clients/${nonExistentPatientId}/invoices`)
+        .get(`/v1/payments/clients/${nonExistentClientId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
         .expect(httpStatus.OK); // Returns empty array, not 404
@@ -379,7 +379,7 @@ describe('Payment routes', () => {
         .expect(httpStatus.FORBIDDEN);
     });
 
-    test('should return empty array for patient with no invoices', async () => {
+    test('should return empty array for client with no invoices', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
@@ -442,7 +442,7 @@ describe('Payment routes', () => {
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       };
 
-      await insertInvoices(patient, [todayInvoice, futureInvoice]);
+      await insertInvoices(client, [todayInvoice, futureInvoice]);
 
       const today = new Date().toISOString().split('T')[0];
 
@@ -461,7 +461,7 @@ describe('Payment routes', () => {
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const [client] = await insertClients([{ ...clientOne, org: org.id }]);
 
-      await insertInvoices(patient, [invoiceOne, invoiceTwo]);
+      await insertInvoices(client, [invoiceOne, invoiceTwo]);
 
       const res = await request(app)
         .get(`/v1/payments/orgs/${org.id}/invoices?status=pending`)
@@ -536,7 +536,7 @@ describe('Payment routes', () => {
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       };
 
-      await insertInvoices(patient, [pendingInvoice, paidInvoice]);
+      await insertInvoices(client, [pendingInvoice, paidInvoice]);
 
       const today = new Date().toISOString().split('T')[0];
 
@@ -558,12 +558,12 @@ describe('Payment routes', () => {
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
 
-      // Create multiple conversations for the same patient
+      // Create multiple conversations for the same client
       const conversations = [];
       for (let i = 0; i < 3; i++) {
         const message1 = await Message.create({
           role: 'client',
-          content: `Test patient message ${i}`,
+          content: `Test client message ${i}`,
           conversationId: new mongoose.Types.ObjectId(),
         });
 
@@ -612,7 +612,7 @@ describe('Payment routes', () => {
       // Create first conversation and invoice
       const message1 = await Message.create({
         role: 'client',
-        content: 'Test patient message 1',
+        content: 'Test client message 1',
         conversationId: new mongoose.Types.ObjectId(),
       });
 
@@ -643,7 +643,7 @@ describe('Payment routes', () => {
       // Create second conversation and invoice
       const message3 = await Message.create({
         role: 'client',
-        content: 'Test patient message 2',
+        content: 'Test client message 2',
         conversationId: new mongoose.Types.ObjectId(),
       });
 

@@ -108,13 +108,20 @@ const persistedReducer = persistReducer(persistConfig, rootReducer)
 // Build API middleware dynamically
 const apiMiddleware = apiEntries.map(([, api]) => api.middleware)
 
+const isJest = Boolean(process.env.JEST_WORKER_ID)
+
 export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
-      },
+      // RTK Query cache + full tree checks can exceed 32ms in Jest; these run only in dev anyway.
+      ...(isJest
+        ? { serializableCheck: false, immutableCheck: false }
+        : {
+            serializableCheck: {
+              ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+            },
+          }),
     }).concat(...apiMiddleware) as any,
 })
 

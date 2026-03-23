@@ -23,6 +23,7 @@
     "test": "yarn workspace @bianca-app/backend test",
     "test:unit": "yarn workspace @bianca-app/backend test:unit",
     "test:integration": "yarn workspace @bianca-app/backend test:integration",
+    "test:all": "bash scripts/test-all.sh",
     "lint": "yarn workspace @bianca-app/backend lint",
     "lint:fix": "yarn workspace @bianca-app/backend lint:fix",
     "prettier": "yarn workspace @bianca-app/backend prettier",

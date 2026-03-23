@@ -3,7 +3,6 @@ module.exports.CaregiverDTO = require('./caregiver.dto');
 module.exports.ConversationDTO = require('./conversation.dto');
 module.exports.OrgDTO = require('./org.dto');
 module.exports.ClientDTO = require('./client.dto');
-module.exports.PatientDTO = require('./client.dto'); // backward compat
 module.exports.ScheduleDTO = require('./schedule.dto');
 module.exports.SentimentAnalysisDTO = require('./sentiment.dto').SentimentAnalysisDTO;
 module.exports.SentimentTrendDTO = require('./sentiment.dto').SentimentTrendDTO;

@@ -1,7 +1,8 @@
 // utils/debug.js
 const logger = require('../config/logger');
 const config = require('../config/config');
-const OpenAI = require('openai'); // Updated import for OpenAI client
+const { getOpenAIConstructor } = require('./openaiSdk');
+const OpenAI = getOpenAIConstructor();
 
 /**
  * Debugging utilities for the wellness check application

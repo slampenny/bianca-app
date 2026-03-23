@@ -35,7 +35,7 @@
 		"HIGH": "⚠️ ALTA PRIORITÀ: %s - %s: %s",
 		"MEDIUM": "📢 ALLERTA: %s - %s: %s"
 	},
-	"patientConsentEmail": {
+	"clientConsentEmail": {
 		"subject": "Bianca Wellness - Consenso richiesto per la registrazione delle chiamate",
 		"title": "Consenso richiesto per la registrazione delle chiamate",
 		"greeting": "Caro/a %s,",

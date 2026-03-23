@@ -6,8 +6,6 @@ import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 import { Org, Client } from "../api.types"
 
 describe("clientApi", () => {
-  jest.setTimeout(20000)
-
   let store: EnhancedStore<RootState>
   let org: Org
   let orgId: string
@@ -75,7 +73,7 @@ describe("clientApi", () => {
   })
 
   it("should get all clients", async () => {
-    const queryParams = { name: "Test", role: "patient", sortBy: "name:asc", limit: 10, page: 1 }
+    const queryParams = { name: "Test", role: "staff", sortBy: "name:asc", limit: 10, page: 1 }
     const result = await clientApi.endpoints.getAllClients.initiate(queryParams)(
       store.dispatch,
       store.getState,

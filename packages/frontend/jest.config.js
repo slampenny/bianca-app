@@ -36,6 +36,11 @@ const thirdPartyIgnorePatterns = [
 module.exports = {
   ...tsjPreset,
   preset: "jest-expo",
+  // Integration tests in app/services/api/__tests__ call localhost:3000 + MongoDB; hooks need headroom.
+  testTimeout: 60000,
+  // Hitting the same API + DB from many workers causes fetch timeouts, 401s, and missing-org races.
+  // Override with: yarn test --maxWorkers=50%
+  maxWorkers: 1,
   transformIgnorePatterns: [
     "jest-runner",
     `<rootDir>/node_modules/(?!${thirdPartyIgnorePatterns.join("|")})`,

@@ -7,9 +7,9 @@ const httpStatus = require('http-status');
 
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Org, Patient, Token, Caregiver } = require('../../src/models');
+const { Org, Client, Token, Caregiver } = require('../../src/models');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
-const { clientOne, insertClientsAndAddToCaregiver } = require('../fixtures/client.fixture');
+const { clientOne, insertClientsAndAddToCaregiver, insertClientsWithOrg } = require('../fixtures/client.fixture');
 
 const {
   caregiverOne,
@@ -33,7 +33,7 @@ describe('Client routes', () => {
   afterEach(async () => {
     await Org.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Token.deleteMany();
   });
 
@@ -471,6 +471,29 @@ describe('Client routes', () => {
 
       expect(res.body.id).toBe(client.id);
       expect(res.body.caregivers).toEqual(expect.arrayContaining([]));
+    });
+  });
+
+  describe('POST /v1/clients/assign-unassigned', () => {
+    test('should assign unassigned clients to a caregiver', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
+      const [assigneeCaregiver] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
+      const [unassigned] = await insertClientsWithOrg(
+        [{ ...clientOne, email: faker.internet.email(), phone: '3333333333', caregivers: [] }],
+        org._id,
+      );
+
+      const res = await request(app)
+        .post('/v1/clients/assign-unassigned')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ caregiverId: assigneeCaregiver.id, clientIds: [unassigned.id] })
+        .expect(httpStatus.OK);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body).toHaveLength(1);
+      const cgIds = res.body[0].caregivers.map((id) => id.toString());
+      expect(cgIds).toContain(assigneeCaregiver.id.toString());
     });
   });
 });

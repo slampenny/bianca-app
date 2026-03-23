@@ -21,7 +21,7 @@ afterAll(async () => {
 describe('Enhanced Emergency Processor with Context Awareness', () => {
   let processor;
   let mockClient;
-  const { Client, Org, EmergencyPhrase } = require('../../src/models');
+  const { Client, Org, EmergencyPhrase, ClientMemory } = require('../../src/models');
 
   beforeEach(async () => {
     // Clear context window
@@ -34,6 +34,7 @@ describe('Enhanced Emergency Processor with Context Awareness', () => {
     await Client.deleteMany({});
     await Org.deleteMany({});
     await EmergencyPhrase.deleteMany({});
+    await ClientMemory.deleteMany({});
     
     // Create test emergency phrases
     const testUserId = new mongoose.Types.ObjectId();

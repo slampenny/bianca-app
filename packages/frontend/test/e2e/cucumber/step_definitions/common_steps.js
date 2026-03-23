@@ -37,7 +37,7 @@ When('I navigate to {string}', async function(path) {
 
 // Common navigation step - navigate to home screen
 When('I navigate to the home screen', async function() {
-  await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+  await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load', timeout: 45000 });
   await this.page.locator('[data-testid="home-header"], [data-testid^="tab-"], [data-testid="email-input"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
   // Check if we're logged in - if login screen is visible, we need to login
@@ -407,7 +407,7 @@ When('I click the {string} button', async function(buttonText) {
   if (buttonText.toLowerCase().includes('add') && buttonText.toLowerCase().includes('client')) {
     const currentUrl = this.page.url();
     if (!currentUrl.includes('/MainTabs/Home') && currentUrl.endsWith('/')) {
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load', timeout: 45000 });
       await this.page.locator('[data-testid="home-header"], [data-testid="client-list"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
@@ -543,7 +543,7 @@ When('I click the {string} button', async function(buttonText) {
         if (!currentUrl.includes('/login') && !currentUrl.includes('/auth')) {
           // Clear cookies/session before logging in as different user
           await this.page.context().clearCookies();
-          await this.page.goto(`${this.baseURL}/login`, { waitUntil: 'networkidle' });
+          await this.page.goto(`${this.baseURL}/login`, { waitUntil: 'load', timeout: 45000 });
           
           try {
             if (this.page && !this.page.isClosed()) {
@@ -623,7 +623,7 @@ When('I click the {string} button', async function(buttonText) {
         }
         
         // Navigate back to home screen
-        await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+        await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load', timeout: 45000 });
         
         // Check if we got redirected to login again
         const finalUrl = this.page.url();

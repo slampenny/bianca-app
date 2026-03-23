@@ -35,6 +35,14 @@ router
   );
 
 router
+  .route('/assign-unassigned')
+  .post(
+    auth('updateOwn:client', 'updateAny:client'),
+    validate(clientValidation.assignUnassignedClients),
+    clientController.assignUnassignedClients
+  );
+
+router
   .route('/:clientId')
   .get(
     auth('readOwn:client', 'readAny:client'),

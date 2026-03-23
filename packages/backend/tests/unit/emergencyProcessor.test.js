@@ -32,13 +32,14 @@ describe('Emergency Processor', () => {
     processor = new EmergencyProcessor();
     
     // Create actual Client and Caregiver documents in the database
-    const { Client, Caregiver, Org, EmergencyPhrase } = require('../../src/models');
+    const { Client, Caregiver, Org, EmergencyPhrase, ClientMemory } = require('../../src/models');
     
     // Clear existing documents
     await Client.deleteMany({});
     await Caregiver.deleteMany({});
     await Org.deleteMany({});
     await EmergencyPhrase.deleteMany({});
+    await ClientMemory.deleteMany({});
     
     // Create test emergency phrases for detection
     const testUserId = new (require('mongoose')).Types.ObjectId();

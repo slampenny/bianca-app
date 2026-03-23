@@ -54,7 +54,7 @@ async function countSchedulesInPicker(picker: any): Promise<number> {
 }
 
 // Helper to navigate to schedules via client
-async function navigateToSchedulesViaPatient(page: any): Promise<void> {
+async function navigateToSchedulesViaClient(page: any): Promise<void> {
   // Step 1: Click on the edit button for a client from home screen
   const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
   const editButtonCount = await editButton.count()
@@ -124,52 +124,45 @@ async function createSchedule(page: any, time: string): Promise<void> {
   const hour12 = hour24 === 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24)
   const isAM = hour24 < 12
   
-  // Wait for modal to be visible - look for modal content
-  await page.waitForSelector('text=Select Time, text=Hour', { timeout: 5000 }).catch(() => {})
-  await page.waitForTimeout(500)
-  
-  // Find the modal content container to scope our selectors
-  // The hour/minute options are in scrollable lists within the modal
-  // Use a more specific approach: find elements that are clickable Pressables within the modal
-  
-  // Click the hour value - find it within a scrollable container
-  // Look for the hour number that's not part of the time display (e.g., "9:00 AM")
-  const hourOption = page.locator(`text=/^${hour12}$/`).first()
-  await hourOption.waitFor({ timeout: 5000, state: 'visible' })
+  // TimePicker.tsx (web): columns labeled Hour, Minute, Period — only minutes 00,15,30,45.
+  // Global text=/^00$/ matches the wrong node or a hidden match; scope to the Minute column.
+  await page.getByText('Hour', { exact: true }).waitFor({ state: 'visible', timeout: 10000 })
+  await page.waitForTimeout(300)
+
+  const hourColumn = page.getByText('Hour', { exact: true }).locator('..')
+  const hourOption = hourColumn.getByText(String(hour12), { exact: true }).first()
+  await hourOption.waitFor({ timeout: 10000, state: 'visible' })
   await hourOption.scrollIntoViewIfNeeded()
-  await page.waitForTimeout(200) // Small wait after scroll
-  // Use force click to bypass any overlay intercepts
+  await page.waitForTimeout(200)
   await hourOption.click({ force: true, timeout: 5000 })
   await page.waitForTimeout(300)
-  
-  // Click the minute value - find exact match for minute (padded)
+
   const minuteStr = minute.toString().padStart(2, '0')
-  // Find minute that's exactly the number (not part of time display)
-  const minuteOption = page.locator(`text=/^${minuteStr}$/`).first()
-  await minuteOption.waitFor({ timeout: 5000, state: 'visible' })
+  const minuteColumn = page.getByText('Minute', { exact: true }).locator('..')
+  const minuteOption = minuteColumn.getByText(minuteStr, { exact: true }).first()
+  await minuteOption.waitFor({ timeout: 10000, state: 'visible' })
   await minuteOption.scrollIntoViewIfNeeded()
-  await page.waitForTimeout(200) // Small wait after scroll
-  // Use force click to bypass any overlay intercepts
+  await page.waitForTimeout(200)
   await minuteOption.click({ force: true, timeout: 5000 })
   await page.waitForTimeout(300)
-  
-  // Click AM/PM button if needed - these are buttons in the modal
+
+  const periodColumn = page.getByText('Period', { exact: true }).locator('..')
   if (isAM) {
-    const amButton = page.locator('text=/^AM$/').first()
+    const amButton = periodColumn.getByText('AM', { exact: true })
     await amButton.waitFor({ timeout: 2000, state: 'visible' }).catch(() => {})
     if (await amButton.isVisible().catch(() => false)) {
       await amButton.click({ force: true })
     }
   } else {
-    const pmButton = page.locator('text=/^PM$/').first()
+    const pmButton = periodColumn.getByText('PM', { exact: true })
     await pmButton.waitFor({ timeout: 2000, state: 'visible' }).catch(() => {})
     if (await pmButton.isVisible().catch(() => false)) {
       await pmButton.click({ force: true })
     }
   }
-  
-  // Click the "Done" button to close the modal
-  const doneButton = page.locator('text=Done').first()
+
+  // Done — translate("common.done") → "Done" in EN; Pressable may not expose role="button" on web
+  const doneButton = page.getByText('Done', { exact: true }).last()
   await doneButton.waitFor({ timeout: 5000, state: 'visible' })
   await doneButton.click()
   await page.waitForTimeout(500) // Wait for modal to close
@@ -203,7 +196,7 @@ async function createSchedule(page: any, time: string): Promise<void> {
   
   // Wait for the save to complete by waiting for network request
   const savePromise = page.waitForResponse(response => 
-    response.url().includes('/schedules/patients/') && response.request().method() === 'POST',
+    response.url().includes('/schedules/clients/') && response.request().method() === 'POST',
     { timeout: 20000 }
   ).catch(() => null) // Don't fail if we can't catch the response
   
@@ -239,7 +232,7 @@ async function createSchedule(page: any, time: string): Promise<void> {
         // Click save again to retry
         await saveButton.click({ force: true })
         const retryResponse = await page.waitForResponse(response => 
-          response.url().includes('/schedules/patients/') && response.request().method() === 'POST',
+          response.url().includes('/schedules/clients/') && response.request().method() === 'POST',
           { timeout: 20000 }
         ).catch(() => null)
         if (retryResponse && retryResponse.status() < 400) {
@@ -283,14 +276,14 @@ async function createSchedule(page: any, time: string): Promise<void> {
   }
 }
 
-test.describe("Multiple Schedules for Patient", () => {
+test.describe("Multiple Schedules for Client", () => {
   test.beforeEach(async ({ page }) => {
-    await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
+    await navigateToHome(page, TEST_USERS.WITH_CLIENTS)
   })
 
-  test("can add more than one schedule to a patient", async ({ page }) => {
-    // Navigate to schedules screen via patient
-    await navigateToSchedulesViaPatient(page)
+  test("can add more than one schedule to a client", async ({ page }) => {
+    // Navigate to schedules screen via client
+    await navigateToSchedulesViaClient(page)
     
     // Verify we're on schedules screen
     await expect(page.locator('[data-testid="schedules-screen"]')).toBeVisible({ timeout: 10000 })
@@ -434,7 +427,7 @@ test.describe("Multiple Schedules for Patient", () => {
       const selectedValue = await schedulePickerAfterSecond.inputValue().catch(() => null)
       expect(selectedValue).toBe(scheduleValues[1])
       
-      console.log('✅ Successfully created and verified multiple schedules for patient')
+      console.log('✅ Successfully created and verified multiple schedules for client')
     } else {
       throw new Error(`Expected at least 2 schedules, but only found ${scheduleValues.length}`)
     }
@@ -456,8 +449,8 @@ test.describe("Multiple Schedules for Patient", () => {
   })
 
   test("can delete a schedule and only the selected schedule is deleted", async ({ page }) => {
-    // Navigate to schedules screen via patient
-    await navigateToSchedulesViaPatient(page)
+    // Navigate to schedules screen via client
+    await navigateToSchedulesViaClient(page)
     
     // Verify we're on schedules screen
     await expect(page.locator('[data-testid="schedules-screen"]')).toBeVisible({ timeout: 10000 })

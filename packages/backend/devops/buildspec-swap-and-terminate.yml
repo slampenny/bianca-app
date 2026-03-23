@@ -70,6 +70,9 @@ phases:
           echo "Blue instance: $BLUE_INSTANCE_ID"
         fi
         
+        # Terraform-managed SIP Elastic IP (staging vs production via env from CodeBuild)
+        EIP_ALLOCATION_ID="${STAGING_EIP_ALLOCATION_ID:-${PRODUCTION_EIP_ALLOCATION_ID:-}}"
+        
         # Step 0: Migrate MongoDB EBS volume from blue to green (so patient data persists)
         # Green is launched from a template with only root volume; the data volume is attached
         # by Terraform only to the (current) blue instance. We must detach it from blue and
@@ -234,6 +237,47 @@ phases:
           exit 1
         fi
         
+        # Step 2.5: Move Elastic IP to green BEFORE terminating blue.
+        # If blue held the EIP, terminating blue disassociates it — a failed late association
+        # left production with an unallocated EIP and ephemeral-only instance (SIP/Twilio broken).
+        if [ -n "$EIP_ALLOCATION_ID" ]; then
+          echo ""
+          echo "Step 2.5: Associating Elastic IP with green instance (before blue termination)..."
+          if aws ec2 associate-address \
+            --instance-id "$GREEN_INSTANCE_ID" \
+            --allocation-id "$EIP_ALLOCATION_ID" \
+            --allow-reassociation; then
+            echo "  ✅ EIP is on green — safe to terminate blue without orphaning the address"
+            echo "  Waiting 15s for propagation, then syncing Asterisk EXTERNAL_ADDRESS via SSM..."
+            sleep 15
+            # Must match DEPLOY_DIR (/opt/bianca-staging | /opt/bianca-production), not BLUE_TAG#bianca- (/opt/staging would be wrong)
+            CMD="cd $DEPLOY_DIR && PUBLIC_IP=\$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && sed -i.bak -e 's|EXTERNAL_ADDRESS=[^[:space:]]*|EXTERNAL_ADDRESS='\$PUBLIC_IP'|' -e 's|ASTERISK_PUBLIC_IP=[^[:space:]]*|ASTERISK_PUBLIC_IP='\$PUBLIC_IP'|' docker-compose.yml && (docker compose up -d asterisk app 2>/dev/null || docker-compose up -d asterisk app)"
+            if command_id=$(aws ssm send-command \
+              --instance-ids "$GREEN_INSTANCE_ID" \
+              --document-name "AWS-RunShellScript" \
+              --parameters "{\"commands\":[\"$CMD\"]}" \
+              --timeout-seconds 60 \
+              --query 'Command.CommandId' \
+              --output text 2>/dev/null); then
+              echo "  SSM Asterisk/app restart sent (CommandId: $command_id)"
+              for i in 1 2 3 4 5 6; do
+                status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$GREEN_INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "Pending")
+                [ "$status" = "Success" ] && echo "  ✅ SSM completed" && break
+                [ "$status" = "Failed" ] && echo "  ⚠️  SSM failed — check instance; EIP is still associated" && break
+                sleep 10
+              done
+            else
+              echo "  ⚠️  Could not send SSM (EIP is associated; fix compose/Asterisk on host if needed)"
+            fi
+          else
+            echo "  ❌ FATAL: EIP association failed — refusing to terminate blue (would orphan SIP)."
+            exit 1
+          fi
+        else
+          echo ""
+          echo "Step 2.5: No STAGING_EIP_ALLOCATION_ID / PRODUCTION_EIP_ALLOCATION_ID — skipping EIP (non-SIP env)"
+        fi
+        
         # Step 3: Deregister blue instance from target groups (if it exists)
         if [ -n "$BLUE_INSTANCE_ID" ]; then
           echo ""
@@ -292,49 +336,16 @@ phases:
           echo "  ⚠️  Warning: Failed to remove green tag (non-critical)"
         }
         
-        # Step 6: Associate EIP with new blue instance (for SIP / Asterisk to keep working)
-        # Supports both STAGING_EIP_ALLOCATION_ID and PRODUCTION_EIP_ALLOCATION_ID
-        EIP_ALLOCATION_ID="${STAGING_EIP_ALLOCATION_ID:-${PRODUCTION_EIP_ALLOCATION_ID:-}}"
+        # Step 6: Verify EIP stayed on the live instance (belt-and-suspenders)
         if [ -n "$EIP_ALLOCATION_ID" ]; then
           echo ""
-          echo "Step 6: Associating EIP with new blue instance (for SIP / Asterisk)..."
-          if aws ec2 associate-address \
-            --instance-id "$GREEN_INSTANCE_ID" \
-            --allocation-id "$EIP_ALLOCATION_ID" \
-            --allow-reassociation 2>/dev/null; then
-            echo "  ✅ EIP associated with new blue instance - SIP domain now points to this instance"
-            echo "  Waiting 15s for EIP to propagate, then updating EXTERNAL_ADDRESS and restarting Asterisk..."
-            sleep 15
-            # docker-compose was written at deploy time with the instance's pre-EIP IP. Update it to
-            # the current public IP (now the EIP) so Asterisk SIP and the app use the correct address.
-            # CodeDeploy application_start.sh also syncs EXTERNAL_ADDRESS from metadata on every deploy
-            # (belt-and-suspenders if SSM fails or someone deploys before swap Step 6 runs).
-            # Use docker-compose (standalone) or docker compose (plugin) so this works on both staging and production.
-            DOCKER_DIR="/opt/bianca-${BLUE_TAG#bianca-}"
-            CMD="cd $DOCKER_DIR && PUBLIC_IP=\$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) && sed -i.bak -e 's|EXTERNAL_ADDRESS=[^[:space:]]*|EXTERNAL_ADDRESS='\$PUBLIC_IP'|' -e 's|ASTERISK_PUBLIC_IP=[^[:space:]]*|ASTERISK_PUBLIC_IP='\$PUBLIC_IP'|' docker-compose.yml && (docker compose up -d asterisk app 2>/dev/null || docker-compose up -d asterisk app)"
-            if command_id=$(aws ssm send-command \
-              --instance-ids "$GREEN_INSTANCE_ID" \
-              --document-name "AWS-RunShellScript" \
-              --parameters "{\"commands\":[\"$CMD\"]}" \
-              --timeout-seconds 60 \
-              --query 'Command.CommandId' \
-              --output text 2>/dev/null); then
-              echo "  SSM restart Asterisk sent (CommandId: $command_id), waiting for completion..."
-              for i in 1 2 3 4 5 6; do
-                status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$GREEN_INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "Pending")
-                [ "$status" = "Success" ] && echo "  ✅ Asterisk restarted with new EXTERNAL_ADDRESS" && break
-                [ "$status" = "Failed" ] && echo "  ⚠️  SSM restart failed (Asterisk may still work; check instance if SIP fails)" && break
-                sleep 10
-              done
-            else
-              echo "  ⚠️  Could not send SSM command to restart Asterisk (instance may need SSM agent). SIP may work after manual Asterisk restart."
-            fi
-          else
-            echo "  ⚠️  EIP association failed (may already be associated or allocation missing). Check SIP DNS and Asterisk."
+          echo "Step 6: Verifying Elastic IP association..."
+          EIP_ON=$(aws ec2 describe-addresses --allocation-ids "$EIP_ALLOCATION_ID" --query 'Addresses[0].InstanceId' --output text 2>/dev/null || echo "")
+          if [ "$EIP_ON" != "$GREEN_INSTANCE_ID" ]; then
+            echo "  ❌ FATAL: EIP $EIP_ALLOCATION_ID is on '$EIP_ON', expected green/live instance $GREEN_INSTANCE_ID"
+            exit 1
           fi
-        else
-          echo ""
-          echo "Step 6: No EIP_ALLOCATION_ID set - skipping EIP association (environment may not use dedicated EIP for SIP)"
+          echo "  ✅ EIP verified on instance $GREEN_INSTANCE_ID"
         fi
         
         # Step 7: Update Terraform state so it points at the new blue instance (avoids drift on next terraform apply)

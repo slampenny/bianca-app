@@ -1,5 +1,5 @@
 // app/services/api/__tests__/paymentApiWithFixtures.test.ts
-import { paymentApi, conversationApi } from "../"
+import { paymentApi, conversationApi, orgApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
 import { registerNewOrgAndCaregiver, createClientInOrg, generateUniqueEmail } from "../../../../test/helpers"
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
@@ -7,8 +7,6 @@ import { newConversation } from "../../../../test/fixtures/conversation.fixture"
 import { Org } from "../api.types"
 
 describe("paymentApi", () => {
-  jest.setTimeout(20000)
-
   let store: typeof appStore
   let org: Org
   let orgId: string
@@ -46,7 +44,18 @@ describe("paymentApi", () => {
     })(store.dispatch, store.getState, {})
   })
 
-  afterEach(() => {
+  // Match clientApi / alertApi: delete org and reset RTK slices so subscriptions/timers don't leak after the suite.
+  afterEach(async () => {
+    if (orgId) {
+      try {
+        await orgApi.endpoints.deleteOrg.initiate({ orgId })(store.dispatch, store.getState, {})
+      } catch {
+        // org may already be deleted
+      }
+    }
+    store.dispatch(paymentApi.util.resetApiState())
+    store.dispatch(conversationApi.util.resetApiState())
+    store.dispatch(orgApi.util.resetApiState())
     jest.clearAllMocks()
     jest.clearAllTimers()
   })
@@ -254,10 +263,10 @@ describe("paymentApi", () => {
     })
 
     it("should handle client not found", async () => {
-      const nonExistentPatientId = "507f1f77bcf86cd799439011"
+      const nonExistentClientId = "507f1f77bcf86cd799439011"
 
       const result = await paymentApi.endpoints.getInvoicesByClient.initiate({
-        clientId: nonExistentPatientId,
+        clientId: nonExistentClientId,
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
@@ -386,24 +395,33 @@ describe("paymentApi", () => {
       // Create a new organization without invoices
       const testCaregiver2 = newCaregiver()
       testCaregiver2.email = generateUniqueEmail()
-      
+
       const response2 = await registerNewOrgAndCaregiver(
         testCaregiver2.name,
         testCaregiver2.email,
         testCaregiver2.password,
         testCaregiver2.phone,
       )
+      const extraOrgId = response2.org.id as string
 
-      const result = await paymentApi.endpoints.getInvoicesByOrg.initiate({
-        orgId: response2.org.id as string,
-      })(store.dispatch, store.getState, {})
+      try {
+        const result = await paymentApi.endpoints.getInvoicesByOrg.initiate({
+          orgId: extraOrgId,
+        })(store.dispatch, store.getState, {})
 
-      if ("data" in result && result.data) {
-        expect(result.data).toBeDefined()
-        expect(Array.isArray(result.data)).toBe(true)
-        expect(result.data.length).toBe(0)
-      } else {
-        throw new Error(`Get org invoices failed with error: ${JSON.stringify(result.error)}`)
+        if ("data" in result && result.data) {
+          expect(result.data).toBeDefined()
+          expect(Array.isArray(result.data)).toBe(true)
+          expect(result.data.length).toBe(0)
+        } else {
+          throw new Error(`Get org invoices failed with error: ${JSON.stringify(result.error)}`)
+        }
+      } finally {
+        try {
+          await orgApi.endpoints.deleteOrg.initiate({ orgId: extraOrgId })(store.dispatch, store.getState, {})
+        } catch {
+          /* ignore */
+        }
       }
     })
 
@@ -596,7 +614,7 @@ describe("paymentApi", () => {
         expect(result.data.orgName).toBeDefined()
         expect(typeof result.data.totalUnbilledCost).toBe("number")
         expect(result.data.totalUnbilledCost).toBeGreaterThanOrEqual(0)
-        const costs = result.data.clientCosts ?? result.data.patientCosts
+        const costs = result.data.clientCosts
         expect(Array.isArray(costs)).toBe(true)
         expect(result.data.period).toBeDefined()
         expect(result.data.period.days).toBe(30)
@@ -614,7 +632,7 @@ describe("paymentApi", () => {
       })(store.dispatch, store.getState, {})
 
       if ("data" in result && result.data) {
-        const costs = result.data.clientCosts ?? result.data.patientCosts
+        const costs = result.data.clientCosts
         expect(costs).toBeDefined()
         expect(Array.isArray(costs)).toBe(true)
 

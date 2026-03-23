@@ -132,6 +132,7 @@ router.get('/service-status', auth(), async (req, res) => {
       '20260310-message-role-patient-to-client.js',
       '20260310-patient-to-client-enums.js',
       '20260310-org-require-patient-consent-to-require-client-consent.js',
+      '20260311-token-type-patient-consent-to-client-consent.js',
     ];
 
     const migrationFiles = fs.readdirSync(MIGRATIONS_DIR)
@@ -205,6 +206,7 @@ router.get('/migration-status', auth(), async (req, res) => {
     '20260310-message-role-patient-to-client.js',
     '20260310-patient-to-client-enums.js',
     '20260310-org-require-patient-consent-to-require-client-consent.js',
+    '20260311-token-type-patient-consent-to-client-consent.js',
   ];
 
   try {
@@ -466,12 +468,15 @@ router.post('/get-email', async (req, res) => {
       });
     }
 
-    // Retrieve email from Ethereal
-    // Note: retrieveLastEmail signature is (recipientEmail, timeoutMs)
-    // If waitForEmail is true, we'll poll with the timeout
+    // Retrieve email: poll until maxWaitMs when waitForEmail (E2E); single fetch otherwise.
+    // Note: retrieveLastEmail alone does not poll — waitForEmail() loops until the message appears in IMAP/capture.
     let emailData;
     try {
-      emailData = await etherealEmailRetriever.retrieveLastEmail(email, waitForEmail ? maxWaitMs : 5000);
+      if (waitForEmail) {
+        emailData = await etherealEmailRetriever.waitForEmail(email, maxWaitMs, 2000);
+      } else {
+        emailData = await etherealEmailRetriever.retrieveLastEmail(email, 5000);
+      }
     } catch (retrieveError) {
       // Handle "no emails found" as a 404, not a 500 error
       if (retrieveError.message && retrieveError.message.includes('No emails found')) {
@@ -503,6 +508,32 @@ router.post('/get-email', async (req, res) => {
       success: false,
       error: err.message 
     });
+  }
+});
+
+/**
+ * Enable in-memory email capture for E2E (same path as NODE_ENV=test sendEmail).
+ * Call from Playwright when the API runs with NODE_ENV=development so consent and other mails are visible to POST /test/get-email.
+ */
+router.post('/e2e-email-capture', async (req, res) => {
+  try {
+    if (config.env === 'production') {
+      return res.status(403).json({ success: false, error: 'Not available in production' });
+    }
+    const enable = req.body?.enable !== false;
+    if (enable) {
+      process.env.E2E_CAPTURE_EMAILS = '1';
+    } else {
+      delete process.env.E2E_CAPTURE_EMAILS;
+    }
+    logger.info(`[test] E2E_CAPTURE_EMAILS ${enable ? 'enabled' : 'disabled'}`);
+    return res.json({
+      success: true,
+      e2eCaptureEmails: process.env.E2E_CAPTURE_EMAILS === '1',
+    });
+  } catch (err) {
+    logger.error('e2e-email-capture error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -797,10 +828,10 @@ router.post('/send-invite-email', async (req, res) => {
 
 /**
  * @swagger
- * /test/send-sms-patient-0:
+ * /test/send-sms-client-0:
  *   post:
- *     summary: Send test SMS to patient 0 phone number
- *     description: Sends a test SMS message to the hardcoded patient 0 phone number (6045624263) for debugging SMS delivery
+ *     summary: Send test SMS to client 0 phone number
+ *     description: Sends a test SMS message to the hardcoded client 0 phone number (6045624263) for debugging SMS delivery
  *     tags: [Test]
  *     security:
  *       - bearerAuth: []
@@ -824,17 +855,17 @@ router.post('/send-invite-email', async (req, res) => {
  *       "500":
  *         description: Failed to send SMS
  */
-router.post('/send-sms-patient-0', auth(), async (req, res) => {
+router.post('/send-sms-client-0', auth(), async (req, res) => {
   try {
     const { twilioSmsService } = require('../../services/twilioSms.service');
     const logger = require('../../config/logger');
     
-    // Hardcoded phone number for patient 0: 6045624263
+    // Hardcoded phone number for client 0: 6045624263
     // Format as E.164: +16045624263
-    const patient0Phone = '+16045624263';
-    const testMessage = `Test SMS from Bianca staging - Patient 0. Timestamp: ${new Date().toISOString()}. If you receive this, SMS delivery is working!`;
+    const client0Phone = '+16045624263';
+    const testMessage = `Test SMS from Bianca staging - Client 0. Timestamp: ${new Date().toISOString()}. If you receive this, SMS delivery is working!`;
     
-    logger.info(`[Test Route] Sending test SMS to patient 0: ${patient0Phone}`);
+    logger.info(`[Test Route] Sending test SMS to client 0: ${client0Phone}`);
     
     // Check if Twilio SMS service is initialized
     if (!twilioSmsService || !twilioSmsService.isInitialized) {
@@ -846,18 +877,18 @@ router.post('/send-sms-patient-0', auth(), async (req, res) => {
     }
     
     // Send SMS using Twilio
-    const response = await twilioSmsService.sendSMS(patient0Phone, testMessage, {
+    const response = await twilioSmsService.sendSMS(client0Phone, testMessage, {
       category: 'test',
-      clientId: 'patient-0'
+      clientId: 'client-0'
     });
     
-    logger.info(`[Test Route] SMS sent successfully to ${patient0Phone}, MessageSid: ${response.messageSid}`);
+    logger.info(`[Test Route] SMS sent successfully to ${client0Phone}, MessageSid: ${response.messageSid}`);
     
     res.json({
       success: true,
       message: 'SMS sent successfully',
       messageId: response.messageSid, // Twilio uses messageSid
-      phoneNumber: twilioSmsService.maskPhoneNumber(patient0Phone),
+      phoneNumber: twilioSmsService.maskPhoneNumber(client0Phone),
       timestamp: new Date().toISOString()
     });
   } catch (error) {

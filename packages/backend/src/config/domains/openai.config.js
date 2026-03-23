@@ -26,7 +26,13 @@ const buildOpenAIConfig = (envVars) => {
       realtimeModel,
       realtimeVoice: envVars.OPENAI_REALTIME_VOICE || 'alloy',
       realtimeSessionConfig,
-      idleTimeout: envVars.OPENAI_IDLE_TIMEOUT || 300000,
+      // 0 disables health-check idle disconnect. Do not use || — 0 is valid (was incorrectly falling through to 5min).
+      idleTimeout: (() => {
+        const v = envVars.OPENAI_IDLE_TIMEOUT;
+        if (v === undefined || v === null) return 0;
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.max(0, n) : 0;
+      })(),
       model: envVars.OPENAI_MODEL || 'gpt-4o-2025-01-12',
       sentimentModel: envVars.OPENAI_SENTIMENT_MODEL || 'gpt-4o', // Chat completions model for sentiment; OPENAI_MODEL may be realtime-only
       useGA: true, // Always true - GA API is the only option
@@ -42,7 +48,7 @@ const validateOpenAIEnvVars = (envVars) => {
     OPENAI_REALTIME_MODEL: Joi.string().optional(),
     OPENAI_REALTIME_VOICE: Joi.string().optional(),
     OPENAI_REALTIME_SESSION_CONFIG: Joi.string().optional(),
-    OPENAI_IDLE_TIMEOUT: Joi.number().optional(),
+    OPENAI_IDLE_TIMEOUT: Joi.number().optional().min(0),
     OPENAI_MODEL: Joi.string().optional(),
     OPENAI_SENTIMENT_MODEL: Joi.string().optional(),
     OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().optional(),
@@ -67,7 +73,13 @@ const applyOpenAISecrets = (config, secrets) => {
   if (secrets.OPENAI_REALTIME_TRANSCRIPTION_MODEL) {
     config.openai.realtimeTranscriptionModel = secrets.OPENAI_REALTIME_TRANSCRIPTION_MODEL;
   }
-  
+
+  // Optional: max idle ms before Realtime disconnect (0 = off). Remove from secrets to use env default.
+  if (secrets.OPENAI_IDLE_TIMEOUT !== undefined && secrets.OPENAI_IDLE_TIMEOUT !== null) {
+    const n = Number(secrets.OPENAI_IDLE_TIMEOUT);
+    config.openai.idleTimeout = Number.isFinite(n) ? Math.max(0, n) : config.openai.idleTimeout;
+  }
+
   return config;
 };
 

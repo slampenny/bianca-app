@@ -45,24 +45,28 @@ jest.mock('i18n', () => ({
   I18n: jest.fn()
 }));
 
+// Must be set at load time — beforeAll cannot rely on setTimeout inside the hook (default hook timeout is 5s).
+jest.setTimeout(60000);
+
 let mongoServer;
 
 beforeAll(async () => {
-  jest.setTimeout(60000);
   mongoServer = await MongoMemoryServer.create();
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri, {});
-  
+
   // Initialize email service with Ethereal for tests
   if (!emailService.isReady()) {
     await emailService.initializeEmailTransport();
   }
-});
+}, 60000);
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
-});
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
+}, 60000);
 
 describe('inviteService', () => {
   describe('generateInviteToken', () => {

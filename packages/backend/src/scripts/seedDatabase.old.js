@@ -438,7 +438,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   let sentimentScore = 0;
   let confidence = 0.85;
   let concernLevel = 'low';
-  let patientMood = 'Client appears calm and engaged';
+  let clientMood = 'Client appears calm and engaged';
   let keyEmotions = ['neutral'];
   let satisfactionIndicators = { positive: [], negative: [] };
   let summary = 'Client engaged in routine wellness check conversation.';
@@ -456,7 +456,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   if (positiveCount > negativeCount + 2) {
     overallSentiment = 'positive';
     sentimentScore = 0.3 + (Math.min(positiveCount, 10) * 0.05);
-    patientMood = 'Client appears cheerful and optimistic';
+    clientMood = 'Client appears cheerful and optimistic';
     keyEmotions = ['happiness', 'satisfaction', 'contentment'];
     summary = 'Patient expressed positive feelings about their health and daily activities.';
     recommendations = 'Continue current treatment plan. Client is responding well.';
@@ -464,7 +464,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   } else if (negativeCount > positiveCount + 2) {
     overallSentiment = 'negative';
     sentimentScore = -0.3 - (Math.min(negativeCount, 10) * 0.05);
-    patientMood = 'Client appears concerned or experiencing some challenges';
+    clientMood = 'Client appears concerned or experiencing some challenges';
     keyEmotions = ['concern', 'frustration', 'tiredness'];
     concernLevel = negativeCount > 5 ? 'high' : 'medium';
     summary = 'Patient expressed some concerns or challenges during the conversation.';
@@ -473,7 +473,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   } else if (positiveCount > 0 && negativeCount > 0) {
     overallSentiment = 'mixed';
     sentimentScore = (positiveCount - negativeCount) * 0.1;
-    patientMood = 'Client shows mixed emotions with both positive and concerning elements';
+    clientMood = 'Client shows mixed emotions with both positive and concerning elements';
     keyEmotions = ['mixed', 'cautious', 'hopeful'];
     concernLevel = 'medium';
     summary = 'Client conversation shows a mix of positive and concerning elements.';
@@ -481,7 +481,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
   } else {
     overallSentiment = 'neutral';
     sentimentScore = 0;
-    patientMood = 'Client appears calm and engaged in routine conversation';
+    clientMood = 'Client appears calm and engaged in routine conversation';
     keyEmotions = ['neutral', 'calm'];
     summary = 'Client engaged in routine wellness check conversation.';
   }
@@ -492,7 +492,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
       overallSentiment = 'negative';
       sentimentScore = -0.4 - (metadata.month - 4) * 0.1;
       concernLevel = 'high';
-      patientMood = 'Client showing signs of cognitive decline and increased confusion';
+      clientMood = 'Client showing signs of cognitive decline and increased confusion';
       keyEmotions = ['confusion', 'frustration', 'concern'];
       summary = 'Client showing concerning signs of cognitive decline. Increased confusion and memory issues noted.';
       recommendations = 'Urgent follow-up recommended. Consider additional support services.';
@@ -501,7 +501,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
       overallSentiment = 'mixed';
       sentimentScore = -0.1;
       concernLevel = 'medium';
-      patientMood = 'Client showing mild concerns about memory and mood';
+      clientMood = 'Client showing mild concerns about memory and mood';
       keyEmotions = ['concern', 'uncertainty'];
       summary = 'Client expressing mild concerns about cognitive function and mood.';
       recommendations = 'Monitor closely. Consider cognitive assessment.';
@@ -515,7 +515,7 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
     overallSentiment,
     sentimentScore: Math.round(sentimentScore * 100) / 100, // Round to 2 decimal places
     confidence,
-    patientMood,
+    clientMood,
     keyEmotions,
     concernLevel,
     satisfactionIndicators,

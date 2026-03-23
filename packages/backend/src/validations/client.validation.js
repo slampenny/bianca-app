@@ -141,6 +141,13 @@ const getUnassignedClients = {
   body: Joi.object().keys({}),
 };
 
+const assignUnassignedClients = {
+  body: Joi.object().keys({
+    caregiverId: Joi.string().required().custom(objectId),
+    clientIds: Joi.array().items(Joi.string().custom(objectId)).min(1).required(),
+  }),
+};
+
 module.exports = {
   createClient,
   getConversationsByClient,
@@ -151,4 +158,5 @@ module.exports = {
   deleteClient,
   getCaregivers,
   getUnassignedClients,
+  assignUnassignedClients,
 };

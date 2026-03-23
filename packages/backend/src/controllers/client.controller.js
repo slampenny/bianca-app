@@ -35,7 +35,11 @@ const createClient = catchAsync(async (req, res) => {
     }
   }
   client = await caregiverService.addClient(req.caregiver._id || req.caregiver.id, client.id);
-  clientService.sendConsentEmailIfRequired(client).catch((err) => logger.error('Failed to send consent email after client creation:', err));
+  try {
+    await clientService.sendConsentEmailIfRequired(client);
+  } catch (err) {
+    logger.error('Failed to send consent email after client creation:', err);
+  }
   res.status(httpStatus.CREATED).send(ClientDTO(client));
 });
 
@@ -154,6 +158,12 @@ const getUnassignedClients = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(clients.map((c) => ClientDTO(c)));
 });
 
+const assignUnassignedClients = catchAsync(async (req, res) => {
+  const { caregiverId, clientIds } = req.body;
+  const clients = await clientService.assignUnassignedClients(caregiverId, clientIds);
+  res.status(httpStatus.OK).send(clients.map((c) => ClientDTO(c)));
+});
+
 const verifyConsent = catchAsync(async (req, res) => {
   const wantsJson = req.headers.accept?.includes('application/json') || req.query.format === 'json';
   const token = req.query.token || req.body.token;
@@ -197,4 +207,5 @@ module.exports = {
   getClientsByCaregiver,
   getCaregivers,
   getUnassignedClients,
+  assignUnassignedClients,
 };

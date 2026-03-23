@@ -110,9 +110,9 @@ export function SentimentAnalysisScreen() {
         preset="scroll"
         safeAreaEdges={["top"]}
       >
-        <View style={styles.noPatientContainer}>
-          <Text style={styles.noPatientTitle}>{translate("sentimentAnalysis.noClientSelected")}</Text>
-          <Text style={styles.noPatientMessage}>
+        <View style={styles.noClientContainer}>
+          <Text style={styles.noClientTitle}>{translate("sentimentAnalysis.noClientSelected")}</Text>
+          <Text style={styles.noClientMessage}>
             {translate("sentimentAnalysis.selectClientToView")}
           </Text>
         </View>
@@ -144,20 +144,20 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.palette.biancaBackground,
   },
-  noPatientContainer: {
+  noClientContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
-  noPatientTitle: {
+  noClientTitle: {
     fontSize: 24,
     fontWeight: "600",
     color: colors.palette.biancaHeader,
     marginBottom: 16,
     textAlign: "center",
   },
-  noPatientMessage: {
+  noClientMessage: {
     fontSize: 16,
     color: colors.palette.neutral600,
     textAlign: "center",

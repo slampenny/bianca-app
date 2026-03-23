@@ -29,6 +29,9 @@ async function safeWait(page, ms) {
   });
 }
 
+/** SPAs often never reach networkidle (websockets, polling). Prefer load + explicit timeout. */
+const GOTO_HOME = { waitUntil: 'load', timeout: 45000 };
+
 // Login step is now in auth_steps.js - this step is kept for backward compatibility
 // but the implementation is shared across all test suites
 
@@ -308,14 +311,18 @@ Given(/a client exists with name "([^"]*)"/, async function(patientName) {
               const clientInRedux = userClients.find((c) => c.id === patientId);
               
               if (!clientInRedux) {
-                // Fetch client and add to Redux
-                const token = localStorage.getItem('accessToken') || 
-                             document.cookie.split('; ').find(row => row.startsWith('accessToken='))?.split('=')[1];
+                // Same Bearer source as baseQueryWithAuth — JWT from login lives in Redux auth.tokens, not localStorage accessToken.
+                const token = store.getState()?.auth?.tokens?.access?.token;
                 
                 if (token) {
-                  const response = await fetch(`${apiURL}/v1/clients/${patientId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                  });
+                  const response = await Promise.race([
+                    fetch(`${apiURL}/v1/clients/${patientId}`, {
+                      headers: { 'Authorization': `Bearer ${token}` },
+                    }),
+                    new Promise((_, reject) =>
+                      setTimeout(() => reject(new Error('Redux client fetch timeout')), 12000)
+                    ),
+                  ]);
                   
                   if (response.ok) {
                     const client = await response.json();
@@ -356,7 +363,7 @@ Given(/a client exists with name "([^"]*)"/, async function(patientName) {
     // Navigate back to home if we're still on the patient form
     const currentUrl = this.page.url();
     if (currentUrl.includes('/Patient') && !currentUrl.includes('/MainTabs/Home')) {
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
       await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
   }
@@ -369,7 +376,7 @@ Given(/a client exists with name "([^"]*)"/, async function(patientName) {
     // Navigate to home screen if we're still on the patient form
     const currentUrlAfterCreation = this.page.url();
     if (!currentUrlAfterCreation.includes('/MainTabs/Home') && !currentUrlAfterCreation.includes('/HomeDetail') && currentUrlAfterCreation !== `${this.baseURL}/`) {
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
       await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
     }
     
@@ -431,7 +438,7 @@ Given(/a client exists with name "([^"]*)"/, async function(patientName) {
       if (currentUrl.includes('/Patient') && !currentUrl.includes('/MainTabs/Home')) {
         // We're on the patient screen, which means creation succeeded
         // Just navigate back to home
-        await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+        await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
         await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         
         // Check again for patient in list
@@ -444,7 +451,7 @@ Given(/a client exists with name "([^"]*)"/, async function(patientName) {
       } else {
         // Still on form - check if patient was actually created by navigating back and checking
         console.log(`[DEBUG] Still on form, checking if patient was created...`);
-        await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+        await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
         await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         
         // Wait for patients to load
@@ -507,7 +514,7 @@ When(/I navigate to the clients screen/, async function() {
     const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
     const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
     if (!alreadyOnApp || !listOrHomeVisible) {
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
     }
   }
 
@@ -839,7 +846,7 @@ Then(/I should see the new client in the list/, async function() {
     const alreadyOnApp = currentUrl === base || currentUrl === `${base}/` || currentUrl.startsWith(`${base}/`);
     const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
     if (!alreadyOnApp || !listOrHomeVisible) {
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
     }
     await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } else {
@@ -984,7 +991,7 @@ When(/I click on the client "([^"]*)"/, async function(patientName) {
     const listOrHomeVisible = await this.page.locator('[data-testid="client-list"], [data-testid="home-header"]').first().isVisible().catch(() => false);
     if (!alreadyOnApp || !listOrHomeVisible) {
       console.log(`[DEBUG] Not on home screen (URL: ${currentUrl}), navigating to home...`);
-      await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+      await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
     }
     const newUrl = this.page.url();
     if (newUrl.includes('/login') || newUrl.includes('/auth')) {
@@ -1109,7 +1116,7 @@ When(/I click on the client "([^"]*)"/, async function(patientName) {
         await this.page.locator('[data-testid="client-list"], [data-testid="client-screen"], [data-testid="client-form"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         
         // Navigate to home after login
-        await this.page.goto(`${this.baseURL}/`, { waitUntil: 'networkidle' });
+        await this.page.goto(`${this.baseURL}/`, GOTO_HOME);
       }
       
       try {

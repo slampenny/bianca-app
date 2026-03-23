@@ -1,10 +1,4 @@
 // app/services/api/__tests__/scheduleApi.test.ts
-/**
- * Note: You may see a "ReferenceError: You are trying to access a property or method of the Jest environment after it has been torn down" warning.
- * This is a known issue with React Native's Jest setup and doesn't affect test results.
- * The warning comes from React Native's internal timers and can be safely ignored.
- * To suppress it, run tests with: yarn test --forceExit
- */
 import { EnhancedStore } from "@reduxjs/toolkit"
 import { orgApi, clientApi, scheduleApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
@@ -60,6 +54,10 @@ describe("scheduleApi", () => {
     } catch (error) {
       // Ignore cleanup errors - org might already be deleted
     }
+    // Drop RTK Query subscriptions / pending work so nothing fires after the hook finishes.
+    // Avoid jest.clearAllTimers() here — it interacts badly with react-native/jest timer mocks.
+    store.dispatch(scheduleApi.util.resetApiState())
+    store.dispatch(clientApi.util.resetApiState())
     jest.clearAllMocks()
   })
 
@@ -88,39 +86,59 @@ describe("scheduleApi", () => {
         time: newSchedulePayload.time,
       })
 
-      // Wait a bit for the client document to be updated with the new schedule
-      // Use a shorter delay to avoid cleanup warnings
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // Fetch the client again to get updated schedules
-      const resultClient = await clientApi.endpoints.getClient.initiate({ id: clientId })(
-        store.dispatch,
-        store.getState,
-        {},
-      )
-      if ("data" in resultClient && resultClient.data) {
-        // Client GET response must include schedules (backend getClientById populates schedules)
-        expect(resultClient.data.schedules).toBeDefined()
-        expect(Array.isArray(resultClient.data.schedules)).toBe(true)
-        const createdSchedule = resultClient.data.schedules.find(
-          (s: Schedule) => s.frequency === newSchedulePayload.frequency && s.time === newSchedulePayload.time
+      // Poll until backend lists the new schedule on the client (avoids fixed sleeps + stray timers)
+      const deadline = Date.now() + 8000
+      let resultClient: Awaited<
+        ReturnType<ReturnType<typeof clientApi.endpoints.getClient.initiate>>
+      >
+      let foundOnClient = false
+      do {
+        resultClient = await clientApi.endpoints.getClient.initiate({ id: clientId })(
+          store.dispatch,
+          store.getState,
+          {},
         )
-        expect(createdSchedule).toBeDefined()
-        if (createdSchedule) {
-          expect(createdSchedule).toMatchObject({
-            id: expect.any(String),
-            frequency: newSchedulePayload.frequency,
-            intervals: expect.arrayContaining([
-              expect.objectContaining({
-                day: 3,
-                weeks: 1,
-              }),
-            ]),
-            time: newSchedulePayload.time,
-          })
-        }
-      } else {
-        throw new Error(`Get client failed: ${JSON.stringify(resultClient.error || 'Unknown error')}`)
+        const schedules =
+          "data" in resultClient && resultClient.data?.schedules
+            ? resultClient.data.schedules
+            : undefined
+        foundOnClient = Boolean(
+          schedules?.some(
+            (s: Schedule) =>
+              s.frequency === newSchedulePayload.frequency && s.time === newSchedulePayload.time,
+          ),
+        )
+        if (foundOnClient) break
+        await new Promise((r) => setTimeout(r, 100))
+      } while (Date.now() < deadline)
+
+      if (!foundOnClient || !("data" in resultClient) || !resultClient.data) {
+        throw new Error(
+          `Client never showed new schedule after create: ${JSON.stringify(
+            "error" in resultClient ? resultClient.error : resultClient,
+          )}`,
+        )
+      }
+
+      // Client GET response must include schedules (backend getClientById populates schedules)
+      expect(resultClient.data.schedules).toBeDefined()
+      expect(Array.isArray(resultClient.data.schedules)).toBe(true)
+      const createdSchedule = resultClient.data.schedules.find(
+        (s: Schedule) => s.frequency === newSchedulePayload.frequency && s.time === newSchedulePayload.time,
+      )
+      expect(createdSchedule).toBeDefined()
+      if (createdSchedule) {
+        expect(createdSchedule).toMatchObject({
+          id: expect.any(String),
+          frequency: newSchedulePayload.frequency,
+          intervals: expect.arrayContaining([
+            expect.objectContaining({
+              day: 3,
+              weeks: 1,
+            }),
+          ]),
+          time: newSchedulePayload.time,
+        })
       }
     } else {
       throw new Error(`Create schedule failed with error: ${JSON.stringify(result)}`)

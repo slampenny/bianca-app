@@ -84,11 +84,11 @@ export class SimpleWorkflow {
     expect(currentUrl).toContain(new URL(FRONTEND_URL).hostname)
   }
 
-  // PATIENT WORKFLOWS  
-  async patientWorkflow_CheckPatientInterface() {
+  // CLIENT WORKFLOWS
+  async clientWorkflow_CheckClientInterface() {
     // GIVEN: I want to manage clients
     // WHEN: I look for client-related elements
-    const patientElements = [
+    const clientElements = [
       { name: 'Client Cards', testId: 'client-card' },
       { name: 'Add Client Button', text: 'Add Client' },
       { name: 'No Clients Message', text: 'No clients found' },
@@ -96,7 +96,7 @@ export class SimpleWorkflow {
     ]
     
     const foundElements = []
-    for (const element of patientElements) {
+    for (const element of clientElements) {
       let count = 0
       if (element.testId) {
         count = await this.page.getByTestId(element.testId).count()
@@ -109,9 +109,9 @@ export class SimpleWorkflow {
       }
     }
     
-    // THEN: I should see patient management interface
+    // THEN: I should see client management interface
     expect(foundElements.length).toBeGreaterThan(0)
-    console.log('Patient interface elements found:', foundElements.join(', '))
+    console.log('Client interface elements found:', foundElements.join(', '))
     
     return foundElements
   }
@@ -162,14 +162,14 @@ export class SimpleWorkflow {
     // Check navigation
     const availableTabs = await this.navigationWorkflow_CheckTabs()
     
-    // Check patient interface
-    const patientElements = await this.patientWorkflow_CheckPatientInterface()
+    // Check client interface
+    const clientElementsFound = await this.clientWorkflow_CheckClientInterface()
     
     // Check alert system
     const alertElements = await this.alertWorkflow_CheckAlertSystem()
     
     // THEN: I should have a functional healthcare app
-    const totalFeatures = availableTabs.length + patientElements.length + alertElements.length
+    const totalFeatures = availableTabs.length + clientElementsFound.length + alertElements.length
     expect(totalFeatures).toBeGreaterThan(0)
     
     console.log('=== WORKFLOW EXPLORATION COMPLETE ===')
@@ -177,7 +177,7 @@ export class SimpleWorkflow {
     
     return {
       navigation: availableTabs,
-      patient: patientElements,
+      client: clientElementsFound,
       alerts: alertElements,
       totalFeatures
     }

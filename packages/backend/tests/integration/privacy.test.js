@@ -18,16 +18,19 @@ const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 const emailService = require('../../src/services/email.service');
 const etherealEmailRetriever = require('../../src/services/etherealEmailRetriever.service');
 
+// Hook timeout: MongoMemoryServer + Ethereal init often exceed Jest's default 5s for beforeAll
+jest.setTimeout(60000);
+
 beforeAll(async () => {
   await setupMongoMemoryServer();
-  
+
   // Initialize email service with Ethereal for testing
   await emailService.initializeEmailTransport();
-});
+}, 60000);
 
 afterAll(async () => {
   await teardownMongoMemoryServer();
-});
+}, 60000);
 
 describe('Privacy API routes', () => {
   let accessToken;

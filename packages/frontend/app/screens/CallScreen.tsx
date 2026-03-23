@@ -111,7 +111,7 @@ export function CallScreen() {
       endTime: callStatusData.data.endTime,
       duration: callStatusData.data.duration,
       status: callStatusData.data.status,
-      clientId: (callStatusData.data as any).client?._id ?? (callStatusData.data as any).patient?._id,
+      clientId: (callStatusData.data as { client?: { _id?: string } }).client?._id,
       callSid: '', // Not available in call status
       lineItemId: null,
       history: '',
@@ -239,7 +239,7 @@ export function CallScreen() {
           <Text style={styles.sectionTitle}>Call Details</Text>
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Patient:</Text>
+            <Text style={styles.infoLabel}>Client:</Text>
             <Text style={styles.infoValue}>{client.name}</Text>
           </View>
           

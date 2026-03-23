@@ -67,7 +67,11 @@ class MessageHandler {
     // Get turn detection settings from config (with defaults)
     const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
     const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
-    const turnDetectionSilenceDuration = config.audio?.turnDetection?.silenceDurationMs ?? 1000;
+    // Require ≥1000ms silence before treating utterance as complete (product + OpenAI VAD floor)
+    const turnDetectionSilenceDuration = Math.max(
+      1000,
+      config.audio?.turnDetection?.silenceDurationMs ?? 1000
+    );
     
     baseConfig.session.audio = {
       input: {

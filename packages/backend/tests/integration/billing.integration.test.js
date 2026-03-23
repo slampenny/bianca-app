@@ -5,7 +5,7 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 const request = require('supertest');
 const app = require('../utils/integration-app');
-const { Org, Patient, Conversation, Invoice, LineItem, Caregiver, Call } = require('../../src/models');
+const { Org, Client, Conversation, Invoice, LineItem, Caregiver, Call } = require('../../src/models');
 const { tokenService } = require('../../src/services');
 
 // Import the actual billing logic to test it
@@ -16,8 +16,8 @@ describe('Billing System Integration Tests', () => {
   let mongoServer;
   let caregiver;
   let org;
-  let patient1;
-  let patient2;
+  let client1;
+  let client2;
   let accessToken;
 
   beforeAll(async () => {
@@ -49,17 +49,17 @@ describe('Billing System Integration Tests', () => {
     const tokens = await tokenService.generateAuthTokens(caregiver);
     accessToken = tokens.access.token;
 
-    // Create test patients
-    patient1 = await Patient.create({
-      name: 'Integration Patient 1',
-      email: 'patient1@integration.com',
+    // Create test clients
+    client1 = await Client.create({
+      name: 'Integration Client 1',
+      email: 'client1@integration.com',
       phone: '+12345678901',
       org: org._id
     });
 
-    patient2 = await Patient.create({
-      name: 'Integration Patient 2',
-      email: 'patient2@integration.com',
+    client2 = await Client.create({
+      name: 'Integration Client 2',
+      email: 'client2@integration.com',
       phone: '+12345678902',
       org: org._id
     });
@@ -89,7 +89,7 @@ describe('Billing System Integration Tests', () => {
       
       const call1 = await Call.create({
         callSid: 'CA11111111111111111111111111111111',
-        clientId: patient1._id,
+        clientId: client1._id,
         duration: 120, // 2 minutes
         cost: 0.20,
         status: 'completed',
@@ -100,7 +100,7 @@ describe('Billing System Integration Tests', () => {
 
       const call2 = await Call.create({
         callSid: 'CA22222222222222222222222222222222',
-        clientId: patient1._id,
+        clientId: client1._id,
         duration: 180, // 3 minutes
         cost: 0.30,
         status: 'completed',
@@ -111,7 +111,7 @@ describe('Billing System Integration Tests', () => {
 
       const call3 = await Call.create({
         callSid: 'CA33333333333333333333333333333333',
-        clientId: patient2._id,
+        clientId: client2._id,
         duration: 90, // 1.5 minutes
         cost: 0.15,
         status: 'completed',
@@ -123,19 +123,19 @@ describe('Billing System Integration Tests', () => {
       // Step 1b: Create conversations linked to calls
       const conversation1 = await Conversation.create({
         callId: call1._id,
-        clientId: patient1._id,
+        clientId: client1._id,
         messages: [],
       });
 
       const conversation2 = await Conversation.create({
         callId: call2._id,
-        clientId: patient1._id,
+        clientId: client1._id,
         messages: [],
       });
 
       const conversation3 = await Conversation.create({
         callId: call3._id,
-        clientId: patient2._id,
+        clientId: client2._id,
         messages: [],
       });
 
@@ -146,7 +146,7 @@ describe('Billing System Integration Tests', () => {
         .expect(200);
 
       expect(unbilledRes.body.totalUnbilledCost).toBe(0.65);
-      expect(unbilledRes.body.patientCosts).toHaveLength(2);
+      expect(unbilledRes.body.clientCosts).toHaveLength(2);
 
       // Step 3: Run daily billing process
       await processDailyBilling();
@@ -165,18 +165,18 @@ describe('Billing System Integration Tests', () => {
 
       // Step 6: Verify line items were created
       const lineItems = await LineItem.find({ invoiceId: invoice._id });
-      expect(lineItems).toHaveLength(2); // One per patient
+      expect(lineItems).toHaveLength(2); // One per client
 
       // Step 7: Verify line items have correct amounts
-      const patient1LineItem = lineItems.find(item => 
-        item.clientId.toString() === patient1._id.toString()
+      const client1LineItem = lineItems.find(item => 
+        item.clientId.toString() === client1._id.toString()
       );
-      expect(patient1LineItem.amount).toBe(0.50); // 0.20 + 0.30
+      expect(client1LineItem.amount).toBe(0.50); // 0.20 + 0.30
 
-      const patient2LineItem = lineItems.find(item => 
-        item.clientId.toString() === patient2._id.toString()
+      const client2LineItem = lineItems.find(item => 
+        item.clientId.toString() === client2._id.toString()
       );
-      expect(patient2LineItem.amount).toBe(0.15);
+      expect(client2LineItem.amount).toBe(0.15);
 
       // Step 8: Verify unbilled costs are now zero
       const finalUnbilledRes = await request(app)
@@ -185,7 +185,7 @@ describe('Billing System Integration Tests', () => {
         .expect(200);
 
       expect(finalUnbilledRes.body.totalUnbilledCost).toBe(0);
-      expect(finalUnbilledRes.body.patientCosts).toHaveLength(0);
+      expect(finalUnbilledRes.body.clientCosts).toHaveLength(0);
 
       // Step 9: Verify invoice is accessible via API
       const invoiceRes = await request(app)
@@ -205,7 +205,7 @@ describe('Billing System Integration Tests', () => {
       await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
-          clientId: patient1._id,
+          clientId: client1._id,
           duration: 120,
           cost: 0.20,
           status: 'completed',
@@ -215,7 +215,7 @@ describe('Billing System Integration Tests', () => {
         },
         {
           callSid: 'CA22222222222222222222222222222222',
-          clientId: patient2._id,
+          clientId: client2._id,
           duration: 90,
           cost: 0.15,
           status: 'completed',
@@ -237,7 +237,7 @@ describe('Billing System Integration Tests', () => {
       await Call.create([
         {
           callSid: 'CA33333333333333333333333333333333',
-          clientId: patient1._id,
+          clientId: client1._id,
           duration: 180,
           cost: 0.30,
           status: 'completed',
@@ -268,7 +268,7 @@ describe('Billing System Integration Tests', () => {
       
       const call1 = await Call.create({
         callSid: 'CA11111111111111111111111111111111',
-        clientId: patient1._id,
+        clientId: client1._id,
         duration: 120,
         cost: 0.20,
         status: 'completed',
@@ -279,7 +279,7 @@ describe('Billing System Integration Tests', () => {
 
       const call2 = await Call.create({
         callSid: 'CA22222222222222222222222222222222',
-        clientId: patient1._id,
+        clientId: client1._id,
         duration: 180,
         cost: 0.30,
         status: 'completed',
@@ -299,7 +299,7 @@ describe('Billing System Integration Tests', () => {
       });
 
       const manualLineItem = await LineItem.create({
-        clientId: patient1._id,
+        clientId: client1._id,
         invoiceId: manualInvoice._id,
         amount: 0.20,
         description: 'Manual billing',
@@ -335,7 +335,7 @@ describe('Billing System Integration Tests', () => {
       await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
-          clientId: patient1._id,
+          clientId: client1._id,
           duration: 120,
           cost: 0.20,
           status: 'completed',
@@ -345,7 +345,7 @@ describe('Billing System Integration Tests', () => {
         },
         {
           callSid: 'CA22222222222222222222222222222222',
-          clientId: patient1._id,
+          clientId: client1._id,
           duration: 0,
           cost: 0, // Zero cost conversation
           status: 'failed',
@@ -355,7 +355,7 @@ describe('Billing System Integration Tests', () => {
         },
         {
           callSid: 'CA33333333333333333333333333333333',
-          clientId: patient2._id,
+          clientId: client2._id,
           duration: 90,
           cost: 0.15,
           status: 'completed',
@@ -385,7 +385,7 @@ describe('Billing System Integration Tests', () => {
       
       await Call.create({
         callSid: 'CA11111111111111111111111111111111',
-        clientId: patient1._id,
+        clientId: client1._id,
         duration: 120,
         cost: 0.20,
         status: 'completed',
@@ -454,7 +454,7 @@ describe('Billing System Integration Tests', () => {
       await Call.create([
         {
           callSid: 'CA11111111111111111111111111111111',
-          clientId: patient1._id,
+          clientId: client1._id,
           duration: 120,
           cost: 0.20,
           status: 'completed',
@@ -464,7 +464,7 @@ describe('Billing System Integration Tests', () => {
         },
         {
           callSid: 'CA22222222222222222222222222222222',
-          clientId: patient2._id,
+          clientId: client2._id,
           duration: 90,
           cost: 0.15,
           status: 'completed',
@@ -498,7 +498,7 @@ describe('Billing System Integration Tests', () => {
       for (let i = 0; i < 50; i++) {
         calls.push({
           callSid: `CA${i.toString().padStart(30, '0')}`,
-          clientId: i % 2 === 0 ? patient1._id : patient2._id,
+          clientId: i % 2 === 0 ? client1._id : client2._id,
           duration: 60 + (i * 2), // Varying durations
           cost: 0.10 + (i * 0.01), // Varying costs
           status: 'completed',

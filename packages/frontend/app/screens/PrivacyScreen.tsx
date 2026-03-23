@@ -37,7 +37,7 @@ Under PIPEDA, you have the right to:
 We collect the following types of personal information:
 
 * **Personal Data:** Your name, email address, phone number, and account credentials
-* **Patient/Recipient Information:** Name and phone number of individuals you call through our service
+* **Client/Recipient Information:** Name and phone number of individuals you call through our service
 * **Call Data:** Recordings, transcriptions, metadata, and wellness information from calls
 * **Derivative Data:** Device information, IP address, and usage patterns
 * **AI Analysis Data:** Results and insights generated from call analysis
@@ -52,7 +52,7 @@ We collect your personal information for the following purposes:
 * To provide wellness check call services
 * To record and transcribe calls (with consent)
 * To analyze calls and provide wellness summaries
-* To enable communication between caregivers and patients
+* To enable communication between caregivers and clients
 * To improve our services and AI models
 * To comply with legal obligations
 
@@ -100,7 +100,7 @@ Your personal information may be transferred to and stored in the United States.
 
 We retain your personal information only as long as necessary for the purposes outlined in this policy, or as required by law:
 
-- **Patient data:** 7 years after last activity
+- **Client data:** 7 years after last activity
 - **Call recordings:** 2 years
 - **Conversations:** 5 years
 - **Medical analysis:** 7 years
@@ -178,7 +178,7 @@ We reserve the right to make changes to this Privacy Policy at any time and for 
 We may collect information about you in a variety of ways. The information we may collect via the App depends on the content and materials you use, and includes:
 
 * **Personal Data:** Personally identifiable information, such as your name, email address, phone number, relationship to the person being called (if applicable), and user account credentials that you voluntarily give to us when you register with the App or when you choose to participate in various activities related to the App. If you are using the App on behalf of an organization (e.g., a retirement home), we may collect information about the organization and your role.
-* **Patient/Recipient Information:** If you use the App to initiate calls to another person (e.g., a family member, a patient, a resident - the "Recipient"), you may provide their name and phone number. **You represent and warrant that you have obtained all necessary consents from the Recipient to provide their information to us and for us to contact them via the App's Services.**
+* **Client/Recipient Information:** If you use the App to initiate calls to another person (e.g., a family member, a client, a resident - the "Recipient"), you may provide their name and phone number. **You represent and warrant that you have obtained all necessary consents from the Recipient to provide their information to us and for us to contact them via the App's Services.**
 * **Call Data and Content:**
     * **Call Recordings:** Phone calls initiated or managed through the App may be recorded. **Appropriate notice and consent for recording will be sought as required by applicable law before recording begins.**
     * **Call Transcriptions:** Audio from recorded calls may be transcribed into text using AI and/or third-party services.
@@ -219,7 +219,7 @@ We may share information we have collected about you in certain situations. Your
 * **Our Responsibility:** The App will provide notice mechanisms (e.g., audible announcements at the start of a call) where feasible and legally required, indicating that a call may be recorded and/or transcribed for wellness check purposes.
 * **Your Responsibility:**
     * **If you are initiating a call to another person (Recipient):** You are responsible for ensuring that the Recipient has consented to the call being recorded and transcribed by our Service *before* the call proceeds with recording/transcription enabled. You represent and warrant that you have obtained all necessary consents required by applicable law.
-    * **If you are an organizational user (e.g., retirement home):** You are responsible for obtaining all necessary consents from your residents/patients and/or their legal representatives, in accordance with applicable laws (including privacy and health information laws) and your own policies, before using the App to call and record/transcribe interactions with them. You agree to indemnify us for any failure to obtain such necessary consents.
+    * **If you are an organizational user (e.g., retirement home):** You are responsible for obtaining all necessary consents from your residents/clients and/or their legal representatives, in accordance with applicable laws (including privacy and health information laws) and your own policies, before using the App to call and record/transcribe interactions with them. You agree to indemnify us for any failure to obtain such necessary consents.
 * **Refusal/Withdrawal:** Participants may have the right to refuse or withdraw consent for recording/transcription according to applicable law.
 
 **5. SECURITY OF YOUR INFORMATION**

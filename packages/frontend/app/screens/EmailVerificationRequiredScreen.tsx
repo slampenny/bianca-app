@@ -211,7 +211,12 @@ export const EmailVerificationRequiredScreen = () => {
         ) : null}
 
         {emailSent && (
-          <Text preset="default" tx="emailVerificationScreen.successMessage" style={styles.successMessage} />
+          <Text
+            preset="default"
+            tx="emailVerificationScreen.successMessage"
+            style={styles.successMessage}
+            testID="email-resend-success-message"
+          />
         )}
 
         <View style={styles.buttonContainer}>

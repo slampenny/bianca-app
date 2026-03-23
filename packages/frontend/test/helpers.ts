@@ -4,8 +4,9 @@ import axios from 'axios';
 import { DEFAULT_API_CONFIG } from '../app/services/api/api';
 
 import { store as appStore } from "../app/store/store"
+import { setAuthTokens, setCurrentUser } from "../app/store/authSlice"
 import { alertApi, authApi, clientApi, orgApi } from "../app/services/api/"
-import { Alert, Org, Caregiver, Client } from "../app/services/api/api.types"
+import { Alert, Org, Caregiver, Client, AuthTokens } from "../app/services/api/api.types"
 
 const buildApiUrl = (path: string) => {
   const base = DEFAULT_API_CONFIG.url.replace(/\/$/, "")
@@ -94,127 +95,182 @@ export function expectError(result: any, status: number, message: string) {
   expect((result.error.data as { message: string }).message).toBe(message);
 }
 
+/**
+ * Login without RTK baseQuery (no Authorization header). Integration tests share a persisted store;
+ * a stale Bearer token can make /auth/login fail with 401 even when email/password are correct.
+ */
+async function loginViaHttpAndHydrateAuth(email: string, password: string): Promise<AuthTokens> {
+  const { status, data } = await axios.post(
+    buildApiUrl("auth/login"),
+    { email, password },
+    {
+      validateStatus: () => true,
+      timeout: 30000,
+      headers: { "Content-Type": "application/json" },
+    },
+  )
+  if (status !== 200 || !data?.tokens) {
+    throw new Error(
+      `loginViaHttp failed: status=${status} body=${JSON.stringify(data)}`,
+    )
+  }
+  if (data.requireMFA) {
+    throw new Error("Login requires MFA — use a test user without MFA for integration helpers")
+  }
+  appStore.dispatch(setAuthTokens(data.tokens))
+  appStore.dispatch(setCurrentUser(data.caregiver))
+  return data.tokens as AuthTokens
+}
+
 export async function registerNewOrgAndCaregiver(name: string, email: string, password: string, phone: string) {
+  // Caregiver model lowercases email; login must use the same string the DB stores.
+  const emailNorm = email.trim().toLowerCase()
+
   const register = authApi.endpoints.register.initiate
-  const returnType = await register({name, email, password, phone})(appStore.dispatch, appStore.getState, {})
+  let returnType = await register({
+    name,
+    email: emailNorm,
+    password,
+    phone: phone.trim(),
+  })(appStore.dispatch, appStore.getState, {})
+
+  // Transient Node/fetch failures under parallel Jest workers — one backoff retry
+  if ("error" in returnType) {
+    const errJson = JSON.stringify(returnType.error)
+    if (errJson.includes("FETCH_ERROR") || errJson.includes("fetch failed") || errJson.includes("Network")) {
+      await new Promise((r) => setTimeout(r, 800))
+      returnType = await register({
+        name,
+        email: emailNorm,
+        password,
+        phone: phone.trim(),
+      })(appStore.dispatch, appStore.getState, {})
+    }
+  }
 
   if ("error" in returnType) {
     throw new Error(`Registration failed with error: ${JSON.stringify(returnType.error)}`)
-  } else {
-    // Register endpoint returns: { message, caregiver, requiresEmailVerification }
-    // It does NOT return org or tokens - need to get org from caregiver.org and login for tokens
-    const caregiver = returnType.data.caregiver as Caregiver
-    const rawOrg = caregiver.org as any
-    const orgId = typeof rawOrg === "string"
-      ? rawOrg
-      : (rawOrg?.id || rawOrg?._id)
-    
-    // If email verification is required, verify it first using the test endpoint
-    if (returnType.data.requiresEmailVerification) {
-      try {
-        // Wait a bit for caregiver to be saved to database
-        await new Promise(resolve => setTimeout(resolve, 200))
-        
-        // Retry getting verification token (caregiver might not be immediately available)
-        let verificationResponse
-        let retries = 3
-        while (retries > 0) {
-          try {
-            // DEFAULT_API_CONFIG.url is "http://localhost:3000/v1", so we need /test/...
-            verificationResponse = await axios.post(`${DEFAULT_API_CONFIG.url}/test/send-verification-email`, { email })
-            break
-          } catch (err: any) {
-            retries--
-            if (retries === 0) {
-              // If test endpoint returns 404, email verification might not be required in test mode
-              // or the test endpoint might not be available - continue without verification
-              if (err.response?.status === 404) {
-                if (!process.env.JEST_WORKER_ID) {
-                  console.log('Email verification test endpoint not available (404) - continuing without verification')
-                }
-                break
+  }
+
+  // Register endpoint returns: { message, caregiver, requiresEmailVerification }
+  const caregiver = returnType.data.caregiver as Caregiver
+  const rawOrg = caregiver.org as any
+  const orgId = typeof rawOrg === "string" ? rawOrg : rawOrg?.id || rawOrg?._id
+
+  // If email verification is required, verify it first using the test endpoint
+  if (returnType.data.requiresEmailVerification) {
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      let verificationResponse
+      let retries = 3
+      while (retries > 0) {
+        try {
+          verificationResponse = await axios.post(`${DEFAULT_API_CONFIG.url}/test/send-verification-email`, {
+            email: emailNorm,
+          })
+          break
+        } catch (err: any) {
+          retries--
+          if (retries === 0) {
+            if (err.response?.status === 404) {
+              if (!process.env.JEST_WORKER_ID) {
+                console.log(
+                  "Email verification test endpoint not available (404) - continuing without verification",
+                )
               }
-              throw err
+              break
             }
-            await new Promise(resolve => setTimeout(resolve, 200))
+            throw err
           }
+          await new Promise((resolve) => setTimeout(resolve, 200))
         }
-        
-        if (verificationResponse) {
-          const verificationLink = verificationResponse.data.details.verificationLinks.frontend
-          const tokenMatch = verificationLink.match(/token=([^&]+)/)
-          
-          if (tokenMatch && tokenMatch[1]) {
-            const verifyToken = tokenMatch[1]
-            // Verify the email (DEFAULT_API_CONFIG.url is "http://localhost:3000/v1")
-            await axios.get(`${DEFAULT_API_CONFIG.url}/auth/verify-email?token=${verifyToken}`)
-          } else if (!process.env.JEST_WORKER_ID) {
-            console.log('Could not extract verification token - continuing without verification')
-          }
+      }
+
+      if (verificationResponse) {
+        const verificationLink = verificationResponse.data.details.verificationLinks.frontend
+        const tokenMatch = verificationLink.match(/token=([^&]+)/)
+
+        if (tokenMatch && tokenMatch[1]) {
+          const verifyToken = tokenMatch[1]
+          await axios.get(`${DEFAULT_API_CONFIG.url}/auth/verify-email?token=${verifyToken}`)
+        } else if (!process.env.JEST_WORKER_ID) {
+          console.log("Could not extract verification token - continuing without verification")
         }
-      } catch (verifyError: any) {
-        // If verification fails (e.g., test endpoint not available), log and continue (silent in test)
-        if (!process.env.JEST_WORKER_ID) {
-          console.log(`Email verification failed (may be acceptable): ${verifyError.message || JSON.stringify(verifyError.response?.data || verifyError)}`)
-        }
-        // Don't throw - allow tests to continue and see if they work without verification
+      }
+    } catch (verifyError: any) {
+      if (!process.env.JEST_WORKER_ID) {
+        console.log(
+          `Email verification failed (may be acceptable): ${verifyError.message || JSON.stringify(verifyError.response?.data || verifyError)}`,
+        )
       }
     }
-    
-    // Brief delay so backend can commit registration before login (reduces flakiness when suite runs in parallel)
-    await new Promise(resolve => setTimeout(resolve, 150))
-    
-    // Login to get tokens (register doesn't return tokens)
-    let loginResult = await authApi.endpoints.login.initiate({ email, password })(
+  }
+
+  // Backoff: DB commit / replication lag when many workers hit the API
+  const delaysMs = [200, 500, 1000, 2000, 3500]
+  let tokens: AuthTokens | null = null
+  let lastRtkError: unknown
+
+  for (let i = 0; i < delaysMs.length; i++) {
+    await new Promise((resolve) => setTimeout(resolve, delaysMs[i]))
+
+    const loginResult = await authApi.endpoints.login.initiate({ email: emailNorm, password })(
       appStore.dispatch,
       appStore.getState,
       {},
     )
-    if (("error" in loginResult || !loginResult.data) && process.env.JEST_WORKER_ID) {
-      await new Promise(resolve => setTimeout(resolve, 400))
-      loginResult = await authApi.endpoints.login.initiate({ email, password })(
-        appStore.dispatch,
-        appStore.getState,
-        {},
-      )
-    }
-    if ("error" in loginResult || !loginResult.data) {
-      throw new Error(`Login after registration failed: ${JSON.stringify(loginResult.error || 'Unknown error')}`)
-    }
-    
-    // Wait a bit for Redux store to update with tokens from the login matcher
-    // RTK Query matchers update the store asynchronously
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    // Verify tokens are in the store
-    const state = appStore.getState()
-    const tokens = (state.auth.tokens || (loginResult.data && 'tokens' in loginResult.data ? loginResult.data.tokens : null))
-    
-    if (!tokens) {
-      throw new Error(`Login succeeded but tokens not found in store: ${JSON.stringify(loginResult.data)}`)
-    }
-    
-    let org: Org
-    if (orgId) {
-      const orgResult = await orgApi.endpoints.getOrg.initiate({ orgId })(
-        appStore.dispatch,
-        appStore.getState,
-        {},
-      )
-      if ("data" in orgResult && orgResult.data) {
-        org = orgResult.data as Org
-      } else {
-        org = { id: orgId } as Org
+
+    if (!("error" in loginResult) && loginResult.data) {
+      if ("requireMFA" in loginResult.data && (loginResult.data as { requireMFA?: boolean }).requireMFA) {
+        throw new Error("Login requires MFA — use a test user without MFA for integration helpers")
       }
-    } else {
-      org = rawOrg as Org
     }
 
-    return {
-      org,
-      caregiver,
-      tokens,
+    if (!("error" in loginResult) && loginResult.data && "tokens" in loginResult.data && loginResult.data.tokens) {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      tokens =
+        appStore.getState().auth.tokens ?? (loginResult.data as { tokens: AuthTokens }).tokens
+      lastRtkError = undefined
+      break
     }
+    lastRtkError = "error" in loginResult ? loginResult.error : undefined
+  }
+
+  if (!tokens) {
+    try {
+      tokens = await loginViaHttpAndHydrateAuth(emailNorm, password)
+    } catch (httpErr) {
+      throw new Error(
+        `Login after registration failed. RTK last error: ${JSON.stringify(lastRtkError)}. HTTP fallback: ${httpErr instanceof Error ? httpErr.message : String(httpErr)}`,
+      )
+    }
+  }
+
+  if (!tokens) {
+    throw new Error("Login after registration failed: no tokens after RTK retries and HTTP fallback")
+  }
+
+  let org: Org
+  if (orgId) {
+    const orgResult = await orgApi.endpoints.getOrg.initiate({ orgId })(
+      appStore.dispatch,
+      appStore.getState,
+      {},
+    )
+    if ("data" in orgResult && orgResult.data) {
+      org = orgResult.data as Org
+    } else {
+      org = { id: orgId } as Org
+    }
+  } else {
+    org = rawOrg as Org
+  }
+
+  return {
+    org,
+    caregiver,
+    tokens,
   }
 }
 
@@ -234,9 +290,4 @@ export async function createClientInOrg(org: Org, _email: string, _password: str
     throw new Error(`Create client failed with error: ${JSON.stringify(result.error)}`)
   }
   return result.data as Client
-}
-
-/** @deprecated Use createClientInOrg */
-export async function createPatientInOrg(org: Org, email: string, password: string) {
-  return createClientInOrg(org, email, password)
 }

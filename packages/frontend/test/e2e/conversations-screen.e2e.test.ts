@@ -1,6 +1,6 @@
 import { test, expect } from './helpers/testHelpers'
 import { AuthWorkflow } from './workflows/auth.workflow'
-import { ClientDetailedWorkflow } from './workflows/patient-detailed.workflow'
+import { ClientDetailedWorkflow } from './workflows/client-detailed.workflow'
 import { TEST_USERS } from './fixtures/testData'
 import { Page } from '@playwright/test'
 
@@ -39,7 +39,7 @@ async function navigateToConversationsScreen(page: Page, clientWorkflow: ClientD
  * Comprehensive test suite for the ConversationsScreen
  * 
  * Tests:
- * 1. Conversations appear when patient is selected
+ * 1. Conversations appear when a client is selected
  * 2. Dropdown arrows are visible
  * 3. Conversations expand/collapse when clicked
  * 4. Messages are displayed when expanded
@@ -50,19 +50,19 @@ test.describe('Conversations Screen', () => {
   test.beforeEach(async ({ page }) => {
     const auth = new AuthWorkflow(page)
     await auth.givenIAmOnTheLoginScreen()
-    await auth.whenIEnterCredentials(TEST_USERS.WITH_PATIENTS.email, TEST_USERS.WITH_PATIENTS.password)
+    await auth.whenIEnterCredentials(TEST_USERS.WITH_CLIENTS.email, TEST_USERS.WITH_CLIENTS.password)
     await auth.whenIClickLoginButton()
     await auth.thenIShouldBeOnHomeScreen()
   })
 
-  test('should display conversations when patient is selected', async ({ page }) => {
+  test('should display conversations when a client is selected', async ({ page }) => {
     const clientWorkflow = new ClientDetailedWorkflow(page)
     
-    // First, select a patient (this sets patient in Redux)
+    // First, select a client (this sets current client in Redux)
     const clientSelected = await clientWorkflow.givenIHaveSelectedAClient()
     expect(clientSelected).toBe(true)
     
-    // Click edit button to open patient details screen
+    // Click edit button to open client details screen
     const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
     const editCount = await editButton.count()
     
@@ -70,17 +70,17 @@ test.describe('Conversations Screen', () => {
       await editButton.click()
       await page.waitForTimeout(2000)
     } else {
-      // Try clicking patient card directly
-      const patientCard = page.locator('[data-testid^="client-card-"]').first()
-      await patientCard.click()
+      // Try clicking client card directly
+      const clientCard = page.locator('[data-testid^="client-card-"]').first()
+      await clientCard.click()
       await page.waitForTimeout(2000)
     }
     
-    // Wait for patient screen/form to load
+    // Wait for client screen/form to load
     await page.waitForSelector('[data-testid="client-name-input"], [data-testid="client-screen"]', { timeout: 10000 })
     await page.waitForTimeout(1000)
     
-    // Look for conversations button on patient screen
+    // Look for conversations button on client screen
     const conversationsButton = page.locator('[data-testid="manage-conversations-button"]')
     const buttonCount = await conversationsButton.count()
     
@@ -97,10 +97,10 @@ test.describe('Conversations Screen', () => {
     } else {
       // Button not found - try using the workflow method or direct navigation
       console.log('Button not found, trying workflow method')
-      const accessed = await clientWorkflow.whenIAccessPatientConversations()
+      const accessed = await clientWorkflow.whenIAccessClientConversations()
       if (!accessed) {
         console.log('Workflow method failed, trying direct navigation')
-        // Last resort: navigate directly (patient should be in Redux)
+        // Last resort: navigate directly (client should be in Redux)
         await page.goto('/MainTabs/Home/Conversations')
         await page.waitForTimeout(3000)
       }
@@ -111,7 +111,7 @@ test.describe('Conversations Screen', () => {
     console.log(`Current URL: ${currentUrl}`)
     
     // Wait for conversations screen to load
-    // It might show error if no patient, or the actual screen
+    // It might show error if no client, or the actual screen
     const conversationsScreen = page.locator('[data-testid="conversations-screen"]')
     const noClientError = page.getByText(/no client selected/i)
     

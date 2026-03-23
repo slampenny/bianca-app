@@ -15,8 +15,8 @@ describe("paymentMethodApi", () => {
 
   beforeEach(async () => {
     store = appStore
-    store.dispatch(paymentMethodApi.util.resetApiState())
-    store.dispatch(orgApi.util.resetApiState())
+    // Like clientApi / alertApi / scheduleApi: register first; reset RTK caches in afterEach only.
+    // Resetting orgApi (or other slices) before registerNewOrgAndCaregiver can interfere with auth/login.
     const testCaregiver = newCaregiver()
     // Create new org and caregiver via helper.
     const response = await registerNewOrgAndCaregiver(
@@ -34,6 +34,7 @@ describe("paymentMethodApi", () => {
     store.dispatch(paymentMethodApi.util.resetApiState())
     store.dispatch(orgApi.util.resetApiState())
     jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   // --- Attach Payment Method Test ---

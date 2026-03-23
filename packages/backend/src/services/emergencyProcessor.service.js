@@ -2,9 +2,11 @@
 
 const { detectEmergency, filterFalsePositives } = require('../utils/emergencyDetector');
 const { localizedEmergencyDetector } = require('./localizedEmergencyDetector.service');
+const emergencyEmbeddingPipeline = require('./emergencyEmbeddingPipeline.service');
 const { getAlertDeduplicator } = require('../utils/alertDeduplicator');
 const { getConversationContextWindow } = require('../utils/conversationContextWindow');
 const { config } = require('../config/emergency.config');
+const appConfig = require('../config/config');
 const { snsService } = require('./sns.service');
 const alertService = require('./alert.service');
 const mongoose = require('mongoose');
@@ -55,7 +57,7 @@ class EmergencyProcessor {
    * @param {number} timestamp - Timestamp of utterance (defaults to now)
    * @returns {Promise<Object>} - Processing result
    */
-  async processUtterance(clientId, text, timestamp = Date.now()) {
+  async processUtterance(clientId, text, timestamp = Date.now(), conversationId = null) {
     try {
       // Validate inputs
       if (!clientId || !text) {
@@ -81,8 +83,47 @@ class EmergencyProcessor {
       const contextWindow = getConversationContextWindow();
       contextWindow.addUtterance(clientId, text, 'user', timestamp);
 
-      // Step 1: Detect emergency patterns using localized detector
-      let emergencyResult = await localizedEmergencyDetector.detectEmergency(text, clientLanguage);
+      // Step 1: Optional embedding + LLM tense pipeline (off in Jest unless FORCE_EMBEDDING_PIPELINE=true)
+      const useEmbeddingPipeline =
+        appConfig.openai?.apiKey &&
+        (process.env.NODE_ENV !== 'test' || process.env.FORCE_EMBEDDING_PIPELINE === 'true');
+
+      let emergencyResult = null;
+      /** When true, embedding + tense pipeline confirmed emergency — skip keyword false-positive filters */
+      let embeddingPipelinePositive = false;
+      if (useEmbeddingPipeline) {
+        try {
+          const pipeline = await emergencyEmbeddingPipeline.evaluateEmergencyEmbedding(text);
+          if (pipeline.evaluated) {
+            if (pipeline.isEmergency) {
+              embeddingPipelinePositive = true;
+              emergencyResult = {
+                isEmergency: true,
+                severity: pipeline.severity,
+                matchedPhrase: pipeline.matchedPhrase,
+                category: pipeline.category,
+                language: clientLanguage,
+              };
+            } else if (pipeline.buckets && pipeline.buckets.length > 0) {
+              emergencyResult = {
+                isEmergency: false,
+                severity: null,
+                matchedPhrase: null,
+                category: null,
+                language: clientLanguage,
+              };
+            }
+            // buckets empty → leave emergencyResult null and fall through to phrase detectors
+          }
+        } catch (pipeErr) {
+          logger.warn(`[Emergency] Embedding pipeline error, falling back: ${pipeErr.message}`);
+        }
+      }
+
+      // Step 1b: Phrase-based localized detector (+ basic fallback) when pipeline did not decide
+      if (!emergencyResult) {
+        emergencyResult = await localizedEmergencyDetector.detectEmergency(text, clientLanguage);
+      }
       
       // CRITICAL FIX: Fallback to basic detector if localized detector has no phrases
       // This ensures emergencies are detected even if database phrases aren't loaded
@@ -106,7 +147,24 @@ class EmergencyProcessor {
           logger.debug(`[Emergency Detection] Basic detector also found no emergency for: "${text.substring(0, 50)}"`);
         }
       }
-      
+
+      // Generic ultra-short "Help me" without other context — avoid false Request-tier alerts (corpus EDGE-003)
+      const strippedForShort = text.replace(/^Client:\s*/i, '').trim();
+      if (
+        emergencyResult.isEmergency &&
+        emergencyResult.category === 'Request' &&
+        /^(help me|i need help)([!.\s]|$)/i.test(strippedForShort) &&
+        strippedForShort.split(/\s+/).filter(Boolean).length <= 3
+      ) {
+        emergencyResult = {
+          isEmergency: false,
+          severity: null,
+          matchedPhrase: null,
+          category: null,
+          language: clientLanguage,
+        };
+      }
+
       if (config.logging.logAllDetections) {
         logger.info(`[Emergency Detection] Processing utterance for emergency detection`, {
           clientId,
@@ -118,8 +176,8 @@ class EmergencyProcessor {
 
       // Step 2: Context-aware false positive filtering
       let falsePositiveResult = { isFalsePositive: false, reason: null };
-      if (config.enableFalsePositiveFilter && emergencyResult.isEmergency) {
-        // First, check basic false positives
+      if (config.enableFalsePositiveFilter && emergencyResult.isEmergency && !embeddingPipelinePositive) {
+        // First, check basic false positives (skipped when embedding pipeline already validated)
         falsePositiveResult = filterFalsePositives(text, emergencyResult);
         
         // If not a basic false positive, check context window for narrative vs present-tense
@@ -194,6 +252,8 @@ class EmergencyProcessor {
       const response = {
         shouldAlert,
         alertData,
+        severity: alertData?.severity ?? null,
+        category: emergencyResult?.category ?? null,
         reason: this.getReason(emergencyResult, falsePositiveResult, deduplicationResult),
         processing: {
           emergencyDetected: emergencyResult.isEmergency,
@@ -213,6 +273,16 @@ class EmergencyProcessor {
           category: alertData?.category,
           processing: response.processing
         });
+      }
+
+      if (shouldAlert) {
+        try {
+          const { writeUrgentFact } = require('./clientMemory.service');
+          const factText = `Emergency/safety signal detected during call: "${text.substring(0, 200)}"`;
+          await writeUrgentFact(clientId, factText, conversationId || null);
+        } catch (memErr) {
+          logger.warn(`[Emergency] Failed to write urgent memory fact: ${memErr.message}`);
+        }
       }
 
       return response;

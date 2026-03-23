@@ -2,6 +2,7 @@
 
 const natural = require('natural');
 const logger = require('../../config/logger');
+const { EmbeddingAnchorService, ABUSE_HIGH_FP_BUCKETS } = require('../embeddingAnchor.service');
 
 /**
  * Abuse and Neglect Detector Service
@@ -516,6 +517,52 @@ class AbuseNeglectDetector {
       temporalPatterns: { hasEscalation: false, trend: 'insufficient_data' },
       flaggedPhrases: []
     };
+  }
+
+  /**
+   * Embedding-based analysis (text-embedding-3-large anchors). Used by corpus tests and production.
+   */
+  async analyze(text, _clientId) {
+    try {
+      const svc = new EmbeddingAnchorService();
+      await svc.initialize();
+      const q = await svc.embedText(text);
+      if (!q) {
+        return { shouldAlert: false, matchedBuckets: [], scores: {}, riskScore: 0, physicalScore: 0, emotionalScore: 0, neglectScore: 0 };
+      }
+      const scores = svc.getBucketScores(q, 'abuseNeglectDetector');
+      const physicalKeys = ['injuries', 'fearOfPerson', 'punishment'];
+      const emotionalKeys = ['emotionalIsolation', 'control', 'threats', 'belittling', 'fearLanguage'];
+      const neglectKeys = ['basicNeeds', 'medicalCare', 'neglectIsolation', 'timeAlone'];
+      const maxOf = (keys) => Math.max(0, ...keys.map((k) => scores[k] || 0));
+      const physicalScore = maxOf(physicalKeys);
+      const emotionalScore = maxOf(emotionalKeys);
+      const neglectScore = maxOf(neglectKeys);
+      const riskScore =
+        physicalScore * this.weights.physicalAbuse +
+        emotionalScore * this.weights.emotionalAbuse +
+        neglectScore * this.weights.neglect;
+
+      const matchedBuckets = Object.keys(scores).filter((b) => {
+        const th = ABUSE_HIGH_FP_BUCKETS[b] != null ? ABUSE_HIGH_FP_BUCKETS[b] : 0.78;
+        return (scores[b] || 0) >= th;
+      });
+
+      const shouldAlert = matchedBuckets.length > 0;
+
+      return {
+        shouldAlert,
+        matchedBuckets,
+        scores,
+        riskScore,
+        physicalScore,
+        emotionalScore,
+        neglectScore,
+      };
+    } catch (e) {
+      logger.error('Error in AbuseNeglectDetector.analyze:', e);
+      return { shouldAlert: false, matchedBuckets: [], scores: {}, riskScore: 0, physicalScore: 0, emotionalScore: 0, neglectScore: 0 };
+    }
   }
 }
 

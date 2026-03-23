@@ -6,7 +6,7 @@ const config = require('../config/config');
 // Import seeders
 const orgsSeeder = require('./seeders/orgs.seeder');
 const caregiversSeeder = require('./seeders/caregivers.seeder');
-const patientsSeeder = require('./seeders/patients.seeder');
+const clientsSeeder = require('./seeders/clients.seeder');
 const conversationsSeeder = require('./seeders/conversations.seeder');
 const schedulesSeeder = require('./seeders/schedules.seeder');
 const alertsSeeder = require('./seeders/alerts.seeder');
@@ -64,13 +64,13 @@ async function seedDatabase() {
       throw new Error('caregiverOne not found in inserted caregivers');
     }
 
-    // Seed patients
-    const patients = await patientsSeeder.seedPatients(caregiverOneRecord);
-    const patient1 = patients[0];
-    const patient2 = patients[1];
+    // Seed clients
+    let clients = await clientsSeeder.seedClients(caregiverOneRecord);
+    const client1 = clients[0];
+    const client2 = clients[1];
 
-    // Create a third patient for fraud/abuse testing
-    const patient3 = new Client({
+    // Create a third client for fraud/abuse testing
+    const client3 = new Client({
       name: 'Margaret Thompson',
       email: 'vulnerable@example.org',
       phone: '1234567892',
@@ -79,28 +79,28 @@ async function seedDatabase() {
       schedules: [],
       isActive: true
     });
-    await patient3.save();
-    caregiverOneRecord.clients.push(patient3._id);
+    await client3.save();
+    caregiverOneRecord.clients.push(client3._id);
     await caregiverOneRecord.save();
-    patients.push(patient3);
+    clients = [...clients, client3];
 
     // Seed conversations
-    const conversations = await conversationsSeeder.seedConversations(patient1);
+    const conversations = await conversationsSeeder.seedConversations(client1);
     
     // Add additional conversation types
-    await conversationsSeeder.addDecliningPatientConversations(patient1._id);
-    await conversationsSeeder.addNormalPatientConversations(patient2._id);
-    await conversationsSeeder.addRecentPatientConversations(patient1._id);
-    await conversationsSeeder.addRecentPatientConversations(patient2._id);
+    await conversationsSeeder.addDecliningPatientConversations(client1._id);
+    await conversationsSeeder.addNormalPatientConversations(client2._id);
+    await conversationsSeeder.addRecentPatientConversations(client1._id);
+    await conversationsSeeder.addRecentPatientConversations(client2._id);
     
-    // Add fraud/abuse pattern conversations for patient3
-    await conversationsSeeder.addFraudAbuseConversations(patient3._id);
+    // Add fraud/abuse pattern conversations for client3
+    await conversationsSeeder.addFraudAbuseConversations(client3._id);
 
     // Seed schedules
-    await schedulesSeeder.seedSchedules(patients);
+    await schedulesSeeder.seedSchedules(clients);
 
     // Seed alerts
-    await alertsSeeder.seedAlerts(caregiverOneRecord, patients, conversations);
+    await alertsSeeder.seedAlerts(caregiverOneRecord, clients, conversations);
 
     // Seed payment methods (with proper test data: one default, one non-default, at least 3 total)
     const paymentMethods = await paymentMethodsSeeder.seedPaymentMethods(org);
@@ -117,27 +117,27 @@ async function seedDatabase() {
     // Add sentiment analysis to conversations
     await sentimentAnalysisSeeder.seedSentimentAnalysis();
 
-    // Run medical analysis on seeded patient data
-    console.log('Running medical analysis on seeded patient data...');
+    // Run medical analysis on seeded client data
+    console.log('Running medical analysis on seeded client data...');
     try {
       const medicalAnalysisScheduler = require('../services/ai/medicalAnalysisScheduler.service');
       
       // Wait a moment for the scheduler to be ready
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Run multiple analyses on patient1 to create trend data
-      console.log('Triggering multiple medical analyses for patient1...');
+      // Run multiple analyses on client1 to create trend data
+      console.log('Triggering multiple medical analyses for client1...');
       for (let i = 0; i < 3; i++) {
-        await medicalAnalysisScheduler.scheduleClientAnalysis(patient1._id.toString(), {
+        await medicalAnalysisScheduler.scheduleClientAnalysis(client1._id.toString(), {
           trigger: 'seeding',
           batchId: `seeding-${Date.now()}-${i}`
         });
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
-      // Also run analysis on patient2 for variety
-      console.log('Triggering medical analysis for patient2...');
-      await medicalAnalysisScheduler.scheduleClientAnalysis(patient2._id.toString(), {
+      // Also run analysis on client2 for variety
+      console.log('Triggering medical analysis for client2...');
+      await medicalAnalysisScheduler.scheduleClientAnalysis(client2._id.toString(), {
         trigger: 'seeding',
         batchId: `seeding-${Date.now()}`
       });
@@ -152,7 +152,7 @@ async function seedDatabase() {
     return { 
       org, 
       caregiver: caregiverOneRecord, 
-      patients: [patient1, patient2, patient3], 
+      clients: [client1, client2, client3], 
       invoice, 
       paymentMethods 
     };

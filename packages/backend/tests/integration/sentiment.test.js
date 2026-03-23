@@ -81,7 +81,7 @@ beforeAll(async () => {
         overallSentiment: 'positive',
         sentimentScore: 0.7,
         confidence: 0.9,
-        patientMood: 'cheerful and optimistic',
+        clientMood: 'cheerful and optimistic',
         keyEmotions: ['happiness', 'satisfaction'],
         concernLevel: 'low',
         satisfactionIndicators: {
@@ -210,7 +210,7 @@ describe('Sentiment Analysis API', () => {
       expect(res.body.sentiment).toHaveProperty('overallSentiment', 'positive');
       expect(res.body.sentiment).toHaveProperty('sentimentScore', 0.7);
       expect(res.body.sentiment).toHaveProperty('confidence', 0.9);
-      expect(res.body.sentiment).toHaveProperty('patientMood', 'cheerful and optimistic');
+      expect(res.body.sentiment).toHaveProperty('clientMood', 'cheerful and optimistic');
       expect(res.body.sentiment).toHaveProperty('keyEmotions');
       expect(res.body.sentiment).toHaveProperty('concernLevel', 'low');
       expect(res.body.sentiment).toHaveProperty('summary');
@@ -279,7 +279,7 @@ describe('Sentiment Analysis API', () => {
               overallSentiment: 'negative',
               sentimentScore: -0.5,
               confidence: 0.8,
-              patientMood: 'frustrated',
+              clientMood: 'frustrated',
               keyEmotions: ['frustration', 'concern'],
               concernLevel: 'medium',
               summary: 'Patient shows negative sentiment',
@@ -351,7 +351,7 @@ describe('Sentiment Analysis API', () => {
       expect(res.body.sentiment).toHaveProperty('overallSentiment', 'negative');
       expect(res.body.sentiment).toHaveProperty('sentimentScore', -0.5);
       expect(res.body.sentiment).toHaveProperty('confidence', 0.8);
-      expect(res.body.sentiment).toHaveProperty('patientMood', 'anxious and concerned');
+      expect(res.body.sentiment).toHaveProperty('clientMood', 'anxious and concerned');
       expect(res.body.sentiment).toHaveProperty('keyEmotions');
       expect(res.body.sentiment).toHaveProperty('concernLevel', 'medium');
       expect(res.body.sentiment).toHaveProperty('summary');

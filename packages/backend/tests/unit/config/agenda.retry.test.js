@@ -58,7 +58,7 @@ jest.mock('../../../src/services/twilioCall.service', () => ({
 
 // Mock other services that agenda.js requires
 jest.mock('../../../src/services', () => ({
-  patientService: {},
+  clientService: {},
   twilioCallService: { initiateCall: jest.fn() },
   alertService: {},
   paymentService: {},

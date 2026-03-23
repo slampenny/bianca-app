@@ -52,7 +52,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
       const messages = [
         {
           id: 'msg1',
-          role: 'patient',
+          role: 'client',
           content: 'Hello, I need help with my medication',
           createdAt: new Date(baseTime + 1000).toISOString(), // T1: 1 second after base
           timestamp: baseTime + 1000
@@ -85,37 +85,37 @@ test.describe('Conversation Message Ordering - Live Call', () => {
     
     // GIVEN: I am logged in
     await auth.givenIAmOnTheLoginScreen()
-    await auth.whenIEnterCredentials(TEST_USERS.WITH_PATIENTS.email, TEST_USERS.WITH_PATIENTS.password)
+    await auth.whenIEnterCredentials(TEST_USERS.WITH_CLIENTS.email, TEST_USERS.WITH_CLIENTS.password)
     await auth.whenIClickLoginButton()
     await auth.thenIShouldBeOnHomeScreen()
 
-    // WHEN: I initiate a call for a patient (using real backend for call initiation, OpenAI mocked)
-    // First check if we have patients - if not, skip the test
-    const patientCards = page.locator('[data-testid="client-card"], [aria-label*="client-card"]')
-    const patientCount = await patientCards.count()
+    // WHEN: I initiate a call for a client (using real backend for call initiation, OpenAI mocked)
+    // First check if we have clients - if not, skip the test
+    const clientCards = page.locator('[data-testid="client-card"], [aria-label*="client-card"]')
+    const clientCount = await clientCards.count()
     
-    if (patientCount === 0) {
-      // Check for "add patient" button or "no patients" message
-      const noPatientsMessage = page.locator('text=/no.*patients|add.*patient/i')
-      const hasNoPatients = await noPatientsMessage.isVisible().catch(() => false)
+    if (clientCount === 0) {
+      // Check for "add client" button or "no clients" message
+      const noClientsMessage = page.locator('text=/no.*clients|add.*client/i')
+      const hasNoClients = await noClientsMessage.isVisible().catch(() => false)
       
-      if (hasNoPatients) {
-        test.skip(true, 'No patients available for this user - cannot test call initiation')
+      if (hasNoClients) {
+        test.skip(true, 'No clients available for this user - cannot test call initiation')
         return
       }
     }
     
-    // Wait for patient cards or edit buttons to appear
+    // Wait for client cards or edit buttons to appear
     const editButton = page.locator('[aria-label*="edit-client-button-"], [data-testid*="edit-client"]').first()
     const hasEditButton = await editButton.isVisible({ timeout: 10000 }).catch(() => false)
     
-    if (!hasEditButton && patientCount > 0) {
-      // Try clicking on a patient card directly
-      await patientCards.first().click()
+    if (!hasEditButton && clientCount > 0) {
+      // Try clicking on a client card directly
+      await clientCards.first().click()
     } else if (hasEditButton) {
       await editButton.click()
     } else {
-      test.skip(true, 'No patients or edit buttons found - cannot test call initiation')
+      test.skip(true, 'No clients or edit buttons found - cannot test call initiation')
       return
     }
     
@@ -194,7 +194,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
       })
       
       const content = text || ''
-      const role = isUserMessage ? 'patient' : 'assistant'
+      const role = isUserMessage ? 'client' : 'assistant'
       
       // Get timestamp if available
       const timeElement = page.locator(`[data-testid="message-time-${i}"]`)
@@ -216,8 +216,8 @@ test.describe('Conversation Message Ordering - Live Call', () => {
       // Or verify by content/role that they appear in the order they were created
       console.log('✅ Messages retrieved from mocked backend:', messages.map(m => ({ role: m.role, index: m.index, content: m.content.substring(0, 30) })))
       
-      // Verify first message is user (patient) and second is assistant (AI)
-      expect(messages[0].role).toBe('patient')
+      // Verify first message is user (client) and second is assistant (AI)
+      expect(messages[0].role).toBe('client')
       expect(messages[1].role).toBe('assistant')
       
       // The mocked backend returns messages in chronological order
@@ -268,7 +268,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
         },
         {
           id: 'msg2',
-          role: 'patient',
+          role: 'client',
           content: 'I need help with my medication schedule',
           createdAt: new Date(baseTime + 5000).toISOString(), // T2: 5 seconds after base (after AI)
           timestamp: baseTime + 5000
@@ -294,37 +294,37 @@ test.describe('Conversation Message Ordering - Live Call', () => {
     
     // GIVEN: I am logged in
     await auth.givenIAmOnTheLoginScreen()
-    await auth.whenIEnterCredentials(TEST_USERS.WITH_PATIENTS.email, TEST_USERS.WITH_PATIENTS.password)
+    await auth.whenIEnterCredentials(TEST_USERS.WITH_CLIENTS.email, TEST_USERS.WITH_CLIENTS.password)
     await auth.whenIClickLoginButton()
     await auth.thenIShouldBeOnHomeScreen()
 
     // WHEN: I initiate a call (using real backend for call initiation, OpenAI mocked)
-    // First check if we have patients - if not, skip the test
-    const patientCards = page.locator('[data-testid="client-card"], [aria-label*="client-card"]')
-    const patientCount = await patientCards.count()
+    // First check if we have clients - if not, skip the test
+    const clientCards = page.locator('[data-testid="client-card"], [aria-label*="client-card"]')
+    const clientCount = await clientCards.count()
     
-    if (patientCount === 0) {
-      // Check for "add patient" button or "no patients" message
-      const noPatientsMessage = page.locator('text=/no.*patients|add.*patient/i')
-      const hasNoPatients = await noPatientsMessage.isVisible().catch(() => false)
+    if (clientCount === 0) {
+      // Check for "add client" button or "no clients" message
+      const noClientsMessage = page.locator('text=/no.*clients|add.*client/i')
+      const hasNoClients = await noClientsMessage.isVisible().catch(() => false)
       
-      if (hasNoPatients) {
-        test.skip(true, 'No patients available for this user - cannot test call initiation')
+      if (hasNoClients) {
+        test.skip(true, 'No clients available for this user - cannot test call initiation')
         return
       }
     }
     
-    // Wait for patient cards or edit buttons to appear
+    // Wait for client cards or edit buttons to appear
     const editButton = page.locator('[aria-label*="edit-client-button-"], [data-testid*="edit-client"]').first()
     const hasEditButton = await editButton.isVisible({ timeout: 10000 }).catch(() => false)
     
-    if (!hasEditButton && patientCount > 0) {
-      // Try clicking on a patient card directly
-      await patientCards.first().click()
+    if (!hasEditButton && clientCount > 0) {
+      // Try clicking on a client card directly
+      await clientCards.first().click()
     } else if (hasEditButton) {
       await editButton.click()
     } else {
-      test.skip(true, 'No patients or edit buttons found - cannot test call initiation')
+      test.skip(true, 'No clients or edit buttons found - cannot test call initiation')
       return
     }
     
@@ -383,7 +383,7 @@ test.describe('Conversation Message Ordering - Live Call', () => {
       })
       
       const content = text || ''
-      const role = isUserMessage ? 'patient' : 'assistant'
+      const role = isUserMessage ? 'client' : 'assistant'
       
       messages.push({
         role: role,
@@ -398,9 +398,9 @@ test.describe('Conversation Message Ordering - Live Call', () => {
     if (messages.length > 1) {
       console.log('✅ Messages retrieved from mocked backend:', messages.map(m => ({ role: m.role, index: m.index, content: m.content.substring(0, 30) })))
       
-      // Verify first message is AI (assistant) and second is user (patient)
+      // Verify first message is AI (assistant) and second is user (client)
       expect(messages[0].role).toBe('assistant')
-      expect(messages[1].role).toBe('patient')
+      expect(messages[1].role).toBe('client')
       
       // The mocked backend returns messages in chronological order
       // This test verifies the frontend displays them correctly

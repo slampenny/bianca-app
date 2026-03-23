@@ -55,11 +55,11 @@ const extractClientId = (client) => {
     logger.error('[Token Service] Extracted ID is not a valid ObjectId:', {
       idString,
       idType: typeof id,
-      patientType: typeof patient,
-      hasId: !!patient.id,
-      has_id: !!patient._id
+      clientType: typeof client,
+      hasId: !!client.id,
+      has_id: !!client._id
     });
-    throw new Error(`Invalid patient ID format: "${idString}" is not a valid ObjectId`);
+    throw new Error(`Invalid client ID format: "${idString}" is not a valid ObjectId`);
   }
   
   return idString;
@@ -353,8 +353,6 @@ module.exports = {
   generateInviteToken,
   generateResetPasswordToken,
   generateVerifyEmailToken,
-  generatePatientConsentToken: generateClientConsentToken,
   generateClientConsentToken,
-  extractPatientId: extractClientId,
   extractClientId,
 };

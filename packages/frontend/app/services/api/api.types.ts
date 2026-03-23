@@ -125,9 +125,6 @@ export interface Client {
   schedules: Schedule[]
 }
 
-/** @deprecated Use Client. Kept for API response compatibility (e.g. login returns patients[]) */
-export type Patient = Client
-
 export interface Interval {
   day?: number
   weeks?: number
@@ -136,14 +133,13 @@ export interface Interval {
 export interface Schedule {
   id?: string | null | undefined
   client?: string | null
-  patient?: string | null // deprecated, use client (API may still send)
   frequency: "daily" | "weekly" | "monthly"
   intervals: Interval[]
   time: string
   isActive: boolean
 }
 
-export type MessageRole = "client" | "patient" | "assistant" | "system" | "debug-user"
+export type MessageRole = "client" | "assistant" | "system" | "debug-user"
 
 export interface Message {
   id?: string
@@ -279,7 +275,6 @@ export interface SentimentAnalysis {
   sentimentScore: number // -1 to 1
   confidence: number // 0 to 1
   clientMood?: string
-  patientMood?: string // deprecated, use clientMood
   keyEmotions?: string[]
   concernLevel?: ConcernLevel
   satisfactionIndicators?: {

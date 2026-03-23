@@ -51,7 +51,7 @@ export interface PrivacyComplaint {
   _id?: string
   id?: string
   complaintType: "PIPEDA" | "HIPAA" | "GENERAL"
-  complainantType: "caregiver" | "patient" | "external"
+  complainantType: "caregiver" | "client" | "external"
   complainantId: string
   subject: string
   description: string

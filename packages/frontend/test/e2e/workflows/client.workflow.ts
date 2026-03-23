@@ -1,15 +1,15 @@
 import { Page, expect } from '@playwright/test'
 
-// Modular patient care workflow components
-export class PatientWorkflow {
+// Modular client care workflow components
+export class ClientWorkflow {
   constructor(private page: Page) {}
 
   // GIVEN steps - Setup conditions
-  async givenIHavePatientsAssigned() {
+  async givenIHaveClientsAssigned() {
     // Wait for home screen to load - use multiple indicators
     try {
-      // Try waiting for Add Patient button (from working navigation helper)
-      await expect(this.page.getByText("Add Patient", { exact: true })).toBeVisible({ timeout: 10000 })
+      // Try waiting for Add Client button (from working navigation helper)
+      await expect(this.page.getByText('Add Client', { exact: true })).toBeVisible({ timeout: 10000 })
     } catch {
       try {
         // Fallback: wait for home header
@@ -19,28 +19,28 @@ export class PatientWorkflow {
         await this.page.waitForTimeout(3000)
       }
     }
-    
-    // Check that we have patients or "no patients" message (use correct selectors)
-    const patientCards = await this.page.locator('[data-testid^="client-card-"]').count()  // Use starts-with selector
-    const noPatients = await this.page.getByTestId('home-no-clients').count()
+
+    // Check that we have clients or "no clients" message (use correct selectors)
+    const clientCards = await this.page.locator('[data-testid^="client-card-"]').count() // Use starts-with selector
+    const noClients = await this.page.getByTestId('home-no-clients').count()
     const noUsersText = await this.page.getByText(/no clients found/i).count()
-    const addPatientButton = await this.page.getByText("Add Patient").count()
-    
-    console.log('Patient workflow elements found:', { patientCards, noPatients, noUsersText, addPatientButton })
-    
+    const addClientButton = await this.page.getByText('Add Client').count()
+
+    console.log('Client workflow elements found:', { clientCards, noClients, noUsersText, addClientButton })
+
     // We should have at least one indicator that we're on the home screen
-    expect(patientCards + noPatients + noUsersText + addPatientButton).toBeGreaterThan(0)
+    expect(clientCards + noClients + noUsersText + addClientButton).toBeGreaterThan(0)
   }
 
-  async givenIHaveAPatientNamed(patientName: string) {
-    // Use the correct selector pattern for patient cards
-    const patientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName })
-    await expect(patientCard).toBeVisible()
-    return { name: patientName }
+  async givenIHaveAClientNamed(clientName: string) {
+    // Use the correct selector pattern for client cards
+    const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+    await expect(clientCard).toBeVisible()
+    return { name: clientName }
   }
 
-  async givenIHaveInitiatedCallToPatient(patientName: string) {
-    await this.whenIClickCallNowForPatient(patientName)
+  async givenIHaveInitiatedCallToClient(clientName: string) {
+    await this.whenIClickCallNowForClient(clientName)
     await this.thenIShouldSeeCallStatusBanner()
   }
 
@@ -55,10 +55,10 @@ export class PatientWorkflow {
     )
   }
 
-  async givenIHaveCompletedCallWithPatient(patientName: string) {
+  async givenIHaveCompletedCallWithClient(clientName: string) {
     // Navigate to conversations to find completed call
     await this.page.getByTestId('conversations-tab').click()
-    const conversation = this.page.getByTestId('conversation-item').filter({ hasText: patientName })
+    const conversation = this.page.getByTestId('conversation-item').filter({ hasText: clientName })
     await expect(conversation).toBeVisible()
   }
 
@@ -67,25 +67,26 @@ export class PatientWorkflow {
   }
 
   // WHEN steps - Actions
-  async whenIClickCallNowForPatient(patientName: string) {
+  async whenIClickCallNowForClient(clientName: string) {
     // COMMENTED OUT: This actually calls real phone numbers!
-    // From debug output, we know the call button pattern is call-now-{patientName}
-    const callButton = this.page.getByTestId(`call-now-${patientName}`)
-    
+    const callButton = this.page.getByTestId(`call-now-${clientName}`)
+
     // Check if call button exists but DON'T click it
     const callButtonCount = await callButton.count()
     if (callButtonCount === 0) {
-      // Try finding call button within the patient card
-      const patientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName })
-      const callButtonInCard = patientCard.locator('[data-testid*="call"]')
+      // Try finding call button within the client card
+      const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+      const callButtonInCard = clientCard.locator('[data-testid*="call"]')
       const callButtonInCardCount = await callButtonInCard.count()
-      console.log(`⚠ Call button for ${patientName} found in card: ${callButtonInCardCount > 0} (NOT clicking to avoid phone calls)`)
+      console.log(
+        `⚠ Call button for ${clientName} found in card: ${callButtonInCardCount > 0} (NOT clicking to avoid phone calls)`
+      )
       // await callButtonInCard.click() // COMMENTED OUT - CALLS REAL PHONE
     } else {
-      console.log(`⚠ Call button for ${patientName} found: ${callButtonCount > 0} (NOT clicking to avoid phone calls)`)
+      console.log(`⚠ Call button for ${clientName} found: ${callButtonCount > 0} (NOT clicking to avoid phone calls)`)
       // await callButton.click() // COMMENTED OUT - CALLS REAL PHONE
     }
-    
+
     // Return whether call button was found (for testing purposes)
     return callButtonCount > 0
   }
@@ -111,12 +112,12 @@ export class PatientWorkflow {
     // await this.page.getByTestId('end-call-button').click()
   }
 
-  async whenIClickPatientCard(patientName: string) {
-    const patientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: patientName })
-    await patientCard.click()
+  async whenIClickClientCard(clientName: string) {
+    const clientCard = this.page.locator('[data-testid^="client-card-"]').filter({ hasText: clientName })
+    await clientCard.click()
   }
 
-  async whenIClickAddPatient() {
+  async whenIClickAddClient() {
     await this.page.getByTestId('add-client-button').click()
   }
 

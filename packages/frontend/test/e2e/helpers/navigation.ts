@@ -86,7 +86,8 @@ export async function navigateToRegister(
 
 export async function navigateToHome(page: Page, user?: { email: string; password: string }) {
   await page.goto("/")
-  const testUser = user || TEST_USERS.WITHOUT_PATIENTS;
+  // Default to seeded staff user (has clients). WITHOUT_CLIENTS (no-clients@example.org) is not in seedDatabase.
+  const testUser = user || TEST_USERS.WITH_CLIENTS;
   await loginUserViaUI(page, testUser.email, testUser.password);
   await isHomeScreen(page)
   
@@ -200,7 +201,7 @@ export async function isHomeScreen(page: Page) {
   }
 }
 
-export async function isPatientScreen(page: Page) {
+export async function isClientScreen(page: Page) {
   console.log("Checking if on Client Screen...")
   // Look for either CREATE CLIENT or UPDATE CLIENT button (or legacy CREATE/UPDATE PATIENT)
   try {
@@ -270,7 +271,7 @@ export async function navigateToSchedules(page: Page) {
     await clientCard.first().click({ timeout: 10000 })
   }
   
-  await isPatientScreen(page)
+  await isClientScreen(page)
   await page.waitForTimeout(1000) // Give time for form to populate
   
   const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"]')
@@ -446,17 +447,17 @@ export async function navigateToReportsTab(page: Page) {
   console.log("Successfully navigated to Reports screen")
 }
 
-export async function navigateToPatientScreen(page: Page, patientName?: string) {
+export async function navigateToClientScreen(page: Page, clientName?: string) {
   console.log("Navigating to Client screen...")
   await isHomeScreen(page)
   
-  if (patientName) {
-    const clientCard = page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]').filter({ hasText: patientName })
+  if (clientName) {
+    const clientCard = page.locator('[data-testid^="client-card-"], [data-testid^="edit-client-button-"]').filter({ hasText: clientName })
     const count = await clientCard.count()
     if (count > 0) {
       await clientCard.first().click({ timeout: 10000 })
     } else {
-      throw new Error(`Client "${patientName}" not found`)
+      throw new Error(`Client "${clientName}" not found`)
     }
   } else {
     const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
@@ -474,7 +475,7 @@ export async function navigateToPatientScreen(page: Page, patientName?: string) 
     }
   }
   
-  await isPatientScreen(page)
+  await isClientScreen(page)
   await page.waitForTimeout(1000) // Give time for form to populate
   console.log("Successfully navigated to Client screen")
 }

@@ -5,7 +5,7 @@ const request = require('supertest');
 const httpStatus = require('http-status');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Alert, Org, Caregiver, Patient } = require('../../src/models');
+const { Alert, Org, Caregiver, Client } = require('../../src/models');
 const { caregiverOne, insertCaregiversAndAddToOrg, admin } = require('../fixtures/caregiver.fixture');
 const { alertOne, alertTwo, insertAlerts } = require('../fixtures/alert.fixture');
 const { tokenService } = require('../../src/services');
@@ -42,7 +42,7 @@ describe('Alert routes', () => {
   afterEach(async () => {
     await Alert.deleteMany();
     await Caregiver.deleteMany();
-    await Patient.deleteMany();
+    await Client.deleteMany();
     await Org.deleteMany();
   });
 

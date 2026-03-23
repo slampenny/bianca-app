@@ -35,7 +35,7 @@
 		"HIGH": "⚠️ ВЫСОКИЙ ПРИОРИТЕТ: %s - %s: %s",
 		"MEDIUM": "📢 ПРЕДУПРЕЖДЕНИЕ: %s - %s: %s"
 	},
-	"patientConsentEmail": {
+	"clientConsentEmail": {
 		"subject": "Bianca Wellness - Требуется согласие на запись звонков",
 		"title": "Требуется согласие на запись звонков",
 		"greeting": "Уважаемый/ая %s,",

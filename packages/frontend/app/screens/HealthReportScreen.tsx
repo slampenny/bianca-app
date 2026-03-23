@@ -99,7 +99,7 @@ export function HealthReportScreen() {
           <Ionicons name="heart" size={32} color={colors.palette.biancaError} />
           <Text style={styles.headerTitle}>Mental Health Report</Text>
         </View>
-        <Text style={styles.headerSubtitle}>Patient wellness tracking over time</Text>
+        <Text style={styles.headerSubtitle}>Client wellness tracking over time</Text>
       </View>
 
       {/* Metric Selector */}

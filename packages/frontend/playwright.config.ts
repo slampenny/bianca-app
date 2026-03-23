@@ -38,7 +38,7 @@ export default defineConfig({
     },
   }),
   // Note: Backend (port 3000) must still be running separately
-  // Start it with `cd packages/backend && yarn dev` before running tests
+  // (`cd packages/backend && yarn dev`). globalSetup POSTs /v1/test/seed so E2E users exist.
   //
   // For active development with code changes:
   //   1. Start backend: cd packages/backend && yarn dev

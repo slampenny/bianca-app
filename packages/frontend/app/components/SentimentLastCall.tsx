@@ -143,11 +143,11 @@ export function SentimentLastCall({ lastCall, style }: SentimentLastCallProps) {
         </View>
       )}
 
-      {/* Patient Mood */}
-      {sentiment.patientMood && (
+      {/* Client mood */}
+      {sentiment.clientMood && (
         <View style={styles.moodCard}>
           <Text style={styles.cardTitle}>{translate("sentimentAnalysis.clientMoodAssessment")}</Text>
-          <Text style={styles.moodText}>{sentiment.patientMood}</Text>
+          <Text style={styles.moodText}>{sentiment.clientMood}</Text>
         </View>
       )}
 

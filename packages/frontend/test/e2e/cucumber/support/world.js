@@ -14,6 +14,8 @@ class PlaywrightWorld {
     this.attach = attach;
     this.parameters = parameters;
     this.browser = null;
+    /** If false, browser is shared (BeforeAll); do not close in cleanup(). */
+    this._ownsBrowser = true;
     this.context = null;
     this.page = null;
     // Use centralized port configuration from cucumber.config.js worldParameters
@@ -23,13 +25,19 @@ class PlaywrightWorld {
     this.apiURL = parameters.apiURL || process.env.API_URL || 'http://localhost:3000';
   }
 
-  async init() {
-    // Launch browser if not already launched
-    if (!this.browser) {
-      this.browser = await chromium.launch({
-        headless: !process.env.HEADED,
-        slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO) : 0,
-      });
+  async init(sharedBrowserFromHook = null) {
+    if (sharedBrowserFromHook) {
+      this._ownsBrowser = false;
+      this.browser = sharedBrowserFromHook;
+    } else {
+      this._ownsBrowser = true;
+      if (!this.browser) {
+        this.browser = await chromium.launch({
+          headless: !process.env.HEADED,
+          slowMo: process.env.SLOW_MO ? parseInt(process.env.SLOW_MO, 10) : 0,
+          timeout: 60000,
+        });
+      }
     }
 
     // Create context
@@ -93,15 +101,18 @@ class PlaywrightWorld {
       this.context = null;
     }
     
-    try {
-      if (this.browser) {
-        await this.browser.close().catch(() => {
-          // Browser might already be closed, that's okay
-        });
+    if (this._ownsBrowser) {
+      try {
+        if (this.browser) {
+          await this.browser.close().catch(() => {
+            // Browser might already be closed, that's okay
+          });
+          this.browser = null;
+        }
+      } catch (e) {
         this.browser = null;
       }
-    } catch (e) {
-      // Browser might already be closed
+    } else {
       this.browser = null;
     }
   }

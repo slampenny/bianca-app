@@ -10,12 +10,12 @@ async function loginIfNeeded(page: any) {
   // Check if we're already logged in by looking for home header or tabs
   const homeHeader = page.locator('[data-testid="home-header"], [aria-label="home-header"]')
   const tabHome = page.locator('[data-testid="tab-home"], [aria-label="Home tab"]')
-  const addPatient = page.getByText("Add Patient", { exact: true })
+  const addClientButton = page.getByText("Add Client", { exact: true })
   
   const isLoggedIn = await Promise.race([
     homeHeader.isVisible({ timeout: 3000 }).catch(() => false),
     tabHome.isVisible({ timeout: 3000 }).catch(() => false),
-    addPatient.isVisible({ timeout: 3000 }).catch(() => false)
+    addClientButton.isVisible({ timeout: 3000 }).catch(() => false)
   ])
   
   if (!isLoggedIn) {
@@ -90,7 +90,7 @@ test.describe('All Screens Crash Check', () => {
     console.log('✅ AlertScreen loaded without crashes')
   })
 
-  test('PatientScreen should load without crashing', async ({ page }) => {
+  test('ClientScreen should load without crashing', async ({ page }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     
@@ -108,7 +108,7 @@ test.describe('All Screens Crash Check', () => {
     await page.waitForTimeout(2000)
     
     expect(errors.length).toBe(0)
-    console.log('✅ PatientScreen loaded without crashes')
+    console.log('✅ ClientScreen loaded without crashes')
   })
 
   test('ProfileScreen should load without crashing', async ({ page }) => {
@@ -146,28 +146,28 @@ test.describe('All Screens Crash Check', () => {
     
     // Try to click first client card or edit button if available
     const editButton = page.locator('[data-testid^="edit-client-button-"]').first()
-    const patientCard = page.locator('[data-testid^="client-card-"]').first()
+    const clientCard = page.locator('[data-testid^="client-card-"]').first()
     
-    let navigatedToPatient = false
+    let navigatedToClient = false
     if (await editButton.count() > 0) {
       try {
         await editButton.click({ timeout: 10000, force: true })
-        navigatedToPatient = true
+        navigatedToClient = true
       } catch {
         // Try client card as fallback
       }
     }
     
-    if (!navigatedToPatient && await patientCard.count() > 0) {
+    if (!navigatedToClient && await clientCard.count() > 0) {
       try {
-        await patientCard.click({ timeout: 10000, force: true })
-        navigatedToPatient = true
+        await clientCard.click({ timeout: 10000, force: true })
+        navigatedToClient = true
       } catch {
         // If we can't navigate, that's okay - test will still pass if no errors
       }
     }
     
-    if (navigatedToPatient) {
+    if (navigatedToClient) {
       await page.waitForTimeout(2000)
       // Look for the "Manage Schedules" button on client screen
       const manageSchedulesButton = page.locator('[data-testid="manage-schedules-button"], [aria-label*="manage-schedules"]')

@@ -70,7 +70,7 @@ const createCaregiver = catchAsync(async (req, res) => {
 });
 
 const updateCaregiver = catchAsync(async (req, res) => {
-  const { org, patients, ...caregiverData } = req.body;
+  const { org, clients, ...caregiverData } = req.body;
   const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
   // Check if trying to access another caregiver's resource
   const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
@@ -135,57 +135,21 @@ const updateThemePreference = catchAsync(async (req, res) => {
   res.send(CaregiverDTO(caregiver));
 });
 
-const addPatient = catchAsync(async (req, res) => {
-  const { caregiverId, clientId } = req.params;
-  const updatedCaregiver = await caregiverService.addPatient(caregiverId, clientId);
-  res.status(httpStatus.OK).send(updatedCaregiver);
-});
-
 const addClient = catchAsync(async (req, res) => {
   const { caregiverId, clientId } = req.params;
-  const updatedCaregiver = await caregiverService.addPatient(caregiverId, clientId);
-  res.status(httpStatus.OK).send(updatedCaregiver);
-});
-
-const removePatient = catchAsync(async (req, res) => {
-  const { caregiverId, clientId } = req.params;
-  const updatedCaregiver = await caregiverService.removePatient(caregiverId, clientId);
-  res.status(httpStatus.OK).send(updatedCaregiver);
+  const updatedClient = await caregiverService.addClient(caregiverId, clientId);
+  res.status(httpStatus.OK).send(updatedClient);
 });
 
 const removeClient = catchAsync(async (req, res) => {
   const { caregiverId, clientId } = req.params;
-  const updatedCaregiver = await caregiverService.removePatient(caregiverId, clientId);
+  const updatedCaregiver = await caregiverService.removeClient(caregiverId, clientId);
   res.status(httpStatus.OK).send(updatedCaregiver);
-});
-
-const updatePatient = catchAsync(async (req, res) => {
-  const { clientId } = req.params;
-  const updatedCaregiver = await caregiverService.removePatient(req.caregiver, clientId);
-  res.status(httpStatus.OK).send(updatedCaregiver);
-});
-
-const deletePatient = catchAsync(async (req, res) => {
-  const { clientId } = req.params;
-  const updatedCaregiver = await caregiverService.deletePatient(req.caregiver, clientId);
-  res.status(httpStatus.OK).send(updatedCaregiver);
-});
-
-const getPatient = catchAsync(async (req, res) => {
-  const { clientId } = req.params;
-  const patients = await caregiverService.getPatient(req.caregiver, clientId);
-  res.status(httpStatus.OK).send(patients);
-});
-
-const getPatients = catchAsync(async (req, res) => {
-  const { caregiverId } = req.params;
-  const patients = await caregiverService.getPatients(caregiverId);
-  res.status(httpStatus.OK).send(patients);
 });
 
 const getClients = catchAsync(async (req, res) => {
   const { caregiverId } = req.params;
-  const clients = await caregiverService.getPatients(caregiverId);
+  const clients = await caregiverService.getClients(caregiverId);
   res.status(httpStatus.OK).send(clients);
 });
 
@@ -197,13 +161,7 @@ module.exports = {
   uploadCaregiverAvatar,
   deleteCaregiver,
   updateThemePreference,
-  addPatient,
   addClient,
-  removePatient,
   removeClient,
-  updatePatient,
-  deletePatient,
-  getPatient,
-  getPatients,
   getClients,
 };

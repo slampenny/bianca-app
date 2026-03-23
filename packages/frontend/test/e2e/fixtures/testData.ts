@@ -1,12 +1,13 @@
 // Test user data for E2E tests
 export const TEST_USERS = {
-  WITH_PATIENTS: {
+  WITH_CLIENTS: {
     name: "Test User",
     email: "fake@example.org",
     password: "Password1",
   },
-  WITHOUT_PATIENTS: {
-    name: "Test User No Patients",
+  /** Not created by default seedDatabase — only use if you add this user in a test or custom seed. */
+  WITHOUT_CLIENTS: {
+    name: "Test User No Clients",
     email: "no-clients@example.org",
     password: "Password1",
   },
@@ -41,7 +42,7 @@ export const TEST_USERS = {
 } as const;
 
 // Test client data
-export const TEST_PATIENTS = {
+export const TEST_CLIENTS = {
   AGNES: {
     name: "Agnes Alphabet",
     email: "agnes@example.org",
@@ -92,11 +93,11 @@ export function generateAlertData() {
   };
 }
 
-// Patient creation test data
-export function generatePatientData() {
+// Client creation test data
+export function generateClientData() {
   const timestamp = Date.now();
   return {
-    name: `Test Patient ${timestamp}`,
+    name: `Test Client ${timestamp}`,
     email: `test-client-${timestamp}@example.com`,
     phone: "1234567890",
   };

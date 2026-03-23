@@ -360,11 +360,9 @@ export function OrgScreen() {
           </View>
         </View>
 
-        {/* Patient Consent Settings Section */}
+        {/* Client consent settings */}
         <View style={styles.callRetrySection}>
-          <Text style={styles.sectionTitle} preset="formLabel">
-            Patient Consent Settings
-          </Text>
+          <Text style={styles.sectionTitle} preset="formLabel" tx="orgScreen.clientConsentSettings" />
           
           <Toggle
             variant="switch"

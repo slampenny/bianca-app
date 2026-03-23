@@ -1,3 +1,6 @@
+// Integration tests (app/services/api/__tests__) hit a real API; default 5s hook timeout is too low.
+jest.setTimeout(60000)
+
 // we always make sure 'react-native' gets included first
 import * as ReactNative from "react-native"
 import en from "../app/i18n/en"

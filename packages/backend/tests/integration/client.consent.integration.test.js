@@ -22,7 +22,7 @@ afterAll(async () => {
   await teardownMongoMemoryServer();
 });
 
-describe('Patient Consent Routes', () => {
+describe('Client consent routes', () => {
   afterEach(async () => {
     await Org.deleteMany();
     await Client.deleteMany();

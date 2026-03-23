@@ -123,7 +123,8 @@ const envVarsSchema = Joi.object({
   OPENAI_REALTIME_MODEL: Joi.string().optional(),
   OPENAI_REALTIME_VOICE: Joi.string().default('alloy'),
   OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
-  OPENAI_IDLE_TIMEOUT: Joi.number().default(300000),
+  // 0 = no idle disconnect (calls run until hangup). Set ms to re-enable (e.g. 300000).
+  OPENAI_IDLE_TIMEOUT: Joi.number().default(0),
   OPENAI_MODEL: Joi.string().default('gpt-4o-2025-01-12'),
   // Transcription model: 'gpt-4o-mini-transcribe' (latest, faster) or 'gpt-4o-transcribe' (higher accuracy) or 'whisper-1' (legacy)
   OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().default('gpt-4o-mini-transcribe'),
@@ -206,7 +207,12 @@ const baselineConfig = {
     turnDetection: {
       threshold: parseFloat(process.env.AUDIO_TURN_DETECTION_THRESHOLD) || 0.6, // Default: 0.6 (higher = more selective, ignores quiet background)
       prefixPaddingMs: parseInt(process.env.AUDIO_TURN_DETECTION_PREFIX_PADDING_MS) || 200, // Default: 200ms (captures speech start)
-      silenceDurationMs: parseInt(process.env.AUDIO_TURN_DETECTION_SILENCE_DURATION_MS) || 1000, // Default: 1000ms (delay before Bianca answers, increased from 500ms)
+      // OpenAI server_vad: min 1000ms silence before end-of-speech (env cannot set below 1000)
+      silenceDurationMs: (() => {
+        const raw = parseInt(process.env.AUDIO_TURN_DETECTION_SILENCE_DURATION_MS, 10);
+        const base = Number.isFinite(raw) && raw > 0 ? raw : 1000;
+        return Math.max(1000, base);
+      })(),
     },
   },
   google: {

@@ -1,4 +1,4 @@
-// Language options for patient preferences
+// Language options for client preferences
 export interface LanguageOption {
   code: string
   label: string

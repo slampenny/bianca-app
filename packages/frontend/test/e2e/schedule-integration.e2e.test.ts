@@ -5,7 +5,7 @@ import { TEST_USERS } from './fixtures/testData'
 
 test.describe("Schedule Integration Workflow", () => {
   test.beforeEach(async ({ page }) => {
-    await navigateToHome(page, TEST_USERS.WITH_PATIENTS)
+    await navigateToHome(page, TEST_USERS.WITH_CLIENTS)
   })
 
   test("can access schedule functionality from home screen", async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe("Schedule Integration Workflow", () => {
     console.log('✅ Schedule access verified - Manage Schedules button found on client screen')
   })
 
-  test("can navigate to schedules via patient management", async ({ page }) => {
+  test("can navigate to schedules via client management", async ({ page }) => {
     // GIVEN: I'm on the home screen
     await expect(page.locator('[data-testid="home-header"], [aria-label="home-header"]')).toBeVisible({ timeout: 10000 })
     

@@ -40,7 +40,7 @@ test.describe('Login Modal Error Display', () => {
     
     // GIVEN: I log in successfully to get into the app
     await auth.givenIAmOnTheLoginScreen()
-    await auth.whenIEnterCredentials(TEST_USERS.WITH_PATIENTS.email, TEST_USERS.WITH_PATIENTS.password)
+    await auth.whenIEnterCredentials(TEST_USERS.WITH_CLIENTS.email, TEST_USERS.WITH_CLIENTS.password)
     await auth.whenIClickLoginButton()
     await auth.thenIShouldBeOnHomeScreen()
     

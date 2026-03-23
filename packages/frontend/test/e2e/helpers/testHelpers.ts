@@ -3,6 +3,7 @@ import { test as base, expect, Page } from '@playwright/test'
 export { expect }
 import { asyncStorageMockScript } from './asyncStorageMock'
 import { goThroughOnboardingToRegister } from './navigation'
+import { TEST_USERS } from '../fixtures/testData'
 
 export async function registerUserViaUI(page: Page, name: string, email: string, password: string, phone: string): Promise<void> {
   // Ensure we're on login screen first
@@ -306,6 +307,33 @@ export async function loginUserViaUI(page: Page, email: string, password: string
   }
 }
 
+/**
+ * Log in via UI only if the login form is shown. Skips when already on home (session restored).
+ * Defaults match /v1/test/seed caregivers (fake@example.org + Password1).
+ */
+export async function loginIfNeeded(
+  page: Page,
+  email: string = TEST_USERS.WITH_CLIENTS.email,
+  password: string = TEST_USERS.WITH_CLIENTS.password
+): Promise<void> {
+  await page.waitForLoadState('domcontentloaded')
+  await page.waitForTimeout(300)
+
+  const url = page.url()
+  if (url.includes('MainTabs/Home') || url.includes('/Home')) {
+    const onHome =
+      (await page.locator('[data-testid="tab-home"]').isVisible({ timeout: 2000 }).catch(() => false)) ||
+      (await page.locator('[data-testid="home-header"]').isVisible({ timeout: 2000 }).catch(() => false)) ||
+      (await page.locator('[data-testid="add-client-button"]').isVisible({ timeout: 2000 }).catch(() => false))
+    if (onHome) return
+  }
+
+  const emailInput = page.locator('input[data-testid="email-input"]')
+  if (await emailInput.isVisible({ timeout: 8000 }).catch(() => false)) {
+    await loginUserViaUI(page, email, password)
+  }
+}
+
 export async function createClientViaUI(page: Page, name: string, email: string, phone: string): Promise<void> {
   console.log(`Creating client: ${name} (${email})`)
   
@@ -430,11 +458,6 @@ export async function createClientViaUI(page: Page, name: string, email: string,
     
     throw error
   }
-}
-
-/** @deprecated Use createClientViaUI */
-export async function createPatientViaUI(page: Page, name: string, email: string, phone: string): Promise<void> {
-  return createClientViaUI(page, name, email, phone)
 }
 
 export async function goToOrgTab(page: Page): Promise<void> {
@@ -635,6 +658,91 @@ export async function getClientCount(page: Page): Promise<number> {
   return await clientCards.count()
 }
 
+/**
+ * JWT access token for API calls. Prefers Redux (__REDUX_STORE__) and persist:root;
+ * localStorage `authToken` is not used by the app.
+ */
+export async function getAuthAccessTokenFromPage(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    try {
+      const store = (window as any).__REDUX_STORE__
+      if (store) {
+        const t = store.getState()?.auth?.tokens?.access?.token
+        if (t) return t
+      }
+      const raw = localStorage.getItem('persist:root')
+      if (raw) {
+        const parsed = JSON.parse(raw) as { auth?: string }
+        const auth = JSON.parse(parsed.auth || '{}') as { tokens?: { access?: { token?: string } } }
+        if (auth.tokens?.access?.token) return auth.tokens.access.token
+      }
+    } catch {
+      /* ignore */
+    }
+    return localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
+  })
+}
+
+/** Current org id from Redux (after org screen / login loads org). */
+export async function getOrgIdFromPage(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    try {
+      const store = (window as any).__REDUX_STORE__
+      const id = store?.getState()?.org?.org?.id
+      if (id) return String(id)
+      const raw = localStorage.getItem('persist:root')
+      if (raw) {
+        const parsed = JSON.parse(raw) as { org?: string }
+        const org = JSON.parse(parsed.org || '{}') as { org?: { id?: string } }
+        if (org.org?.id) return String(org.org.id)
+      }
+    } catch {
+      /* ignore */
+    }
+    return null
+  })
+}
+
+/** Decode JWT payload (access token) in Node — Playwright tests run in Node, not in the browser. */
+function decodeJwtPayload(token: string): { sub?: string } | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length < 2) return null
+    const segment = parts[1]
+    const b64 = segment.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.length % 4
+    const padded = pad ? b64 + '='.repeat(4 - pad) : b64
+    const json = Buffer.from(padded, 'base64').toString('utf8')
+    return JSON.parse(json) as { sub?: string }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Org id for the logged-in caregiver from GET /caregivers/:id (source of truth).
+ * Prefer this over Redux for E2E API calls: persisted UI state can point at the wrong org,
+ * and org-screen Save can race with PATCH requireClientConsent.
+ */
+export async function getCaregiverOrgIdFromApi(page: Page, apiBaseUrl: string): Promise<string | null> {
+  const token = await getAuthAccessTokenFromPage(page)
+  if (!token) return null
+  const payload = decodeJwtPayload(token)
+  const caregiverId = payload?.sub
+  if (!caregiverId) return null
+  const base = apiBaseUrl.replace(/\/$/, '')
+  const res = await page.request.get(`${base}/caregivers/${caregiverId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok()) return null
+  try {
+    const cg = (await res.json()) as { org?: string }
+    return cg.org != null && cg.org !== '' ? String(cg.org) : null
+  } catch {
+    return null
+  }
+}
+
 
 export async function navigateToPrivacyRequestScreen(page: Page): Promise<void> {
   // Navigate directly via URL (fastest method)
@@ -644,11 +752,6 @@ export async function navigateToPrivacyRequestScreen(page: Page): Promise<void> 
 
 export async function waitForClientListToLoad(page: Page): Promise<void> {
   await page.waitForSelector('[data-testid="client-list"]', { timeout: 10000 })
-}
-
-/** @deprecated Use waitForClientListToLoad */
-export async function waitForPatientListToLoad(page: Page): Promise<void> {
-  return waitForClientListToLoad(page)
 }
 
 // Custom test fixture that navigates to the root URL before each test

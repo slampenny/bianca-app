@@ -104,10 +104,16 @@ Then('I should see a message about checking my email', async function() {
 // Removed duplicate to avoid ambiguity
 
 Then('I should see a confirmation that email was sent', async function() {
-  const confirmation = this.page.getByText(/email sent|verification email sent/i).first();
-  await confirmation.waitFor({ state: 'visible', timeout: 10000 });
-  const count = await confirmation.count();
-  expect(count).toBeGreaterThan(0);
+  // Wait for API (RTK) — UI only sets emailSent after unwrap() succeeds
+  await this.page.waitForResponse(
+    (r) =>
+      r.url().includes('resend-verification-email') &&
+      (r.status() === 200 || r.status() === 201 || r.status() === 204),
+    { timeout: 20000 }
+  ).catch(() => null);
+
+  // Only match the resend banner — the static intro copy ("We've sent a verification…") also matches broad text regexes and breaks strict mode.
+  await expect(this.page.getByTestId('email-resend-success-message')).toBeVisible({ timeout: 15000 });
 });
 
 Given('I have received a verification email', async function() {

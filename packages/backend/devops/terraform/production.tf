@@ -310,7 +310,8 @@ resource "aws_launch_template" "production_green" {
   }
 }
 
-# Elastic IP for production instance (prevents IP changes on restart)
+# Elastic IP for production (stable public IP for SIP/DNS/Twilio). See STABLE_EXTERNAL_ADDRESSING.md
+# Blue/green: same allocation is re-associated to the live instance in buildspec-swap-and-terminate.yml.
 resource "aws_eip" "production" {
   domain = "vpc"
   tags = {

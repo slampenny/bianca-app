@@ -1,13 +1,12 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { Org, Client, Token } = require('../../../src/models');
-const patientService = require('../../../src/services/patient.service');
+const clientService = require('../../../src/services/client.service');
 const tokenService = require('../../../src/services/token.service');
 const emailService = require('../../../src/services/email.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 const { clientOne } = require('../../fixtures/client.fixture');
 const { tokenTypes } = require('../../../src/config/tokens');
-const httpStatus = require('http-status');
 const ApiError = require('../../../src/utils/ApiError');
 
 let mongoServer;
@@ -15,7 +14,7 @@ let mongoServer;
 beforeAll(async () => {
   mongoServer = new MongoMemoryServer();
   await mongoServer.start();
-  const mongoUri = mongoServer.getUri();
+  const mongoUri = await mongoServer.getUri();
   await mongoose.connect(mongoUri, {});
 });
 
@@ -24,7 +23,7 @@ afterAll(async () => {
   await mongoServer.stop();
 });
 
-describe('patientService - Consent Functionality', () => {
+describe('clientService - consent', () => {
   afterEach(async () => {
     await Org.deleteMany();
     await Client.deleteMany();
@@ -32,15 +31,14 @@ describe('patientService - Consent Functionality', () => {
   });
 
   describe('sendConsentEmailIfRequired', () => {
-    it('should send consent email when org requires patient consent and patient has not consented', async () => {
+    it('should send consent email when org requires client consent and client has not consented', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
-      // Mock email service
-      const sendEmailSpy = jest.spyOn(emailService, 'sendPatientConsentRequestEmail').mockResolvedValue();
+      const sendEmailSpy = jest.spyOn(emailService, 'sendClientConsentRequestEmail').mockResolvedValue();
 
-      await patientService.sendConsentEmailIfRequired(client);
+      await clientService.sendConsentEmailIfRequired(client);
 
       expect(sendEmailSpy).toHaveBeenCalledTimes(1);
       expect(sendEmailSpy).toHaveBeenCalledWith(
@@ -52,7 +50,6 @@ describe('patientService - Consent Functionality', () => {
         '1.0'
       );
 
-      // Verify token was created
       const token = await Token.findOne({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
       expect(token).toBeTruthy();
       expect(token.expires).toBeTruthy();
@@ -60,28 +57,28 @@ describe('patientService - Consent Functionality', () => {
       sendEmailSpy.mockRestore();
     });
 
-    it('should not send consent email when org does not require patient consent', async () => {
+    it('should not send consent email when org does not require client consent', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: false }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
-      const sendEmailSpy = jest.spyOn(emailService, 'sendPatientConsentRequestEmail').mockResolvedValue();
+      const sendEmailSpy = jest.spyOn(emailService, 'sendClientConsentRequestEmail').mockResolvedValue();
 
-      await patientService.sendConsentEmailIfRequired(client);
+      await clientService.sendConsentEmailIfRequired(client);
 
       expect(sendEmailSpy).not.toHaveBeenCalled();
 
       sendEmailSpy.mockRestore();
     });
 
-    it('should not send consent email when patient has already consented', async () => {
+    it('should not send consent email when client has already consented', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: true };
       const client = await Client.create(clientData);
 
-      const sendEmailSpy = jest.spyOn(emailService, 'sendPatientConsentRequestEmail').mockResolvedValue();
+      const sendEmailSpy = jest.spyOn(emailService, 'sendClientConsentRequestEmail').mockResolvedValue();
 
-      await patientService.sendConsentEmailIfRequired(client);
+      await clientService.sendConsentEmailIfRequired(client);
 
       expect(sendEmailSpy).not.toHaveBeenCalled();
 
@@ -93,105 +90,97 @@ describe('patientService - Consent Functionality', () => {
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
-      const sendEmailSpy = jest.spyOn(emailService, 'sendPatientConsentRequestEmail').mockRejectedValue(new Error('Email service error'));
+      const sendEmailSpy = jest.spyOn(emailService, 'sendClientConsentRequestEmail').mockRejectedValue(new Error('Email service error'));
 
-      // Should not throw error
-      await expect(patientService.sendConsentEmailIfRequired(client)).resolves.not.toThrow();
+      await expect(clientService.sendConsentEmailIfRequired(client)).resolves.not.toThrow();
 
       sendEmailSpy.mockRestore();
     });
   });
 
-  describe('checkPatientConsent', () => {
+  describe('checkClientConsent', () => {
     it('should return true when org does not require consent', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: false }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
-      const hasConsent = await patientService.checkPatientConsent(client._id);
+      const hasConsent = await clientService.checkClientConsent(client._id);
       expect(hasConsent).toBe(true);
     });
 
-    it('should return true when org requires consent and patient has consented', async () => {
+    it('should return true when org requires consent and client has consented', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: true };
       const client = await Client.create(clientData);
 
-      const hasConsent = await patientService.checkPatientConsent(client._id);
+      const hasConsent = await clientService.checkClientConsent(client._id);
       expect(hasConsent).toBe(true);
     });
 
-    it('should return false when org requires consent and patient has not consented', async () => {
+    it('should return false when org requires consent and client has not consented', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
-      const hasConsent = await patientService.checkPatientConsent(client._id);
+      const hasConsent = await clientService.checkClientConsent(client._id);
       expect(hasConsent).toBe(false);
     });
 
-    it('should return false when patient does not exist', async () => {
+    it('should return false when client does not exist', async () => {
       const fakeClientId = new mongoose.Types.ObjectId();
-      const hasConsent = await patientService.checkPatientConsent(fakeClientId);
+      const hasConsent = await clientService.checkClientConsent(fakeClientId);
       expect(hasConsent).toBe(false);
     });
   });
 
   describe('verifyConsentToken', () => {
-    it('should verify consent token and update patient consent status', async () => {
+    it('should verify consent token and update client consent status', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
-      // Generate consent token
       const consentToken = await tokenService.generateClientConsentToken(client);
 
-      // Verify consent
-      const result = await patientService.verifyConsentToken(consentToken);
+      const result = await clientService.verifyConsentToken(consentToken);
 
       expect(result.success).toBe(true);
       expect(result.alreadyConsented).toBe(false);
       expect(result.client).toBeTruthy();
 
-      // Verify client was updated
       const updatedClient = await Client.findById(client._id);
       expect(updatedClient.consented).toBe(true);
       expect(updatedClient.consentedAt).toBeTruthy();
       expect(updatedClient.consentEmailVersion).toBe('1.0');
 
-      // Verify token was deleted
       const token = await Token.findOne({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
       expect(token).toBeNull();
     });
 
     it('should handle already consented clients gracefully', async () => {
       const [org] = await insertOrgs([{ ...orgOne, requireClientConsent: true }]);
-      const clientData = { 
-        ...clientOne, 
-        org: org._id, 
+      const clientData = {
+        ...clientOne,
+        org: org._id,
         consented: true,
         consentedAt: new Date(),
         consentEmailVersion: '1.0'
       };
       const client = await Client.create(clientData);
 
-      // Generate consent token (even though already consented)
       const consentToken = await tokenService.generateClientConsentToken(client);
 
-      // Verify consent
-      const result = await patientService.verifyConsentToken(consentToken);
+      const result = await clientService.verifyConsentToken(consentToken);
 
       expect(result.success).toBe(true);
       expect(result.alreadyConsented).toBe(true);
       expect(result.message).toContain('already provided consent');
 
-      // Verify client was not changed
       const updatedClient = await Client.findById(client._id);
       expect(updatedClient.consented).toBe(true);
     });
 
     it('should throw error for invalid token', async () => {
-      await expect(patientService.verifyConsentToken('invalid-token')).rejects.toThrow(ApiError);
+      await expect(clientService.verifyConsentToken('invalid-token')).rejects.toThrow(ApiError);
     });
 
     it('should throw error for expired token', async () => {
@@ -199,23 +188,21 @@ describe('patientService - Consent Functionality', () => {
       const clientData = { ...clientOne, org: org._id, consented: false };
       const client = await Client.create(clientData);
 
-      // Create expired token manually
       const moment = require('moment');
-      const expires = moment().subtract(1, 'day'); // Expired yesterday
+      const expires = moment().subtract(1, 'day');
       const expiredToken = tokenService.generateToken(client._id, expires, tokenTypes.CLIENT_CONSENT);
       await tokenService.saveToken(expiredToken, null, expires, tokenTypes.CLIENT_CONSENT, false, client._id);
 
-      await expect(patientService.verifyConsentToken(expiredToken)).rejects.toThrow(ApiError);
+      await expect(clientService.verifyConsentToken(expiredToken)).rejects.toThrow(ApiError);
     });
 
-    it('should throw error for non-existent patient', async () => {
+    it('should throw error for non-existent client', async () => {
       const fakeClientId = new mongoose.Types.ObjectId();
       const expires = require('moment')().add(30, 'days');
       const fakeToken = tokenService.generateToken(fakeClientId, expires, tokenTypes.CLIENT_CONSENT);
       await tokenService.saveToken(fakeToken, null, expires, tokenTypes.CLIENT_CONSENT, false, fakeClientId);
 
-      await expect(patientService.verifyConsentToken(fakeToken)).rejects.toThrow(ApiError);
+      await expect(clientService.verifyConsentToken(fakeToken)).rejects.toThrow(ApiError);
     });
   });
 });
-

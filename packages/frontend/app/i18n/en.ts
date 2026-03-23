@@ -224,8 +224,8 @@ const en = {
     day: "day",
     days: "days",
     clientsWithCharges: "Clients with Charges:",
-    patient: "client",
-    patients: "clients",
+    clientWord: "client",
+    clientsWord: "clients",
     chargesByClient: "Charges by Client",
     conversation: "conversation",
     conversations: "conversations",
@@ -295,6 +295,7 @@ const en = {
     retryIntervalMinutesHelper: "Time to wait between retry attempts (1-60 minutes, default: 15)",
     alertOnAllMissedCallsLabel: "Alert on All Missed Calls",
     alertOnAllMissedCallsHelper: "Send alerts for every missed call and retry attempt",
+    clientConsentSettings: "Client Consent Settings",
   },
   caregiverScreen: {
     nameLabel: "Name",
@@ -822,7 +823,6 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
   },
   headers: {
     home: "Home",
-    patient: "Client",
     client: "Client",
     schedule: "Schedule",
     conversations: "Conversations",

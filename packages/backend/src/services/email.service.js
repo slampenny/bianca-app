@@ -43,13 +43,27 @@ const captureTestEmail = (mailOptions) => {
   return record;
 };
 
+const normalizeCapturedTo = (to) => {
+  if (!to) return '';
+  if (Array.isArray(to)) {
+    return to
+      .map((t) => (typeof t === 'string' ? t : t?.address || t?.email || ''))
+      .filter(Boolean)
+      .join(',');
+  }
+  if (typeof to === 'object' && to !== null) {
+    return to.address || to.email || '';
+  }
+  return String(to);
+};
+
 const getLastCapturedEmail = (recipientEmail) => {
   if (!recipientEmail) {
     return capturedEmails[capturedEmails.length - 1] || null;
   }
   const lowered = recipientEmail.toLowerCase();
   const matches = capturedEmails.filter((email) => {
-    const to = Array.isArray(email.to) ? email.to.join(',') : String(email.to || '');
+    const to = normalizeCapturedTo(email.to);
     return to.toLowerCase().includes(lowered);
   });
   return matches[matches.length - 1] || null;
@@ -273,7 +287,8 @@ const sendEmail = async (to, subject, text, html, attachments = null) => {
       throw error;
     }
 
-    if (config.env === 'test') {
+    // E2E: Playwright often runs against NODE_ENV=development API; use E2E_CAPTURE_EMAILS=1 (or POST /test/e2e-email-capture) so get-email reads the same in-memory store as send.
+    if (config.env === 'test' || process.env.E2E_CAPTURE_EMAILS === '1') {
       const senderAddress = config.email.from || 'no-reply@test.local';
       const mailOptions = {
         from: senderAddress,
@@ -775,50 +790,50 @@ const forceEtherealInitialization = async () => {
 /**
  * Send client consent request email
  * @param {string} to - Client email address
- * @param {string} patientName - Client's name (param name kept for API compat)
+ * @param {string} clientName - Client's display name
  * @param {string} orgName - Organization name
  * @param {string} consentLink - Link to consent page (frontend URL with token)
  * @param {string} [locale='en'] - Client's preferred language
  * @param {string} [consentEmailVersion='1.0'] - Version of consent email template
  * @returns {Promise}
  */
-const sendPatientConsentRequestEmail = async (to, patientName, orgName, consentLink, locale = 'en', consentEmailVersion = '1.0') => {
+const sendClientConsentRequestEmail = async (to, clientName, orgName, consentLink, locale = 'en', consentEmailVersion = '1.0') => {
   // Set locale for this email
   const previousLocale = i18n.getLocale();
   i18n.setLocale(locale);
   
   // Get localized strings
-  const subject = i18n.__ ? i18n.__('patientConsentEmail.subject') : 'Bianca Wellness - Consent Required for Call Recording';
+  const subject = i18n.__ ? i18n.__('clientConsentEmail.subject') : 'Bianca Wellness - Consent Required for Call Recording';
   
   let greeting, intro, whyConsent, consentBenefit1, consentBenefit2, consentBenefit3, noConsent1, noConsent2;
   let buttonText, expiryNote, contactInfo, versionLabel, closing, title, whyConsentTitle, consentTitle, noConsentTitle;
   
   if (i18n.__) {
     // Get templates and replace placeholders
-    const greetingTemplate = i18n.__('patientConsentEmail.greeting');
-    greeting = greetingTemplate.replace('%s', patientName || 'Client');
+    const greetingTemplate = i18n.__('clientConsentEmail.greeting');
+    greeting = greetingTemplate.replace('%s', clientName || 'Client');
     
-    const introTemplate = i18n.__('patientConsentEmail.intro');
+    const introTemplate = i18n.__('clientConsentEmail.intro');
     intro = introTemplate.replace('%s', orgName);
     
-    whyConsent = i18n.__('patientConsentEmail.whyConsent');
-    consentBenefit1 = i18n.__('patientConsentEmail.consentBenefit1');
-    consentBenefit2 = i18n.__('patientConsentEmail.consentBenefit2');
-    consentBenefit3 = i18n.__('patientConsentEmail.consentBenefit3');
-    noConsent1 = i18n.__('patientConsentEmail.noConsent1');
-    noConsent2 = i18n.__('patientConsentEmail.noConsent2');
-    buttonText = i18n.__('patientConsentEmail.buttonText');
-    expiryNote = i18n.__('patientConsentEmail.expiryNote');
-    contactInfo = i18n.__('patientConsentEmail.contactInfo');
-    versionLabel = i18n.__('patientConsentEmail.versionLabel');
-    closing = i18n.__('patientConsentEmail.closing');
-    title = i18n.__('patientConsentEmail.title');
-    whyConsentTitle = i18n.__('patientConsentEmail.whyConsentTitle');
-    consentTitle = i18n.__('patientConsentEmail.consentTitle');
-    noConsentTitle = i18n.__('patientConsentEmail.noConsentTitle');
+    whyConsent = i18n.__('clientConsentEmail.whyConsent');
+    consentBenefit1 = i18n.__('clientConsentEmail.consentBenefit1');
+    consentBenefit2 = i18n.__('clientConsentEmail.consentBenefit2');
+    consentBenefit3 = i18n.__('clientConsentEmail.consentBenefit3');
+    noConsent1 = i18n.__('clientConsentEmail.noConsent1');
+    noConsent2 = i18n.__('clientConsentEmail.noConsent2');
+    buttonText = i18n.__('clientConsentEmail.buttonText');
+    expiryNote = i18n.__('clientConsentEmail.expiryNote');
+    contactInfo = i18n.__('clientConsentEmail.contactInfo');
+    versionLabel = i18n.__('clientConsentEmail.versionLabel');
+    closing = i18n.__('clientConsentEmail.closing');
+    title = i18n.__('clientConsentEmail.title');
+    whyConsentTitle = i18n.__('clientConsentEmail.whyConsentTitle');
+    consentTitle = i18n.__('clientConsentEmail.consentTitle');
+    noConsentTitle = i18n.__('clientConsentEmail.noConsentTitle');
   } else {
     // Fallback to English
-    greeting = `Dear ${patientName || 'Client'},`;
+    greeting = `Dear ${clientName || 'Client'},`;
     intro = `Your healthcare organization, ${orgName}, uses Bianca Wellness to conduct wellness check calls. In accordance with applicable laws in your jurisdiction, we need your consent before we can record these calls.`;
     whyConsent = 'Some jurisdictions require consent from all parties before a call can be recorded. Your organization has enabled the "Require Client Consent" setting, which means we need your explicit consent before recording any calls.';
     consentBenefit1 = 'Your wellness check calls may be recorded for quality assurance and care coordination purposes';
@@ -916,7 +931,7 @@ ${closing}`;
       errorCode: error.code,
       stack: error.stack,
       to,
-      patientName,
+      clientName,
       orgName,
       locale,
       consentEmailVersion,
@@ -937,7 +952,7 @@ module.exports = {
   sendResetPasswordEmail,
   sendVerificationEmail,
   sendPrivacyDataEmail,
-  sendPatientConsentRequestEmail,
+  sendClientConsentRequestEmail,
   getStatus,
   isReady,
   forceEtherealInitialization,

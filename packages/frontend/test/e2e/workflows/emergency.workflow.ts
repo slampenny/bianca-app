@@ -5,16 +5,16 @@ export class EmergencyWorkflow {
   constructor(private page: Page) {}
 
   // GIVEN steps - Setup conditions
-  async givenThereIsACriticalAlertForPatient(patientName: string) {
+  async givenThereIsACriticalAlertForClient(clientName: string) {
     // Navigate to alerts tab
     await this.page.getByTestId('alerts-tab').click()
     await this.page.waitForSelector('[data-testid="alert-list"]', { timeout: 10000 })
     
     // Verify critical alert exists
-    const alert = this.page.getByTestId('alert-item').filter({ hasText: patientName })
+    const alert = this.page.getByTestId('alert-item').filter({ hasText: clientName })
     await expect(alert).toBeVisible()
     
-    return { patientName, severity: 'CRITICAL' }
+    return { clientName, severity: 'CRITICAL' }
   }
 
   async givenAlertSeverityIs(severity: string) {
@@ -22,24 +22,24 @@ export class EmergencyWorkflow {
     await expect(alertBadge).toContainText(severity)
   }
 
-  async givenIAmViewingCriticalAlert(patientName: string) {
+  async givenIAmViewingCriticalAlert(clientName: string) {
     await this.page.getByTestId('alerts-tab').click()
-    const alert = this.page.getByTestId('alert-item').filter({ hasText: patientName })
+    const alert = this.page.getByTestId('alert-item').filter({ hasText: clientName })
     await alert.click()
     await this.page.waitForSelector('[data-testid="alert-details"]', { timeout: 10000 })
   }
 
-  async givenIHaveRespondedToEmergency(patientName: string) {
+  async givenIHaveRespondedToEmergency(clientName: string) {
     return {
-      patientName,
+      clientName,
       responded: true,
       timestamp: new Date()
     }
   }
 
-  async givenIAmRespondingToLifeThreateningEmergency(patientName: string) {
+  async givenIAmRespondingToLifeThreateningEmergency(clientName: string) {
     return {
-      patientName,
+      clientName,
       severity: 'LIFE_THREATENING',
       requiresEscalation: true
     }
@@ -52,7 +52,7 @@ export class EmergencyWorkflow {
     await alertBadge.click()
   }
 
-  async whenIClickCallPatientImmediately() {
+  async whenIClickCallClientImmediately() {
     await this.page.getByTestId('call-client-immediately-button').click()
   }
 
@@ -88,7 +88,7 @@ export class EmergencyWorkflow {
     expect(conversations).toBeGreaterThan(0)
   }
 
-  async thenIShouldSeeCallPatientButton() {
+  async thenIShouldSeeCallClientButton() {
     await expect(this.page.getByTestId('call-client-immediately-button')).toBeVisible()
   }
 

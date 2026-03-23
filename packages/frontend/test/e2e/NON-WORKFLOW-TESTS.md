@@ -87,18 +87,18 @@ These tests verify feature integration or complex scenarios:
   - **Could convert to Cucumber**: Yes - This is a workflow (manage payment methods)
 
 - **`multiple-schedules.e2e.test.ts`**
-  - Tests handling multiple schedules for a patient
+  - Tests handling multiple schedules for a client
   - **Purpose**: Technical behavior test
   - **Could convert to Cucumber**: Maybe - Could be a "Manage Multiple Schedules" workflow
 
 - **`schedule-integration.e2e.test.ts`**
-  - Tests schedule integration with patient management
-  - Verifies schedules can be accessed from patient screen
+  - Tests schedule integration with client management
+  - Verifies schedules can be accessed from the client screen
   - **Purpose**: Integration test
   - **Could convert to Cucumber**: Maybe - Already covered in `schedule-management.feature`
 
-- **`patient-consent-flow.e2e.test.ts`**
-  - Tests complete patient consent flow with real email
+- **`client-consent-flow.e2e.test.ts`**
+  - Tests complete client consent flow with real email
   - Complex workflow with email verification
   - **Purpose**: End-to-end integration test with external service
   - **Could convert to Cucumber**: Yes - This is actually a workflow, but complex
@@ -119,7 +119,7 @@ These tests have been converted to Cucumber and can be removed:
 - `alert-workflow.e2e.test.ts` - Alert workflow (covered in `alert-management.feature`)
 - `schedule-workflow.e2e.test.ts` - Schedule workflow (covered in `schedule-management.feature`)
 - `schedule-management.e2e.test.ts` - Schedule management (covered in `schedule-management.feature`)
-- `schedule-patient-workflow.e2e.test.ts` - Schedule patient workflow (covered in `schedule-management.feature`)
+- *(removed)* `schedule-patient-workflow.e2e.test.ts` — superseded by `schedule-integration.e2e.test.ts` / `schedule-management.feature`
 
 ## Recommendations
 
@@ -132,7 +132,7 @@ These tests have been converted to Cucumber and can be removed:
 ### Could Convert to Cucumber (Workflow-like)
 1. `alert-read-unread-tabs.e2e.test.ts` - Alert filtering workflow
 2. `payment-methods.e2e.test.ts` - Payment method management workflow
-3. `patient-consent-flow.e2e.test.ts` - Patient consent workflow (complex)
+3. `client-consent-flow.e2e.test.ts` - Client consent workflow (complex)
 4. `billing.e2e.test.ts` - View billing information workflow
 
 ### Can Remove (Already in Cucumber)

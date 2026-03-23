@@ -108,7 +108,7 @@ NODE_ENV=test npx playwright test test/e2e/avatar-picker.e2e.test.ts -g "upload"
 1. **Backend Running**: Backend must be running on `http://localhost:3000`
 2. **Frontend Running**: Frontend must be running on `http://localhost:8082`
 3. **Test Users**: Test users must exist in the database (seeded via `/v1/test/seed`)
-4. **Test Data**: Patients with conversations should exist for comprehensive testing
+4. **Test Data**: Clients with conversations should exist for comprehensive testing
 
 ## Integration with Existing Tests
 

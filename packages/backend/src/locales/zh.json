@@ -35,7 +35,7 @@
 		"HIGH": "⚠️ 高优先级：%s - %s：%s",
 		"MEDIUM": "📢 警报：%s - %s：%s"
 	},
-	"patientConsentEmail": {
+	"clientConsentEmail": {
 		"subject": "Bianca Wellness - 需要同意才能录制通话",
 		"title": "需要同意才能录制通话",
 		"greeting": "亲爱的%s，",

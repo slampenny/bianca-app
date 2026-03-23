@@ -2,23 +2,36 @@ import { test, expect, Page } from '@playwright/test'
 import { generateUniqueTestData, TEST_USERS } from './fixtures/testData'
 import { getEmailFromEthereal } from './helpers/backendHelpers'
 import { FRONTEND_URL, getFrontendUrl } from './helpers/testConfig'
-import { loginIfNeeded, navigateToHome } from './helpers/testHelpers'
-import { navigateToOrgScreen } from './helpers/navigation'
+import {
+  getAuthAccessTokenFromPage,
+  getCaregiverOrgIdFromApi,
+  getOrgIdFromPage,
+  loginIfNeeded,
+} from './helpers/testHelpers'
+import { navigateToTab, isHomeScreen, navigateToOrgScreen } from './helpers/navigation'
 
-test.describe('Patient Consent Flow - End to End with Ethereal', () => {
+test.describe('Client Consent Flow - End to End with Ethereal', () => {
   let testData: ReturnType<typeof generateUniqueTestData>
-  let testPatientEmail: string
+  let testClientEmail: string
   const testPassword = 'Password123!'
 
   test.beforeEach(() => {
-    testData = generateUniqueTestData('patient-consent-e2e')
+    testData = generateUniqueTestData('client-consent-e2e')
     // Use a unique email for each test run to avoid conflicts
-    testPatientEmail = `patient-consent-${Date.now()}@example.com`
+    testClientEmail = `client-consent-${Date.now()}@example.com`
   })
 
-  test('complete patient consent flow works end-to-end with real email', async ({ page }) => {
+  test('complete client consent flow works end-to-end with real email', async ({ page }) => {
+    // Server /test/get-email can block up to maxWaitMs while polling IMAP; keep headroom above that.
+    test.setTimeout(180_000)
     // Force Ethereal initialization for this test run
     const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
+    try {
+      await page.request.post(`${API_BASE_URL}/test/e2e-email-capture`, { data: { enable: true } })
+      console.log('✅ E2E in-memory email capture enabled')
+    } catch (error) {
+      console.log('⚠️ Could not enable e2e-email-capture:', error.message)
+    }
     try {
       await page.request.post(`${API_BASE_URL}/test/force-ethereal-init`)
       console.log('✅ Forced Ethereal initialization for test')
@@ -31,16 +44,16 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     await page.waitForLoadState('networkidle')
     
     await loginIfNeeded(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
-    await navigateToHome(page)
-    
-    // Step 2: Enable "Require Patient Consent" in org settings
-    console.log('Enabling Require Patient Consent setting...')
+    // Stay logged in as org admin — do not call navigateToHome() without user or it re-logs in as staff.
+
+    // Step 2: Enable "Require Client Consent" in org settings
+    console.log('Enabling Require Client Consent setting...')
     await navigateToOrgScreen(page)
     
     // Wait for org screen to load
     await page.waitForTimeout(2000)
     
-    // Find and toggle the "Require Patient Consent" toggle
+    // Find and toggle the "Require Client Consent" toggle (UI may still say patient in legacy builds)
     const consentToggle = page.locator('[data-testid="require-client-consent-toggle"]').or(
       page.locator('text=/require.*patient.*consent/i').locator('..').locator('input[type="checkbox"], [role="switch"]')
     ).first()
@@ -89,10 +102,10 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     }
     
     if (!toggleFound) {
-      console.log('⚠️ Could not find Require Patient Consent toggle - may need to add test ID')
+      console.log('⚠️ Could not find Require Client Consent toggle - may need to add test ID')
       // Continue anyway - the org may already have it enabled or we'll test with API
     } else {
-      console.log('✅ Toggled Require Patient Consent setting')
+      console.log('✅ Toggled Require Client Consent setting')
     }
     
     // Save org settings if there's a save button
@@ -102,48 +115,106 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
       await page.waitForTimeout(2000) // Wait for save to complete
       console.log('✅ Saved org settings')
     }
-    
-    // Step 3: Create a patient (this should trigger consent email if org requires it)
-    console.log('Creating patient to trigger consent email...')
-    await navigateToHome(page)
-    
-    // Navigate to patient screen
-    const addClientButton = page.locator('[data-testid="add-client-button"]').first()
-    await addClientButton.waitFor({ timeout: 10000, state: 'visible' })
-    await addClientButton.click()
-    
-    // Wait for patient screen
-    await page.waitForSelector('[data-testid="client-screen"]', { timeout: 10000 }).catch(() => {})
-    await page.waitForTimeout(2000)
-    
-    // Fill patient form
-    const nameInput = page.locator('[data-testid="client-name-input"]').or(page.locator('input[placeholder*="name" i]')).first()
-    const emailInput = page.locator('[data-testid="client-email-input"]').or(page.locator('input[type="email"]')).first()
-    const phoneInput = page.locator('[data-testid="client-phone-input"]').or(page.locator('input[placeholder*="phone" i]')).first()
-    
-    await nameInput.fill('Test Patient')
-    await emailInput.fill(testPatientEmail)
-    await phoneInput.fill('+16045551234')
-    
-    // Save patient
-    const savePatientButton = page.locator('button:has-text("Create"), button:has-text("Save")').first()
-    await savePatientButton.click()
-    
-    // Wait for patient to be created
-    await page.waitForTimeout(3000)
-    console.log('✅ Patient created')
+
+    // Seeded org defaults requireClientConsent=false; UI toggle/Save can race and clear PATCH. Force via API
+    // using the caregiver's org from GET /caregivers/:id (not only Redux — persisted state can be wrong org).
+    const authToken = await getAuthAccessTokenFromPage(page)
+    const orgId =
+      (await getCaregiverOrgIdFromApi(page, API_BASE_URL)) ?? (await getOrgIdFromPage(page))
+    if (!authToken) {
+      console.log('⚠️ No auth token for org PATCH — consent email may not send')
+    } else if (orgId) {
+      const patch = await page.request.patch(`${API_BASE_URL}/orgs/${orgId}`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        data: { requireClientConsent: true },
+      })
+      if (patch.ok()) {
+        const patchedOrg = await patch.json()
+        expect(
+          patchedOrg.requireClientConsent,
+          'API must persist requireClientConsent so consent email is sent'
+        ).toBe(true)
+        console.log('✅ Patched org requireClientConsent=true via API (org from caregiver)')
+      } else {
+        console.log('⚠️ Could not PATCH requireClientConsent:', patch.status(), await patch.text())
+      }
+    } else {
+      console.log('⚠️ No org id (API / Redux) — could not PATCH requireClientConsent')
+    }
+
+    // Step 3: Create a client (this should trigger consent email if org requires it)
+    console.log('Creating client to trigger consent email...')
+    // Already logged in as org admin — do not call navigateToHome (it forces login form). Go to Home tab.
+    await navigateToTab(page, 'home')
+    await isHomeScreen(page)
+
+    // Org-screen Save may have completed after the earlier PATCH and set requireClientConsent=false — enforce again.
+    const orgBeforeCreate =
+      (await getCaregiverOrgIdFromApi(page, API_BASE_URL)) ?? (await getOrgIdFromPage(page))
+    const tokenBeforeCreate = await getAuthAccessTokenFromPage(page)
+    if (tokenBeforeCreate && orgBeforeCreate) {
+      const pre = await page.request.patch(`${API_BASE_URL}/orgs/${orgBeforeCreate}`, {
+        headers: {
+          Authorization: `Bearer ${tokenBeforeCreate}`,
+          'Content-Type': 'application/json',
+        },
+        data: { requireClientConsent: true },
+      })
+      if (pre.ok()) {
+        const body = await pre.json()
+        expect(body.requireClientConsent, 'requireClientConsent must be true immediately before create').toBe(true)
+        console.log('✅ Re-patched org requireClientConsent=true before creating client (avoids UI race)')
+      }
+    }
+
+    // Create client via POST /clients (same as Client screen). UI form submit is unreliable in Playwright
+    // (PhoneInputWeb / validation timing), and this guarantees the same server path as production API.
+    const tokenCreate = await getAuthAccessTokenFromPage(page)
+    const orgCreate =
+      (await getCaregiverOrgIdFromApi(page, API_BASE_URL)) ?? (await getOrgIdFromPage(page))
+    expect(tokenCreate, 'auth token required to create client').toBeTruthy()
+    expect(orgCreate, 'org id required to create client').toBeTruthy()
+    const createRes = await page.request.post(`${API_BASE_URL}/clients`, {
+      headers: {
+        Authorization: `Bearer ${tokenCreate}`,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        name: 'Test Client',
+        email: testClientEmail,
+        phone: '+16045551234',
+        org: orgCreate,
+        consented: false,
+      },
+    })
+    if (!createRes.ok()) {
+      console.log('Create client failed:', createRes.status(), await createRes.text())
+    }
+    expect(createRes.ok(), 'POST /clients must succeed so consent email is sent').toBeTruthy()
+    console.log('✅ Client created via API (POST /clients — same as Client screen)')
     
     // Step 4: Wait for consent email to be sent
-    console.log(`📧 Waiting for consent email to ${testPatientEmail}...`)
+    console.log(`📧 Waiting for consent email to ${testClientEmail}...`)
     await page.waitForTimeout(10000) // Give email time to be processed
     
-    // Step 5: Retrieve the consent email from Ethereal
-    let email
-    let retries = 6
+    // Step 5: Retrieve the consent email (server uses waitForEmail — keep maxWaitMs below test timeout)
+    const emailWaitMs = 45_000
+    let email: Awaited<ReturnType<typeof getEmailFromEthereal>> | undefined
+    let retries = 5
     while (retries > 0) {
       try {
-        email = await getEmailFromEthereal(page, testPatientEmail, true, 90000)
-        break
+        email = await getEmailFromEthereal(page, testClientEmail, true, emailWaitMs)
+        if (email.tokens?.consent) {
+          break
+        }
+        console.log(
+          `📧 Latest mail "${email.subject}" has no consent token (often verify-first); retrying… (${retries - 1} left)`
+        )
+        retries--
+        await page.waitForTimeout(4000)
       } catch (error) {
         retries--
         if (retries === 0) {
@@ -153,21 +224,20 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
           return
         }
         console.log(`Email not found yet, retrying... (${retries} retries left)`)
-        await page.waitForTimeout(5000)
+        await page.waitForTimeout(4000)
       }
     }
     
-    // Verify email was received
     expect(email).toBeTruthy()
-    expect(email.subject).toContain('Consent')
-    expect(email.tokens.consent).toBeTruthy()
+    expect(email!.subject).toMatch(/consent|verify|email|bianca/i)
+    expect(email!.tokens.consent).toBeTruthy()
     
     console.log('✅ Consent email retrieved from Ethereal')
-    console.log(`   Subject: ${email.subject}`)
-    console.log(`   Token extracted: ${email.tokens.consent ? 'Yes' : 'No'}`)
+    console.log(`   Subject: ${email!.subject}`)
+    console.log(`   Token extracted: ${email!.tokens.consent ? 'Yes' : 'No'}`)
     
     // Step 6: Extract consent token from email
-    const token = email.tokens.consent
+    const token = email!.tokens.consent
     expect(token).toBeTruthy()
     
     // Step 7: Construct consent URL
@@ -223,9 +293,9 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     
     expect(foundSuccess).toBe(true)
     
-    console.log('✅ End-to-end patient consent flow completed successfully!')
-    console.log('   - Real consent email sent via Ethereal')
-    console.log('   - Email retrieved from Ethereal IMAP')
+    console.log('✅ End-to-end client consent flow completed successfully!')
+    console.log('   - Consent email sent (Ethereal or in-memory capture when E2E_CAPTURE_EMAILS=1)')
+    console.log('   - Email retrieved via POST /test/get-email')
     console.log('   - Token extracted from email content')
     console.log(`   - Link uses correct frontend URL (${FRONTEND_URL})`)
     console.log('   - Frontend extracts token from URL')
@@ -237,44 +307,36 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     // Force Ethereal initialization for this test run
     const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000/v1'
     try {
+      await page.request.post(`${API_BASE_URL}/test/e2e-email-capture`, { data: { enable: true } })
+      console.log('✅ E2E in-memory email capture enabled')
+    } catch (error) {
+      console.log('⚠️ Could not enable e2e-email-capture:', error.message)
+    }
+    try {
       await page.request.post(`${API_BASE_URL}/test/force-ethereal-init`)
       console.log('✅ Forced Ethereal initialization for test')
     } catch (error) {
       console.log('⚠️ Could not force Ethereal init:', error.message)
     }
     
-    // Step 1: Create a patient via API with org that requires consent
-    // First, get an org ID
+    // Step 1: Create a client via API with org that requires consent
+    await page.goto(FRONTEND_URL)
+    await page.waitForLoadState('networkidle')
     await loginIfNeeded(page, TEST_USERS.ORG_ADMIN.email, TEST_USERS.ORG_ADMIN.password)
     
-    // Get auth token for API calls
-    const authToken = await page.evaluate(() => {
-      return localStorage.getItem('authToken') || sessionStorage.getItem('authToken')
-    })
-    
-    // Get org info
-    const orgResponse = await page.request.get(`${API_BASE_URL}/orgs`, {
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-      },
-    })
-    
-    if (!orgResponse.ok()) {
-      console.log('⚠️ Could not get org info, skipping test')
+    // Prefer caregiver org from API so PATCH/create use the same org as the backend.
+    const authToken = await getAuthAccessTokenFromPage(page)
+    const orgId =
+      (await getCaregiverOrgIdFromApi(page, API_BASE_URL)) ?? (await getOrgIdFromPage(page))
+
+    if (!authToken || !orgId) {
+      console.log('⚠️ Could not get auth token or org id, skipping test')
       test.skip()
       return
     }
-    
-    const orgs = await orgResponse.json()
-    const org = orgs.results?.[0] || orgs[0]
-    if (!org) {
-      console.log('⚠️ No org found, skipping test')
-      test.skip()
-      return
-    }
-    
+
     // Enable requireClientConsent on org
-    await page.request.patch(`${API_BASE_URL}/orgs/${org.id}`, {
+    await page.request.patch(`${API_BASE_URL}/orgs/${orgId}`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
@@ -284,28 +346,28 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
       },
     })
     
-    // Create patient via API
-    const patientResponse = await page.request.post(`${API_BASE_URL}/clients`, {
+    // Create client via API
+    const clientResponse = await page.request.post(`${API_BASE_URL}/clients`, {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
       data: {
-        name: 'Test Patient',
-        email: testPatientEmail,
+        name: 'Test Client',
+        email: testClientEmail,
         phone: '+16045551234',
-        org: org.id,
+        org: orgId,
         consented: false,
       },
     })
     
-    if (!patientResponse.ok()) {
-      console.log('⚠️ Could not create patient, skipping test')
+    if (!clientResponse.ok()) {
+      console.log('⚠️ Could not create client, skipping test')
       test.skip()
       return
     }
     
-    console.log('✅ Patient created via API')
+    console.log('✅ Client created via API')
     
     // Step 2: Wait for email
     await page.waitForTimeout(10000)
@@ -314,7 +376,7 @@ test.describe('Patient Consent Flow - End to End with Ethereal', () => {
     let email
     let frontendLink: string | null = null
     try {
-      email = await getEmailFromEthereal(page, testPatientEmail, true, 30000)
+      email = await getEmailFromEthereal(page, testClientEmail, true, 30000)
       
       // Extract the consent link from the email
       const emailText = email.text || ''

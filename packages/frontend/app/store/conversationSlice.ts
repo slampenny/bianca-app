@@ -100,7 +100,7 @@ export const conversationSlice = createSlice({
             logger.debug('[ConversationSlice] Set first page conversations:', payload.results?.map(c => ({ id: c.id, startTime: c.startTime })));
           } else if (payload.results !== undefined && payload.results.length === 0 && state.conversations.length === 0) {
             // Only clear if we explicitly got empty AND we don't have any conversations already
-            // This allows API to clear conversations when patient has none, but preserves them during loading
+            // This allows API to clear conversations when a client has none, but preserves them during loading
             state.conversations = [];
             logger.debug('[ConversationSlice] Cleared conversations (client has none)');
           }

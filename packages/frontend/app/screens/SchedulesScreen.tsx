@@ -190,7 +190,15 @@ export const SchedulesScreen = () => {
       } else {
         // Create new schedule (no ID or ID is null/undefined)
         if (selectedClient && selectedClient.id && selectedSchedule) {
-          const { id, patient, ...scheduleData } = selectedSchedule
+          // POST /schedules/clients/:clientId only allows frequency, intervals, time, isActive — not client/patient id in body
+          const {
+            id,
+            patient: _omitLegacyPatientField,
+            client: _omitClientFromBody,
+            ...scheduleData
+          } = selectedSchedule as Schedule & {
+            patient?: string | null
+          }
           const newSchedule = await createNewSchedule({ clientId: selectedClient.id, data: scheduleData }).unwrap()
           // Reset changes after successful create
           setHasChanges(false)
@@ -237,7 +245,7 @@ export const SchedulesScreen = () => {
     // Create a new empty schedule with no ID
     const newSchedule: Schedule = {
       id: null,
-      patient: selectedClient?.id || null, // API field name
+      client: selectedClient?.id || null,
       frequency: "daily",
       intervals: [],
       time: "09:00",
@@ -449,7 +457,7 @@ export const SchedulesScreen = () => {
 
 const createStyles = (colors: ThemeColors, fontScale: number) => StyleSheet.create({
   button: {
-    marginBottom: 15, // Match patient screen button spacing
+    marginBottom: 15, // Match client screen button spacing
   },
 
   cardHeading: {

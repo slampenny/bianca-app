@@ -9,7 +9,6 @@ module.exports.emailService = require('./email.service');
 module.exports.emergencyPhraseService = require('./emergencyPhrase.service');
 module.exports.orgService = require('./org.service');
 module.exports.clientService = require('./client.service');
-module.exports.patientService = require('./client.service'); // backward compat
 module.exports.paymentService = require('./payment.service');
 module.exports.paymentMethodService = require('./paymentMethod.service');
 module.exports.scheduleService = require('./schedule.service');

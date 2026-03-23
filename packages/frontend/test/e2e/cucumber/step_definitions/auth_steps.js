@@ -84,11 +84,19 @@ Given('I am logged in as {string}', async function(username) {
       await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load', timeout: 15000 });
       navigationSuccess = true;
     } catch (e) {
-      if (e.message && (e.message.includes('ERR_CONNECTION_REFUSED') || e.message.includes('net::ERR_CONNECTION_REFUSED') || e.message.includes('Navigation timeout'))) {
+      const msg = e.message || '';
+      // Playwright uses "Timeout 15000ms exceeded", not "Navigation timeout" — include that so we retry when the dev server is slow to respond.
+      const isRetryableNav =
+        msg.includes('ERR_CONNECTION_REFUSED') ||
+        msg.includes('net::ERR_CONNECTION_REFUSED') ||
+        msg.includes('Navigation timeout') ||
+        /\bTimeout\b.*\bexceeded\b/i.test(msg);
+      if (isRetryableNav) {
         attempts++;
         if (attempts < maxAttempts) {
           console.log(`Frontend not ready, waiting... (attempt ${attempts}/${maxAttempts})`);
           await this.page.locator('body').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+          await this.page.waitForTimeout(2000);
         } else {
           throw new Error(`Frontend not available at ${this.baseURL} after ${maxAttempts} attempts. Is it running?`);
         }

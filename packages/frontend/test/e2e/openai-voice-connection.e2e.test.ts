@@ -18,7 +18,7 @@ test.describe('OpenAI Voice Connection', () => {
   test('should successfully connect to OpenAI and verify voice configuration', async ({ page }) => {
     // Login to get authentication token (must match /v1/test/seed — seed creates fake@example.org, not no-clients@example.org)
     await page.goto('/')
-    await loginUserViaUI(page, TEST_USERS.WITH_PATIENTS.email, TEST_USERS.WITH_PATIENTS.password)
+    await loginUserViaUI(page, TEST_USERS.WITH_CLIENTS.email, TEST_USERS.WITH_CLIENTS.password)
     
     // Wait for home screen to ensure login is complete
     await page.waitForSelector('[data-testid="home-header"]', { timeout: 10000 })

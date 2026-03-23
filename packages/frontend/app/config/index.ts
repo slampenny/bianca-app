@@ -48,10 +48,10 @@ if (process.env.NODE_ENV === 'test' ||
     window_location: browserHostname ?? 'undefined'
   });
 
-  // For web: if running on localhost, use dev config (for local testing and Playwright tests)
-  if (browserHostname === 'localhost') {
+  // For web: if running on localhost or loopback, use dev config (for local testing and Playwright tests)
+  if (browserHostname === 'localhost' || browserHostname === '127.0.0.1') {
     ExtraConfig = DevConfig
-    logger.debug('Using DEV config (localhost detected)');
+    logger.debug('Using DEV config (localhost / 127.0.0.1 detected)');
   }
   // Use dev config for development
   else if (typeof __DEV__ !== 'undefined' && __DEV__) {

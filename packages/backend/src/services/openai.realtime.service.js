@@ -1924,7 +1924,8 @@ class OpenAIRealtimeService {
           const emergencyResult = await emergencyProcessor.processUtterance(
             conn.clientId,
             content,
-            Date.now()
+            Date.now(),
+            conn.conversationId || null
           );
 
           logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}`, {
@@ -2061,7 +2062,8 @@ class OpenAIRealtimeService {
         const emergencyResult = await emergencyProcessor.processUtterance(
           conn.clientId,
           message.transcript,
-          Date.now()
+          Date.now(),
+          conn.conversationId || null
         );
 
         logger.info(`[Emergency Detection] Emergency detection result - shouldAlert: ${emergencyResult.shouldAlert}, reason: ${emergencyResult.reason}`);
@@ -3189,12 +3191,17 @@ class OpenAIRealtimeService {
 
     this._healthCheckInterval = setInterval(() => {
       const now = Date.now();
-      const idleTimeout = config.openai.idleTimeout || 300000; // 5 minutes default
+      // OPENAI_IDLE_TIMEOUT: 0 = disabled (no max call length from this health check)
+      const idleTimeout = config.openai?.idleTimeout ?? 0;
 
       for (const [callId, conn] of this.connections.entries()) {
-        // Check for idle connections
-        if (conn.lastActivity && now - conn.lastActivity > idleTimeout) {
-          logger.warn(`[OpenAI Realtime] Connection ${callId} idle timeout. Cleaning up.`);
+        // Check for idle connections (only when idleTimeout > 0)
+        if (
+          idleTimeout > 0 &&
+          conn.lastActivity &&
+          now - conn.lastActivity > idleTimeout
+        ) {
+          logger.warn(`[OpenAI Realtime] Connection ${callId} idle timeout (${idleTimeout}ms). Cleaning up.`);
           this.disconnect(callId);
           continue;
         }

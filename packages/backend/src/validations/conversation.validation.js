@@ -7,12 +7,6 @@ const getConversation = {
   }),
 };
 
-const createConversationForPatient = {
-  params: Joi.object().keys({
-    clientId: Joi.string().custom(objectId),
-  }),
-};
-
 const createConversationForClient = {
   params: Joi.object().keys({
     clientId: Joi.string().custom(objectId),
@@ -32,6 +26,5 @@ const addMessageToConversation = {
 module.exports = {
   getConversation,
   addMessageToConversation,
-  createConversationForPatient,
   createConversationForClient,
 };

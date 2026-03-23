@@ -18,9 +18,7 @@ describe("conversationApi", () => {
 
   beforeEach(async () => {
     store = appStore
-    store.dispatch(conversationApi.util.resetApiState())
-    store.dispatch(orgApi.util.resetApiState())
-    store.dispatch(clientApi.util.resetApiState())
+    // Same as clientApi / alertApi: register before resetting RTK caches (see afterEach).
     const testCaregiver = newCaregiver()
     const response = await registerNewOrgAndCaregiver(
       testCaregiver.name,
@@ -59,6 +57,7 @@ describe("conversationApi", () => {
     store.dispatch(clientApi.util.resetApiState())
 
     jest.clearAllMocks()
+    jest.clearAllTimers()
   })
 
   afterAll(async () => {
@@ -160,7 +159,7 @@ describe("conversationApi", () => {
     })
 
     it("should return 403 when user lacks permission to access conversation", async () => {
-      // This test would require creating a different caregiver/patient setup
+      // This test would require creating a different caregiver/client setup
       // For now, we'll test that the endpoint exists and can be called
       const result = await conversationApi.endpoints.getConversation.initiate({
         conversationId,

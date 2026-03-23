@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const { Caregiver, Client, Org, Token } = require('../models');
 const ApiError = require('../utils/ApiError');
+const { toOrgIdString } = require('../dtos/caregiver.dto');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
 const tokenService = require('./token.service');
@@ -116,29 +117,83 @@ const getUnassignedClients = async () => {
   }
 };
 
+/**
+ * Assign multiple unassigned clients to a caregiver (bulk assign from admin UI).
+ * @param {string} caregiverId
+ * @param {string[]} clientIds
+ * @returns {Promise<import('mongoose').Document[]>}
+ */
+const assignUnassignedClients = async (caregiverId, clientIds) => {
+  if (!Array.isArray(clientIds) || clientIds.length === 0) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'clientIds must be a non-empty array');
+  }
+  const caregiver = await Caregiver.findById(caregiverId);
+  if (!caregiver) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
+  }
+  const caregiverOrgId = toOrgIdString(caregiver.org);
+  const results = [];
+  for (const clientId of clientIds) {
+    const client = await Client.findById(clientId);
+    if (!client) {
+      logger.warn(`[assignUnassignedClients] Skipping missing client ${clientId}`);
+      continue;
+    }
+    const clientOrgId = toOrgIdString(client.org);
+    if (caregiverOrgId && clientOrgId && caregiverOrgId !== clientOrgId) {
+      logger.warn(`[assignUnassignedClients] Client ${clientId} is not in the same organization as the caregiver; skipping`);
+      continue;
+    }
+    const hasNoCaregivers = !client.caregivers || client.caregivers.length === 0;
+    if (!hasNoCaregivers) {
+      logger.warn(`[assignUnassignedClients] Client ${clientId} already has caregivers; skipping`);
+      continue;
+    }
+    const updated = await assignCaregiver(caregiverId, clientId);
+    results.push(updated);
+  }
+  return results;
+};
+
 const sendConsentEmailIfRequired = async (client) => {
   try {
-    const clientWithOrg = await Client.findById(client._id).populate('org');
-    if (!clientWithOrg || !clientWithOrg.org) {
-      logger.warn(`[Client Service] Cannot send consent email: client ${client._id} has no org`);
+    const clientId = client._id || client.id;
+    const clientFresh = await Client.findById(clientId)
+      .select('email name consented preferredLanguage org')
+      .lean();
+    if (!clientFresh?.org) {
+      logger.warn(`[Client Service] Cannot send consent email: client ${clientId} has no org`);
       return;
     }
-    const org = clientWithOrg.org;
-    if (!org.requireClientConsent) {
+    if (!clientFresh.email) {
+      logger.warn(`[Client Service] Cannot send consent email: client ${clientId} has no email`);
       return;
     }
-    if (client.consented === true) {
+    // Fresh read — populated org can be stale right after PATCH requireClientConsent (E2E / org settings).
+    const orgId = clientFresh.org;
+    const orgFresh = await Org.findById(orgId).lean();
+    if (!orgFresh || !orgFresh.requireClientConsent) {
+      logger.warn(
+        `[Client Service] Skipping consent email for client ${clientId}: org ${orgId} missing or requireClientConsent=${Boolean(
+          orgFresh?.requireClientConsent
+        )}`
+      );
       return;
     }
-    const consentToken = await tokenService.generateClientConsentToken(client);
+    if (clientFresh.consented === true) {
+      return;
+    }
+    const consentToken = await tokenService.generateClientConsentToken(
+      await Client.findById(clientId)
+    );
     const consentLink = `${config.frontendUrl}/client/consent?token=${consentToken}`;
     const consentEmailVersion = '1.0';
-    await emailService.sendPatientConsentRequestEmail(
-      client.email,
-      client.name,
-      org.name,
+    await emailService.sendClientConsentRequestEmail(
+      clientFresh.email,
+      clientFresh.name,
+      orgFresh.name,
       consentLink,
-      client.preferredLanguage || 'en',
+      clientFresh.preferredLanguage || 'en',
       consentEmailVersion
     );
     logger.info(`[Client Service] Consent request email sent to client ${client._id} (${client.email})`);
@@ -216,6 +271,7 @@ module.exports = {
   getCaregivers,
   getActiveClients,
   getUnassignedClients,
+  assignUnassignedClients,
   sendConsentEmailIfRequired,
   checkClientConsent,
   verifyConsentToken,

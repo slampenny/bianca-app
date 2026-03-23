@@ -76,7 +76,7 @@ export const PhoneVerificationBanner: React.FC<PhoneVerificationBannerProps> = (
     return null
   }
 
-  // Only show for caregivers/admins (not patients - patients don't create accounts)
+  // Only show for caregivers/admins (clients use a separate consent flow; banner targets org users)
   // All users in the system are caregivers, so we show for all
   const handleVerifyPhone = () => {
     if (navigationRef.isReady()) {

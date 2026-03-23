@@ -101,12 +101,12 @@ export function SentimentRecentTrends({ recentTrend, style }: SentimentRecentTre
                   </View>
                 )}
 
-                {/* Patient mood */}
-                {conversation.sentiment.patientMood && (
+                {/* Client mood */}
+                {conversation.sentiment.clientMood && (
                   <View style={styles.moodContainer}>
                     <Text style={styles.moodLabel}>{translate("sentimentAnalysis.clientMood")}</Text>
                     <Text style={styles.moodText} numberOfLines={2}>
-                      {conversation.sentiment.patientMood}
+                      {conversation.sentiment.clientMood}
                     </Text>
                   </View>
                 )}
