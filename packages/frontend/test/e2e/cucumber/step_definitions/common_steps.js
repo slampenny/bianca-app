@@ -103,8 +103,17 @@ When('I click the {string} button', async function(buttonText) {
     if (count > 0) {
       const isVisible = await button.isVisible().catch(() => false);
       if (isVisible) {
+        // Register before click — Playwright only matches responses that occur after the listener exists.
+        // The success banner also auto-hides after a few seconds, so we must await API + banner here, not in a later step.
+        const resendDone = this.page.waitForResponse(
+          (r) =>
+            r.url().includes('resend-verification-email') &&
+            (r.status() === 200 || r.status() === 201 || r.status() === 204),
+          { timeout: 45000 }
+        );
         await button.click();
-        await this.page.locator('text=/verification|email|sent/i').first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+        await resendDone;
+        await this.page.getByTestId('email-resend-success-message').waitFor({ state: 'visible', timeout: 15000 });
         return;
       }
     }
