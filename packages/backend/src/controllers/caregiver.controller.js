@@ -5,7 +5,7 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { caregiverService } = require('../services');
 const config = require('../config/config');
-const { CaregiverDTO } = require('../dtos');
+const { CaregiverDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const logger = require('../config/logger');
 
 const getCaregivers = catchAsync(async (req, res) => {
@@ -150,7 +150,8 @@ const removeClient = catchAsync(async (req, res) => {
 const getClients = catchAsync(async (req, res) => {
   const { caregiverId } = req.params;
   const clients = await caregiverService.getClients(caregiverId);
-  res.status(httpStatus.OK).send(clients);
+  const clientDTOs = await clientsToDTOsWithLastCall(clients);
+  res.status(httpStatus.OK).send(clientDTOs);
 });
 
 module.exports = {

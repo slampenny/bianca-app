@@ -4,7 +4,7 @@ const config = require('../config/config');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const { authService, caregiverService, orgService, tokenService, emailService, alertService, mfaService, privacyService } = require('../services');
-const { AlertDTO, CaregiverDTO, OrgDTO, ClientDTO } = require('../dtos');
+const { AlertDTO, CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const { auditAuthFailure } = require('../middlewares/auditLog');
 const { AuditLog, Token } = require('../models');
 const i18n = require('i18n');
@@ -263,7 +263,7 @@ const login = catchAsync(async (req, res, next) => {
     // Step 4: Create session and audit log
     const alerts = await alertService.getAlerts(caregiverId);
     const alertDTOs = alerts.map((alert) => AlertDTO(alert));
-    const clientDTOs = clients.map((c) => ClientDTO(c));
+    const clientDTOs = await clientsToDTOsWithLastCall(clients);
     const caregiverDTO = CaregiverDTO(caregiver);
     const tokens = await tokenService.generateAuthTokens(caregiver);
     
@@ -798,7 +798,8 @@ const verifyEmail = async (req, res, next) => {
     
     // If JSON is requested, return tokens and user data for auto-login
     if (wantsJson) {
-      const { CaregiverDTO, OrgDTO, ClientDTO } = require('../dtos');
+      const { CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall: clientsWithCalls } = require('../dtos');
+      const clientDTOs = result.clients ? await clientsWithCalls(result.clients) : [];
       return res.status(httpStatus.OK).json({
         success: true,
         message: result.message,
@@ -806,7 +807,7 @@ const verifyEmail = async (req, res, next) => {
         caregiver: CaregiverDTO(result.caregiver),
         tokens: result.tokens,
         org: result.org ? OrgDTO(result.org) : null,
-        clients: result.clients ? result.clients.map((c) => ClientDTO(c)) : []
+        clients: clientDTOs,
       });
     }
     

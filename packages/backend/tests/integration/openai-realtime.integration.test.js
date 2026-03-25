@@ -66,6 +66,7 @@ describe('OpenAI Realtime API Integration Tests', () => {
       expect(sessionConfig.session.type).toBe('realtime');
       expect(sessionConfig.session.audio).toBeDefined();
       expect(sessionConfig.session.audio.input.format.type).toBe('audio/pcmu');
+      expect(sessionConfig.session.audio.input.transcription.language).toBe('en');
       expect(sessionConfig.session.audio.input.noise_reduction).toEqual({ type: 'near_field' });
       expect(sessionConfig.session.audio.output.format.type).toBe('audio/pcmu');
       expect(sessionConfig.session.audio.output.voice).toBeDefined();

@@ -6,6 +6,7 @@ import I18n from "i18n-js"
 // This is because react-native does not support tree-shaking.
 import type { Locale } from "date-fns"
 import format from "date-fns/format"
+import formatDistanceToNow from "date-fns/formatDistanceToNow"
 import parseISO from "date-fns/parseISO"
 import ar from "date-fns/locale/ar-SA"
 import ko from "date-fns/locale/ko"
@@ -25,4 +26,10 @@ export const formatDate = (date: string, dateFormat?: string, options?: Options)
     locale,
   }
   return format(parseISO(date), dateFormat ?? "MMM dd, yyyy", dateOptions)
+}
+
+/** Relative time (e.g. "3 days ago") for ISO timestamps, locale-aware. */
+export const formatRelativeFromIso = (iso: string) => {
+  const locale = getLocale()
+  return formatDistanceToNow(parseISO(iso), { addSuffix: true, locale })
 }

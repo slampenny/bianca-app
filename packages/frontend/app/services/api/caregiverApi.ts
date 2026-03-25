@@ -125,4 +125,5 @@ export const {
   useDeleteCaregiverMutation,
   useGetClientForCaregiverQuery,
   useGetClientsForCaregiverQuery,
+  useLazyGetClientsForCaregiverQuery,
 } = caregiverApi

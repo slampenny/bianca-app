@@ -341,7 +341,13 @@ const removeClient = async (caregiverId, clientId) => {
  * @returns {Promise<Array<Client>>}
  */
 const getClients = async (caregiverId) => {
-  const caregiver = await Caregiver.findById(caregiverId).populate('clients');
+  const caregiver = await Caregiver.findById(caregiverId).populate({
+    path: 'clients',
+    populate: {
+      path: 'schedules',
+      model: 'Schedule',
+    },
+  });
   if (!caregiver) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }

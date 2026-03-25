@@ -1,6 +1,19 @@
 // seedDatabaseDemo.js - Comprehensive demo data seeder for showcasing all app features
 const mongoose = require('mongoose');
-const { Alert, Org, Caregiver, Client, Conversation, Message, Schedule, PaymentMethod, Invoice, Call } = require('../models');
+const {
+  Alert,
+  Org,
+  Caregiver,
+  Client,
+  Conversation,
+  Message,
+  Schedule,
+  PaymentMethod,
+  Invoice,
+  Call,
+  MedicalAnalysis,
+  FraudAbuseAnalysis,
+} = require('../models');
 const config = require('../config/config');
 
 // Import seeders
@@ -14,6 +27,7 @@ const paymentMethodsSeeder = require('./seeders/paymentMethods.seeder');
 const invoicesSeeder = require('./seeders/invoices.seeder');
 const sentimentAnalysisSeeder = require('./seeders/sentimentAnalysis.seeder');
 const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
+const clientReportSnapshotSeeder = require('./seeders/clientReportSnapshot.seeder');
 
 /**
  * Clear all database collections
@@ -30,6 +44,8 @@ async function clearDatabase() {
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
   await Call.deleteMany({});
+  await MedicalAnalysis.deleteMany({});
+  await FraudAbuseAnalysis.deleteMany({});
   // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
   console.log('Database cleared');
 }
@@ -551,6 +567,8 @@ async function seedDatabaseDemo() {
       console.warn('Failed to run medical analysis on demo data:', error.message);
       // Don't fail the entire seeding process if medical analysis fails
     }
+
+    await clientReportSnapshotSeeder.seedClientReportSnapshots(allClients);
 
     console.log('Demo database seeded successfully!');
     console.log(`Created:`);

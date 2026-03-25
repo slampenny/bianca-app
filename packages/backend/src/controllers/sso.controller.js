@@ -6,7 +6,7 @@ const config = require('../config/config');
 const logger = require('../config/logger');
 const catchAsync = require('../utils/catchAsync');
 const { tokenService, orgService, emailService, alertService } = require('../services');
-const { CaregiverDTO, OrgDTO, ClientDTO, AlertDTO } = require('../dtos');
+const { CaregiverDTO, OrgDTO, AlertDTO, clientsToDTOsWithLastCall } = require('../dtos');
 
 const login = catchAsync(async (req, res) => {
   try {
@@ -220,7 +220,7 @@ const login = catchAsync(async (req, res) => {
     
     // Get clients from caregiver (already populated)
     const clients = caregiver.clients || [];
-    const clientDTOs = clients.map((c) => ClientDTO(c));
+    const clientDTOs = await clientsToDTOsWithLastCall(clients);
 
     // Generate DTOs
     let caregiverDTO, orgDTO;

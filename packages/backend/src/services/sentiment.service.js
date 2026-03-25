@@ -1,4 +1,5 @@
-const { Conversation } = require('../models');
+const mongoose = require('mongoose');
+const { Conversation, Call } = require('../models');
 const logger = require('../config/logger');
 
 /**
@@ -273,40 +274,85 @@ const getSentimentTrend = async (clientId, timeRange = 'lastCall') => {
   }
 };
 
+const conversationHasUsableSentiment = (conv) => {
+  const s = conv?.analyzedData?.sentiment;
+  if (!s || typeof s !== 'object') return false;
+  if (s.sentimentScore !== undefined && s.sentimentScore !== null) return true;
+  if (typeof s.overallSentiment === 'string' && s.overallSentiment.length > 0) return true;
+  return false;
+};
+
 /**
  * Get sentiment summary for a client
- * @param {string} clientId - The client ID
+ * @param {string|import('mongoose').Types.ObjectId} clientId - The client ID
+ * @param {{ maxAgeDays?: number }} [options] - maxAgeDays defaults to 30 (API / reports). Home glance passes a larger window.
  * @returns {Promise<Object>} Sentiment summary data
  */
-const getSentimentSummary = async (clientId) => {
+const getSentimentSummary = async (clientId, options = {}) => {
   try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const maxAgeDays = Number(options.maxAgeDays) > 0 ? Number(options.maxAgeDays) : 30;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - maxAgeDays);
 
-    let recentConversations = await Conversation.find({
-      clientId
-    })
-      .populate('callId', 'endTime startTime duration callDuration status')
-      .select('_id analyzedData callId')
-      .lean();
-    
-    // Filter by Call's endTime
-    recentConversations = recentConversations.filter(conv => {
-      const callEndTime = conv.callId?.endTime;
-      return callEndTime && callEndTime >= thirtyDaysAgo;
-    });
-    
-    // Sort by Call's endTime (most recent first)
-    recentConversations.sort((a, b) => {
-      const aTime = a.callId?.endTime || 0;
-      const bTime = b.callId?.endTime || 0;
-      return bTime - aTime;
-    });
-    
-    // Limit to 10
-    recentConversations = recentConversations.slice(0, 10);
+    const cid = mongoose.Types.ObjectId.isValid(clientId)
+      ? new mongoose.Types.ObjectId(String(clientId))
+      : clientId;
+    const cidStr = String(cid);
 
-    const analyzedConversations = recentConversations.filter(conv => conv.analyzedData?.sentiment);
+    // Use aggregation + $lookup so we read timing from the calls collection (not broken populate + lean).
+    const callCollection = Call.collection.name;
+
+    const recentConversations = await Conversation.aggregate([
+      {
+        $match: {
+          clientId: { $in: [cid, cidStr] },
+        },
+      },
+      {
+        $lookup: {
+          from: callCollection,
+          localField: 'callId',
+          foreignField: '_id',
+          as: 'callJoin',
+        },
+      },
+      {
+        $addFields: {
+          callEnd: {
+            $cond: {
+              if: { $gt: [{ $size: '$callJoin' }, 0] },
+              then: {
+                $let: {
+                  vars: { c: { $arrayElemAt: ['$callJoin', 0] } },
+                  in: {
+                    $ifNull: [
+                      '$$c.endTime',
+                      {
+                        $ifNull: [
+                          '$$c.callEndTime',
+                          { $ifNull: ['$$c.startTime', { $ifNull: ['$$c.callStartTime', '$updatedAt'] }] },
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+              else: '$updatedAt',
+            },
+          },
+        },
+      },
+      {
+        $match: {
+          callEnd: { $ne: null, $gte: cutoff },
+        },
+      },
+      { $sort: { callEnd: -1 } },
+      { $limit: 10 },
+      { $project: { _id: 1, analyzedData: 1 } },
+    ]);
+
+    const analyzedConversations = recentConversations.filter(conversationHasUsableSentiment);
     
     // Calculate summary statistics
     const sentimentScores = analyzedConversations

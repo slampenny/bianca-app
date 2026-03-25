@@ -9,6 +9,7 @@ module.exports.emailService = require('./email.service');
 module.exports.emergencyPhraseService = require('./emergencyPhrase.service');
 module.exports.orgService = require('./org.service');
 module.exports.clientService = require('./client.service');
+module.exports.clientHomeSnapshotService = require('./clientHomeSnapshot.service');
 module.exports.paymentService = require('./payment.service');
 module.exports.paymentMethodService = require('./paymentMethod.service');
 module.exports.scheduleService = require('./schedule.service');

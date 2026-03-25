@@ -1,5 +1,5 @@
 const httpStatus = require('http-status');
-const { Client } = require('../models');
+const mongoose = require('mongoose');
 // Note: openAiService methods are now in openai.realtime.service.js
 // This service may need to be updated to use the new service structure
 const config = require('../config/config');
@@ -61,9 +61,76 @@ const getLastContactTime = async (clientId) => {
   }
 };
 
+/**
+ * Latest call attempt (any outcome) and latest answered call per client, in one round-trip.
+ * @param {import('mongoose').Types.ObjectId[]|string[]} clientIds
+ * @returns {Promise<Record<string, { lastCallAttemptAt: Date|null, lastAnsweredCallAt: Date|null }>>}
+ */
+const getLastCallTimestampsForClientIds = async (clientIds) => {
+  const empty = {};
+  if (!clientIds?.length) {
+    return empty;
+  }
+  const ids = clientIds
+    .map((id) => {
+      if (!id) return null;
+      const raw = id._id ?? id;
+      if (mongoose.Types.ObjectId.isValid(raw)) {
+        return new mongoose.Types.ObjectId(raw);
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  if (!ids.length) {
+    return empty;
+  }
+
+  try {
+    const [attempts, answered] = await Promise.all([
+      Call.aggregate([
+        { $match: { clientId: { $in: ids } } },
+        { $group: { _id: '$clientId', lastCallAttemptAt: { $max: '$startTime' } } },
+      ]),
+      Call.aggregate([
+        {
+          $match: {
+            clientId: { $in: ids },
+            callOutcome: 'answered',
+          },
+        },
+        {
+          $addFields: {
+            answeredAt: {
+              $ifNull: ['$endTime', { $ifNull: ['$callEndTime', '$startTime'] }],
+            },
+          },
+        },
+        { $match: { answeredAt: { $ne: null } } },
+        { $group: { _id: '$clientId', lastAnsweredCallAt: { $max: '$answeredAt' } } },
+      ]),
+    ]);
+
+    const map = {};
+    attempts.forEach((row) => {
+      const key = row._id.toString();
+      map[key] = { ...(map[key] || {}), lastCallAttemptAt: row.lastCallAttemptAt || null };
+    });
+    answered.forEach((row) => {
+      const key = row._id.toString();
+      map[key] = { ...(map[key] || {}), lastAnsweredCallAt: row.lastAnsweredCallAt || null };
+    });
+    return map;
+  } catch (err) {
+    logger.error(`[Last call timestamps] Error: ${err.message}`);
+    return empty;
+  }
+};
+
 module.exports = {
   getCallById,
   processCallRecording,
   sendResponseAsCall,
   getLastContactTime,
+  getLastCallTimestampsForClientIds,
 };

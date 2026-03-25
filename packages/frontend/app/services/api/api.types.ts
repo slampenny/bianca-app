@@ -123,6 +123,17 @@ export interface Client {
   org: string | null
   caregivers: string[]
   schedules: Schedule[]
+  /** Most recent call attempt (any outcome), ISO string */
+  lastCallAttemptAt?: string | null
+  /** Most recent call with outcome answered, ISO string */
+  lastAnsweredCallAt?: string | null
+  /** ~30d sentiment summary (reports) */
+  sentimentTrendDirection?: "improving" | "stable" | "declining" | null
+  sentimentAnalyzedConversations?: number | null
+  /** Latest medical analysis overall health score (0–100), if any */
+  latestOverallHealthScore?: number | null
+  /** Latest fraud/abuse overall risk score (0–100), if any */
+  latestOverallRiskScore?: number | null
 }
 
 export interface Interval {

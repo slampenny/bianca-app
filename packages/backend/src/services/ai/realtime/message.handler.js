@@ -35,7 +35,11 @@ class MessageHandler {
   static buildSessionConfig(connection) {
     const voice = config.openai.realtimeVoice || 'alloy';
     const transcriptionModel = config.openai.realtimeTranscriptionModel || 'gpt-4o-mini-transcribe';
-    
+    // ISO-639-1 — matches Client.preferredLanguage enum; avoids ASR auto-detect picking wrong language
+    const rawLang = connection?.preferredLanguage;
+    const transcriptionLanguage =
+      typeof rawLang === 'string' && /^[a-z]{2}$/i.test(rawLang) ? rawLang.toLowerCase() : 'en';
+
     const baseConfig = {
       type: 'session.update',
       session: {
@@ -79,7 +83,8 @@ class MessageHandler {
           type: 'audio/pcmu'  // GA uses audio/pcmu instead of g711_ulaw
         },
         transcription: {
-          model: transcriptionModel
+          model: transcriptionModel,
+          language: transcriptionLanguage,
         },
         // OpenAI built-in noise reduction (optimized for phone calls)
         noise_reduction: noiseReductionObject,

@@ -33,7 +33,7 @@ const WebSocket = require('ws');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
-const { Call, Conversation, Message } = require('../models'); // Assuming Message model is used for saving transcripts
+const { Call, Client, Conversation, Message } = require('../models'); // Assuming Message model is used for saving transcripts
 const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
 const { emergencyProcessor } = require('./emergencyProcessor.service');
 const { getConversationContextWindow } = require('../utils/conversationContextWindow');
@@ -375,6 +375,19 @@ class OpenAIRealtimeService {
       logger.info(`[OpenAI Realtime] Emergency detection enabled for client: ${clientId}`);
     }
 
+    let preferredLanguage = 'en';
+    if (clientId) {
+      try {
+        const client = await Client.findById(clientId).select('preferredLanguage').lean();
+        if (client?.preferredLanguage) {
+          preferredLanguage = client.preferredLanguage;
+        }
+        logger.info(`[OpenAI Realtime] Input transcription language (client preferred): ${preferredLanguage}`);
+      } catch (err) {
+        logger.warn(`[OpenAI Realtime] Could not load client preferredLanguage for ${clientId}: ${err.message}`);
+      }
+    }
+
     // Ensure Conversation exists (for outbound calls, it might not exist yet)
     let finalConversationId = conversationId;
     if (!finalConversationId && callSid) {
@@ -415,7 +428,7 @@ class OpenAIRealtimeService {
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
       clientId,
-      preferredLanguage: null, // Will be loaded when needed
+      preferredLanguage,
       webSocket: null,
       sessionReady: false,
       startTime: Date.now(),
@@ -1172,9 +1185,15 @@ class OpenAIRealtimeService {
               this.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, 'user_started_speaking');
             }
 
-            // Create placeholder message when user starts speaking
-            // This ensures the timestamp reflects when user actually started speaking
-            await this.createPlaceholderUserMessage(callId);
+            // Placeholder once the greeting is done — before that, user audio exists but transcripts are ignored,
+            // which would otherwise leave permanent "[Speaking...]" rows.
+            if (!conn._waitingForInitialGreeting) {
+              await this.createPlaceholderUserMessage(callId);
+            } else {
+              logger.debug(
+                `[OpenAI Realtime] Skipping user placeholder for ${callId} — waiting for initial greeting (transcripts ignored until then)`
+              );
+            }
 
             // CRITICAL: If AI is currently speaking, we need to interrupt it
             if (conn._aiIsSpeaking) {
@@ -1240,11 +1259,12 @@ class OpenAIRealtimeService {
                 
                 // Check if transcript is only filler words - if so, don't save or respond, just wait
                 if (this.isOnlyFillerWords(transcript, preferredLanguage)) {
-                  logger.info(`[OpenAI Realtime] User transcript contains only filler words (${preferredLanguage}): "${transcript}" - waiting for more substantial speech`);
-                  // Clear the transcript but keep the placeholder - user might continue speaking
+                  logger.info(
+                    `[OpenAI Realtime] User transcript contains only filler words (${preferredLanguage}): "${transcript}" — removing placeholder, no response`
+                  );
                   currentConn.pendingUserTranscript = '';
-                  // Don't finalize message or trigger response - just wait
-                  return; // Exit early, don't trigger AI response
+                  await this.removeUserSpeakingPlaceholder(callId, 'filler-only utterance');
+                  return;
                 }
                 
                 logger.info(`[OpenAI Realtime] Saving user transcript now that user finished speaking: "${transcript}"`);
@@ -1979,6 +1999,26 @@ class OpenAIRealtimeService {
    * 2. Store the message ID in the connection for later updating
    * 3. This ensures the timestamp reflects when user actually started speaking
    */
+  /**
+   * Delete in-progress user placeholder (e.g. filler-only turn) so "[Speaking...]" never stays in the transcript.
+   */
+  async removeUserSpeakingPlaceholder(callId, reason) {
+    const conn = this.connections.get(callId);
+    if (!conn?.activeUserMessageId) return;
+
+    const id = conn.activeUserMessageId;
+    try {
+      const { Message } = require('../models');
+      await Message.findByIdAndDelete(id);
+      logger.info(`[OpenAI Realtime] Removed user placeholder ${id} for ${callId} (${reason})`);
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Failed to remove user placeholder for ${callId}: ${err.message}`);
+    }
+
+    conn.activeUserMessageId = null;
+    conn._waitingForUserTranscript = false;
+  }
+
   async createPlaceholderUserMessage(callId) {
     const conn = this.connections.get(callId);
     if (!conn?.conversationId) return;
@@ -3745,6 +3785,33 @@ class OpenAIRealtimeService {
           }
           
           conn.pendingUserTranscript = '';
+        }
+
+        // Never persist bare "[Speaking...]" if the call ended before transcript/placeholder flow completed
+        if (conn.activeUserMessageId) {
+          const orphanUser = await Message.findById(conn.activeUserMessageId).select('content').lean();
+          if (orphanUser?.content === '[Speaking...]') {
+            await Message.findByIdAndDelete(conn.activeUserMessageId);
+            logger.info(`[OpenAI Call End] Removed orphan user [Speaking...] placeholder for ${callId}`);
+          } else if (orphanUser) {
+            logger.warn(
+              `[OpenAI Call End] User placeholder ${conn.activeUserMessageId} still active at hangup — leaving message in DB`
+            );
+          }
+          conn.activeUserMessageId = null;
+          conn._waitingForUserTranscript = false;
+        }
+        if (conn.activeAssistantMessageId) {
+          const orphanAi = await Message.findById(conn.activeAssistantMessageId).select('content').lean();
+          if (orphanAi?.content === '[Speaking...]') {
+            await Message.findByIdAndDelete(conn.activeAssistantMessageId);
+            logger.info(`[OpenAI Call End] Removed orphan assistant [Speaking...] placeholder for ${callId}`);
+          } else if (orphanAi) {
+            logger.warn(
+              `[OpenAI Call End] Assistant placeholder ${conn.activeAssistantMessageId} still active at hangup — leaving message in DB`
+            );
+          }
+          conn.activeAssistantMessageId = null;
         }
 
         // Save any pending assistant message

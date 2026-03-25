@@ -1,16 +1,16 @@
-import React from "react"
+import React, { useCallback } from "react"
 import { View, StyleSheet, FlatList, Platform } from "react-native"
-import { AutoImage, Card, Button, Text } from "app/components"
+import { AutoImage, Card, Button, Text, ClientGlanceStat } from "app/components"
 import { Ionicons } from "@expo/vector-icons"
 import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser } from "../store/authSlice"
-import { setClient, getClientsForCaregiver, clearClient } from "../store/clientSlice"
+import { setClient, getClientsForCaregiver, clearClient, setClientsForCaregiver } from "../store/clientSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
 import { setPendingCallData, clearCallData } from "../store/callSlice"
 import { clearConversation } from "../store/conversationSlice"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { isAuthCancelledError } from "../services/api/baseQueryWithAuth"
-import { useNavigation, NavigationProp } from "@react-navigation/native"
+import { useNavigation, NavigationProp, useFocusEffect } from "@react-navigation/native"
 import { Caregiver, Client } from "../services/api/api.types"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { RootState } from "../store/store"
@@ -19,11 +19,38 @@ import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
 import { logger } from "../utils/logger"
 import { PhoneVerificationBanner } from "../components/PhoneVerificationBanner"
+import { caregiverApi } from "../services/api/caregiverApi"
+import { formatRelativeFromIso } from "../utils/formatDate"
 
+function formatSentimentGlanceLabel(
+  trend: Client["sentimentTrendDirection"],
+  analyzed: number | null | undefined,
+): string {
+  if (analyzed == null || analyzed === 0) return translate("homeScreen.glanceNoData")
+  if (trend === "improving") return translate("homeScreen.sentimentTrendImproving")
+  if (trend === "declining") return translate("homeScreen.sentimentTrendDeclining")
+  return translate("homeScreen.sentimentTrendStable")
+}
+
+function formatScoreGlance(score: number | null | undefined): string {
+  if (score == null || Number.isNaN(Number(score))) return translate("homeScreen.glanceNoData")
+  return String(Math.round(Number(score)))
+}
+
+function sentimentGlanceIcon(
+  trend: Client["sentimentTrendDirection"],
+  analyzed: number | null | undefined,
+): "trending-up" | "trending-down" | "remove" | null {
+  if (analyzed == null || analyzed === 0) return null
+  if (trend === "improving") return "trending-up"
+  if (trend === "declining") return "trending-down"
+  return "remove"
+}
 
 export function HomeScreen() {
   const dispatch = useDispatch()
   const currentUser: Caregiver | null = useSelector(getCurrentUser)
+  const [fetchClientsForCaregiver] = caregiverApi.useLazyGetClientsForCaregiverQuery()
   const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   const { colors, isLoading: themeLoading } = useTheme()
@@ -39,7 +66,22 @@ export function HomeScreen() {
       console.log(`[HOMESCREEN] Rendered ${clients.length} clients for user ${currentUser.id}`)
     }
   }, [clients.length, currentUser?.id])
-  
+
+  useFocusEffect(
+    useCallback(() => {
+      const id = currentUser?.id
+      if (!id) return undefined
+      void fetchClientsForCaregiver(id)
+        .unwrap()
+        .then((list) => {
+          dispatch(setClientsForCaregiver({ caregiverId: id, clients: list }))
+        })
+        .catch(() => {
+          /* offline / auth: keep cached list */
+        })
+      return undefined
+    }, [currentUser?.id, dispatch, fetchClientsForCaregiver]),
+  )
 
   
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
@@ -116,24 +158,107 @@ export function HomeScreen() {
     }
   }
 
+  const styles = createStyles(colors)
+
   const renderClient = ({ item }: { item: Client }) => {
     const hasNoSchedule = !item.schedules || item.schedules.length === 0
     const cardStyle = hasNoSchedule 
       ? [styles.clientCard, styles.clientCardWarning]
       : styles.clientCard
-    
+
+    const lastCalledLabel = item.lastCallAttemptAt
+      ? formatRelativeFromIso(item.lastCallAttemptAt)
+      : translate("homeScreen.neverCalled")
+    const lastAnsweredLabel = item.lastAnsweredCallAt
+      ? formatRelativeFromIso(item.lastAnsweredCallAt)
+      : translate("homeScreen.noAnsweredCallsYet")
+
+    const sentimentIcon = sentimentGlanceIcon(
+      item.sentimentTrendDirection,
+      item.sentimentAnalyzedConversations,
+    )
+    const sentimentIconColor =
+      item.sentimentTrendDirection === "improving"
+        ? colors.palette.biancaSuccess || "#22c55e"
+        : item.sentimentTrendDirection === "declining"
+          ? colors.palette.error || "#ef4444"
+          : colors.palette.neutral500
+
+    const contentBlock = (
+      <View style={styles.clientContentBlock}>
+        <View style={styles.clientTopRow}>
+          <View style={styles.nameColumn}>
+            <Text style={styles.clientName} testID={`client-name-${item.name}`}>
+              {item.name}
+            </Text>
+            <View style={styles.callMetaColumn}>
+              <Text style={styles.callMetaLine} size="xs">
+                {translate("homeScreen.lastCalled")}: {lastCalledLabel}
+              </Text>
+              <Text style={styles.callMetaLine} size="xs">
+                {translate("homeScreen.lastAnsweredCall")}: {lastAnsweredLabel}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.glanceStats}>
+            <ClientGlanceStat
+              labelTx="homeScreen.glanceSentiment"
+              hintTitleTx="homeScreen.glanceHintSentimentTitle"
+              hintBodyTx="homeScreen.glanceHintSentimentBody"
+              valueTestID={`client-glance-mood-${item.id}`}
+              value={formatSentimentGlanceLabel(
+                item.sentimentTrendDirection,
+                item.sentimentAnalyzedConversations,
+              )}
+              leftAccessory={
+                sentimentIcon ? (
+                  <Ionicons name={sentimentIcon} size={14} color={sentimentIconColor} />
+                ) : undefined
+              }
+            />
+            <ClientGlanceStat
+              labelTx="homeScreen.glanceHealth"
+              hintTitleTx="homeScreen.glanceHintHealthTitle"
+              hintBodyTx="homeScreen.glanceHintHealthBody"
+              value={formatScoreGlance(item.latestOverallHealthScore)}
+              valueAccessibilityLabel={
+                item.latestOverallHealthScore != null
+                  ? translate("homeScreen.glanceHealthA11y", {
+                      score: String(item.latestOverallHealthScore),
+                    })
+                  : undefined
+              }
+            />
+            <ClientGlanceStat
+              labelTx="homeScreen.glanceRisk"
+              hintTitleTx="homeScreen.glanceHintRiskTitle"
+              hintBodyTx="homeScreen.glanceHintRiskBody"
+              value={formatScoreGlance(item.latestOverallRiskScore)}
+              valueAccessibilityLabel={
+                item.latestOverallRiskScore != null
+                  ? translate("homeScreen.glanceRiskA11y", {
+                      score: String(item.latestOverallRiskScore),
+                    })
+                  : undefined
+              }
+            />
+          </View>
+        </View>
+        {hasNoSchedule ? (
+          <Text style={styles.warningFooter} testID={`no-schedule-warning-${item.name}`}>
+            {translate("homeScreen.noScheduleWarning")}
+          </Text>
+        ) : null}
+      </View>
+    )
+
     return (
       <Card
         style={cardStyle}
         testID={`client-card-${item.id}`}
         accessibilityLabel={`client-card-${item.name}`}
         LeftComponent={<AutoImage source={{ uri: item.avatar }} style={styles.avatar} />}
-        content={item.name}
-        contentStyle={styles.clientName}
-        ContentTextProps={{ testID: `client-name-${item.name}` }}
-        footer={hasNoSchedule ? translate("homeScreen.noScheduleWarning") : undefined}
-        footerStyle={hasNoSchedule ? styles.warningFooter : undefined}
-        FooterTextProps={hasNoSchedule ? { testID: `no-schedule-warning-${item.name}` } : undefined}
+        ContentComponent={contentBlock}
         RightComponent={
           <View style={styles.buttonContainer}>
             <Button
@@ -187,8 +312,6 @@ export function HomeScreen() {
   
   // Debug log to confirm component is rendering
   console.log('[HOMESCREEN] Component rendering: currentUser.id=', currentUser?.id, 'clients.count=', clients.length, 'themeLoading=', themeLoading)
-
-  const styles = createStyles(colors)
 
   return (
     <View style={styles.container} accessibilityLabel="home-screen">
@@ -256,6 +379,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 48,
     marginRight: 12,
     width: 48,
+    alignSelf: "flex-start",
   },
   container: {
     backgroundColor: colors.palette.biancaBackground,
@@ -319,7 +443,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   clientCard: {
     backgroundColor: colors.palette.neutral100,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     marginBottom: 12,
     padding: 16,
@@ -339,6 +463,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.palette.warning300 || colors.palette.warning400 || "#FCD34D",
   },
+  callMetaLine: {
+    color: colors.palette.neutral600,
+  },
   warningFooter: {
     color: colors.palette.warning700 || colors.palette.warning800 || "#B45309",
     fontSize: 12,
@@ -353,11 +480,46 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.palette.biancaHeader,
     flexShrink: 1,
     fontSize: 16,
+    fontWeight: "600",
+  },
+  clientContentBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  clientTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    width: "100%",
+    gap: 8,
+  },
+  nameColumn: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    gap: 4,
+    paddingRight: 4,
+  },
+  callMetaColumn: {
+    gap: 2,
+    maxWidth: 220,
+  },
+  glanceStats: {
+    flex: 1,
+    minWidth: 0,
+    maxWidth: 248,
+    flexDirection: "row",
+    alignItems: "stretch",
+    justifyContent: "flex-end",
+    flexWrap: "nowrap",
+    gap: 6,
   },
   buttonContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    alignSelf: "flex-start",
+    marginLeft: 4,
+    paddingTop: 2,
   },
 
   tooltip: {

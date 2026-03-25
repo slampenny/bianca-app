@@ -108,10 +108,11 @@ function generateFakeSentimentAnalysis(conversationText, metadata = {}) {
 async function seedSentimentAnalysis() {
   console.log('Adding sentiment analysis to seeded conversations...');
   try {
-    // Get all conversations for sentiment analysis
+    // Match conversations that have messages. Do not require status: 'completed' — the
+    // Conversation schema historically did not persist status (strict mode stripped it),
+    // so that filter matched zero rows and home "Mood" always stayed empty after seed.
     const allConversations = await Conversation.find({
-      status: 'completed',
-      messages: { $exists: true, $ne: [] }
+      messages: { $exists: true, $ne: [] },
     }).populate('messages');
     
     console.log(`Found ${allConversations.length} conversations to analyze for sentiment`);
