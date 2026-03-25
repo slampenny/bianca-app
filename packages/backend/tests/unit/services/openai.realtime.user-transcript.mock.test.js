@@ -24,11 +24,43 @@ jest.mock('../../../src/services/emergencyProcessor.service', () => {
 
 const { OpenAIRealtimeService } = require('../../../src/services/openai.realtime.service');
 
+const SPEAKING_PLACEHOLDER = '[Speaking...]';
+
 describe('OpenAI Realtime user transcript (mocked server events)', () => {
   let mongoServer;
   let service;
   let conversationId;
   const callId = 'mock-call-transcript';
+
+  /** Fails if emergency runs before live transcript path (regression guard for caregiver UI lag). */
+  async function assertTranscriptPathBeforeEmergency(serviceInstance, callIdKey, completedPayload) {
+    const { emergencyProcessor } = require('../../../src/services/emergencyProcessor.service');
+    const order = [];
+
+    emergencyProcessor.processUtterance.mockClear();
+    emergencyProcessor.processUtterance.mockImplementation(async () => {
+      order.push('emergency');
+      return { shouldAlert: false, reason: 'ok' };
+    });
+
+    serviceInstance.setNotificationCallback((cid, type) => {
+      if (type === 'user_transcript_updated') order.push('notify');
+    });
+
+    const origUpdate = Message.findByIdAndUpdate.bind(Message);
+    const updateSpy = jest.spyOn(Message, 'findByIdAndUpdate').mockImplementation(async (...args) => {
+      order.push('db');
+      return origUpdate(...args);
+    });
+
+    try {
+      await serviceInstance.handleInputAudioTranscriptionCompleted(callIdKey, completedPayload);
+    } finally {
+      updateSpy.mockRestore();
+    }
+
+    expect(order).toEqual(['notify', 'db', 'emergency']);
+  }
 
   beforeAll(async () => {
     mongoServer = new MongoMemoryServer();
@@ -85,7 +117,7 @@ describe('OpenAI Realtime user transcript (mocked server events)', () => {
     expect(service.connections.get(callId).pendingUserTranscript).toBe('I feel fine today.');
   });
 
-  it('handleInputAudioTranscriptionCompleted writes message to DB immediately (live)', async () => {
+  it('handleInputAudioTranscriptionCompleted updates placeholder content in DB (final state only)', async () => {
     const conn = baseConn();
     service.connections.set(callId, conn);
     await service.createPlaceholderUserMessage(callId);
@@ -100,6 +132,87 @@ describe('OpenAI Realtime user transcript (mocked server events)', () => {
     const saved = await Message.findById(mid);
     expect(saved.content).toBe('Live update text.');
     expect(conn.pendingUserTranscript).toBe('Live update text.');
+  });
+
+  it('handleInputAudioTranscriptionCompleted runs notify + DB persist before emergencyProcessor.processUtterance', async () => {
+    const conn = baseConn();
+    service.connections.set(callId, conn);
+    await service.createPlaceholderUserMessage(callId);
+
+    await assertTranscriptPathBeforeEmergency(service, callId, {
+      type: 'conversation.item.input_audio_transcription.completed',
+      transcript: 'User said something long enough for emergency path to run.',
+    });
+  });
+
+  it('deferred assistant queues are isolated per callId (concurrent calls)', async () => {
+    const callA = 'mock-concurrent-a';
+    const callB = 'mock-concurrent-b';
+    const convA = new mongoose.Types.ObjectId();
+    const convB = new mongoose.Types.ObjectId();
+
+    const clientA = new mongoose.Types.ObjectId();
+    const clientB = new mongoose.Types.ObjectId();
+    const callRowA = await Call.create({ callSid: callA, clientId: clientA, status: 'in-progress', duration: 0 });
+    const callRowB = await Call.create({ callSid: callB, clientId: clientB, status: 'in-progress', duration: 0 });
+    await Conversation.create({ _id: convA, clientId: clientA, callId: callRowA._id, messages: [] });
+    await Conversation.create({ _id: convB, clientId: clientB, callId: callRowB._id, messages: [] });
+
+    const svc = new OpenAIRealtimeService();
+    svc.connections = new Map();
+
+    const minimalConn = (convId, clientId) => ({
+      conversationId: convId.toString(),
+      clientId,
+      pendingUserTranscript: '',
+      pendingAssistantTranscript: '',
+      activeUserMessageId: null,
+      activeAssistantMessageId: null,
+      _waitingForInitialGreeting: false,
+      _deferredAssistantQueue: [],
+      conversationState: null,
+      stateHistory: [],
+    });
+
+    svc.connections.set(callA, minimalConn(convA, clientA));
+    svc.connections.set(callB, minimalConn(convB, clientB));
+
+    const connA = svc.connections.get(callA);
+    const connB = svc.connections.get(callB);
+
+    connA._deferredAssistantQueue.push({ assistantMessageId: null, transcript: 'Deferred for call A only.' });
+
+    await svc.flushDeferredAssistantQueue(callB, { force: true });
+    expect(connA._deferredAssistantQueue).toHaveLength(1);
+
+    await svc.flushDeferredAssistantQueue(callA, { force: true });
+    expect(connA._deferredAssistantQueue).toHaveLength(0);
+    expect(connB._deferredAssistantQueue).toHaveLength(0);
+  });
+
+  it('defers assistant final transcript in DB until user row is no longer [Speaking...]', async () => {
+    const conn = baseConn();
+    service.connections.set(callId, conn);
+    await service.createPlaceholderUserMessage(callId);
+    await service.createPlaceholderAssistantMessage(callId);
+    const userMid = conn.activeUserMessageId;
+    const asstMid = conn.activeAssistantMessageId;
+
+    expect((await Message.findById(userMid)).content).toBe(SPEAKING_PLACEHOLDER);
+    expect((await Message.findById(asstMid)).content).toBe(SPEAKING_PLACEHOLDER);
+
+    conn.pendingAssistantTranscript = 'Bianca says hello and this is long enough.';
+    await service.handleResponseDone(callId, { response: { status: 'completed' } });
+
+    const assistantRow = await Message.findById(asstMid);
+    expect(assistantRow.content).toBe(SPEAKING_PLACEHOLDER);
+    expect(service.connections.get(callId)._deferredAssistantQueue).toHaveLength(1);
+
+    await service.persistUserTranscriptToPlaceholder(callId, 'User line appears first in the UI.');
+
+    expect((await Message.findById(userMid)).content).toBe('User line appears first in the UI.');
+    expect((await Message.findById(asstMid)).content).toBe('Bianca says hello and this is long enough.');
+    expect(service.connections.get(callId)._deferredAssistantQueue || []).toHaveLength(0);
   });
 
   it('handleInputAudioTranscriptionCompleted reads nested transcript shape', async () => {

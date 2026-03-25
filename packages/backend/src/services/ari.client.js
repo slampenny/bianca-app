@@ -2305,6 +2305,9 @@ async handleStasisStartForPlayback(channel, channelName, event) {
                     case 'user_transcript_updated':
                         logger.debug(`[ARI] User transcript persisted for ${callbackId} (message ${data?.messageId || '?'})`);
                         break;
+                    case 'assistant_transcript_updated':
+                        logger.debug(`[ARI] Assistant transcript for ${callbackId} (message ${data?.messageId || '?'})`);
+                        break;
                     case 'openai_text_delta':
                         logger.debug(`[ARI] Text delta for ${callbackId}: ${data.text}`);
                         break;
