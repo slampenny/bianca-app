@@ -1,4 +1,5 @@
 const httpStatus = require('http-status');
+const validator = require('validator');
 const Caregiver = require('../models/caregiver.model');
 const Org = require('../models/org.model');
 const ApiError = require('../utils/ApiError');
@@ -19,8 +20,13 @@ const login = catchAsync(async (req, res) => {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Missing required SSO fields: provider, email, name, and id are required');
     }
 
-    // Check if caregiver exists with this email - populate clients and org
-    let caregiver = await Caregiver.findOne({ email })
+    const normalizedEmail = String(email).trim().toLowerCase();
+    if (!validator.isEmail(normalizedEmail)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid email address from SSO provider');
+    }
+
+    // Check if caregiver exists with this email (always match case-insensitively)
+    let caregiver = await Caregiver.findOne({ email: normalizedEmail })
       .populate('org')
       .populate({
         path: 'clients',
@@ -29,25 +35,46 @@ const login = catchAsync(async (req, res) => {
           model: 'Schedule',
         },
       });
-    logger.debug('SSO login caregiver lookup', { email, found: !!caregiver });
+    logger.debug('SSO login caregiver lookup by email', { email: normalizedEmail, found: !!caregiver });
+
+    // Microsoft/Google may return a different mailbox string than we stored (e.g. UPN vs mail); match stable IdP subject
+    if (!caregiver && provider && providerId) {
+      caregiver = await Caregiver.findOne({
+        ssoProvider: provider,
+        ssoProviderId: String(providerId),
+      })
+        .populate('org')
+        .populate({
+          path: 'clients',
+          populate: {
+            path: 'schedules',
+            model: 'Schedule',
+          },
+        });
+      logger.info('SSO login caregiver lookup by provider id', {
+        provider,
+        found: !!caregiver,
+        emailFromIdp: normalizedEmail,
+      });
+    }
 
     let orgForDTO = null;
     
     if (!caregiver) {
       // Check if an org exists with this email (but no caregiver)
-      const existingOrg = await Org.findOne({ email });
+      const existingOrg = await Org.findOne({ email: normalizedEmail });
       
       if (existingOrg) {
         // Org exists but caregiver doesn't - create caregiver and add to existing org
-        logger.info('SSO login: org exists, creating caregiver', { email, name, provider, orgId: existingOrg._id });
+        logger.info('SSO login: org exists, creating caregiver', { email: normalizedEmail, name, provider, orgId: existingOrg._id });
         try {
           caregiver = await Caregiver.create({
-            email: email,
+            email: normalizedEmail,
             name: name,
             org: existingOrg._id,
             password: null, // SSO users don't have passwords
             ssoProvider: provider,
-            ssoProviderId: providerId,
+            ssoProviderId: String(providerId),
             avatar: picture,
             isEmailVerified: true, // SSO users are pre-verified
             role: 'orgAdmin', // First caregiver in org should be orgAdmin
@@ -90,7 +117,7 @@ const login = catchAsync(async (req, res) => {
           logger.error('SSO login failed to create caregiver for existing org', {
             error: createError.message,
             stack: createError.stack,
-            email,
+            email: normalizedEmail,
             provider,
             orgId: existingOrg._id
           });
@@ -101,22 +128,22 @@ const login = catchAsync(async (req, res) => {
         }
       } else {
         // Neither org nor caregiver exists - create both
-        logger.info('SSO login creating new org and caregiver', { email, name, provider });
+        logger.info('SSO login creating new org and caregiver', { email: normalizedEmail, name, provider });
         try {
           // Create new user through the proper registration workflow (returns { org, caregiver })
           const { org: createdOrg, caregiver: createdCaregiver } = await orgService.createOrg(
             {
-              email: email,
+              email: normalizedEmail,
               name: `${name}'s Organization`,
               // phone will be set later when user completes profile
             },
             {
-              email: email,
+              email: normalizedEmail,
               name: name,
               // phone will be set later when user completes profile
               password: null, // SSO users don't have passwords
               ssoProvider: provider,
-              ssoProviderId: providerId,
+              ssoProviderId: String(providerId),
               avatar: picture,
               isEmailVerified: true, // SSO users are pre-verified
               role: 'orgAdmin', // User creating the org should be orgAdmin from the start
@@ -149,7 +176,7 @@ const login = catchAsync(async (req, res) => {
           logger.error('SSO login failed to create org and caregiver', {
             error: createError.message,
             stack: createError.stack,
-            email,
+            email: normalizedEmail,
             provider
           });
           throw new ApiError(
@@ -169,16 +196,53 @@ const login = catchAsync(async (req, res) => {
       //   console.error('Failed to send verification email during SSO registration:', emailError);
       // }
     } else {
-      // Update existing caregiver with SSO info if not already set
+      let caregiverDirty = false;
       if (!caregiver.ssoProvider) {
         caregiver.ssoProvider = provider;
-        caregiver.ssoProviderId = providerId;
+        caregiver.ssoProviderId = String(providerId);
         if (picture) {
           caregiver.avatar = picture;
         }
+        caregiverDirty = true;
+      } else {
+        if (String(caregiver.ssoProviderId) !== String(providerId)) {
+          logger.warn('SSO login: ssoProviderId changed for existing caregiver', {
+            caregiverId: caregiver._id,
+            previous: caregiver.ssoProviderId,
+            incoming: providerId,
+          });
+          caregiver.ssoProviderId = String(providerId);
+          caregiverDirty = true;
+        }
+        if (picture && caregiver.avatar !== picture) {
+          caregiver.avatar = picture;
+          caregiverDirty = true;
+        }
+      }
+
+      if (caregiver.email !== normalizedEmail) {
+        const taken = await Caregiver.isEmailTaken(normalizedEmail, caregiver._id);
+        if (!taken) {
+          logger.info('SSO login: updating caregiver email to match IdP', {
+            caregiverId: caregiver._id,
+            from: caregiver.email,
+            to: normalizedEmail,
+          });
+          caregiver.email = normalizedEmail;
+          caregiverDirty = true;
+        } else {
+          logger.warn('SSO login: IdP email differs from stored but is already used by another account', {
+            caregiverId: caregiver._id,
+            storedEmail: caregiver.email,
+            idpEmail: normalizedEmail,
+          });
+        }
+      }
+
+      if (caregiverDirty) {
         await caregiver.save();
       }
-      
+
       // Fetch org data if caregiver has an org
       if (caregiver.org) {
         const mongoose = require('mongoose');
@@ -317,7 +381,11 @@ const verify = catchAsync(async (req, res) => {
         throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid Google token');
       }
 
-      userInfo = await response.json();
+      const g = await response.json();
+      userInfo = {
+        ...g,
+        email: g.email ? String(g.email).trim().toLowerCase() : g.email,
+      };
     } else if (provider === 'microsoft') {
       // Verify Microsoft token
       const response = await fetch('https://graph.microsoft.com/v1.0/me', {
@@ -331,9 +399,10 @@ const verify = catchAsync(async (req, res) => {
       }
 
       const msUserInfo = await response.json();
+      const rawMsEmail = msUserInfo.mail || msUserInfo.userPrincipalName;
       userInfo = {
         id: msUserInfo.id,
-        email: msUserInfo.mail || msUserInfo.userPrincipalName,
+        email: rawMsEmail ? String(rawMsEmail).trim().toLowerCase() : rawMsEmail,
         name: msUserInfo.displayName,
         picture: msUserInfo.photo ? `https://graph.microsoft.com/v1.0/me/photo/$value` : undefined,
       };

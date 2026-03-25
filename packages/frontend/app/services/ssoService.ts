@@ -426,9 +426,10 @@ class SSOService {
 
     const userInfo = await response.json();
     
+    const email = userInfo.email ? String(userInfo.email).trim().toLowerCase() : userInfo.email;
     return {
       id: userInfo.id,
-      email: userInfo.email,
+      email,
       name: userInfo.name,
       picture: userInfo.picture,
       provider: 'google',
@@ -461,9 +462,11 @@ class SSOService {
       displayName: userInfo.displayName,
     });
     
+    const rawEmail = userInfo.mail || userInfo.userPrincipalName;
+    const email = rawEmail ? String(rawEmail).trim().toLowerCase() : rawEmail;
     return {
       id: userInfo.id,
-      email: userInfo.mail || userInfo.userPrincipalName,
+      email,
       name: userInfo.displayName,
       picture: userInfo.photo ? `https://graph.microsoft.com/v1.0/me/photo/$value` : undefined,
       provider: 'microsoft',
