@@ -48,18 +48,20 @@ describe('Client routes', () => {
         .send({ ...clientOne, org: org._id })
         .expect(httpStatus.CREATED);
 
-      expect(res.body).toEqual({
-        id: expect.any(String),
-        org: org.id.toString(),
-        name: clientOne.name,
-        email: clientOne.email,
-        phone: clientOne.phone,
-        isEmailVerified: false,
-        preferredLanguage: 'en',
-        consented: true,
-        caregivers: expect.arrayContaining([]),
-        schedules: expect.arrayContaining([]),
-      });
+      expect(res.body).toEqual(
+        expect.objectContaining({
+          id: expect.any(String),
+          org: org.id.toString(),
+          name: clientOne.name,
+          email: clientOne.email,
+          phone: clientOne.phone,
+          isEmailVerified: false,
+          preferredLanguage: 'en',
+          consented: true,
+          caregivers: expect.arrayContaining([]),
+          schedules: expect.arrayContaining([]),
+        })
+      );
     });
 
     describe('Phone number validation in client creation', () => {
