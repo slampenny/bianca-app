@@ -121,6 +121,11 @@ resource "aws_codebuild_project" "production_swap_and_terminate" {
       name  = "PRODUCTION_EIP_ALLOCATION_ID"
       value = aws_eip.production.id
     }
+    # Must match aws_ebs_volume.production_mongodb tag Name (staging uses bianca-staging-mongodb-data)
+    environment_variable {
+      name  = "MONGODB_DATA_VOLUME_TAG"
+      value = aws_ebs_volume.production_mongodb.tags["Name"]
+    }
   }
 
   source {

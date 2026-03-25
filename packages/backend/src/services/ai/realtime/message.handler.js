@@ -12,6 +12,21 @@ const config = require('../../../config/config');
  */
 class MessageHandler {
   /**
+   * Normalize transcript from conversation.item.input_audio_transcription.completed (GA may use top-level or nested fields).
+   */
+  static extractUserInputTranscript(message) {
+    if (!message || typeof message !== 'object') return '';
+    if (typeof message.transcript === 'string' && message.transcript.trim()) {
+      return message.transcript.trim();
+    }
+    const nested = message.item?.input_audio_transcription?.transcript;
+    if (typeof nested === 'string' && nested.trim()) {
+      return nested.trim();
+    }
+    return '';
+  }
+
+  /**
    * Parse and validate OpenAI message
    * @param {string|Buffer} data - Raw message data
    * @returns {Object|null} Parsed message object or null if invalid
@@ -76,7 +91,7 @@ class MessageHandler {
       1000,
       config.audio?.turnDetection?.silenceDurationMs ?? 1000
     );
-    
+
     baseConfig.session.audio = {
       input: {
         format: {

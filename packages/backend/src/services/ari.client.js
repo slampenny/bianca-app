@@ -2050,8 +2050,14 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             // Step 4: Get call type from SIP parameters or default to inbound
             const callType = this.extractCallTypeFromChannel(channel) || 'inbound';
 
+            const { Call } = require('../models');
+            let callRecord = await Call.findOne({ callSid: twilioCallSid }).select('_id onboardingDay').lean();
+            const onboardingDay = callRecord?.onboardingDay;
+
             const conversationService = require('./conversation.service');
-            const enhancedPrompt = await conversationService.buildEnhancedPrompt(clientId, callType);
+            const enhancedPrompt = await conversationService.buildEnhancedPrompt(clientId, callType, {
+              onboardingDay: onboardingDay >= 1 && onboardingDay <= 4 ? onboardingDay : undefined,
+            });
             
             logger.info(`[ARI Pipeline] Built enhanced prompt for client ${clientId} (${callType} call)`);
 
@@ -2059,8 +2065,26 @@ async handleStasisStartForPlayback(channel, channelName, event) {
             // Step 4: Create conversation record in database
             const dbConversationId = await this.createConversationRecord(twilioCallSid, asteriskChannelId, clientId, callType);
 
+            if (!callRecord) {
+              callRecord = await Call.findOne({ callSid: twilioCallSid }).select('_id onboardingDay').lean();
+            }
+            const onboardingRealtimeOpts =
+              callRecord?.onboardingDay >= 1 && callRecord?.onboardingDay <= 4
+                ? {
+                    onboardingDay: callRecord.onboardingDay,
+                    onboardingCallMongoId: callRecord._id.toString(),
+                  }
+                : undefined;
+
             // Step 5: Initialize OpenAI service for this call
-            await openAIService.initialize(asteriskChannelId, twilioCallSid, dbConversationId, enhancedPrompt, clientId);
+            await openAIService.initialize(
+              asteriskChannelId,
+              twilioCallSid,
+              dbConversationId,
+              enhancedPrompt,
+              clientId,
+              onboardingRealtimeOpts
+            );
 
             // Step 6: Create the main bridge for mixing audio
             mainBridge = await this.client.bridges.create({
@@ -2277,6 +2301,12 @@ async handleStasisStartForPlayback(channel, channelName, event) {
                         break;
                     case 'speech_stopped':
                         logger.debug(`[ARI] Speech stopped for ${callbackId}`);
+                        break;
+                    case 'user_transcript_updated':
+                        logger.debug(`[ARI] User transcript persisted for ${callbackId} (message ${data?.messageId || '?'})`);
+                        break;
+                    case 'assistant_transcript_updated':
+                        logger.debug(`[ARI] Assistant transcript for ${callbackId} (message ${data?.messageId || '?'})`);
                         break;
                     case 'openai_text_delta':
                         logger.debug(`[ARI] Text delta for ${callbackId}: ${data.text}`);

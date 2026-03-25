@@ -10,13 +10,16 @@ const { Message, Conversation, Call } = require('../../../src/models');
 
 // Mock only external dependencies
 jest.mock('ws');
-jest.mock('../../../src/services/emergencyProcessor.service', () => ({
-  processUtterance: jest.fn().mockResolvedValue({
-    shouldAlert: false,
-    reason: 'No emergency detected'
-  }),
-  createAlert: jest.fn().mockResolvedValue({ success: true })
-}));
+jest.mock('../../../src/services/emergencyProcessor.service', () => {
+  const emergencyProcessor = {
+    processUtterance: jest.fn().mockResolvedValue({
+      shouldAlert: false,
+      reason: 'No emergency detected',
+    }),
+    createAlert: jest.fn().mockResolvedValue({ success: true }),
+  };
+  return { emergencyProcessor };
+});
 
 const WebSocket = require('ws');
 

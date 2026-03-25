@@ -18,6 +18,9 @@
  * 
  *   # Test with specific transcription model
  *   OPENAI_REALTIME_TRANSCRIPTION_MODEL=gpt-4o-transcribe OPENAI_REALTIME_USE_GA=true node scripts/test-openai-realtime-local.js
+ *
+ * To exercise user transcript + placeholder logic without a phone call (mocked OpenAI payloads + Mongo memory):
+ *   yarn test tests/unit/services/openai.realtime.user-transcript.mock.test.js
  */
 
 require('dotenv').config();

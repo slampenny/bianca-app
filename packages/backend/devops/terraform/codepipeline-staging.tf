@@ -502,6 +502,11 @@ resource "aws_codebuild_project" "staging_swap_and_terminate" {
       name  = "STAGING_EIP_ALLOCATION_ID"
       value = aws_eip.staging.id
     }
+    # Must match aws_ebs_volume.staging_mongodb tag Name (swap script finds the correct volume; prod uses a different tag)
+    environment_variable {
+      name  = "MONGODB_DATA_VOLUME_TAG"
+      value = aws_ebs_volume.staging_mongodb.tags["Name"]
+    }
   }
 
   source {

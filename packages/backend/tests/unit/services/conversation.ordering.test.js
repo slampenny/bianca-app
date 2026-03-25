@@ -12,13 +12,16 @@ const { Message, Conversation, Call } = require('../../../src/models');
 
 jest.mock('ws');
 
-jest.mock('../../../src/services/emergencyProcessor.service', () => ({
-  processUtterance: jest.fn().mockResolvedValue({
-    shouldAlert: false,
-    reason: 'No emergency detected'
-  }),
-  createAlert: jest.fn().mockResolvedValue({ success: true })
-}));
+jest.mock('../../../src/services/emergencyProcessor.service', () => {
+  const emergencyProcessor = {
+    processUtterance: jest.fn().mockResolvedValue({
+      shouldAlert: false,
+      reason: 'No emergency detected',
+    }),
+    createAlert: jest.fn().mockResolvedValue({ success: true }),
+  };
+  return { emergencyProcessor };
+});
 
 const WebSocket = require('ws');
 
@@ -399,39 +402,40 @@ describe('Conversation Ordering - Message Timestamps', () => {
       expect(allMessages[0].createdAt.getTime()).toBeLessThan(allMessages[1].createdAt.getTime());
     });
 
-    it('should not update placeholder in handleInputAudioTranscriptionCompleted', async () => {
-      // This test verifies that we removed the placeholder update from handleInputAudioTranscriptionCompleted
-      // The placeholder should only be updated when speech_stopped fires, not when transcription completes
-      
+    it('should persist placeholder when transcription completes (live, before speech_stopped)', async () => {
       const userStartTime = new Date('2024-01-01T10:00:00Z');
-      
+
       const conn = {
         conversationId,
         clientId: new mongoose.Types.ObjectId(),
         pendingUserTranscript: '',
         activeUserMessageId: null,
         _userIsSpeaking: true,
+        _waitingForInitialGreeting: false,
+        _waitingForUserTranscript: false,
         webSocket: mockWebSocket,
-        sessionReady: true
+        sessionReady: true,
       };
       service.connections.set(callId, conn);
 
-      // Create placeholder when user starts speaking
       const placeholderMessage = await Message.create({
         conversationId,
         role: 'client',
         content: '[Speaking...]',
         messageType: 'user_message',
-        createdAt: userStartTime
+        createdAt: userStartTime,
       });
       conn.activeUserMessageId = placeholderMessage._id;
 
-      // Simulate transcription completed (but user still speaking)
-      conn.pendingUserTranscript = 'Hello world';
-      
-      // Verify placeholder was NOT updated (we removed that code)
+      await service.handleInputAudioTranscriptionCompleted(callId, {
+        type: 'conversation.item.input_audio_transcription.completed',
+        transcript: 'Hello world',
+      });
+
       const message = await Message.findById(placeholderMessage._id);
-      expect(message.content).toBe('[Speaking...]'); // Still placeholder, not updated yet
+      expect(message.content).toBe('Hello world');
+      expect(conn.pendingUserTranscript).toBe('Hello world');
+      expect(conn.activeUserMessageId).toEqual(placeholderMessage._id);
     });
   });
 });
