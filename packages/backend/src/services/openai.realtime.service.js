@@ -12,9 +12,10 @@
  * 3. TIMESTAMP CONSISTENCY: All messages get timestamps when saved, not when first generated
  * 
  * USER MESSAGE FLOW:
- * 1. User speaks → Audio transcribed → Accumulated in pendingUserTranscript
- * 2. User stops speaking → input_audio_buffer.speech_stopped event
- * 3. pendingUserTranscript saved to database with timestamp
+ * 1. User speaks → placeholder row created on speech_started (after greeting)
+ * 2. OpenAI ASR → conversation.item.input_audio_transcription.delta (debounced) and .completed
+ * 3. Transcript text is written to the placeholder immediately (live UI/polling), not only on speech_stopped
+ * 4. speech_stopped still runs filler filtering and clears the active placeholder id when the turn ends
  * 
  * AI MESSAGE FLOW:
  * 1. AI generates text → response.content_part.added event → Accumulated in pendingAssistantTranscript
@@ -351,7 +352,7 @@ class OpenAIRealtimeService {
   /**
    * Initialize a connection to OpenAI for a call. Uses callSid as the primary key.
    */
-  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt, clientId = null) {
+  async initialize(initialAsteriskChannelId, callSid, conversationId, initialPrompt, clientId = null, realtimeOptions = null) {
     const callId = callSid || initialAsteriskChannelId; // Prefer callSid if available
     if (!callId) {
       logger.error('[OpenAI Realtime] Initialize: Critical - Missing call identifier.');
@@ -422,12 +423,20 @@ class OpenAIRealtimeService {
       }
     }
 
+    const onboardingDay =
+      realtimeOptions && realtimeOptions.onboardingDay >= 1 && realtimeOptions.onboardingDay <= 4
+        ? realtimeOptions.onboardingDay
+        : null;
+    const onboardingCallMongoId = realtimeOptions?.onboardingCallMongoId || null;
+
     this.connections.set(callId, {
       status: 'initializing',
       conversationId: finalConversationId,
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
       clientId,
+      onboardingDay,
+      onboardingCallMongoId,
       preferredLanguage,
       webSocket: null,
       sessionReady: false,
@@ -1161,6 +1170,14 @@ class OpenAIRealtimeService {
           await this.handleInputAudioTranscriptionCompleted(callId, message);
           break;
 
+        case 'conversation.item.input_audio_transcription.failed':
+          await this.handleInputAudioTranscriptionFailed(callId, message);
+          break;
+
+        case 'conversation.item.input_audio_transcription.delta':
+          await this.handleInputAudioTranscriptionDelta(callId, message);
+          break;
+
         case 'response.audio_transcript.delta':  // Beta event name
         case 'response.output_audio_transcript.delta':  // GA event name
           // STRANGLER FIG: Use MessageHandler for audio transcript delta
@@ -1179,6 +1196,11 @@ class OpenAIRealtimeService {
           if (conn) {
             conn._userIsSpeaking = true;
             conn._lastUserSpeechStart = Date.now();
+            conn._userTranscriptLiveBuffer = '';
+            if (conn._userTranscriptFlushTimer) {
+              clearTimeout(conn._userTranscriptFlushTimer);
+              conn._userTranscriptFlushTimer = null;
+            }
 
             // STATE MACHINE: Transition to user speaking state
             if (this.canUserSpeak(callId)) {
@@ -2019,9 +2041,52 @@ class OpenAIRealtimeService {
     conn._waitingForUserTranscript = false;
   }
 
+  /**
+   * Persist user ASR text to the active placeholder as soon as OpenAI sends it (pollers / UI see text without waiting for speech_stopped).
+   */
+  async persistUserTranscriptToPlaceholder(callId, transcript) {
+    const conn = this.connections.get(callId);
+    if (!conn?.activeUserMessageId || !transcript?.trim()) return;
+
+    try {
+      const { Message } = require('../models');
+      await Message.findByIdAndUpdate(
+        conn.activeUserMessageId,
+        {
+          content: transcript.trim(),
+          messageType: 'user_message',
+        },
+        { timestamps: false, runValidators: false }
+      );
+      logger.info(
+        `[OpenAI Realtime] Live user transcript persisted for ${callId} (${conn.activeUserMessageId}): "${transcript.length > 100 ? `${transcript.slice(0, 100)}…` : transcript}"`
+      );
+      this.notify(callId, 'user_transcript_updated', {
+        messageId: conn.activeUserMessageId.toString(),
+        conversationId: conn.conversationId,
+        transcript: transcript.trim(),
+      });
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Live user transcript persist failed for ${callId}: ${err.message}`);
+    }
+  }
+
   async createPlaceholderUserMessage(callId) {
     const conn = this.connections.get(callId);
     if (!conn?.conversationId) return;
+
+    // New speech_started while the last turn never got ASR — drop the stale "[Speaking...]" row so we do not accumulate orphans.
+    if (conn.activeUserMessageId) {
+      try {
+        const { Message } = require('../models');
+        const prev = await Message.findById(conn.activeUserMessageId).select('content').lean();
+        if (prev?.content === '[Speaking...]') {
+          await this.removeUserSpeakingPlaceholder(callId, 'superseded by new speech_started');
+        }
+      } catch (e) {
+        logger.warn(`[OpenAI Realtime] Could not supersede prior user placeholder for ${callId}: ${e.message}`);
+      }
+    }
 
     try {
       const conversationService = require('./conversation.service');
@@ -2072,6 +2137,31 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Streaming ASR deltas — debounce writes so the live transcript updates without waiting for speech_stopped.
+   */
+  async handleInputAudioTranscriptionDelta(callId, message) {
+    const conn = this.connections.get(callId);
+    if (!conn || conn._waitingForInitialGreeting || !conn.activeUserMessageId) return;
+
+    const delta = typeof message.delta === 'string' ? message.delta : '';
+    if (!delta) return;
+
+    conn._userTranscriptLiveBuffer = (conn._userTranscriptLiveBuffer || '') + delta;
+
+    if (conn._userTranscriptFlushTimer) {
+      clearTimeout(conn._userTranscriptFlushTimer);
+    }
+    conn._userTranscriptFlushTimer = setTimeout(async () => {
+      conn._userTranscriptFlushTimer = null;
+      const text = (conn._userTranscriptLiveBuffer || '').trim();
+      if (!text) return;
+      const currentConn = this.connections.get(callId);
+      if (!currentConn?.activeUserMessageId) return;
+      await this.persistUserTranscriptToPlaceholder(callId, text);
+    }, 120);
+  }
+
+  /**
    * Handle input audio transcription completed - UPDATED
    * 
    * MESSAGE FLOW LOGIC:
@@ -2080,7 +2170,8 @@ class OpenAIRealtimeService {
    * 3. This ensures the timestamp reflects when user started speaking, not when transcript was created
    */
   async handleInputAudioTranscriptionCompleted(callId, message) {
-    if (!message.transcript) return;
+    const transcript = MessageHandler.extractUserInputTranscript(message);
+    if (!transcript) return;
 
     const conn = this.connections.get(callId);
     if (!conn) return;
@@ -2091,17 +2182,23 @@ class OpenAIRealtimeService {
       return;
     }
 
-    logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${message.transcript}"`);
+    if (conn._userTranscriptFlushTimer) {
+      clearTimeout(conn._userTranscriptFlushTimer);
+      conn._userTranscriptFlushTimer = null;
+    }
+    conn._userTranscriptLiveBuffer = '';
+
+    logger.info(`[OpenAI Realtime] User audio transcription completed for ${callId}: "${transcript}"`);
 
     // EMERGENCY DETECTION: Real-time analysis of user transcript
-    logger.debug(`[Emergency Detection] Checking transcript - clientId: ${conn.clientId}, transcript length: ${message.transcript?.trim().length || 0}`);
+    logger.debug(`[Emergency Detection] Checking transcript - clientId: ${conn.clientId}, transcript length: ${transcript.length || 0}`);
     
-    if (conn.clientId && message.transcript && message.transcript.trim().length > 10) {
+    if (conn.clientId && transcript.length > 10) {
       try {
-        logger.info(`[Emergency Detection] Processing utterance for emergency detection: "${message.transcript.substring(0, 100)}..."`);
+        logger.info(`[Emergency Detection] Processing utterance for emergency detection: "${transcript.substring(0, 100)}..."`);
         const emergencyResult = await emergencyProcessor.processUtterance(
           conn.clientId,
-          message.transcript,
+          transcript,
           Date.now(),
           conn.conversationId || null
         );
@@ -2117,7 +2214,7 @@ class OpenAIRealtimeService {
           const alertResult = await emergencyProcessor.createAlert(
             conn.clientId,
             emergencyResult.alertData,
-            message.transcript
+            transcript
           );
 
           logger.info(`[Emergency Detection] createAlert result - success: ${alertResult.success}, error: ${alertResult.error || 'none'}`);
@@ -2169,46 +2266,51 @@ class OpenAIRealtimeService {
       if (!conn.clientId) {
         logger.debug(`[Emergency Detection] Skipping - no clientId in connection for ${callId}`);
       }
-      if (!message.transcript || message.transcript.trim().length <= 10) {
-        logger.debug(`[Emergency Detection] Skipping - transcript too short (${message.transcript?.trim().length || 0} chars) for ${callId}`);
+      if (transcript.length <= 10) {
+        logger.debug(`[Emergency Detection] Skipping - transcript too short (${transcript.length} chars) for ${callId}`);
       }
     }
 
-    // Store the transcript for saving when user stops speaking
-    conn.pendingUserTranscript = message.transcript.trim();
-    logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${message.transcript}"`);
-    
-    // CRITICAL: If we're waiting for this transcript (user already stopped speaking), update the placeholder NOW
-    if (conn._waitingForUserTranscript && conn.activeUserMessageId && conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
-      logger.info(`[OpenAI Realtime] Transcript arrived after user stopped speaking - updating placeholder ${conn.activeUserMessageId} now`);
-      try {
-        const { Message } = require('../models');
-        const originalMessage = await Message.findById(conn.activeUserMessageId);
-        if (originalMessage) {
-          await Message.findByIdAndUpdate(
-            conn.activeUserMessageId,
-            { 
-              content: conn.pendingUserTranscript.trim(),
-              messageType: 'user_message',
-            },
-            { timestamps: false, runValidators: false }
-          );
-          logger.info(`[OpenAI Realtime] Updated placeholder user message ${conn.activeUserMessageId} with delayed transcript: "${conn.pendingUserTranscript}"`);
-          conn.activeUserMessageId = null;
-          conn._waitingForUserTranscript = false;
-          conn.pendingUserTranscript = '';
-          
-          // If AI placeholder was deferred, create it now
-          if (conn._pendingAiPlaceholder && conn._aiIsSpeaking) {
-            logger.info(`[OpenAI Realtime] User message finalized - now creating deferred AI placeholder for ${callId}`);
-            await this.createPlaceholderAssistantMessage(callId);
-            conn._pendingAiPlaceholder = false;
-          }
-        }
-      } catch (err) {
-        logger.error(`[OpenAI Realtime] Failed to update placeholder with delayed transcript: ${err.message}`);
+    // Store for speech_stopped (filler filter + turn finalization). Also persist immediately so UI/polling sees text as soon as OpenAI sends it.
+    conn.pendingUserTranscript = transcript;
+    logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${transcript}"`);
+    await this.persistUserTranscriptToPlaceholder(callId, transcript);
+
+    // speech_stopped already ran and was waiting on ASR — finalize turn (placeholder already updated above).
+    if (conn._waitingForUserTranscript && conn.activeUserMessageId && transcript.trim()) {
+      logger.info(`[OpenAI Realtime] Transcript arrived after speech_stopped — finalizing user turn ${conn.activeUserMessageId}`);
+      conn.activeUserMessageId = null;
+      conn._waitingForUserTranscript = false;
+      conn.pendingUserTranscript = '';
+
+      if (conn._pendingAiPlaceholder && conn._aiIsSpeaking) {
+        logger.info(`[OpenAI Realtime] User message finalized — creating deferred AI placeholder for ${callId}`);
+        await this.createPlaceholderAssistantMessage(callId);
+        conn._pendingAiPlaceholder = false;
       }
     }
+  }
+
+  /**
+   * Input ASR failed — avoid leaving "[Speaking...]" rows with no text.
+   */
+  async handleInputAudioTranscriptionFailed(callId, message) {
+    const errPayload = message?.error || message;
+    logger.error(
+      `[OpenAI Realtime] Input audio transcription failed for ${callId}: ${typeof errPayload === 'object' ? JSON.stringify(errPayload) : errPayload}`
+    );
+
+    const conn = this.connections.get(callId);
+    if (!conn) return;
+
+    if (conn._userTranscriptFlushTimer) {
+      clearTimeout(conn._userTranscriptFlushTimer);
+      conn._userTranscriptFlushTimer = null;
+    }
+    conn._userTranscriptLiveBuffer = '';
+    conn.pendingUserTranscript = '';
+    conn._waitingForUserTranscript = false;
+    await this.removeUserSpeakingPlaceholder(callId, 'input_audio_transcription.failed');
   }
 
   /**
@@ -2404,6 +2506,113 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Submit tool result to OpenAI Realtime (GA function_call_output).
+   */
+  async submitFunctionCallOutput(callId, openaiCallId, outputObj) {
+    if (!openaiCallId) return;
+    const output = typeof outputObj === 'string' ? outputObj : JSON.stringify(outputObj);
+    try {
+      await this.sendJsonMessage(callId, {
+        type: 'conversation.item.create',
+        item: {
+          type: 'function_call_output',
+          call_id: openaiCallId,
+          output,
+        },
+      });
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] submitFunctionCallOutput failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Persist PRD onboarding tool calls and acknowledge to the model.
+   */
+  async processOnboardingToolInvocation(callId, item, dbConversationId) {
+    const conn = this.connections.get(callId);
+    if (!conn?.onboardingDay) return;
+
+    let name;
+    let argsRaw;
+    let openaiCallId;
+
+    if (item.type === 'function_call') {
+      name = item.name;
+      argsRaw = item.arguments;
+      openaiCallId = item.call_id || item.id;
+    } else if (item.function_call) {
+      name = item.function_call.name;
+      argsRaw = item.function_call.arguments;
+      openaiCallId = item.function_call.call_id || item.function_call.id || item.id;
+    } else {
+      return;
+    }
+
+    if (!name || !openaiCallId) return;
+
+    if (name !== 'capture_onboarding_response' && name !== 'complete_onboarding_session') {
+      await this.submitFunctionCallOutput(callId, openaiCallId, { ok: false, error: 'unsupported_tool', name });
+      try {
+        await this.sendResponseCreate(callId);
+      } catch (e) {
+        logger.warn(`[Onboarding Tool] sendResponseCreate after unknown tool: ${e.message}`);
+      }
+      return;
+    }
+
+    let args = {};
+    try {
+      args = typeof argsRaw === 'string' ? JSON.parse(argsRaw || '{}') : argsRaw || {};
+    } catch (e) {
+      logger.error(`[Onboarding Tool] Bad JSON arguments: ${e.message}`);
+    }
+
+    const onboardingService = require('./onboarding.service');
+    const mongoose = require('mongoose');
+
+    try {
+      if (name === 'capture_onboarding_response' && args.question_id) {
+        await onboardingService.recordCapture({
+          clientId: conn.clientId,
+          dayNumber: conn.onboardingDay,
+          questionId: String(args.question_id),
+          responseType: args.response_type || 'text',
+          responseValue: args.response_value,
+          verbatimTranscript: args.verbatim_transcript,
+          callId: conn.onboardingCallMongoId
+            ? new mongoose.Types.ObjectId(String(conn.onboardingCallMongoId))
+            : undefined,
+          conversationId:
+            dbConversationId && mongoose.Types.ObjectId.isValid(String(dbConversationId))
+              ? new mongoose.Types.ObjectId(String(dbConversationId))
+              : undefined,
+          safety_flag: args.safety_flag,
+          memory_flag: args.memory_flag,
+          mood_flag: args.mood_flag,
+          distress_flag: args.distress_flag,
+          confusion_flag: args.confusion_flag,
+          notes: args.notes,
+        });
+      } else if (name === 'complete_onboarding_session') {
+        await onboardingService.completeSession({
+          callMongoId: conn.onboardingCallMongoId,
+          endedEarlyReason: args.ended_early_reason || 'completed',
+          summaryNotes: args.summary_notes,
+        });
+      }
+    } catch (err) {
+      logger.error(`[Onboarding Tool] ${err.message}`);
+    }
+
+    await this.submitFunctionCallOutput(callId, openaiCallId, { ok: true, tool: name });
+    try {
+      await this.sendResponseCreate(callId);
+    } catch (e) {
+      logger.warn(`[Onboarding Tool] sendResponseCreate after tool: ${e.message}`);
+    }
+  }
+
+  /**
    * STRANGLER FIG: Conversation item handling now uses MessageHandler
    */
   
@@ -2428,15 +2637,19 @@ class OpenAIRealtimeService {
 
       // Handle function calls
       if (item.type === 'function_call') {
-        logger.info(`[OpenAI Realtime] Function call: ${item.function_call?.name}`);
+        const fcName = item.function_call?.name || item.name;
+        logger.info(`[OpenAI Realtime] Function call: ${fcName}`);
 
-        if (dbConversationId && item.function_call) {
+        if (dbConversationId && (item.function_call || item.name)) {
           try {
             const conversationService = require('./conversation.service');
-            const functionContent = `Function call: ${item.function_call.name}(${JSON.stringify(item.function_call.arguments || {})})`;
+            const fn = item.function_call || { name: item.name, arguments: item.arguments };
+            const argStr =
+              typeof fn.arguments === 'string' ? fn.arguments : JSON.stringify(fn.arguments || {});
+            const functionContent = `Function call: ${fn.name}(${argStr})`;
             await conversationService.saveRealtimeMessage(
               dbConversationId,
-              item.role,
+              item.role || 'assistant',
               functionContent,
               'function_call'
             );
@@ -2446,10 +2659,12 @@ class OpenAIRealtimeService {
         }
 
         this.notify(callId, 'function_call', {
-          call: item.function_call,
+          call: item.function_call || { name: item.name, arguments: item.arguments },
           itemId: item.id,
           timestamp: new Date()
         });
+
+        await this.processOnboardingToolInvocation(callId, item, dbConversationId);
       }
     } catch (err) {
       logger.error(`[OpenAI Realtime] Error in handleConversationItem for ${callId}: ${err.message}`, err);
