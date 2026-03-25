@@ -136,6 +136,57 @@ export interface Client {
   latestOverallRiskScore?: number | null
 }
 
+export interface OnboardingResponseRow {
+  id?: string
+  clientId?: string
+  dayNumber: number
+  questionId: string
+  responseType: string
+  responseValue: unknown
+  verbatimTranscript?: string
+  callId?: string
+  conversationId?: string
+  capturedAt?: string
+  safety_flag?: boolean
+  memory_flag?: boolean
+  mood_flag?: boolean
+  distress_flag?: boolean
+  confusion_flag?: boolean
+  notes?: string
+}
+
+export interface ClientOnboardingJourneyDay {
+  dayNumber: number
+  totalQuestions: number
+  capturedCount: number
+  sessionCompleted: boolean
+  sessionCompletedAt?: string | null
+  sessionEndedReason?: string | null
+}
+
+export interface ClientOnboardingJourney {
+  days: ClientOnboardingJourneyDay[]
+  currentDay: number | null
+  journeyComplete: boolean
+  sessionsCompletedCount: number
+  hasAnyOnboardingActivity: boolean
+}
+
+export interface ClientOnboardingFlags {
+  safety: boolean
+  memory: boolean
+  mood: boolean
+  distress: boolean
+  confusion: boolean
+}
+
+export interface ClientOnboardingPayload {
+  journey: ClientOnboardingJourney
+  responses: OnboardingResponseRow[]
+  flags: ClientOnboardingFlags
+  questionCount: number
+}
+
 export interface Interval {
   day?: number
   weeks?: number
@@ -188,7 +239,7 @@ export interface Conversation {
   callEndTime?: string
   callDuration?: number
   callOutcome?: 'answered' | 'no_answer' | 'busy' | 'failed' | 'voicemail'
-  agentId?: string
+  caregiverId?: string
   callNotes?: string
   
   // Sentiment analysis fields

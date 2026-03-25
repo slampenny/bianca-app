@@ -13,6 +13,7 @@ const {
   Call,
   MedicalAnalysis,
   FraudAbuseAnalysis,
+  OnboardingResponse,
 } = require('../models');
 const config = require('../config/config');
 
@@ -28,6 +29,7 @@ const invoicesSeeder = require('./seeders/invoices.seeder');
 const sentimentAnalysisSeeder = require('./seeders/sentimentAnalysis.seeder');
 const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
 const clientReportSnapshotSeeder = require('./seeders/clientReportSnapshot.seeder');
+const onboardingSeeder = require('./seeders/onboarding.seeder');
 
 /**
  * Clear all database collections
@@ -44,6 +46,7 @@ async function clearDatabase() {
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
   await Call.deleteMany({});
+  await OnboardingResponse.deleteMany({});
   await MedicalAnalysis.deleteMany({});
   await FraudAbuseAnalysis.deleteMany({});
   // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
@@ -495,7 +498,9 @@ async function seedDatabaseDemo() {
 
     // Create additional demo clients
     const demoClients = await createDemoClients(caregiverOneRecord, org);
-    const allClients = [...baseClients, client3, ...demoClients];
+    const clientsForDemoConversations = [...baseClients, client3, ...demoClients];
+    const onboardingScenarioClients = await onboardingSeeder.seedOnboardingScenarioClients(caregiverOneRecord);
+    const allClients = [...clientsForDemoConversations, ...onboardingScenarioClients];
 
     // Seed base conversations
     const baseConversations = await conversationsSeeder.seedConversations(client1);
@@ -509,8 +514,8 @@ async function seedDatabaseDemo() {
     // Add fraud/abuse pattern conversations for client3
     await conversationsSeeder.addFraudAbuseConversations(client3._id);
 
-    // Create additional demo conversations
-    const demoConversations = await createDemoConversations(allClients);
+    // Demo wellness threads (skip onboarding journey clients — they only have seeded onboarding captures)
+    const demoConversations = await createDemoConversations(clientsForDemoConversations);
     const allConversations = [...baseConversations, ...demoConversations];
 
     // Seed base schedules
@@ -572,7 +577,7 @@ async function seedDatabaseDemo() {
 
     console.log('Demo database seeded successfully!');
     console.log(`Created:`);
-    console.log(`- ${allClients.length} clients`);
+    console.log(`- ${allClients.length} clients (includes ${onboardingScenarioClients.length} onboarding journey demos)`);
     console.log(`- ${allConversations.length} conversations`);
     console.log(`- ${paymentMethods.length} payment methods`);
     console.log(`- Multiple schedules, alerts, and invoices`);

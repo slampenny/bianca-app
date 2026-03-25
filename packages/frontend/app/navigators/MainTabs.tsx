@@ -7,6 +7,7 @@ import { useTheme } from "app/theme/ThemeContext"
 import {
   HomeScreen,
   ClientScreen,
+  ClientOnboardingScreen,
   SchedulesScreen,
   ConversationsScreen,
   CallScreen,
@@ -98,6 +99,11 @@ function HomeStack() {
     >
       <Stack.Screen name="HomeDetail" component={HomeScreen} options={() => ({ title: translate("headers.home") })} />
       <Stack.Screen name="Client" component={ClientScreen} options={() => ({ title: translate("headers.client") })} />
+      <Stack.Screen
+        name="ClientOnboarding"
+        component={ClientOnboardingScreen}
+        options={() => ({ title: translate("headers.clientOnboarding") })}
+      />
       <Stack.Screen name="Schedule" component={SchedulesScreen} options={() => ({ title: translate("headers.schedule") })} />
       <Stack.Screen name="Conversations" component={ConversationsScreen} options={() => ({ title: translate("headers.conversations") })} />
       <Stack.Screen name="Call" component={CallScreen} options={() => ({ title: translate("headers.call") })} />

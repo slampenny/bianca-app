@@ -69,6 +69,20 @@ export interface SSOError {
   description?: string;
 }
 
+/** Result of `signInWithGoogle` / `signInWithMicrosoft` before narrowing. */
+export type SSOSignInResult = SSOUser | SSOError | SSORedirecting;
+
+export function isSSOUserResult(result: SSOSignInResult): result is SSOUser {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    'provider' in result &&
+    (result.provider === 'google' || result.provider === 'microsoft') &&
+    'id' in result &&
+    typeof (result as SSOUser).id === 'string'
+  );
+}
+
 class SSOService {
 
   // Google OAuth configuration

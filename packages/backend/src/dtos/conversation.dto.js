@@ -93,7 +93,11 @@ const ConversationDTO = (conversation) => {
   const callDuration = conversationObj.callDuration || conversation.callDuration;
   const callOutcome = conversationObj.callOutcome || conversation.callOutcome;
   const callNotes = conversationObj.callNotes || conversation.callNotes;
-  const agentId = conversationObj.agentId || conversation.agentId;
+  const caregiverIdRaw =
+    conversationObj.caregiverId ||
+    conversation.caregiverId ||
+    conversationObj.agentId ||
+    conversation.agentId;
   const status = conversationObj.status || conversation.status;
 
   // Convert _id (ObjectId) to string, or use id if already converted by toJSON plugin
@@ -138,7 +142,13 @@ const ConversationDTO = (conversation) => {
   
   // Convert ObjectId fields to strings if needed
   const clientIdStr = clientId ? (clientId instanceof ObjectId ? clientId.toString() : (clientId.toString ? clientId.toString() : clientId)) : null;
-  const agentIdStr = agentId ? (agentId instanceof ObjectId ? agentId.toString() : (agentId.toString ? agentId.toString() : agentId)) : null;
+  const caregiverIdStr = caregiverIdRaw
+    ? caregiverIdRaw instanceof ObjectId
+      ? caregiverIdRaw.toString()
+      : caregiverIdRaw.toString
+        ? caregiverIdRaw.toString()
+        : caregiverIdRaw
+    : null;
   const lineItemIdStr = lineItemId ? (lineItemId instanceof ObjectId ? lineItemId.toString() : (lineItemId.toString ? lineItemId.toString() : lineItemId)) : null;
 
   // Debug: Log if clientId conversion resulted in null/undefined
@@ -170,7 +180,7 @@ const ConversationDTO = (conversation) => {
     callDuration,
     callOutcome,
     callNotes,
-    agentId: agentIdStr,
+    caregiverId: caregiverIdStr,
     status,
     // Include sentiment analysis if available
     sentiment: analyzedData?.sentiment ? SentimentAnalysisDTO(analyzedData.sentiment) : null,

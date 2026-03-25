@@ -23,6 +23,7 @@ import {
   useUpdateClientMutation,
   useDeleteClientMutation,
   useUploadClientAvatarMutation,
+  useGetClientOnboardingQuery,
 } from "../services/api/clientApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
@@ -94,6 +95,16 @@ function ClientScreen() {
   const [deleteClient, { isLoading: isDeleting, error: deleteError }] = useDeleteClientMutation()
   const [uploadAvatar, { isLoading: isUploading, error: uploadError }] =
     useUploadClientAvatarMutation()
+
+  const {
+    data: onboardingData,
+    isLoading: onboardingLoading,
+    isFetching: onboardingFetching,
+    error: onboardingQueryError,
+  } = useGetClientOnboardingQuery(
+    { clientId: client?.id || "" },
+    { skip: !client?.id },
+  )
 
   // --- Effects ---
 
@@ -386,6 +397,10 @@ function ClientScreen() {
     }
   }
 
+  const handleViewOnboarding = () => {
+    navigation.navigate("ClientOnboarding")
+  }
+
   if (themeLoading) {
     return <LoadingScreen />
   }
@@ -513,6 +528,66 @@ function ClientScreen() {
             style={[styles.button, styles.saveButton, (!canCreateOrEditClient || !name || !email || !phone || !!emailError || !!phoneError) ? styles.buttonDisabled : undefined]}
             textStyle={styles.buttonText}
           />
+
+          {client && client.id ? (
+            <View
+              style={styles.onboardingSection}
+              testID="client-onboarding-section"
+              accessibilityLabel="client-onboarding-summary"
+            >
+              <Text style={styles.fieldLabel}>{translate("clientScreen.onboardingCardTitle")}</Text>
+              {(onboardingLoading || onboardingFetching) && !onboardingData ? (
+                <Text style={styles.onboardingMeta}>{translate("clientOnboardingScreen.loading")}</Text>
+              ) : null}
+              {onboardingQueryError ? (
+                <Text style={styles.apiError}>{translate("clientOnboardingScreen.error")}</Text>
+              ) : null}
+              {onboardingData ? (
+                <>
+                  <Text style={styles.onboardingMeta}>
+                    {onboardingData.journey.journeyComplete
+                      ? translate("clientScreen.onboardingComplete")
+                      : !onboardingData.journey.hasAnyOnboardingActivity
+                        ? translate("clientScreen.onboardingNotStarted")
+                        : translate("clientScreen.onboardingInProgress")}
+                  </Text>
+                  {!onboardingData.journey.journeyComplete &&
+                    onboardingData.journey.hasAnyOnboardingActivity ? (
+                    <Text style={styles.onboardingMeta}>
+                      {translate("clientScreen.onboardingCallsCompleted", {
+                        completed: String(onboardingData.journey.sessionsCompletedCount),
+                      })}
+                    </Text>
+                  ) : null}
+                  {!onboardingData.journey.journeyComplete &&
+                  onboardingData.journey.currentDay != null &&
+                  onboardingData.journey.hasAnyOnboardingActivity ? (
+                    <Text style={styles.onboardingMeta}>
+                      {translate("clientScreen.onboardingNextDay", {
+                        day: String(onboardingData.journey.currentDay),
+                      })}
+                    </Text>
+                  ) : null}
+                  {onboardingData.questionCount > 0 ? (
+                    <Text style={styles.onboardingMeta}>
+                      {translate("clientScreen.onboardingCapturesLine", {
+                        count: String(onboardingData.questionCount),
+                      })}
+                    </Text>
+                  ) : null}
+                </>
+              ) : null}
+              <Button
+                text={translate("clientScreen.viewOnboardingDetails")}
+                onPress={handleViewOnboarding}
+                disabled={isLoading}
+                testID="view-onboarding-responses-button"
+                preset="default"
+                style={[styles.button, styles.manageButton, styles.onboardingButton]}
+                textStyle={styles.buttonText}
+              />
+            </View>
+          ) : null}
 
           {/* Show Delete, Schedules, Conversations only for existing clients */}
           {client && client.id && (
@@ -700,6 +775,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: 13,
     marginBottom: 10, // Space after error before next input
     paddingLeft: 5,
+  },
+  onboardingSection: {
+    marginTop: 8,
+    marginBottom: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
+  },
+  onboardingMeta: {
+    fontSize: 14,
+    color: colors.text || colors.palette.neutral700,
+    marginBottom: 6,
+  },
+  onboardingButton: {
+    marginTop: 12,
+    marginBottom: 0,
   },
   formCard: {
     backgroundColor: colors.palette.neutral100,

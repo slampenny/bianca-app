@@ -111,7 +111,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
   let res;
   let next;
   let clientId;
-  let agentId;
+  let caregiverId;
   let patient;
   let agent;
 
@@ -126,7 +126,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     await Caregiver.deleteMany({});
 
     clientId = new mongoose.Types.ObjectId();
-    agentId = new mongoose.Types.ObjectId();
+    caregiverId = new mongoose.Types.ObjectId();
 
     // Create mock patient with all required fields (use unique email per test)
     const uniqueId = clientId.toString().slice(-6);
@@ -140,7 +140,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
 
     // Create mock agent/caregiver with all required fields (use unique email per test)
     agent = await Caregiver.create({
-      _id: agentId,
+      _id: caregiverId,
       name: 'Test Agent',
       email: `agent-${uniqueId}@test.com`,
       password: 'password123',
@@ -159,7 +159,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
         callNotes: 'Test call notes'
       },
       caregiver: {
-        id: agentId.toString()
+        id: caregiverId.toString()
       }
     };
 
@@ -185,7 +185,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       expect(responseData).toHaveProperty('callId');
       expect(responseData).toHaveProperty('callSid', 'CA1234567890abcdef');
       expect(responseData.clientId.toString()).toBe(clientId.toString());
-      expect(responseData.agentId.toString()).toBe(agentId.toString());
+      expect(responseData.caregiverId.toString()).toBe(caregiverId.toString());
 
       // Verify conversation was created in database
       const conversation = await Conversation.findOne({ callId: responseData.callId });
@@ -196,7 +196,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       const call = await Call.findById(responseData.callId);
       expect(call).toBeTruthy();
       expect(call.conversationId.toString()).toBe(responseData.conversationId);
-      expect(call.agentId.toString()).toBe(agentId.toString());
+      expect(call.caregiverId.toString()).toBe(caregiverId.toString());
       expect(call.callNotes).toBe('Test call notes');
     });
 
@@ -225,7 +225,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       expect(error.message).toBe('Client does not have a phone number');
     });
 
-    it('should return 404 if agent not found', async () => {
+    it('should return 404 if caregiver not found', async () => {
       jest.spyOn(caregiverService, 'getCaregiverById').mockResolvedValue(null);
 
       await callWorkflowController.initiateCall(req, res, next);
@@ -234,7 +234,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       const error = next.mock.calls[0][0];
       expect(error).toBeInstanceOf(Error);
       expect(error.statusCode).toBe(httpStatus.NOT_FOUND);
-      expect(error.message).toBe('Agent not found');
+      expect(error.message).toBe('Caregiver not found');
     });
 
     it('should use existing conversation if one already exists for the call', async () => {
@@ -242,7 +242,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       const existingCall = await Call.create({
         callSid: 'CA1234567890abcdef',
         clientId,
-        agentId: agentId,
+        caregiverId: caregiverId,
         status: 'initiated',
         callStatus: 'initiating'
       });
@@ -300,14 +300,14 @@ describe('CallWorkflow Controller - End Call', () => {
     await Conversation.deleteMany({});
 
     const clientId = new mongoose.Types.ObjectId();
-    const agentId = new mongoose.Types.ObjectId();
+    const testCaregiverId = new mongoose.Types.ObjectId();
     const conversationId = new mongoose.Types.ObjectId();
 
     // Create a real Call record in the database
     const call = await Call.create({
       callSid: 'CA1234567890abcdef',
       clientId,
-      agentId: agentId,
+      caregiverId: testCaregiverId,
       asteriskChannelId: 'asterisk-channel-123',
       status: 'in-progress',
       startTime: new Date(Date.now() - 60000),
@@ -318,7 +318,6 @@ describe('CallWorkflow Controller - End Call', () => {
     const realConversation = await Conversation.create({
       _id: conversationId,
       clientId,
-      agentId: agentId,
       callId: call._id,
       status: 'in-progress',
       messages: []
@@ -356,7 +355,7 @@ describe('CallWorkflow Controller - End Call', () => {
         notes: 'Call ended by agent'
       },
       caregiver: {
-        id: mockConversation.agentId
+        id: testCaregiverId.toString()
       }
     };
 
@@ -394,7 +393,7 @@ describe('CallWorkflow Controller - End Call', () => {
       // Verify Asterisk cleanup was called
       expect(channelTracker.cleanupCall).toHaveBeenCalledWith(
         'asterisk-channel-123',
-        'Call ended by agent'
+        'Call ended by caregiver'
       );
     });
 

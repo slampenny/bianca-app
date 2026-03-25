@@ -95,7 +95,7 @@ describe('Conversation routes', () => {
         callDuration: expect.any(Number),
         callOutcome: null,
         callNotes: expect.any(String),
-        agentId: null,
+        caregiverId: null,
         lineItemId: null,
         sentiment: null,
         sentimentAnalyzedAt: null,
@@ -207,7 +207,7 @@ describe('Conversation routes', () => {
         sentiment: null,
         sentimentAnalyzedAt: null,
         callNotes: expect.any(String),
-        agentId: null,
+        caregiverId: null,
         lineItemId: null,
       });
     });
@@ -489,7 +489,7 @@ describe('Conversation routes', () => {
         callDuration: expect.any(Number),
         callOutcome: null,
         callNotes: expect.any(String),
-        agentId: null,
+        caregiverId: null,
         lineItemId: null,
         sentiment: null,
         sentimentAnalyzedAt: null,

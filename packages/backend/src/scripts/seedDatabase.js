@@ -13,6 +13,7 @@ const {
   Call,
   MedicalAnalysis,
   FraudAbuseAnalysis,
+  OnboardingResponse,
 } = require('../models');
 const config = require('../config/config');
 
@@ -28,6 +29,7 @@ const invoicesSeeder = require('./seeders/invoices.seeder');
 const sentimentAnalysisSeeder = require('./seeders/sentimentAnalysis.seeder');
 const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
 const clientReportSnapshotSeeder = require('./seeders/clientReportSnapshot.seeder');
+const onboardingSeeder = require('./seeders/onboarding.seeder');
 
 /**
  * Clear all database collections
@@ -44,6 +46,7 @@ async function clearDatabase() {
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
   await Call.deleteMany({});
+  await OnboardingResponse.deleteMany({});
   await MedicalAnalysis.deleteMany({});
   await FraudAbuseAnalysis.deleteMany({});
   // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
@@ -100,6 +103,9 @@ async function seedDatabase() {
     caregiverOneRecord.clients.push(client3._id);
     await caregiverOneRecord.save();
     clients = [...clients, client3];
+
+    const onboardingClients = await onboardingSeeder.seedOnboardingScenarioClients(caregiverOneRecord);
+    clients = [...clients, ...onboardingClients];
 
     // Seed conversations
     const conversations = await conversationsSeeder.seedConversations(client1);
@@ -171,7 +177,7 @@ async function seedDatabase() {
     return { 
       org, 
       caregiver: caregiverOneRecord, 
-      clients: [client1, client2, client3], 
+      clients: [client1, client2, client3, ...onboardingClients], 
       invoice, 
       paymentMethods 
     };

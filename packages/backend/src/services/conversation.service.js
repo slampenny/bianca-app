@@ -154,7 +154,7 @@ const queryConversationsByClient = async (clientId, options) => {
     status: c.status, 
     startTime: c.startTime,
     createdAt: c.createdAt,
-    agentId: c.agentId 
+    caregiverId: c.caregiverId
   })));
   
   return result;

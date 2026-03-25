@@ -81,6 +81,15 @@ router
   );
 
 router
+  .route('/:clientId/onboarding')
+  .get(
+    auth('readOwn:client', 'readAny:client'),
+    minimumNecessaryMiddleware('clientOnboarding'),
+    validate(clientValidation.getClientOnboarding),
+    clientController.getClientOnboarding
+  );
+
+router
   .route('/:clientId/caregivers')
   .get(auth('readAny:caregiver'), validate(clientValidation.getCaregivers), clientController.getCaregivers);
 

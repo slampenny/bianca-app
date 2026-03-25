@@ -13,8 +13,8 @@ export interface InitiateCallResponse {
   clientId: string
   clientName: string
   clientPhone: string
-  agentId: string
-  agentName: string
+  caregiverId: string
+  caregiverName: string
   status: string
   callStatus?: string
 }
@@ -37,7 +37,7 @@ export interface CallStatusResponse {
     name: string
     phone: string
   }
-  agent: {
+  caregiver: {
     _id: string
     name: string
   }

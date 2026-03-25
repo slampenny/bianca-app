@@ -63,9 +63,9 @@ export const CallNowButton: React.FC<CallNowButtonProps> = ({
           name: clientName,
           phone: response.clientPhone || "" // Will be populated by backend
         },
-        agent: {
-          _id: response.agentId,
-          name: response.agentName
+        caregiver: {
+          _id: response.caregiverId,
+          name: response.caregiverName
         }
       }))
       

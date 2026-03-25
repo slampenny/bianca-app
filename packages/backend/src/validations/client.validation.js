@@ -129,6 +129,15 @@ const getConversationsByClient = {
   }),
 };
 
+const getClientOnboarding = {
+  params: Joi.object().keys({
+    clientId: Joi.string().custom(objectId),
+  }),
+  query: Joi.object().keys({
+    day: Joi.number().integer().min(1).max(4).optional(),
+  }),
+};
+
 const getCaregivers = {
   params: Joi.object().keys({
     clientId: Joi.string().custom(objectId),
@@ -151,6 +160,7 @@ const assignUnassignedClients = {
 module.exports = {
   createClient,
   getConversationsByClient,
+  getClientOnboarding,
   getClients,
   getClient,
   updateClient,

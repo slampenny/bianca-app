@@ -1,5 +1,12 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import { Client, ClientPages, Caregiver, Conversation, ConversationPages } from "./api.types"
+import {
+  Client,
+  ClientPages,
+  Caregiver,
+  ClientOnboardingPayload,
+  Conversation,
+  ConversationPages,
+} from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 // Lazy import to break circular dependency with clientSlice
@@ -125,6 +132,16 @@ export const clientApi = createApi({
         }
       },
     }),
+    getClientOnboarding: builder.query<ClientOnboardingPayload, { clientId: string; day?: number }>({
+      query: ({ clientId, day }) => {
+        const qs = day != null && day >= 1 && day <= 4 ? `?day=${day}` : ""
+        return {
+          url: `/clients/${clientId}/onboarding${qs}`,
+          method: "GET",
+        }
+      },
+      providesTags: (result, error, { clientId }) => [{ type: "Client", id: `${clientId}-onboarding` }],
+    }),
     getCaregivers: builder.query<Caregiver[], { clientId: string }>({
       query: ({ clientId }) => ({
         url: `/clients/${clientId}/caregivers`,
@@ -166,6 +183,7 @@ export const {
   useCreateClientMutation,
   useGetAllClientsQuery,
   useGetClientQuery,
+  useGetClientOnboardingQuery,
   useUploadClientAvatarMutation,
   useUpdateClientMutation,
   useDeleteClientMutation,

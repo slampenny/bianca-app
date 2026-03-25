@@ -13,7 +13,7 @@ const logger = require('../config/logger');
 const initiateCall = catchAsync(async (req, res) => {
   const clientId = req.body.clientId;
   const { callNotes } = req.body;
-  const agentId = req.caregiver.id;
+  const caregiverId = req.caregiver.id;
   let call = null;
 
   const client = await clientService.getClientById(clientId);
@@ -24,10 +24,9 @@ const initiateCall = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Client does not have a phone number');
   }
 
-  // Validate agent exists
-  const agent = await caregiverService.getCaregiverById(agentId);
-  if (!agent) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Agent not found');
+  const initiatingCaregiver = await caregiverService.getCaregiverById(caregiverId);
+  if (!initiatingCaregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
   try {
@@ -46,7 +45,7 @@ const initiateCall = catchAsync(async (req, res) => {
     }
     
     // Add call workflow-specific fields
-    call.agentId = agentId;
+    call.caregiverId = caregiverId;
     call.callNotes = callNotes;
     call.status = 'in-progress';
     call.callStatus = 'ringing';
@@ -76,13 +75,12 @@ const initiateCall = catchAsync(async (req, res) => {
       callSid,
       conversationId: conversation._id.toString(),
       clientId: client._id,
-      clientId: client._id,
       patientName: client.name,
       clientName: client.name,
       patientPhone: client.phone,
       clientPhone: client.phone,
-      agentId: agent._id,
-      agentName: agent.name,
+      caregiverId: initiatingCaregiver._id,
+      caregiverName: initiatingCaregiver.name,
       status: call.status,
       callStatus: call.callStatus,
     });
@@ -119,11 +117,10 @@ const getCallStatus = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
   }
   
-  // Populate client and agent details
+  // Populate client and caregiver details
   await conversation.populate('clientId', 'name phone');
-  // Note: agentId is on Call, not Conversation
   await call.populate('clientId', 'name phone');
-  await call.populate('agentId', 'name');
+  await call.populate('caregiverId', 'name');
   
   // CRITICAL: conversation.messages IS THE QUEUE - use it as-is, don't touch it
   // Messages are added via $push which maintains FIFO order
@@ -219,7 +216,7 @@ const getCallStatus = catchAsync(async (req, res) => {
     endTime: call.endTime,
     duration: call.duration,
     client: conversation.clientId || call.clientId,
-    agent: call.agentId,
+    caregiver: call.caregiverId,
     // Include all messages (patient and assistant) for live call display
     messages: messages,
     // Include AI speaking status
@@ -293,7 +290,7 @@ const updateCallStatus = catchAsync(async (req, res) => {
   conversation.callStartTime = call.callStartTime;
   conversation.callEndTime = call.callEndTime;
   conversation.callDuration = call.callDuration;
-  conversation.agentId = call.agentId;
+  conversation.caregiverId = call.caregiverId;
   conversation.callSid = call.callSid;
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
@@ -357,7 +354,7 @@ const endCall = catchAsync(async (req, res) => {
       if (call.asteriskChannelId) {
         try {
           const { channelTracker } = require('../services');
-          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by agent');
+          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by caregiver');
           logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${call.asteriskChannelId}`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel: ${err.message}`);
@@ -404,7 +401,7 @@ const endCall = catchAsync(async (req, res) => {
       if (call.asteriskChannelId) {
         try {
           const { channelTracker } = require('../services');
-          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by agent');
+          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by caregiver');
           logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${call.asteriskChannelId} (fallback)`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel (fallback): ${err.message}`);
@@ -455,25 +452,24 @@ const endCall = catchAsync(async (req, res) => {
   conversation.callStartTime = call.callStartTime;
   conversation.callEndTime = call.callEndTime;
   conversation.callDuration = call.callDuration;
-  conversation.agentId = call.agentId;
+  conversation.caregiverId = call.caregiverId;
   conversation.callSid = call.callSid;
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
 /**
- * Get active calls for the current agent
+ * Get active calls for the current caregiver
  * @route GET /v1/calls/active
  */
 const getActiveCalls = catchAsync(async (req, res) => {
-  const agentId = req.caregiver.id;
-  
-  // Get active calls for this agent (Call model tracks call status)
+  const caregiverId = req.caregiver.id;
+
   const activeCalls = await Call.find({
-    agentId,
+    caregiverId,
     status: { $in: ['initiated', 'in-progress'] }
   })
   .populate('clientId', 'name phone')
-  .populate('agentId', 'name')
+  .populate('caregiverId', 'name')
   .populate('conversationId')
   .limit(50)
   .lean();
@@ -513,11 +509,11 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
   }
   
-  // Populate client and agent details
+  // Populate client and caregiver details
   await conversation.populate('clientId', 'name phone');
   await call.populate('clientId', 'name phone');
-  await call.populate('agentId', 'name');
-  
+  await call.populate('caregiverId', 'name');
+
   const callDetails = {
     conversationId: conversation._id,
     callId: call._id,
@@ -527,7 +523,7 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     endTime: call.endTime,
     duration: call.duration,
     client: conversation.clientId || call.clientId,
-    agent: call.agentId
+    caregiver: call.caregiverId
   };
   
   res.status(httpStatus.OK).send({ data: callDetails });

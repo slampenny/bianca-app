@@ -136,8 +136,8 @@ export function HomeScreen() {
         clientId: response.clientId,
         clientName: response.clientName,
         clientPhone: response.clientPhone,
-        agentId: response.agentId,
-        agentName: response.agentName,
+        caregiverId: response.caregiverId,
+        caregiverName: response.caregiverName,
         status: response.status || 'initiated',
         callStatus: response.callStatus,
       }))

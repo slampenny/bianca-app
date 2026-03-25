@@ -28,6 +28,7 @@ export type HomeStackParamList = {
   Schedule: { isNewClient?: boolean } | undefined
   Conversations: undefined
   Call: undefined
+  ClientOnboarding: undefined
   SentimentAnalysis: {
     clientId?: string
     clientName?: string

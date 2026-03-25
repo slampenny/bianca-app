@@ -61,8 +61,8 @@ describe('CallNowButton', () => {
       clientId: 'client-123',
       clientName: 'John Doe',
       clientPhone: '+1234567890',
-      agentId: 'agent-123',
-      agentName: 'Agent Name',
+      caregiverId: 'caregiver-123',
+      caregiverName: 'Caregiver Name',
     }
   }
 
@@ -88,8 +88,8 @@ describe('CallNowButton', () => {
         clientId: 'client-123',
         clientName: 'John Doe',
         clientPhone: '+1234567890',
-        agentId: 'agent-123',
-        agentName: 'Agent Name',
+        caregiverId: 'caregiver-123',
+        caregiverName: 'Caregiver Name',
         callStatus: 'ringing'
       }
     }
@@ -121,8 +121,8 @@ describe('CallNowButton', () => {
         clientId: 'client-123',
         clientName: 'John Doe',
         clientPhone: '+1234567890',
-        agentId: 'agent-123',
-        agentName: 'Agent Name',
+        caregiverId: 'caregiver-123',
+        caregiverName: 'Caregiver Name',
         callStatus: 'ringing'
       }
     }

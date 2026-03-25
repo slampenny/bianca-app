@@ -11,6 +11,7 @@ module.exports.EmergencyPhrase = require('./emergencyPhrase.model');
 module.exports.Invoice = Invoice;
 module.exports.LineItem = LineItem;
 module.exports.Call = require('./call.model');
+module.exports.OnboardingResponse = require('./onboardingResponse.model').OnboardingResponse;
 
 module.exports.Message = Message;
 module.exports.Conversation = Conversation;

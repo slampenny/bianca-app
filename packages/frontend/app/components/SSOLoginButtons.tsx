@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Pressable, Text, ActivityIndicator } from 'react-native';
 import { useTheme } from 'app/theme/ThemeContext';
-import { ssoService, SSOUser, SSOError } from '../services/ssoService';
+import { ssoService, SSOUser, SSOError, isSSOUserResult } from '../services/ssoService';
 import { translate } from '../i18n';
 import { useToast } from '../hooks/useToast';
 import Toast from './Toast';
@@ -135,7 +135,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
         } else {
           showError(`${translate("ssoButtons.signInFailed")}: ${message}`);
         }
-      } else {
+      } else if (isSSOUserResult(result)) {
         onSSOSuccess(result);
       }
     } catch (error) {
@@ -168,7 +168,7 @@ export const SSOLoginButtons: React.FC<SSOLoginButtonsProps> = ({
         } else {
           showError(`${translate("ssoButtons.signInFailed")}: ${message}`);
         }
-      } else {
+      } else if (isSSOUserResult(result)) {
         onSSOSuccess(result);
       }
     } catch (error) {

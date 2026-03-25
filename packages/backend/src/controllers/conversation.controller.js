@@ -15,7 +15,7 @@ const createConversationForClient = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'callId is required in request body');
   }
   const conversation = await conversationService.createConversationForClient(clientId, callId);
-  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes agentId callSid');
+  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes caregiverId callSid');
   if (conversation.callId) {
     conversation.status = conversation.callId.status;
     conversation.callStatus = conversation.callId.callStatus;
@@ -27,7 +27,7 @@ const createConversationForClient = catchAsync(async (req, res) => {
     conversation.callDuration = conversation.callId.callDuration;
     conversation.callOutcome = conversation.callId.callOutcome;
     conversation.callNotes = conversation.callId.callNotes;
-    conversation.agentId = conversation.callId.agentId;
+    conversation.caregiverId = conversation.callId.caregiverId;
     conversation.callSid = conversation.callId.callSid;
   }
   res.status(httpStatus.CREATED).send(ConversationDTO(conversation));
@@ -39,8 +39,8 @@ const addMessageToConversation = catchAsync(async (req, res) => {
   const conversation = await conversationService.addMessageToConversation(conversationId, role, content);
   
   // Populate callId to get call data for DTO
-  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes agentId callSid');
-  
+  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes caregiverId callSid');
+
   // Set fields from call for DTO compatibility
   if (conversation.callId) {
     conversation.status = conversation.callId.status;
@@ -53,10 +53,10 @@ const addMessageToConversation = catchAsync(async (req, res) => {
     conversation.callDuration = conversation.callId.callDuration;
     conversation.callOutcome = conversation.callId.callOutcome;
     conversation.callNotes = conversation.callId.callNotes;
-    conversation.agentId = conversation.callId.agentId;
+    conversation.caregiverId = conversation.callId.caregiverId;
     conversation.callSid = conversation.callId.callSid;
   }
-  
+
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
@@ -67,8 +67,8 @@ const getConversation = catchAsync(async (req, res) => {
   }
   
   // Populate callId to get call data for DTO
-  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes agentId callSid');
-  
+  await conversation.populate('callId', 'startTime endTime duration status callStatus callStartTime callEndTime callDuration callOutcome callNotes caregiverId callSid');
+
   // Set fields from call for DTO compatibility
   if (conversation.callId) {
     conversation.status = conversation.callId.status;
@@ -81,19 +81,20 @@ const getConversation = catchAsync(async (req, res) => {
     conversation.callDuration = conversation.callId.callDuration;
     conversation.callOutcome = conversation.callId.callOutcome;
     conversation.callNotes = conversation.callId.callNotes;
-    conversation.agentId = conversation.callId.agentId;
+    conversation.caregiverId = conversation.callId.caregiverId;
     conversation.callSid = conversation.callId.callSid;
   }
-  
+
   // Check if the caregiver has access to this conversation
   // For staff users, they can only access conversations of their own clients OR conversations they initiated
   // For orgAdmin users, they can access any conversation in their org
   if (req.caregiver.role === 'staff') {
     const caregiver = await Caregiver.findById(req.caregiver.id);
     const hasClientAccess = caregiver.clients.includes(conversation.clientId);
-    const isCallAgent = conversation.agentId && conversation.agentId.toString() === req.caregiver.id;
-    
-    if (!hasClientAccess && !isCallAgent) {
+    const initiatedCall =
+      conversation.caregiverId && conversation.caregiverId.toString() === req.caregiver.id;
+
+    if (!hasClientAccess && !initiatedCall) {
       throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this conversation');
     }
   }

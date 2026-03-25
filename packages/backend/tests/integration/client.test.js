@@ -7,7 +7,7 @@ const httpStatus = require('http-status');
 
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Org, Client, Token, Caregiver } = require('../../src/models');
+const { Org, Client, Token, Caregiver, OnboardingResponse, Call } = require('../../src/models');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
 const { clientOne, insertClientsAndAddToCaregiver, insertClientsWithOrg } = require('../fixtures/client.fixture');
 
@@ -31,6 +31,8 @@ afterAll(async () => {
 
 describe('Client routes', () => {
   afterEach(async () => {
+    await OnboardingResponse.deleteMany();
+    await Call.deleteMany();
     await Org.deleteMany();
     await Caregiver.deleteMany();
     await Client.deleteMany();
@@ -494,6 +496,137 @@ describe('Client routes', () => {
       expect(res.body).toHaveLength(1);
       const cgIds = res.body[0].caregivers.map((id) => id.toString());
       expect(cgIds).toContain(assigneeCaregiver.id.toString());
+    });
+  });
+
+  describe('GET /v1/clients/:clientId/onboarding', () => {
+    test('should return journey and empty responses when no onboarding data', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
+
+      const res = await request(app)
+        .get(`/v1/clients/${client.id}/onboarding`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      expect(res.body).toMatchObject({
+        journey: {
+          journeyComplete: false,
+          hasAnyOnboardingActivity: false,
+          sessionsCompletedCount: 0,
+          currentDay: 1,
+        },
+        responses: [],
+        questionCount: 0,
+        flags: {
+          safety: false,
+          memory: false,
+          mood: false,
+          distress: false,
+          confusion: false,
+        },
+      });
+      expect(res.body.journey.days).toHaveLength(4);
+      expect(res.body.journey.days[0]).toMatchObject({
+        dayNumber: 1,
+        totalQuestions: 6,
+        capturedCount: 0,
+        sessionCompleted: false,
+      });
+    });
+
+    test('should return captures, flags, and filter by day', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
+
+      await OnboardingResponse.create({
+        clientId: client._id,
+        dayNumber: 1,
+        questionId: 'day1_emotional_orientation',
+        responseType: 'text',
+        responseValue: 'Okay',
+        safety_flag: true,
+      });
+      await OnboardingResponse.create({
+        clientId: client._id,
+        dayNumber: 2,
+        questionId: 'day2_morning_routine',
+        responseType: 'text',
+        responseValue: 'Coffee first',
+      });
+
+      const all = await request(app)
+        .get(`/v1/clients/${client.id}/onboarding`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      expect(all.body.questionCount).toBe(2);
+      expect(all.body.flags.safety).toBe(true);
+      expect(all.body.responses).toHaveLength(2);
+      expect(all.body.journey.hasAnyOnboardingActivity).toBe(true);
+
+      const day1 = await request(app)
+        .get(`/v1/clients/${client.id}/onboarding?day=1`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      expect(day1.body.responses).toHaveLength(1);
+      expect(day1.body.responses[0].questionId).toBe('day1_emotional_orientation');
+      expect(day1.body.questionCount).toBe(2);
+    });
+
+    test('should mark journey day complete when latest onboarding call has onboardingCompletedAt', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
+
+      await Call.create({
+        callSid: `onb-test-${Date.now()}`,
+        clientId: client._id,
+        status: 'completed',
+        duration: 120,
+        onboardingDay: 1,
+        onboardingCompletedAt: new Date(),
+        onboardingEndedEarlyReason: 'completed',
+      });
+
+      const res = await request(app)
+        .get(`/v1/clients/${client.id}/onboarding`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      expect(res.body.journey.sessionsCompletedCount).toBe(1);
+      expect(res.body.journey.currentDay).toBe(2);
+      expect(res.body.journey.days[0].sessionCompleted).toBe(true);
+      expect(res.body.journey.journeyComplete).toBe(false);
+    });
+
+    test('should allow staff onboarding access when roster link is missing but caregiver is agent on a Call', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [unassigned] = await insertClientsWithOrg(
+        [{ ...clientOne, email: 'unassigned-onb@example.org', caregivers: [] }],
+        org._id
+      );
+
+      await Call.create({
+        callSid: `onb-agent-fallback-${Date.now()}`,
+        clientId: unassigned._id,
+        caregiverId: caregiver._id,
+        status: 'completed',
+        callStatus: 'ended',
+        duration: 60,
+        onboardingDay: 1,
+      });
+
+      const res = await request(app)
+        .get(`/v1/clients/${unassigned._id}/onboarding`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      expect(res.body.journey.hasAnyOnboardingActivity).toBe(true);
     });
   });
 });

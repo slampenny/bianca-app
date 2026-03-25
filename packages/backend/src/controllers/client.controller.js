@@ -4,9 +4,36 @@ const pick = require('../utils/pick');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
+const onboardingService = require('../services/onboarding.service');
 const { caregiverService, conversationService, clientService, scheduleService } = require('../services');
 const { ConversationDTO, ClientDTO } = require('../dtos');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
+
+/**
+ * Staff may access a client's nested data if the client is on their roster, lists them as caregiver,
+ * or they have at least one Call with them as caregiverId (stored on Call, not Conversation).
+ */
+const assertStaffHasClientAccess = async (caregiver, clientId, client, denyMessage) => {
+  const caregiverDoc = await caregiverService.getCaregiverById(caregiver._id || caregiver.id);
+  if (!caregiverDoc) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Caregiver not found');
+  }
+  const idStr = clientId.toString();
+  const onRoster = (caregiverDoc.clients || []).some((p) =>
+    (p._id ? p._id.toString() : p.toString()) === idStr
+  );
+  const assignedOnClient =
+    Array.isArray(client.caregivers) &&
+    client.caregivers.some((c) => (c._id ? c._id.toString() : c.toString()) === caregiver.id.toString());
+  if (onRoster || assignedOnClient) {
+    return;
+  }
+  const { Call } = require('../models');
+  const callCount = await Call.countDocuments({ clientId, caregiverId: caregiver.id });
+  if (callCount === 0) {
+    throw new ApiError(httpStatus.FORBIDDEN, denyMessage);
+  }
+};
 
 const createClient = catchAsync(async (req, res) => {
   const { schedules, ...clientData } = req.body;
@@ -104,6 +131,63 @@ const getClientsByCaregiver = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(clients);
 });
 
+const formatOnboardingResponseRow = (r) => ({
+  id: r._id ? r._id.toString() : undefined,
+  clientId: r.clientId ? r.clientId.toString() : undefined,
+  dayNumber: r.dayNumber,
+  questionId: r.questionId,
+  responseType: r.responseType,
+  responseValue: r.responseValue,
+  verbatimTranscript: r.verbatimTranscript,
+  callId: r.callId ? r.callId.toString() : undefined,
+  conversationId: r.conversationId ? r.conversationId.toString() : undefined,
+  capturedAt: r.capturedAt,
+  safety_flag: !!r.safety_flag,
+  memory_flag: !!r.memory_flag,
+  mood_flag: !!r.mood_flag,
+  distress_flag: !!r.distress_flag,
+  confusion_flag: !!r.confusion_flag,
+  notes: r.notes,
+});
+
+const getClientOnboarding = catchAsync(async (req, res) => {
+  const { clientId } = req.params;
+  const dayRaw = req.query.day;
+  const dayNumber =
+    dayRaw !== undefined && dayRaw !== '' && !Number.isNaN(Number(dayRaw)) ? parseInt(String(dayRaw), 10) : undefined;
+
+  const caregiver = req.caregiver;
+  const client = await clientService.getClientById(clientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  }
+  if (caregiver.role === 'staff') {
+    await assertStaffHasClientAccess(
+      caregiver,
+      clientId,
+      client,
+      "You do not have access to this client's onboarding data"
+    );
+  } else if (caregiver.role === 'orgAdmin') {
+    const clientOrgId = toOrgIdString(client.org);
+    const caregiverOrgId = toOrgIdString(caregiver.org);
+    if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
+      throw new ApiError(httpStatus.FORBIDDEN, "You do not have access to this client's onboarding data");
+    }
+  }
+
+  const payload = await onboardingService.getDashboardForClient(clientId, {
+    dayNumber: dayNumber >= 1 && dayNumber <= 4 ? dayNumber : undefined,
+  });
+
+  res.status(httpStatus.OK).send({
+    journey: payload.journey,
+    responses: payload.responses.map(formatOnboardingResponseRow),
+    flags: payload.flags,
+    questionCount: payload.questionCount,
+  });
+});
+
 const getConversationsByClient = catchAsync(async (req, res) => {
   const { clientId } = req.params;
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
@@ -113,16 +197,12 @@ const getConversationsByClient = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid client ID');
   }
   if (caregiver.role === 'staff') {
-    const caregiverDoc = await caregiverService.getCaregiverById(caregiver.id);
-    const hasClientAccess = caregiverDoc.clients.some((p) => (p._id ? p._id.toString() : p.toString()) === clientId.toString())
-      || (client.caregivers && client.caregivers.some((c) => (c._id ? c._id.toString() : c.toString()) === caregiver.id.toString()));
-    if (!hasClientAccess) {
-      const { Conversation } = require('../models');
-      const conversationCount = await Conversation.countDocuments({ clientId, agentId: caregiver.id });
-      if (conversationCount === 0) {
-        throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client\'s conversations');
-      }
-    }
+    await assertStaffHasClientAccess(
+      caregiver,
+      clientId,
+      client,
+      "You do not have access to this client's conversations"
+    );
   } else if (caregiver.role === 'orgAdmin') {
     const clientOrgId = toOrgIdString(client.org);
     const caregiverOrgId = toOrgIdString(caregiver.org);
@@ -197,6 +277,7 @@ module.exports = {
   createClient,
   getClients,
   getClient,
+  getClientOnboarding,
   getConversationsByClient,
   updateClient,
   verifyConsent,

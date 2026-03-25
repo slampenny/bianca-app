@@ -217,13 +217,13 @@ describe('Privacy Service', () => {
         clientId,
         callSid: 'CA1234567890abcdef',
         status: 'completed',
-        duration: 60
+        duration: 60,
+        caregiverId,
       });
 
       const conversation = await Conversation.create({
         clientId,
         callId: call._id,
-        agentId: caregiverId,
         status: 'completed',
         startTime: new Date(),
         messages: [],
