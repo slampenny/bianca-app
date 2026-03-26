@@ -3,9 +3,10 @@ import { useSelector, useDispatch } from "react-redux"
 import { FlatList, View, StyleSheet, ActivityIndicator, Pressable } from "react-native"
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native"
 import type { StackNavigationProp } from "@react-navigation/stack"
+import { getAlertsPollingIntervalMs } from "app/constants/alertsPolling"
 import type { AlertStackParamList } from "app/navigators/navigationTypes"
 import { Ionicons } from "@expo/vector-icons"
-import { Toggle, Button, ListItem, Text } from "../components"
+import { Toggle, Button, Text } from "../components"
 import {
   useMarkAllAsReadMutation,
   useMarkAlertAsReadMutation,
@@ -21,7 +22,7 @@ import { translate } from "../i18n"
 import { logger } from "../utils/logger"
 
 type AlertListRouteProp = RouteProp<AlertStackParamList, "AlertList">
-type AlertListNavProp = StackNavigationProp<AlertStackParamList, "AlertList">
+type AlertListNavProp = StackNavigationProp<AlertStackParamList, "AlertList" | "AlertDetail">
 
 export function AlertScreen() {
   const dispatch = useDispatch()
@@ -42,22 +43,7 @@ export function AlertScreen() {
     }
   }, [filterClientId])
 
-  // Determine polling interval - check dynamically to handle test mode
-  const getPollingInterval = React.useMemo(() => {
-    if (typeof window !== 'undefined') {
-      // Check URL parameter (set by Playwright tests)
-      if (window.location.search.includes('playwright_test=1')) return 3000;
-      // Check localStorage (can be set by tests) - check dynamically
-      try {
-        if (localStorage.getItem('playwright_test') === '1') return 3000;
-      } catch (e) {
-        // localStorage might not be available
-      }
-    }
-    // Check process.env (works in Node.js, might work in some build configs)
-    if (process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1') return 3000;
-    return 30000;
-  }, [])
+  const pollingInterval = React.useMemo(() => getAlertsPollingIntervalMs(), [])
 
   const {
     data: fetchAllAlerts,
@@ -65,8 +51,7 @@ export function AlertScreen() {
     error: fetchError,
     refetch,
   } = useGetAllAlertsQuery(undefined, {
-    // Poll every 30 seconds to automatically fetch new alerts (or 3 seconds in test mode)
-    pollingInterval: getPollingInterval,
+    pollingInterval,
     // Refetch when the screen comes into focus
     refetchOnFocus: true,
     // Refetch when the app reconnects
@@ -260,12 +245,7 @@ export function AlertScreen() {
   const allVisibleAlertsRead = alerts.every(alert => alert.readBy?.includes(currentUser?.id || ""))
 
   const renderItem = ({ item }: { item: Alert }) => (
-    <ListItem
-      onPress={() => handleAlertPress(item)}
-      style={styles.listItem}
-      testID="alert-item"
-      accessibilityLabel="alert-item"
-    >
+    <View style={styles.listItem} testID="alert-item" accessibilityLabel="alert-item">
       <View style={styles.alertContent}>
         <View style={styles.alertHeader}>
           <Toggle
@@ -275,23 +255,33 @@ export function AlertScreen() {
             containerStyle={styles.alertToggle}
             testID="alert-checkbox"
           />
-          <View style={styles.alertHeaderContent}>
-            <Text style={styles.alertMessage} numberOfLines={1}>
+          <Pressable
+            style={styles.alertHeaderContent}
+            onPress={() => item.id && navigation.navigate("AlertDetail", { alertId: item.id })}
+            accessibilityRole="button"
+            accessibilityLabel={translate("alertScreen.openDetails")}
+            accessibilityHint={translate("alertScreen.openDetailsHint")}
+          >
+            <Text style={styles.alertMessage} numberOfLines={2}>
               {item.message}
             </Text>
             <Text style={styles.alertType}>
               {getAlertTypeDisplay(item.alertType)}
             </Text>
-          </View>
+            {item.evidence?.confidence != null && Number.isFinite(item.evidence.confidence) ? (
+              <Text style={styles.confidenceHint}>
+                {translate("alertDetail.confidenceLabel")} {Math.round(item.evidence.confidence * 100)}%
+              </Text>
+            ) : null}
+          </Pressable>
         </View>
-        
-        {/* Show client information if alert is related to a client */}
+
         {item.relatedClient && (
           <Text style={styles.alertDetails}>
             {translate("alertScreen.client")} {getClientName(item.relatedClient)}
           </Text>
         )}
-        
+
         <Text style={styles.alertDetails}>{translate("alertScreen.importance")} {item.importance}</Text>
         {item.relevanceUntil && (
           <Text style={styles.alertDetails}>
@@ -299,7 +289,7 @@ export function AlertScreen() {
           </Text>
         )}
       </View>
-    </ListItem>
+    </View>
   )
 
   const alertsInClientScope = React.useMemo(() => {
@@ -509,6 +499,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     marginTop: 2,
+  },
+  confidenceHint: {
+    color: colors.palette.neutral600,
+    fontSize: 11,
+    marginTop: 4,
   },
   container: {
     backgroundColor: colors.palette.biancaBackground,

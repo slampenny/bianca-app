@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
-const { Org, Caregiver, Client } = require('../../../src/models');
+const { Org, Caregiver, Client, ConsentRecord } = require('../../../src/models');
 const clientService = require('../../../src/services/client.service');
 const caregiverService = require('../../../src/services/caregiver.service');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
@@ -26,6 +26,7 @@ describe('clientService', () => {
     await Org.deleteMany();
     await Caregiver.deleteMany();
     await Client.deleteMany();
+    await ConsentRecord.deleteMany();
   });
 
   it('should create a new client', async () => {

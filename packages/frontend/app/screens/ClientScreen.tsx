@@ -27,6 +27,7 @@ import {
   useGetClientOnboardingQuery,
 } from "../services/api/clientApi"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { getAlertsPollingIntervalMs } from "app/constants/alertsPolling"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
 import { Button, TextField, PhoneInputWeb } from "app/components"
@@ -82,8 +83,11 @@ function ClientScreen() {
   const currentUser = useSelector(getCurrentUser)
   const client = useSelector(getClient)
   const alertsFromStore = useSelector(getAlerts)
+  const alertsPollMs = React.useMemo(() => getAlertsPollingIntervalMs(), [])
+
   const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
     skip: !currentUser?.id,
+    pollingInterval: alertsPollMs,
     refetchOnFocus: true,
     refetchOnReconnect: true,
   })

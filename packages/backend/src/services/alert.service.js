@@ -4,43 +4,93 @@ const { Alert, Caregiver } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { translateAlertMessage, parseAlertMessage } = require('../utils/alertTranslations');
 
+const RELATED_CLIENT_SELECT = 'name preferredName consented consentedAt';
+
+const populateRelatedClient = {
+  path: 'relatedClient',
+  select: RELATED_CLIENT_SELECT,
+};
+
+/**
+ * Flatten populated client for API (US-7B) and normalize ObjectIds to strings.
+ * @param {import('mongoose').Document|object} doc Mongoose doc (prefer .toJSON()) or plain object
+ */
+function formatAlertForResponse(doc) {
+  if (!doc || typeof doc !== 'object') {
+    return doc;
+  }
+  const obj = typeof doc.toJSON === 'function' ? doc.toJSON() : { ...doc };
+  const out = { ...obj };
+  if (out.relatedClient && typeof out.relatedClient === 'object') {
+    const rid = out.relatedClient._id || out.relatedClient.id;
+    if (rid) {
+      out.relatedResidentConsent = {
+        onFile: !!out.relatedClient.consented,
+        recordedAt: out.relatedClient.consentedAt || null,
+      };
+      out.relatedClient = rid.toString();
+    }
+  } else if (out.relatedClient && mongoose.Types.ObjectId.isValid(out.relatedClient)) {
+    out.relatedClient = out.relatedClient.toString();
+  }
+  if (out.relatedConversation && mongoose.Types.ObjectId.isValid(out.relatedConversation)) {
+    out.relatedConversation = out.relatedConversation.toString();
+  }
+  if (out.evidence && out.evidence.conversationId && mongoose.Types.ObjectId.isValid(out.evidence.conversationId)) {
+    out.evidence = {
+      ...out.evidence,
+      conversationId: out.evidence.conversationId.toString(),
+    };
+  }
+  if (out.evidence?.messageIds?.length) {
+    out.evidence = {
+      ...out.evidence,
+      messageIds: out.evidence.messageIds.map((id) =>
+        id && mongoose.Types.ObjectId.isValid(id) ? id.toString() : id
+      ),
+    };
+  }
+  return out;
+}
+
 const createAlert = async (alertData) => {
-  return await Alert.create(alertData);
+  const created = await Alert.create(alertData);
+  const populated = await Alert.findById(created._id).populate(populateRelatedClient);
+  return formatAlertForResponse(populated);
 };
 
 const getAlertById = async (alertId, caregiverId) => {
   const alert = await Alert.findOne({
     _id: alertId,
-    relevanceUntil: { $gte: new Date() }, // Ensure the alert is still relevant
-  });
+    relevanceUntil: { $gte: new Date() },
+  }).populate(populateRelatedClient);
 
   if (!alert) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Alert not found');
   }
 
-  // Optionally check if the alert has been read by this caregiver, if required
-  if (alert.readBy && alert.readBy.includes(caregiverId)) {
+  const caregiverObjectId = caregiverId ? new mongoose.Types.ObjectId(caregiverId) : null;
+  if (caregiverObjectId && alert.readBy && alert.readBy.some((id) => id.equals(caregiverObjectId))) {
     throw new ApiError(httpStatus.FORBIDDEN, 'Alert has already been read');
   }
 
-  // Translate alert message based on caregiver's preferred language
   if (caregiverId) {
     const caregiver = await Caregiver.findById(caregiverId).select('preferredLanguage');
     if (caregiver && caregiver.preferredLanguage) {
-      const alertData = parseAlertMessage(alert.message);
-      if (alertData) {
+      const parsed = parseAlertMessage(alert.message);
+      if (parsed) {
         alert.message = translateAlertMessage(alert.message, caregiver.preferredLanguage, {
-          severity: alertData.severity,
-          category: alertData.category,
-          phrase: alertData.phrase,
-          patientName: alertData.patientName,
-          originalText: alertData.originalText
+          severity: parsed.severity,
+          category: parsed.category,
+          phrase: parsed.phrase,
+          patientName: parsed.patientName,
+          originalText: parsed.originalText,
         });
       }
     }
   }
 
-  return alert;
+  return formatAlertForResponse(alert);
 };
 
 const getAlerts = async (caregiverId, showRead = false) => {
@@ -55,10 +105,10 @@ const getAlerts = async (caregiverId, showRead = false) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
-  const orgCaregiverIds = (caregiver.org && caregiver.org.caregivers) ? caregiver.org.caregivers : [];
-  const clientIds = (caregiver.clients && Array.isArray(caregiver.clients)) ? caregiver.clients.map((pt) => pt._id) : [];
+  const orgCaregiverIds = caregiver.org && caregiver.org.caregivers ? caregiver.org.caregivers : [];
+  const clientIds = caregiver.clients && Array.isArray(caregiver.clients) ? caregiver.clients.map((pt) => pt._id) : [];
 
-  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId); // Convert caregiverId to ObjectId
+  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId);
 
   let visibilityConditions;
   if (caregiver.role === 'orgAdmin') {
@@ -78,44 +128,44 @@ const getAlerts = async (caregiverId, showRead = false) => {
           { createdBy: { $in: clientIds }, visibility: 'assignedCaregivers' },
         ],
       },
-      { relevanceUntil: { $gte: new Date() } }, // ADDED RELEVANCE FILTER
+      { relevanceUntil: { $gte: new Date() } },
     ],
   };
 
   let alerts;
   if (showRead) {
-    alerts = await Alert.find(baseConditions);
+    alerts = await Alert.find(baseConditions).populate(populateRelatedClient).sort({ createdAt: -1 });
   } else {
-    // Only include alerts that have NOT been read by the caregiver.
-    const conditions = {
+    alerts = await Alert.find({
       $and: [
         baseConditions,
-        { readBy: { $not: { $elemMatch: { $eq: objectCaregiverId } } } }, // Use ObjectId for comparison
+        { readBy: { $not: { $elemMatch: { $eq: objectCaregiverId } } } },
       ],
-    };
-    alerts = await Alert.find(conditions);
+    })
+      .populate(populateRelatedClient)
+      .sort({ createdAt: -1 });
   }
-
-  // Translate alert messages based on caregiver's preferred language
   const caregiverLanguage = caregiver.preferredLanguage || 'en';
-  if (caregiverLanguage !== 'en') {
-    alerts = alerts.map(alert => {
-      const alertData = parseAlertMessage(alert.message);
-      if (alertData) {
-        // Create a new object to avoid modifying the original Mongoose document
-        const translatedAlert = alert.toObject();
-        translatedAlert.message = translateAlertMessage(alert.message, caregiverLanguage, {
-          severity: alertData.severity,
-          category: alertData.category,
-          phrase: alertData.phrase,
-          patientName: alertData.patientName,
-          originalText: alertData.originalText
-        });
-        return translatedAlert;
+
+  alerts = alerts.map((alert) => {
+    let plain = alert.toJSON();
+    if (caregiverLanguage !== 'en') {
+      const parsed = parseAlertMessage(alert.message);
+      if (parsed) {
+        plain = {
+          ...plain,
+          message: translateAlertMessage(alert.message, caregiverLanguage, {
+            severity: parsed.severity,
+            category: parsed.category,
+            phrase: parsed.phrase,
+            patientName: parsed.patientName,
+            originalText: parsed.originalText,
+          }),
+        };
       }
-      return alert;
-    });
-  }
+    }
+    return formatAlertForResponse(plain);
+  });
 
   return alerts;
 };
@@ -127,7 +177,8 @@ const updateAlertById = async (alertId, updateBody) => {
   }
   Object.assign(alert, updateBody);
   await alert.save();
-  return alert;
+  const populated = await Alert.findById(alertId).populate(populateRelatedClient);
+  return formatAlertForResponse(populated);
 };
 
 const markAlertAsRead = async (alertId, caregiverId) => {
@@ -135,13 +186,13 @@ const markAlertAsRead = async (alertId, caregiverId) => {
   if (!alert) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Alert not found');
   }
-  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId); // Convert to ObjectId
+  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId);
   if (!alert.readBy.some((id) => id.equals(objectCaregiverId))) {
-    // Use .equals() for ObjectId comparison
     alert.readBy.push(objectCaregiverId);
     await alert.save();
   }
-  return alert;
+  const populated = await Alert.findById(alertId).populate(populateRelatedClient);
+  return formatAlertForResponse(populated);
 };
 
 const markAlertAsUnread = async (alertId, caregiverId) => {
@@ -149,11 +200,11 @@ const markAlertAsUnread = async (alertId, caregiverId) => {
   if (!alert) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Alert not found');
   }
-  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId); // Convert to ObjectId
-  // Remove the caregiver ID from the readBy array
+  const objectCaregiverId = new mongoose.Types.ObjectId(caregiverId);
   alert.readBy = alert.readBy.filter((id) => !id.equals(objectCaregiverId));
   await alert.save();
-  return alert;
+  const populated = await Alert.findById(alertId).populate(populateRelatedClient);
+  return formatAlertForResponse(populated);
 };
 
 const deleteAlertById = async (alertId) => {
@@ -169,4 +220,5 @@ module.exports = {
   markAlertAsUnread,
   updateAlertById,
   deleteAlertById,
+  formatAlertForResponse,
 };

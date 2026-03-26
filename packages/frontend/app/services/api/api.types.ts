@@ -58,8 +58,29 @@ export interface AlertPages {
 
 export type CreatedModel = "Client" | "Caregiver" | "Org" | "Schedule"
 export type AlertVisibility = "orgAdmin" | "allCaregivers" | "assignedCaregivers"
-export type AlertImportance = "low" | "medium" | "high"
+export type AlertImportance = "low" | "medium" | "high" | "urgent"
 export type AlertType = "conversation" | "client" | "system"
+
+export interface AlertEvidence {
+  snippet?: string
+  conversationId?: string
+  messageIds?: string[]
+  detector?: string
+  confidence?: number
+  language?: string
+}
+
+export interface AlertRecommendedAction {
+  id: string
+  labelKey: string
+  actionType: string
+}
+
+/** US-7B: consent summary when relatedClient was populated on the server */
+export interface RelatedResidentConsent {
+  onFile: boolean
+  recordedAt?: string | null
+}
 
 export interface Alert {
   id?: string
@@ -73,6 +94,9 @@ export interface Alert {
   visibility: AlertVisibility
   readBy: string[] // Assuming these are the IDs of the caregivers who have read the alert
   relevanceUntil?: Date
+  evidence?: AlertEvidence
+  recommendedActions?: AlertRecommendedAction[]
+  relatedResidentConsent?: RelatedResidentConsent
 }
 
 export interface OrgPages {

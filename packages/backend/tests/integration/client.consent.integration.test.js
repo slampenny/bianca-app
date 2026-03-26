@@ -7,7 +7,7 @@ const moment = require('moment');
 
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
-const { Org, Client, Token } = require('../../src/models');
+const { Org, Client, Token, ConsentRecord } = require('../../src/models');
 const { insertOrgs } = require('../fixtures/org.fixture');
 const { clientOne } = require('../fixtures/client.fixture');
 const tokenService = require('../../src/services/token.service');
@@ -27,6 +27,7 @@ describe('Client consent routes', () => {
     await Org.deleteMany();
     await Client.deleteMany();
     await Token.deleteMany();
+    await ConsentRecord.deleteMany();
   });
 
   describe('POST /v1/clients/consent/verify', () => {
@@ -58,6 +59,14 @@ describe('Client consent routes', () => {
       const updatedClient = await Client.findById(client._id);
       expect(updatedClient.consented).toBe(true);
       expect(updatedClient.consentedAt).toBeTruthy();
+
+      const auditRows = await ConsentRecord.find({
+        userId: client._id,
+        userModel: 'Client',
+        consentType: 'recording',
+      });
+      expect(auditRows.length).toBeGreaterThanOrEqual(1);
+      expect(auditRows.some((r) => r.granted === true)).toBe(true);
     });
 
     test('should return 200 with alreadyConsented=true when patient already consented', async () => {

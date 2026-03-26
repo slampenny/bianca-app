@@ -1,9 +1,11 @@
 const httpStatus = require('http-status');
+const mongoose = require('mongoose');
 const { PrivacyRequest, ConsentRecord, PrivacyComplaint, Caregiver, Client, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const config = require('../config/config');
 const { getJurisdiction } = require('../utils/jurisdiction.utils');
+const { buildConsentAuditPdfBuffer } = require('./consentAuditPdf.service');
 
 /**
  * Create an access request
@@ -192,6 +194,13 @@ const updatePrivacyRequest = async (requestId, updateBody, updatedBy) => {
  * @returns {Promise<ConsentRecord>}
  */
 const createConsentRecord = async (consentBody, userId, userModel = 'Caregiver') => {
+  const createdBy =
+    consentBody.createdBy !== undefined && consentBody.createdBy !== null
+      ? consentBody.createdBy
+      : userModel === 'Caregiver'
+        ? userId
+        : undefined;
+
   const consent = await ConsentRecord.create({
     userType: userModel === 'Caregiver' ? 'caregiver' : 'client',
     userId,
@@ -209,7 +218,7 @@ const createConsentRecord = async (consentBody, userId, userModel = 'Caregiver')
     collectionNoticeProvided: consentBody.collectionNoticeProvided || false,
     collectionNoticeProvidedAt: consentBody.collectionNoticeProvided ? new Date() : null,
     collectionNoticeVersion: consentBody.collectionNoticeVersion,
-    createdBy: consentBody.createdBy || userId
+    createdBy,
   });
   
   logger.info(`[Privacy Service] Consent record created: ${consent._id} for user ${userId}`);
@@ -290,6 +299,329 @@ const withdrawConsent = async (consentId, withdrawalBody, userId) => {
  */
 const getConsentHistory = async (userId, userModel = 'Caregiver') => {
   return await ConsentRecord.getConsentHistory(userId, userModel);
+};
+
+/**
+ * US-16: Persist a ConsentRecord when resident recording consent is granted or revoked (client model flags).
+ * @param {Object} params
+ */
+const recordClientRecordingConsentEvent = async ({
+  clientId,
+  granted,
+  explicitMeta = {},
+  performedByCaregiverId,
+}) => {
+  await createConsentRecord(
+    {
+      consentType: 'recording',
+      purpose: granted
+        ? 'Wellness check call recording and transcription'
+        : 'Recording consent withdrawn or declined',
+      granted,
+      method: 'explicit',
+      explicitConsent: {
+        provided: granted,
+        providedAt: new Date(),
+        providedVia: explicitMeta.providedVia || 'unknown',
+        ipAddress: explicitMeta.ipAddress,
+        userAgent: explicitMeta.userAgent,
+      },
+      informationTypes: ['call_recordings', 'voice_transcripts'],
+      collectionNoticeProvided: true,
+      collectionNoticeVersion: explicitMeta.consentEmailVersion || '1.0',
+      createdBy: performedByCaregiverId,
+    },
+    clientId,
+    'Client'
+  );
+  logger.info(
+    `[Privacy Service] Client recording consent event recorded (granted=${granted}) for client ${clientId}`
+  );
+};
+
+const assertOrgConsentAuditAccess = (caregiver) => {
+  if (!caregiver.role || !['orgAdmin', 'superAdmin'].includes(caregiver.role)) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Organization administrator access required');
+  }
+};
+
+const resolveCaregiverOrgObjectId = (caregiver) => {
+  let orgId = caregiver.org;
+  if (orgId && orgId._id) orgId = orgId._id;
+  if (!orgId) return null;
+  return orgId instanceof mongoose.Types.ObjectId ? orgId : new mongoose.Types.ObjectId(String(orgId));
+};
+
+const wantsAllOrganizations = (query, caregiver) => {
+  const v = query.allOrganizations;
+  const on = v === true || v === 'true' || v === '1';
+  if (on && caregiver.role !== 'superAdmin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Cross-organization consent audit requires super administrator');
+  }
+  return on;
+};
+
+const enrichGlobalConsentRows = async (results) => {
+  const docs = results.map((d) => (typeof d.toJSON === 'function' ? d.toJSON() : { ...d }));
+  const clientIds = [...new Set(docs.filter((x) => x.userModel === 'Client').map((x) => x.userId.toString()))];
+  const caregiverIds = [...new Set(docs.filter((x) => x.userModel === 'Caregiver').map((x) => x.userId.toString()))];
+
+  const [clients, caregivers] = await Promise.all([
+    clientIds.length
+      ? Client.find({ _id: { $in: clientIds.map((id) => new mongoose.Types.ObjectId(id)) } })
+          .select('name preferredName org')
+          .populate('org', 'name')
+          .lean()
+      : [],
+    caregiverIds.length
+      ? Caregiver.find({ _id: { $in: caregiverIds.map((id) => new mongoose.Types.ObjectId(id)) } })
+          .select('name email org')
+          .populate('org', 'name')
+          .lean()
+      : [],
+  ]);
+
+  const clientMap = new Map(clients.map((c) => [c._id.toString(), c]));
+  const cgMap = new Map(caregivers.map((c) => [c._id.toString(), c]));
+
+  return docs.map((o) => {
+    const uid = o.userId.toString();
+    if (o.userModel === 'Client') {
+      const c = clientMap.get(uid);
+      o.subjectDisplayName = c ? c.preferredName || c.name || uid : uid;
+      o.subjectKind = 'resident';
+      if (c && c.org) {
+        const org = c.org;
+        o.organizationName = org.name || '';
+        o.organizationId = (org._id || org).toString();
+      } else {
+        o.organizationName = '';
+        o.organizationId = '';
+      }
+    } else {
+      const c = cgMap.get(uid);
+      o.subjectDisplayName = c ? c.name || c.email || uid : uid;
+      o.subjectKind = 'caregiver';
+      if (c && c.org) {
+        const org = c.org;
+        o.organizationName = org.name || '';
+        o.organizationId = (org._id || org).toString();
+      } else {
+        o.organizationName = '';
+        o.organizationId = '';
+      }
+    }
+    return o;
+  });
+};
+
+const runOrgScopedConsentAudit = async (oid, query) => {
+  const orgMeta = await Org.findById(oid).select('name').lean();
+  const scopeLabel = orgMeta && orgMeta.name ? `${orgMeta.name} (${oid})` : oid.toString();
+
+  const clients = await Client.find({ org: oid }).select('_id name preferredName').lean();
+  const clientIds = clients.map((c) => c._id);
+  const clientNameById = new Map(clients.map((c) => [c._id.toString(), c.preferredName || c.name || '']));
+
+  const caregiversInOrg = await Caregiver.find({ org: oid }).select('_id name email').lean();
+  const caregiverIds = caregiversInOrg.map((c) => c._id);
+  const caregiverNameById = new Map(caregiversInOrg.map((c) => [c._id.toString(), c.name || c.email || '']));
+
+  const filter = {
+    $or: [
+      { userModel: 'Client', userId: { $in: clientIds } },
+      { userModel: 'Caregiver', userId: { $in: caregiverIds } },
+    ],
+  };
+
+  if (query.clientId) {
+    if (!mongoose.Types.ObjectId.isValid(query.clientId)) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid clientId');
+    }
+    const cid = new mongoose.Types.ObjectId(query.clientId);
+    if (!clientIds.some((id) => id.equals(cid))) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Client not found in your organization');
+    }
+    filter.userModel = 'Client';
+    filter.userId = cid;
+    delete filter.$or;
+  }
+
+  if (query.consentType) {
+    filter.consentType = query.consentType;
+  }
+
+  const options = {
+    sortBy: query.sortBy || 'createdAt:desc',
+    limit: query.limit,
+    page: query.page,
+  };
+
+  const pageResult = await ConsentRecord.paginate(filter, options);
+
+  const enrich = (doc) => {
+    const o = typeof doc.toJSON === 'function' ? doc.toJSON() : { ...doc };
+    const uid = o.userId ? o.userId.toString() : String(o.userId);
+    if (o.userModel === 'Client') {
+      o.subjectDisplayName = clientNameById.get(uid) || uid;
+      o.subjectKind = 'resident';
+    } else {
+      o.subjectDisplayName = caregiverNameById.get(uid) || uid;
+      o.subjectKind = 'caregiver';
+    }
+    o.organizationName = orgMeta?.name || '';
+    o.organizationId = oid.toString();
+    return o;
+  };
+
+  return {
+    ...pageResult,
+    results: pageResult.results.map(enrich),
+    scopeLabel,
+  };
+};
+
+/**
+ * US-17: Paginated consent audit (single org, or superAdmin cross-org via allOrganizations=true / orgId).
+ */
+const queryOrgConsentAudit = async (caregiver, query = {}) => {
+  assertOrgConsentAuditAccess(caregiver);
+  const isSuper = caregiver.role === 'superAdmin';
+  const allOrgs = wantsAllOrganizations(query, caregiver);
+
+  if (allOrgs) {
+    const filter = {};
+    if (query.consentType) filter.consentType = query.consentType;
+    if (query.clientId) {
+      if (!mongoose.Types.ObjectId.isValid(query.clientId)) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid clientId');
+      }
+      filter.userModel = 'Client';
+      filter.userId = new mongoose.Types.ObjectId(query.clientId);
+    }
+    const options = {
+      sortBy: query.sortBy || 'createdAt:desc',
+      limit: query.limit,
+      page: query.page,
+    };
+    const pageResult = await ConsentRecord.paginate(filter, options);
+    const enriched = await enrichGlobalConsentRows(pageResult.results);
+    return {
+      ...pageResult,
+      results: enriched,
+      scopeLabel: 'All organizations',
+    };
+  }
+
+  let oid = null;
+  if (isSuper && query.orgId && mongoose.Types.ObjectId.isValid(query.orgId)) {
+    oid = new mongoose.Types.ObjectId(query.orgId);
+  } else {
+    oid = resolveCaregiverOrgObjectId(caregiver);
+  }
+
+  if (!oid) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      isSuper
+        ? 'Provide orgId, or pass allOrganizations=true for a cross-organization view'
+        : 'Your account is not linked to an organization'
+    );
+  }
+
+  if (!isSuper) {
+    const myOrg = resolveCaregiverOrgObjectId(caregiver);
+    if (!myOrg) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Your account is not linked to an organization');
+    }
+    if (!myOrg.equals(oid)) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'Cannot query another organization');
+    }
+  }
+
+  return runOrgScopedConsentAudit(oid, query);
+};
+
+function escapeCsvField(val) {
+  if (val === undefined || val === null) return '';
+  const s = String(val);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/**
+ * US-17: CSV export (same scope as queryOrgConsentAudit).
+ */
+const exportOrgConsentAuditCsv = async (caregiver, query = {}) => {
+  const page = await queryOrgConsentAudit(caregiver, {
+    ...query,
+    page: 1,
+    limit: 10000,
+    sortBy: 'createdAt:desc',
+  });
+  const headers = [
+    'id',
+    'subjectKind',
+    'subjectDisplayName',
+    'organizationName',
+    'organizationId',
+    'userModel',
+    'userId',
+    'consentType',
+    'purpose',
+    'granted',
+    'withdrawn',
+    'method',
+    'createdAt',
+    'withdrawnAt',
+    'providedVia',
+  ];
+  const lines = [headers.join(',')];
+  for (const row of page.results) {
+    const providedVia = row.explicitConsent && row.explicitConsent.providedVia;
+    lines.push(
+      [
+        escapeCsvField(row.id || row._id),
+        escapeCsvField(row.subjectKind),
+        escapeCsvField(row.subjectDisplayName),
+        escapeCsvField(row.organizationName),
+        escapeCsvField(row.organizationId),
+        escapeCsvField(row.userModel),
+        escapeCsvField(row.userId),
+        escapeCsvField(row.consentType),
+        escapeCsvField(row.purpose),
+        escapeCsvField(row.granted),
+        escapeCsvField(row.withdrawn),
+        escapeCsvField(row.method),
+        escapeCsvField(row.createdAt),
+        escapeCsvField(row.withdrawnAt),
+        escapeCsvField(providedVia),
+      ].join(',')
+    );
+  }
+  return lines.join('\n');
+};
+
+/**
+ * US-17 optional: PDF export with SHA-256 document fingerprint (integrity seal, not PKI).
+ */
+const exportOrgConsentAuditPdf = async (caregiver, query = {}) => {
+  const page = await queryOrgConsentAudit(caregiver, {
+    ...query,
+    page: 1,
+    limit: 10000,
+    sortBy: 'createdAt:desc',
+  });
+  const cgId = caregiver._id || caregiver.id;
+  const caregiverDoc = await Caregiver.findById(cgId).select('email').lean();
+  const buffer = await buildConsentAuditPdfBuffer({
+    rows: page.results,
+    scopeLabel: page.scopeLabel,
+    generatorEmail: caregiverDoc?.email || String(cgId),
+    generatorRole: caregiver.role,
+    generatorId: String(cgId),
+  });
+  return buffer;
 };
 
 /**
@@ -711,10 +1043,14 @@ module.exports = {
   queryPrivacyRequests,
   updatePrivacyRequest,
   createConsentRecord,
+  recordClientRecordingConsentEvent,
   getActiveConsent,
   hasConsent,
   withdrawConsent,
   getConsentHistory,
+  queryOrgConsentAudit,
+  exportOrgConsentAuditCsv,
+  exportOrgConsentAuditPdf,
   getApproachingDeadline,
   getOverdueRequests,
   getPrivacyStatistics,

@@ -603,6 +603,91 @@ describe('Privacy API routes', () => {
         expect(res.body.requests.total).toBeGreaterThan(0);
       });
     });
+
+    describe('GET /v1/privacy/consent/audit (US-17)', () => {
+      beforeEach(async () => {
+        await ConsentRecord.create({
+          userType: 'client',
+          userId: clientId,
+          userModel: 'Client',
+          consentType: 'recording',
+          purpose: 'Wellness check call recording and transcription',
+          granted: true,
+          withdrawn: false,
+          method: 'explicit',
+        });
+      });
+
+      it('should return paginated consent audit for superAdmin', async () => {
+        const res = await request(app)
+          .get('/v1/privacy/consent/audit')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .query({ limit: 20, page: 1 })
+          .expect(httpStatus.OK);
+
+        expect(res.body.results).toBeDefined();
+        expect(Array.isArray(res.body.results)).toBe(true);
+        expect(res.body.results.length).toBeGreaterThanOrEqual(1);
+        expect(res.body.scopeLabel).toBeDefined();
+        const row = res.body.results.find((r) => r.consentType === 'recording' && r.userModel === 'Client');
+        expect(row).toBeDefined();
+        expect(row.subjectKind).toBe('resident');
+        expect(row.organizationId).toBeDefined();
+      });
+
+      it('should allow superAdmin cross-org audit when allOrganizations=true', async () => {
+        const res = await request(app)
+          .get('/v1/privacy/consent/audit')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .query({ limit: 20, page: 1, allOrganizations: 'true' })
+          .expect(httpStatus.OK);
+
+        expect(res.body.scopeLabel).toBe('All organizations');
+        const row = res.body.results.find((r) => r.consentType === 'recording' && r.userModel === 'Client');
+        expect(row).toBeDefined();
+        expect(row.organizationName || row.organizationId).toBeTruthy();
+      });
+
+      it('should reject staff for org consent audit', async () => {
+        await request(app)
+          .get('/v1/privacy/consent/audit')
+          .set('Authorization', `Bearer ${accessToken}`)
+          .expect(httpStatus.FORBIDDEN);
+      });
+
+      it('should reject staff for cross-org consent audit', async () => {
+        await request(app)
+          .get('/v1/privacy/consent/audit')
+          .set('Authorization', `Bearer ${accessToken}`)
+          .query({ allOrganizations: 'true' })
+          .expect(httpStatus.FORBIDDEN);
+      });
+
+      it('should export consent audit as CSV', async () => {
+        const res = await request(app)
+          .get('/v1/privacy/consent/audit/export')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(httpStatus.OK);
+
+        expect(res.headers['content-type']).toMatch(/csv/);
+        const headerLine = res.text.split('\n')[0];
+        expect(headerLine).toContain('organizationName');
+        expect(headerLine).toContain('organizationId');
+        expect(res.text).toContain('recording');
+        expect(res.text).toContain('resident');
+      });
+
+      it('should export consent audit as PDF', async () => {
+        const res = await request(app)
+          .get('/v1/privacy/consent/audit/export/pdf')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(httpStatus.OK);
+
+        expect(res.headers['content-type']).toMatch(/pdf/);
+        expect(res.body.length).toBeGreaterThan(4);
+        expect(res.body.slice(0, 4).toString()).toBe('%PDF');
+      });
+    });
   });
 });
 

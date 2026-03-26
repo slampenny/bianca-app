@@ -40,6 +40,7 @@
  */
 
 const WebSocket = require('ws');
+const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
@@ -2119,11 +2120,16 @@ class OpenAIRealtimeService {
             const alertResult = await emergencyProcessor.createAlert(
               conn.clientId,
               emergencyResult.alertData,
-              content
+              content,
+              {
+                conversationId: conn.conversationId || null,
+                detectionSource: emergencyResult.detectionSource || 'phrase_match',
+                ...(message?._id ? { messageId: message._id } : {}),
+              }
             );
 
             if (alertResult.success) {
-              logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert._id}`);
+              logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert?.id || alertResult.alert?._id}`);
             } else {
               logger.error(`[Emergency Detection] ❌ Failed to create alert: ${alertResult.error}`);
             }
@@ -2345,6 +2351,11 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${transcript}"`);
     await this.persistUserTranscriptToPlaceholder(callId, transcript);
 
+    const evidenceUserMessageId =
+      conn.activeUserMessageId && mongoose.Types.ObjectId.isValid(conn.activeUserMessageId)
+        ? conn.activeUserMessageId
+        : null;
+
     // speech_stopped already ran and was waiting on ASR — finalize turn (placeholder already updated above).
     if (conn._waitingForUserTranscript && conn.activeUserMessageId && transcript.trim()) {
       logger.info(`[OpenAI Realtime] Transcript arrived after speech_stopped — finalizing user turn ${conn.activeUserMessageId}`);
@@ -2382,7 +2393,12 @@ class OpenAIRealtimeService {
           const alertResult = await emergencyProcessor.createAlert(
             conn.clientId,
             emergencyResult.alertData,
-            transcript
+            transcript,
+            {
+              conversationId: conn.conversationId || null,
+              detectionSource: emergencyResult.detectionSource || 'phrase_match',
+              ...(evidenceUserMessageId ? { messageId: evidenceUserMessageId } : {}),
+            }
           );
 
           logger.info(`[Emergency Detection] createAlert result - success: ${alertResult.success}, error: ${alertResult.error || 'none'}`);
@@ -2391,7 +2407,7 @@ class OpenAIRealtimeService {
           }
 
           if (alertResult.success) {
-            logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert._id}`);
+            logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert?.id || alertResult.alert?._id}`);
 
             try {
               const emergencyInstruction = `\n\nCRITICAL: An emergency alert has been AUTOMATICALLY sent to the patient's caregiver via text message. In your next response, you MUST inform them: "I've already sent an alert to your caregiver. They'll be notified right away. Please call emergency services right away if you need immediate medical help." Do NOT offer to call emergency services yourself - you cannot make calls. Use "emergency services" (not "911") as it works in all countries. ONLY say this because the system has confirmed an alert was sent.`;
@@ -2712,7 +2728,6 @@ class OpenAIRealtimeService {
     }
 
     const onboardingService = require('./onboarding.service');
-    const mongoose = require('mongoose');
 
     try {
       if (name === 'capture_onboarding_response' && args.question_id) {

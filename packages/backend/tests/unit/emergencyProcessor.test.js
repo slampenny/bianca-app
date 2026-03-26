@@ -190,6 +190,7 @@ describe('Emergency Processor', () => {
       expect(result.processing.falsePositive).toBe(false);
       expect(result.processing.deduplicationPassed).toBe(true);
       expect(result.processing.confidence).toBeDefined();
+      expect(result.detectionSource).toBe('phrase_match');
     });
   });
 

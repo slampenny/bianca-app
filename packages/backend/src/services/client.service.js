@@ -25,13 +25,51 @@ const getClientByEmail = async (email) => {
   return Client.findOne({ email }).populate('schedules');
 };
 
-const updateClientById = async (clientId, updateBody) => {
+const updateClientById = async (clientId, updateBody, consentAuditContext = null) => {
   const client = await getClientById(clientId);
   if (!client) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
+  const prevConsented = client.consented === true;
   Object.assign(client, updateBody);
   await client.save();
+
+  if (updateBody.consented === true && !prevConsented) {
+    try {
+      const privacyService = require('./privacy.service');
+      await privacyService.recordClientRecordingConsentEvent({
+        clientId: client._id,
+        granted: true,
+        explicitMeta: {
+          providedVia: (consentAuditContext && consentAuditContext.providedVia) || 'api',
+          ipAddress: consentAuditContext && consentAuditContext.ipAddress,
+          userAgent: consentAuditContext && consentAuditContext.userAgent,
+          consentEmailVersion: client.consentEmailVersion,
+        },
+        performedByCaregiverId: consentAuditContext && consentAuditContext.performedByCaregiverId,
+      });
+    } catch (err) {
+      logger.error(`[Client Service] Failed to record recording consent grant for client ${clientId}:`, err);
+    }
+  } else if (updateBody.consented === false && prevConsented) {
+    try {
+      const privacyService = require('./privacy.service');
+      await privacyService.recordClientRecordingConsentEvent({
+        clientId: client._id,
+        granted: false,
+        explicitMeta: {
+          providedVia: (consentAuditContext && consentAuditContext.providedVia) || 'api',
+          ipAddress: consentAuditContext && consentAuditContext.ipAddress,
+          userAgent: consentAuditContext && consentAuditContext.userAgent,
+          consentEmailVersion: client.consentEmailVersion,
+        },
+        performedByCaregiverId: consentAuditContext && consentAuditContext.performedByCaregiverId,
+      });
+    } catch (err) {
+      logger.error(`[Client Service] Failed to record recording consent revocation for client ${clientId}:`, err);
+    }
+  }
+
   return client;
 };
 
@@ -242,11 +280,15 @@ const verifyConsentToken = async (consentToken) => {
     }
     const idForFetch = client._id.toString ? client._id.toString() : client._id;
     await Token.deleteMany({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
-    await updateClientById(idForFetch, {
-      consented: true,
-      consentedAt: new Date(),
-      consentEmailVersion: client.consentEmailVersion || '1.0',
-    });
+    await updateClientById(
+      idForFetch,
+      {
+        consented: true,
+        consentedAt: new Date(),
+        consentEmailVersion: client.consentEmailVersion || '1.0',
+      },
+      { providedVia: 'resident_email_link' }
+    );
     return {
       success: true,
       alreadyConsented: false,

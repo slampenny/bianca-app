@@ -57,6 +57,7 @@ const allRoles = {
     'deleteAny:invoice',
     'readAny:medicalAnalysis', // Add this for orgAdmin to read medical analysis of any patient
     'createAny:medicalAnalysis', // Add this for orgAdmin to trigger medical analysis
+    'readAny:privacy', // US-16/17: org consent audit, privacy queue endpoints shared with superAdmin
   ],
   superAdmin: [], // superAdmin can do everything without explicit permissions
 };

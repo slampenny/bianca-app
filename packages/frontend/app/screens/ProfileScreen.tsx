@@ -532,6 +532,18 @@ function ProfileScreen() {
               style={styles.requestDataButton}
             />
 
+            {(currentUser?.role === "orgAdmin" || currentUser?.role === "superAdmin") && (
+              <Button
+                text={translate("profileScreen.consentCenter")}
+                onPress={() => navigation.navigate("ConsentCenter" as never)}
+                preset="default"
+                testID="consent-center-button"
+                accessibilityLabel={translate("profileScreen.consentCenter")}
+                accessibilityHint="Opens organization consent audit"
+                style={styles.requestDataButton}
+              />
+            )}
+
             <Button
               text={translate("profileScreen.updateProfile")}
               onPress={handleSave}

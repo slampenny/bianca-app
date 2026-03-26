@@ -47,6 +47,35 @@ export interface ConsentRecord {
   withdrawnAt?: string
 }
 
+/** US-17: org consent audit row (API-enriched) */
+export interface ConsentAuditRow {
+  id?: string
+  _id?: string
+  subjectKind: "resident" | "caregiver"
+  subjectDisplayName: string
+  userModel: string
+  userId: string
+  consentType: string
+  purpose: string
+  granted: boolean
+  withdrawn: boolean
+  method: string
+  createdAt?: string
+  withdrawnAt?: string
+  explicitConsent?: { providedVia?: string }
+  organizationName?: string
+  organizationId?: string
+}
+
+export interface ConsentAuditPages {
+  results: ConsentAuditRow[]
+  page: number
+  limit: number
+  totalPages: number
+  totalResults: number
+  scopeLabel?: string
+}
+
 export interface PrivacyComplaint {
   _id?: string
   id?: string
@@ -204,6 +233,33 @@ export const privacyApi = createApi({
       providesTags: ["ConsentRecord"],
     }),
 
+    // US-17: org-scoped consent audit (orgAdmin / superAdmin); superAdmin may pass orgId or allOrganizations
+    getConsentAudit: builder.query<
+      ConsentAuditPages,
+      {
+        clientId?: string
+        consentType?: string
+        orgId?: string
+        allOrganizations?: boolean
+        page?: number
+        limit?: number
+      }
+    >({
+      query: (params) => ({
+        url: "/privacy/consent/audit",
+        method: "GET",
+        params: {
+          page: params.page ?? 1,
+          limit: params.limit ?? 25,
+          ...(params.clientId ? { clientId: params.clientId } : {}),
+          ...(params.consentType ? { consentType: params.consentType } : {}),
+          ...(params.orgId ? { orgId: params.orgId } : {}),
+          ...(params.allOrganizations ? { allOrganizations: true } : {}),
+        },
+      }),
+      providesTags: ["ConsentRecord"],
+    }),
+
     // Withdraw consent
     withdrawConsent: builder.mutation<
       ConsentRecord,
@@ -312,6 +368,7 @@ export const {
   useGetActiveConsentQuery,
   useCheckConsentQuery,
   useGetConsentHistoryQuery,
+  useGetConsentAuditQuery,
   useWithdrawConsentMutation,
   useCreateComplaintMutation,
   useGetComplaintsQuery,

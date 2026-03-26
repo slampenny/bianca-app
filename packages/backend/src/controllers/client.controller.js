@@ -87,7 +87,16 @@ const getClient = catchAsync(async (req, res) => {
 
 const updateClient = catchAsync(async (req, res) => {
   const { schedules, ...clientData } = req.body;
-  const client = await clientService.updateClientById(req.params.clientId, clientData);
+  const consentAuditContext =
+    clientData.consented !== undefined
+      ? {
+          providedVia: 'caregiver_app',
+          ipAddress: req.ip || req.connection?.remoteAddress,
+          userAgent: req.get('user-agent'),
+          performedByCaregiverId: req.caregiver.id,
+        }
+      : null;
+  const client = await clientService.updateClientById(req.params.clientId, clientData, consentAuditContext);
   if (schedules) {
     for (const schedule of schedules) {
       await scheduleService.updateSchedule(schedule.id, { ...schedule });

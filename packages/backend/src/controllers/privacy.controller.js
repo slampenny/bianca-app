@@ -160,6 +160,54 @@ const getConsentHistory = catchAsync(async (req, res) => {
 });
 
 /**
+ * US-17: Org-scoped consent audit (operators)
+ */
+const getOrgConsentAudit = catchAsync(async (req, res) => {
+  const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  const { clientId, consentType, orgId, allOrganizations } = req.query;
+  const result = await privacyService.queryOrgConsentAudit(req.caregiver, {
+    ...options,
+    clientId,
+    consentType,
+    orgId,
+    allOrganizations,
+  });
+  res.send(result);
+});
+
+/**
+ * US-17: CSV export of org consent audit
+ */
+const exportOrgConsentAudit = catchAsync(async (req, res) => {
+  const { clientId, consentType, orgId, allOrganizations } = req.query;
+  const csv = await privacyService.exportOrgConsentAuditCsv(req.caregiver, {
+    clientId,
+    consentType,
+    orgId,
+    allOrganizations,
+  });
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="consent-audit.csv"');
+  res.send(csv);
+});
+
+/**
+ * US-17 optional: PDF export with integrity fingerprint
+ */
+const exportOrgConsentAuditPdf = catchAsync(async (req, res) => {
+  const { clientId, consentType, orgId, allOrganizations } = req.query;
+  const pdf = await privacyService.exportOrgConsentAuditPdf(req.caregiver, {
+    clientId,
+    consentType,
+    orgId,
+    allOrganizations,
+  });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="consent-audit.pdf"');
+  res.send(pdf);
+});
+
+/**
  * Get approaching deadline requests
  */
 const getApproachingDeadline = catchAsync(async (req, res) => {
@@ -253,6 +301,9 @@ module.exports = {
   checkConsent,
   withdrawConsent,
   getConsentHistory,
+  getOrgConsentAudit,
+  exportOrgConsentAudit,
+  exportOrgConsentAuditPdf,
   getApproachingDeadline,
   getOverdueRequests,
   getPrivacyStatistics,

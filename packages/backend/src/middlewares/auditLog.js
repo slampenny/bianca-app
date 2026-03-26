@@ -70,6 +70,11 @@ const PHI_ROUTES = {
   'GET /v1/clients/:id/export': { action: 'EXPORT', resource: 'client', phiAccessed: true, highRisk: true },
   'GET /v1/conversations/:id/export': { action: 'EXPORT', resource: 'conversation', phiAccessed: true, highRisk: true },
   'POST /v1/reports/export': { action: 'EXPORT', resource: 'report', phiAccessed: true, highRisk: true },
+
+  // Privacy router is mounted under /v1/privacy — Express uses route path relative to the mount
+  'GET /consent/audit': { action: 'READ', resource: 'consentAudit', phiAccessed: true, highRisk: true },
+  'GET /consent/audit/export': { action: 'EXPORT', resource: 'consentAudit', phiAccessed: true, highRisk: true },
+  'GET /consent/audit/export/pdf': { action: 'EXPORT', resource: 'consentAudit', phiAccessed: true, highRisk: true },
 };
 
 // Authentication events that need auditing

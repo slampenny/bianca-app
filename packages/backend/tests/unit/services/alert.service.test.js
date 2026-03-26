@@ -58,7 +58,7 @@ describe('alertService', () => {
 
   it('should get an alert by id', async () => {
     const fetchedAlert = await alertService.getAlertById(alert1.id);
-    expect(fetchedAlert._id.toString()).toBe(alert1._id.toString());
+    expect(fetchedAlert.id).toBe(alert1.id);
   });
 
   it('should update an alert by id', async () => {
@@ -71,37 +71,39 @@ describe('alertService', () => {
     const updatedAlert = await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
     expect(updatedAlert.readBy).toEqual(expect.any(Array));
     expect(updatedAlert.readBy.length).toBeGreaterThan(0);
-    expect(updatedAlert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+    const caregiverIdStr = adminCargiver._id.toString();
+    expect(updatedAlert.readBy.some((id) => id.toString() === caregiverIdStr)).toBe(true);
   });
 
   it('should mark an alert as unread', async () => {
     // First mark as read
     await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
     const readAlert = await Alert.findById(alert1.id);
-    expect(readAlert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+    expect(readAlert.readBy.some((id) => id.toString() === adminCargiver._id.toString())).toBe(true);
     
     // Then mark as unread
     const updatedAlert = await alertService.markAlertAsUnread(alert1.id, adminCargiver.id);
     expect(updatedAlert.readBy).toEqual(expect.any(Array));
-    expect(updatedAlert.readBy.some(id => id.equals(adminCargiver._id))).toBe(false);
+    expect(updatedAlert.readBy.some((id) => id.toString() === adminCargiver._id.toString())).toBe(false);
   });
 
   it('should toggle alert between read and unread multiple times', async () => {
+    const cid = adminCargiver._id.toString();
     // Mark as read
     let alert = await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
-    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+    expect(alert.readBy.some((id) => id.toString() === cid)).toBe(true);
     
     // Mark as unread
     alert = await alertService.markAlertAsUnread(alert1.id, adminCargiver.id);
-    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(false);
+    expect(alert.readBy.some((id) => id.toString() === cid)).toBe(false);
     
     // Mark as read again
     alert = await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
-    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(true);
+    expect(alert.readBy.some((id) => id.toString() === cid)).toBe(true);
     
     // Mark as unread again
     alert = await alertService.markAlertAsUnread(alert1.id, adminCargiver.id);
-    expect(alert.readBy.some(id => id.equals(adminCargiver._id))).toBe(false);
+    expect(alert.readBy.some((id) => id.toString() === cid)).toBe(false);
   });
 
   it('should delete an alert by id', async () => {
@@ -116,10 +118,10 @@ describe('alertService', () => {
     await alertService.markAlertAsRead(alert1.id, adminCargiver.id);
     const alerts = await alertService.getAlerts(adminCargiver.id, false);
 
-    expect(alerts).not.toContainEqual(expect.objectContaining({ _id: expiredAlert._id }));
-    expect(alerts).not.toContainEqual(expect.objectContaining({ _id: alertOne._id }));
+    expect(alerts).not.toContainEqual(expect.objectContaining({ id: expiredAlert.id }));
+    expect(alerts).not.toContainEqual(expect.objectContaining({ id: alert1.id }));
     expect(alerts).toEqual(
-      expect.arrayContaining([expect.objectContaining({ _id: alert2._id }), expect.objectContaining({ _id: alert3._id })])
+      expect.arrayContaining([expect.objectContaining({ id: alert2.id }), expect.objectContaining({ id: alert3.id })])
     );
     expect(alerts).toHaveLength(2);
   });
@@ -129,7 +131,7 @@ describe('alertService', () => {
     const adminAlerts = await alertService.getAlerts(adminCargiver.id, true);
     const regularAlerts = await alertService.getAlerts(notAdmin.id, true);
 
-    expect(adminAlerts).toEqual(expect.arrayContaining([expect.objectContaining({ _id: alert2._id })]));
-    expect(regularAlerts).not.toEqual(expect.arrayContaining([expect.objectContaining({ _id: alert2._id })]));
+    expect(adminAlerts).toEqual(expect.arrayContaining([expect.objectContaining({ id: alert2.id })]));
+    expect(regularAlerts).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: alert2.id })]));
   });
 });

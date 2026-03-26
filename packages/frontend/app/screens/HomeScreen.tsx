@@ -32,6 +32,7 @@ import { logger } from "../utils/logger"
 import { PhoneVerificationBanner } from "../components/PhoneVerificationBanner"
 import { caregiverApi } from "../services/api/caregiverApi"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { getAlertsPollingIntervalMs } from "app/constants/alertsPolling"
 import { formatRelativeFromIso } from "../utils/formatDate"
 
 function formatSentimentGlanceLabel(
@@ -75,8 +76,11 @@ export function HomeScreen() {
 
   const alertsFromStore = useSelector(getAlerts)
 
+  const alertsPollMs = React.useMemo(() => getAlertsPollingIntervalMs(), [])
+
   const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
     skip: !currentUser?.id,
+    pollingInterval: alertsPollMs,
     refetchOnFocus: true,
     refetchOnReconnect: true,
   })

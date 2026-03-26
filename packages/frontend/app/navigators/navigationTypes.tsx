@@ -15,6 +15,7 @@ export type AppStackParamList = {
 
 export type AlertStackParamList = {
   AlertList: { filterClientId?: string; filterClientName?: string } | undefined
+  AlertDetail: { alertId: string }
 }
 
 /** Params for medical / fraud report screens (Home stack and Reports stack). */
@@ -60,6 +61,7 @@ export type HomeStackParamList = {
   PrivacyPractices: undefined
   Terms: undefined
   PrivacyRequest: undefined
+  ConsentCenter: { clientId?: string; clientName?: string } | undefined
 }
 
 export type ProfileStackParamList = {

@@ -53,6 +53,37 @@ const alertSchema = new mongoose.Schema(
       },
     ],
     relevanceUntil: Date, // Indicates until when the alert is considered relevant
+    /** Structured evidence for operators (US-3): transcript snippet, detector, confidence, conversation link */
+    evidence: {
+      type: new mongoose.Schema(
+        {
+          snippet: { type: String },
+          conversationId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Conversation',
+          },
+          messageIds: [{ type: mongoose.Schema.Types.ObjectId }],
+          detector: { type: String },
+          confidence: { type: Number },
+          language: { type: String },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
+    /** Suggested next steps (US-7); labelKey is resolved in the app i18n */
+    recommendedActions: [
+      {
+        type: new mongoose.Schema(
+          {
+            id: { type: String, required: true },
+            labelKey: { type: String, required: true },
+            actionType: { type: String, required: true },
+          },
+          { _id: false }
+        ),
+      },
+    ],
   },
   {
     timestamps: true,

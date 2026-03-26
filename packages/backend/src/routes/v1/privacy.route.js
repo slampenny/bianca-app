@@ -96,6 +96,27 @@ router
   );
 
 router
+  .route('/consent/audit/export/pdf')
+  .get(
+    auth('readAny:privacy'),
+    privacyController.exportOrgConsentAuditPdf
+  );
+
+router
+  .route('/consent/audit/export')
+  .get(
+    auth('readAny:privacy'),
+    privacyController.exportOrgConsentAudit
+  );
+
+router
+  .route('/consent/audit')
+  .get(
+    auth('readAny:privacy'),
+    privacyController.getOrgConsentAudit
+  );
+
+router
   .route('/consent/:consentId/withdraw')
   .post(
     auth(),

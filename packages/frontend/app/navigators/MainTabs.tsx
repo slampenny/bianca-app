@@ -15,6 +15,7 @@ import {
   CaregiversScreen,
   CaregiverInvitedScreen,
   AlertScreen,
+  AlertDetailScreen,
   OrgScreen,
   PaymentInfoScreen,
   ProfileScreen,
@@ -28,6 +29,7 @@ import {
   MedicalAnalysisScreen,
   FraudAbuseAnalysisScreen,
   MFASetupScreen,
+  ConsentCenterScreen,
 } from "app/screens"
 import { DrawerParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
@@ -113,6 +115,11 @@ function HomeStack() {
       <Stack.Screen name="MFASetup" component={MFASetupScreen} options={() => ({ title: translate("mfa.setupTitle") || "Multi-Factor Authentication" })} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={() => ({ title: translate("headers.privacyPolicy") })} />
       <Stack.Screen name="PrivacyRequest" component={PrivacyRequestScreen} options={() => ({ title: translate("headers.privacyRequest") || "Request My Data" })} />
+      <Stack.Screen
+        name="ConsentCenter"
+        component={ConsentCenterScreen}
+        options={() => ({ title: translate("headers.consentCenter") })}
+      />
       <Stack.Screen name="Terms" component={TermsScreen} options={() => ({ title: translate("headers.termsOfService") })} />
       <Stack.Screen name="Logout" component={LogoutScreen} options={() => ({ title: translate("headers.logout") })} />
     </Stack.Navigator>
@@ -131,6 +138,11 @@ function AlertStack() {
       })}
     >
       <Stack.Screen name="AlertList" component={AlertScreen} options={() => ({ title: translate("headers.alerts") })} />
+      <Stack.Screen
+        name="AlertDetail"
+        component={AlertDetailScreen}
+        options={() => ({ title: translate("alertDetail.title") })}
+      />
     </Stack.Navigator>
   )
 }
