@@ -1,50 +1,51 @@
 import React from "react"
-import { Alert, Platform, Pressable, StyleSheet, View, ViewStyle } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
+import { Pressable, StyleSheet, View, ViewStyle } from "react-native"
 import { Text } from "./Text"
 import { useTheme } from "../theme/ThemeContext"
 import { translate, TxKeyPath } from "../i18n"
 
 export interface ClientGlanceStatProps {
   labelTx: TxKeyPath
-  hintTitleTx: TxKeyPath
-  hintBodyTx: TxKeyPath
   /** Main value text (already localized or numeric) */
   value: string
+  onPress: () => void
+  /** Optional screen reader hint describing the navigation action */
+  accessibilityHint?: string
   /** Optional test id for the value row (web: data-testid) — used by E2E / debugging */
   valueTestID?: string
-  valueAccessibilityLabel?: string
   leftAccessory?: React.ReactNode
   containerStyle?: ViewStyle
+  /** Red alert styling (e.g. when the client has open alerts) */
+  tone?: "default" | "danger"
 }
 
 export function ClientGlanceStat(props: ClientGlanceStatProps) {
-  const { labelTx, hintTitleTx, hintBodyTx, value, valueTestID, valueAccessibilityLabel, leftAccessory, containerStyle } =
-    props
+  const {
+    labelTx,
+    value,
+    onPress,
+    accessibilityHint,
+    valueTestID,
+    leftAccessory,
+    containerStyle,
+    tone = "default",
+  } = props
   const { colors } = useTheme()
-  const styles = createStyles(colors)
+  const styles = createStyles(colors, tone)
 
-  const title = translate(hintTitleTx)
-  const body = translate(hintBodyTx)
-  const webTitle = `${title}\n\n${body}`
-
-  const showHint = () => {
-    Alert.alert(title, body, [{ text: translate("common.ok"), style: "default" }])
-  }
+  const label = translate(labelTx)
+  const accessibilityLabel = `${label}: ${value}`
 
   return (
-    <View style={[styles.chip, containerStyle]} accessibilityRole="summary">
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, pressed && styles.chipPressed, containerStyle]}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      {...(accessibilityHint ? { accessibilityHint } : {})}
+    >
       <View style={styles.labelRow}>
-        <Text style={styles.label} size="xxs" tx={labelTx} />
-        <Pressable
-          onPress={showHint}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={translate("homeScreen.glanceHintButtonA11y", { label: translate(labelTx) })}
-          {...(Platform.OS === "web" ? ({ title: webTitle, accessibilityHint: body } as object) : { accessibilityHint: body })}
-        >
-          <Ionicons name="information-circle-outline" size={15} color={colors.palette.neutral500} />
-        </Pressable>
+        <Text style={styles.label} size="xxs" text={label} importantForAccessibility="no" />
       </View>
       <View style={styles.valueBlock}>
         <View style={styles.valueRow}>
@@ -53,28 +54,37 @@ export function ClientGlanceStat(props: ClientGlanceStatProps) {
             style={styles.value}
             size="xs"
             text={value}
+            importantForAccessibility="no"
             {...(valueTestID ? { testID: valueTestID } : {})}
-            accessibilityLabel={valueAccessibilityLabel ?? value}
           />
         </View>
       </View>
-    </View>
+    </Pressable>
   )
 }
 
-const createStyles = (colors: any) =>
-  StyleSheet.create({
+const createStyles = (colors: any, tone: "default" | "danger") => {
+  const danger = tone === "danger"
+  const chipBg = danger ? colors.palette.biancaErrorBackground : colors.palette.neutral100
+  const chipBorder = danger ? colors.palette.biancaError : colors.palette.biancaBorder || colors.palette.neutral300
+  const labelColor = danger ? colors.palette.error700 || colors.palette.biancaError : colors.palette.neutral600
+  const valueColor = danger ? colors.palette.biancaError : colors.palette.biancaHeader
+
+  return StyleSheet.create({
     chip: {
       flex: 1,
       minWidth: 0,
       maxWidth: "100%",
-      backgroundColor: colors.palette.neutral100,
+      backgroundColor: chipBg,
       borderWidth: 1,
-      borderColor: colors.palette.biancaBorder || colors.palette.neutral300,
+      borderColor: chipBorder,
       borderRadius: 10,
       paddingHorizontal: 8,
       paddingVertical: 6,
       flexDirection: "column",
+    },
+    chipPressed: {
+      opacity: 0.88,
     },
     valueBlock: {
       flex: 1,
@@ -84,12 +94,10 @@ const createStyles = (colors: any) =>
     labelRow: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
-      gap: 4,
       marginBottom: 3,
     },
     label: {
-      color: colors.palette.neutral600,
+      color: labelColor,
       flex: 1,
     },
     valueRow: {
@@ -100,8 +108,9 @@ const createStyles = (colors: any) =>
       flexWrap: "nowrap",
     },
     value: {
-      color: colors.palette.biancaHeader,
+      color: valueColor,
       fontWeight: "600",
       textAlign: "center",
     },
   })
+}

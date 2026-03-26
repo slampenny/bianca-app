@@ -15,6 +15,7 @@ const ru: LocaleTranslations = {
     ending: "Завершение...",
     endCall: "Завершить звонок",
     loading: "Загрузка...",
+    signInToContinue: "Войдите, чтобы продолжить.",
   },
   alertScreen: {
     markAllAsRead: "Отметить все как прочитанные",
@@ -29,6 +30,11 @@ const ru: LocaleTranslations = {
     client: "Клиент:",
     importance: "Важность:",
     expires: "Истекает:",
+    filteredByClientBanner: "Уведомления для {{name}}",
+    clearAlertFilter: "Показать все",
+    noAlertsForFilteredClientTitle: "Нет уведомлений для этого клиента",
+    noAlertsForFilteredClientSubtitle:
+      "Нет уведомлений, связанных с {{name}}. Снимите фильтр, чтобы увидеть все уведомления, или выберите другого клиента на главной.",
   },
   legalLinks: {
     privacyPolicy: "Политика конфиденциальности",
@@ -201,6 +207,9 @@ const ru: LocaleTranslations = {
     onboardingCapturesLine: "Записано ответов по темам: {{count}}",
     onboardingComplete: "Адаптация завершена — все 4 звонка проведены",
     viewOnboardingDetails: "СМОТРЕТЬ ОТВЕТЫ АДАПТАЦИИ",
+    onboardingButtonCompactComplete: "Адаптация · Завершена",
+    onboardingButtonCompactDay: "Адаптация · День {{day}}",
+    onboardingButtonA11yHint: "Открывает ответы и ход адаптации этого клиента.",
   },
   clientOnboardingScreen: {
     title: "Ответы адаптации",
@@ -211,7 +220,8 @@ const ru: LocaleTranslations = {
     loading: "Загрузка…",
     error: "Не удалось загрузить данные адаптации.",
     captureCount: "{{count}} ответов",
-    empty: "Для этого фильтра пока нет ответов.",
+    emptyAllDays: "Записей онбординга пока нет.",
+    emptyForDay: "Онбординг дня {{day}} ещё не завершён.",
     flag: {
       safety: "Безопасность",
       memory: "Память",
@@ -421,6 +431,13 @@ const ru: LocaleTranslations = {
     allTime: "Все время",
     noClientSelected: "Клиент не выбран",
     selectClientToView: "Пожалуйста, выберите клиента с главного экрана, чтобы посмотреть его анализ настроений.",
+    sessionRequiredTitle: "Требуется вход",
+    sessionRequiredMessage:
+      "Сессия могла истечь. Войдите снова, чтобы просмотреть анализ настроений. Если окно входа уже открыто, завершите вход там.",
+    signInToContinueButton: "Войти",
+    accessDeniedTitle: "Не удалось загрузить отчёт",
+    accessDeniedMessage:
+      "У вас может не быть доступа к данным настроений этого клиента или изменились права. Попробуйте снова выбрать клиента на главном экране или обратитесь к администратору.",
     clientSentimentAnalysis: "Анализ настроений клиента",
     emotionalWellnessInsights: "Инсайты эмоционального благополучия и тенденции",
     timeRange: "Временной диапазон:",
@@ -619,6 +636,15 @@ const ru: LocaleTranslations = {
     noClientsFound: "Клиенты не найдены",
     viewSchedules: "Просмотр расписаний",
     noScheduleWarning: "⚠ Расписание не установлено",
+    glanceAlerts: "Уведомления",
+    glanceHintAlertsTitle: "Уведомления по этому клиенту",
+    glanceHintAlertsBody:
+      "Сколько уведомлений в вашем списке привязано к этому подопечному (например, по клиенту, разговору или расписанию). Откройте вкладку «Уведомления», чтобы просмотреть или управлять ими. Уведомления без привязки к клиенту здесь не учитываются.",
+    glanceAlertsA11y: "{{count}} уведомлений, связанных с этим клиентом",
+    glanceSentimentActionHint: "Открывает анализ настроения по последнему звонку в разделе «Отчёты».",
+    glanceHealthActionHint: "Открывает отчёт медицинского анализа для этого клиента в разделе «Отчёты».",
+    glanceRiskActionHint: "Открывает отчёт о мошенничестве и безопасности для этого клиента в разделе «Отчёты».",
+    glanceAlertsActionHint: "Открывает список уведомлений, отфильтрованный по этому клиенту.",
   },
   tabs: {
     home: "Главная",

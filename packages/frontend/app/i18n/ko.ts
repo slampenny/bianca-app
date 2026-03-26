@@ -6,6 +6,7 @@ const ko: LocaleTranslations = {
     cancel: "취소",
     back: "뒤로",
     logOut: "로그아웃",
+    signInToContinue: "계속하려면 로그인하세요.",
   },
   alertScreen: {
     markAllAsRead: "모두 읽음으로 표시",
@@ -20,6 +21,11 @@ const ko: LocaleTranslations = {
     client: "클라이언트:",
     importance: "중요도:",
     expires: "만료:",
+    filteredByClientBanner: "{{name}} 알림 표시 중",
+    clearAlertFilter: "전체 보기",
+    noAlertsForFilteredClientTitle: "이 클라이언트에 대한 알림 없음",
+    noAlertsForFilteredClientSubtitle:
+      "{{name}}에 연결된 알림이 없습니다. 필터를 해제해 모든 알림을 보거나 홈에서 다른 클라이언트를 선택하세요.",
   },
   welcomeScreen: {
     postscript:
@@ -258,6 +264,9 @@ const ko: LocaleTranslations = {
     onboardingCapturesLine: "주제 응답 {{count}}건 기록됨",
     onboardingComplete: "온보딩 완료 — 4통화 모두 종료",
     viewOnboardingDetails: "온보딩 응답 보기",
+    onboardingButtonCompactComplete: "온보딩 · 완료",
+    onboardingButtonCompactDay: "온보딩 · {{day}}일차",
+    onboardingButtonA11yHint: "이 클라이언트의 온보딩 응답과 진행 상세를 엽니다.",
   },
   clientOnboardingScreen: {
     title: "온보딩 응답",
@@ -268,7 +277,8 @@ const ko: LocaleTranslations = {
     loading: "불러오는 중…",
     error: "온보딩 데이터를 불러올 수 없습니다.",
     captureCount: "응답 {{count}}건",
-    empty: "이 필터에 해당하는 응답이 없습니다.",
+    emptyAllDays: "아직 기록된 온보딩 응답이 없습니다.",
+    emptyForDay: "{{day}}일차 온보딩이 아직 완료되지 않았습니다.",
     flag: {
       safety: "안전",
       memory: "기억",
@@ -415,6 +425,15 @@ const ko: LocaleTranslations = {
     noClientsFound: "클라이언트를 찾을 수 없습니다",
     viewSchedules: "일정 보기",
     noScheduleWarning: "⚠ 일정이 설정되지 않음",
+    glanceAlerts: "알림",
+    glanceHintAlertsTitle: "이 클라이언트 알림",
+    glanceHintAlertsBody:
+      "목록에서 이 수급자와 연결된 알림 수입니다(클라이언트, 대화, 일정 알림 등). 알림 탭에서 확인하거나 관리하세요. 연결된 클라이언트가 없는 알림은 여기에 포함되지 않습니다.",
+    glanceAlertsA11y: "이 클라이언트와 연결된 알림 {{count}}개",
+    glanceSentimentActionHint: "보고서에서 최근 통화의 감정 분석을 엽니다.",
+    glanceHealthActionHint: "보고서에서 이 클라이언트의 건강 분석 보고서를 엽니다.",
+    glanceRiskActionHint: "보고서에서 이 클라이언트의 사기 및 안전 보고서를 엽니다.",
+    glanceAlertsActionHint: "이 클라이언트로 필터된 알림 목록을 엽니다.",
   },
   tabs: {
     home: "홈",
@@ -502,6 +521,13 @@ const ko: LocaleTranslations = {
     allTime: "전체 기간",
     noClientSelected: "선택된 클라이언트가 없습니다",
     selectClientToView: "감정 분석을 보려면 홈 화면에서 클라이언트를 선택하세요.",
+    sessionRequiredTitle: "로그인이 필요합니다",
+    sessionRequiredMessage:
+      "세션이 만료되었을 수 있습니다. 감정 분석을 보려면 다시 로그인하세요. 로그인 창이 이미 열려 있으면 그곳에서 완료하세요.",
+    signInToContinueButton: "로그인",
+    accessDeniedTitle: "이 보고서를 불러올 수 없습니다",
+    accessDeniedMessage:
+      "이 클라이언트의 감정 데이터에 대한 액세스 권한이 없거나 권한이 변경되었을 수 있습니다. 홈에서 클라이언트를 다시 선택하거나 관리자에게 문의하세요.",
     // Dashboard
     clientSentimentAnalysis: "클라이언트 감정 분석",
     emotionalWellnessInsights: "감정적 웰빙 인사이트 및 트렌드",

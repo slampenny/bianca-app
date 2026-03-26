@@ -1,4 +1,4 @@
-import { NavigationContainerProps } from "@react-navigation/native"
+import type { NavigationContainerProps, NavigatorScreenParams } from "@react-navigation/native"
 
 export type AppStackParamList = {
   Login: undefined
@@ -13,12 +13,36 @@ export type AppStackParamList = {
   ClientConsent: { token?: string } | undefined
 }
 
+export type AlertStackParamList = {
+  AlertList: { filterClientId?: string; filterClientName?: string } | undefined
+}
+
+/** Params for medical / fraud report screens (Home stack and Reports stack). */
+export type ClientReportParams = {
+  clientId?: string
+  clientName?: string
+}
+
+/** Sentiment screen: same on Home stack (`SentimentAnalysis`) and Reports stack (`SentimentReport`). */
+export type SentimentAnalysisScreenParams = ClientReportParams & {
+  /** When set (e.g. from home glance), selects Last call / 30 days / All time. */
+  timeRange?: "lastCall" | "month" | "lifetime"
+}
+
+export type ReportsStackParamList = {
+  ReportsList: undefined
+  SentimentReport: SentimentAnalysisScreenParams | undefined
+  MedicalAnalysis: ClientReportParams | undefined
+  FraudAbuseAnalysis: ClientReportParams | undefined
+  HealthReport: undefined
+}
+
 export type DrawerParamList = {
   Home: undefined
   Profile: undefined
-  Alert: undefined
+  Alert: NavigatorScreenParams<AlertStackParamList>
   Org: undefined
-  Reports: undefined
+  Reports: NavigatorScreenParams<ReportsStackParamList>
   Logout: undefined
 }
 
@@ -29,18 +53,9 @@ export type HomeStackParamList = {
   Conversations: undefined
   Call: undefined
   ClientOnboarding: undefined
-  SentimentAnalysis: {
-    clientId?: string
-    clientName?: string
-  } | undefined
-  MedicalAnalysis: {
-    clientId?: string
-    clientName?: string
-  } | undefined
-  FraudAbuseAnalysis: {
-    clientId?: string
-    clientName?: string
-  } | undefined
+  SentimentAnalysis: SentimentAnalysisScreenParams | undefined
+  MedicalAnalysis: ClientReportParams | undefined
+  FraudAbuseAnalysis: ClientReportParams | undefined
   Privacy: undefined
   PrivacyPractices: undefined
   Terms: undefined
@@ -54,10 +69,6 @@ export type ProfileStackParamList = {
   Terms: undefined
   MFASetup: undefined
   PrivacyRequest: undefined
-}
-
-export type AlertStackParamList = {
-  Alert: undefined
 }
 
 export type OrgStackParamList = {

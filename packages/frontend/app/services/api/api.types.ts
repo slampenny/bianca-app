@@ -8,11 +8,12 @@ export interface NewUser {
 
 export interface AuthTokens {
   access: {
-    expires: string
+    /** ISO string or Unix seconds (backend `moment().unix()`). */
+    expires: string | number
     token: string
   }
   refresh: {
-    expires: string
+    expires: string | number
     token: string
   }
 }

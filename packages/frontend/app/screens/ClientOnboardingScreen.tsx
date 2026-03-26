@@ -76,6 +76,25 @@ export function ClientOnboardingScreen() {
       </Text>
       <Text style={styles.subtitle}>{client?.name}</Text>
 
+      <Text style={styles.filterLabel}>{translate("clientOnboardingScreen.filterByDay")}</Text>
+      <View style={styles.dayRow}>
+        <Pressable
+          onPress={() => setFilterDay(null)}
+          style={[styles.dayChip, filterDay === null && styles.dayChipActive]}
+        >
+          <Text size="xs">{translate("clientOnboardingScreen.allDays")}</Text>
+        </Pressable>
+        {DAYS.map((d) => (
+          <Pressable
+            key={d}
+            onPress={() => setFilterDay(d)}
+            style={[styles.dayChip, filterDay === d && styles.dayChipActive]}
+          >
+            <Text size="xs">{d}</Text>
+          </Pressable>
+        ))}
+      </View>
+
       {data?.flags && (
         <View style={styles.flagRow}>
           <View style={[styles.flagChip, data.flags.safety ? styles.flagOn : styles.flagOff]}>
@@ -96,25 +115,6 @@ export function ClientOnboardingScreen() {
         </View>
       )}
 
-      <Text style={styles.filterLabel}>{translate("clientOnboardingScreen.filterByDay")}</Text>
-      <View style={styles.dayRow}>
-        <Pressable
-          onPress={() => setFilterDay(null)}
-          style={[styles.dayChip, filterDay === null && styles.dayChipActive]}
-        >
-          <Text size="xs">{translate("clientOnboardingScreen.allDays")}</Text>
-        </Pressable>
-        {DAYS.map((d) => (
-          <Pressable
-            key={d}
-            onPress={() => setFilterDay(d)}
-            style={[styles.dayChip, filterDay === d && styles.dayChipActive]}
-          >
-            <Text size="xs">{d}</Text>
-          </Pressable>
-        ))}
-      </View>
-
       {isLoading && <Text>{translate("clientOnboardingScreen.loading")}</Text>}
       {error && <Text style={styles.err}>{translate("clientOnboardingScreen.error")}</Text>}
       {!isLoading && data && (
@@ -130,7 +130,11 @@ export function ClientOnboardingScreen() {
         scrollEnabled={false}
         ListEmptyComponent={
           !isLoading ? (
-            <Text style={styles.empty}>{translate("clientOnboardingScreen.empty")}</Text>
+            <Text style={styles.empty}>
+              {filterDay != null
+                ? translate("clientOnboardingScreen.emptyForDay", { day: String(filterDay) })
+                : translate("clientOnboardingScreen.emptyAllDays")}
+            </Text>
           ) : null
         }
       />
@@ -145,7 +149,7 @@ function createStyles(colors: any) {
     centered: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
     title: { marginBottom: 4 },
     subtitle: { color: colors.palette.neutral600, marginBottom: 12 },
-    flagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+    flagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4, marginBottom: 12 },
     flagChip: {
       paddingHorizontal: 10,
       paddingVertical: 6,
@@ -156,7 +160,7 @@ function createStyles(colors: any) {
     flagOn: { backgroundColor: colors.palette.angry100 || "#fee2e2" },
     flagOff: { opacity: 0.5 },
     filterLabel: { marginBottom: 8, fontWeight: "600" },
-    dayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+    dayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
     dayChip: {
       paddingHorizontal: 12,
       paddingVertical: 8,

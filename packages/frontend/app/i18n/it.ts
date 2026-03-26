@@ -15,6 +15,7 @@ const it: LocaleTranslations = {
     ending: "Terminando...",
     endCall: "Termina chiamata",
     loading: "Caricamento...",
+    signInToContinue: "Accedi per continuare.",
   },
   alertScreen: {
     markAllAsRead: "Segna tutto come letto",
@@ -29,6 +30,11 @@ const it: LocaleTranslations = {
     client: "Cliente:",
     importance: "Importanza:",
     expires: "Scade:",
+    filteredByClientBanner: "Avvisi per {{name}}",
+    clearAlertFilter: "Mostra tutti",
+    noAlertsForFilteredClientTitle: "Nessun avviso per questo cliente",
+    noAlertsForFilteredClientSubtitle:
+      "Non ci sono avvisi collegati a {{name}}. Rimuovi il filtro per vedere tutti gli avvisi o scegli un altro cliente dalla Home.",
   },
   legalLinks: {
     privacyPolicy: "Informativa sulla privacy",
@@ -119,6 +125,15 @@ const it: LocaleTranslations = {
     addClient: "Aggiungi cliente",
     adminOnlyMessage: "Solo gli amministratori dell'organizzazione e i super amministratori possono aggiungere clienti",
     noClientsFound: "Nessun cliente trovato",
+    glanceAlerts: "Avvisi",
+    glanceHintAlertsTitle: "Avvisi per questo cliente",
+    glanceHintAlertsBody:
+      "Quanti avvisi nell’elenco sono collegati a questo assistito (ad esempio avvisi cliente, conversazione o pianificazione). Apri la scheda Avvisi per leggerli o gestirli. Gli avvisi senza cliente collegato non sono conteggiati qui.",
+    glanceAlertsA11y: "{{count}} avvisi collegati a questo cliente",
+    glanceSentimentActionHint: "Apre l’analisi del sentimento dell’ultima chiamata in Report.",
+    glanceHealthActionHint: "Apre il report di analisi sanitaria per questo cliente in Report.",
+    glanceRiskActionHint: "Apre il report su frode e sicurezza per questo cliente in Report.",
+    glanceAlertsActionHint: "Apre l’elenco avvisi filtrato per questo cliente.",
   },
   tabs: {
     home: "Home",
@@ -263,6 +278,9 @@ const it: LocaleTranslations = {
     onboardingCapturesLine: "{{count}} risposte ai temi registrate",
     onboardingComplete: "Onboarding completato — tutte e 4 le chiamate concluse",
     viewOnboardingDetails: "VISUALIZZA RISPOSTE ONBOARDING",
+    onboardingButtonCompactComplete: "Onboarding · Completato",
+    onboardingButtonCompactDay: "Onboarding · Giorno {{day}}",
+    onboardingButtonA11yHint: "Apre le risposte e i dettagli dell’onboarding per questo residente.",
   },
   clientOnboardingScreen: {
     title: "Risposte onboarding",
@@ -273,7 +291,8 @@ const it: LocaleTranslations = {
     loading: "Caricamento…",
     error: "Impossibile caricare i dati di onboarding.",
     captureCount: "{{count}} risposte",
-    empty: "Nessuna risposta per questo filtro.",
+    emptyAllDays: "Nessuna risposta di onboarding registrata.",
+    emptyForDay: "L'onboarding del giorno {{day}} non è ancora stato completato.",
     flag: {
       safety: "Sicurezza",
       memory: "Memoria",
@@ -495,6 +514,13 @@ const it: LocaleTranslations = {
     allTime: "Tutto il tempo",
     noClientSelected: "Nessun cliente selezionato",
     selectClientToView: "Per favore seleziona un cliente dalla schermata home per visualizzare la sua analisi dei sentimenti.",
+    sessionRequiredTitle: "Accesso richiesto",
+    sessionRequiredMessage:
+      "La sessione potrebbe essere scaduta. Accedi di nuovo per vedere l’analisi dei sentimenti. Se la finestra di accesso è già aperta, completa l’accesso lì.",
+    signInToContinueButton: "Accedi",
+    accessDeniedTitle: "Impossibile caricare questo report",
+    accessDeniedMessage:
+      "Potresti non avere accesso ai dati di sentimento di questo cliente o i permessi potrebbero essere cambiati. Riprova dalla home o contatta un amministratore.",
     clientSentimentAnalysis: "Analisi sentimenti cliente",
     emotionalWellnessInsights: "Insights benessere emotivo e tendenze",
     timeRange: "Intervallo di tempo:",

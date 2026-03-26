@@ -499,8 +499,8 @@ async function seedDatabaseDemo() {
     // Create additional demo clients
     const demoClients = await createDemoClients(caregiverOneRecord, org);
     const clientsForDemoConversations = [...baseClients, client3, ...demoClients];
-    const onboardingScenarioClients = await onboardingSeeder.seedOnboardingScenarioClients(caregiverOneRecord);
-    const allClients = [...clientsForDemoConversations, ...onboardingScenarioClients];
+    await onboardingSeeder.seedPrimaryTestClientsOnboarding(client1, client2, client3, caregiverOneRecord._id);
+    const allClients = [...clientsForDemoConversations];
 
     // Seed base conversations
     const baseConversations = await conversationsSeeder.seedConversations(client1);
@@ -514,7 +514,7 @@ async function seedDatabaseDemo() {
     // Add fraud/abuse pattern conversations for client3
     await conversationsSeeder.addFraudAbuseConversations(client3._id);
 
-    // Demo wellness threads (skip onboarding journey clients — they only have seeded onboarding captures)
+    // Demo wellness threads (primary clients also have seeded onboarding captures for UI testing)
     const demoConversations = await createDemoConversations(clientsForDemoConversations);
     const allConversations = [...baseConversations, ...demoConversations];
 
@@ -577,7 +577,7 @@ async function seedDatabaseDemo() {
 
     console.log('Demo database seeded successfully!');
     console.log(`Created:`);
-    console.log(`- ${allClients.length} clients (includes ${onboardingScenarioClients.length} onboarding journey demos)`);
+    console.log(`- ${allClients.length} clients (Agnes/Barnaby/Margaret: onboarding day-1 WIP, day-2 WIP, complete)`);
     console.log(`- ${allConversations.length} conversations`);
     console.log(`- ${paymentMethods.length} payment methods`);
     console.log(`- Multiple schedules, alerts, and invoices`);

@@ -104,8 +104,7 @@ async function seedDatabase() {
     await caregiverOneRecord.save();
     clients = [...clients, client3];
 
-    const onboardingClients = await onboardingSeeder.seedOnboardingScenarioClients(caregiverOneRecord);
-    clients = [...clients, ...onboardingClients];
+    await onboardingSeeder.seedPrimaryTestClientsOnboarding(client1, client2, client3, caregiverOneRecord._id);
 
     // Seed conversations
     const conversations = await conversationsSeeder.seedConversations(client1);
@@ -177,7 +176,7 @@ async function seedDatabase() {
     return { 
       org, 
       caregiver: caregiverOneRecord, 
-      clients: [client1, client2, client3, ...onboardingClients], 
+      clients: [client1, client2, client3], 
       invoice, 
       paymentMethods 
     };

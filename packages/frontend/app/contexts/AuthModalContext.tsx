@@ -9,7 +9,7 @@ import { useToast } from "../hooks/useToast"
 import Toast from "../components/Toast"
 
 interface AuthModalContextType {
-  showAuthModal: () => void
+  showAuthModal: (errorMessage?: string) => void
   hideAuthModal: () => void
   isVisible: boolean
 }

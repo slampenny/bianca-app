@@ -14,6 +14,7 @@ const fr: LocaleTranslations = {
     ending: "Fin...",
     endCall: "Terminer l'appel",
     loading: "Chargement...",
+    signInToContinue: "Veuillez vous connecter pour continuer.",
   },
   alertScreen: {
     markAllAsRead: "Marquer tout comme lu",
@@ -28,6 +29,11 @@ const fr: LocaleTranslations = {
     client: "Client :",
     importance: "Importance :",
     expires: "Expire :",
+    filteredByClientBanner: "Alertes affichées pour {{name}}",
+    clearAlertFilter: "Tout afficher",
+    noAlertsForFilteredClientTitle: "Aucune alerte pour ce client",
+    noAlertsForFilteredClientSubtitle:
+      "Aucune alerte n’est liée à {{name}}. Effacez le filtre pour voir toutes les alertes ou choisissez un autre client depuis l’accueil.",
   },
   legalLinks: {
     privacyPolicy: "Politique de confidentialité",
@@ -117,6 +123,15 @@ const fr: LocaleTranslations = {
     noClientsFound: "Aucun client trouvé",
     viewSchedules: "Voir les plannings",
     noScheduleWarning: "⚠ Aucun planning configuré",
+    glanceAlerts: "Alertes",
+    glanceHintAlertsTitle: "Alertes pour ce client",
+    glanceHintAlertsBody:
+      "Nombre d’alertes de votre liste liées à ce résident (par exemple alertes client, conversation ou planning). Ouvrez l’onglet Alertes pour les consulter ou les gérer. Les alertes sans client lié ne sont pas comptées ici.",
+    glanceAlertsA11y: "{{count}} alertes liées à ce client",
+    glanceSentimentActionHint: "Ouvre l’analyse de sentiment du dernier appel dans Rapports.",
+    glanceHealthActionHint: "Ouvre le rapport d’analyse de santé de ce client dans Rapports.",
+    glanceRiskActionHint: "Ouvre le rapport fraude et sécurité de ce client dans Rapports.",
+    glanceAlertsActionHint: "Ouvre la liste des alertes filtrée sur ce client.",
   },
   tabs: {
     home: "Accueil",
@@ -277,6 +292,9 @@ const fr: LocaleTranslations = {
     onboardingCapturesLine: "{{count}} réponses enregistrées",
     onboardingComplete: "Accueil terminé — les 4 appels sont faits",
     viewOnboardingDetails: "VOIR LES RÉPONSES D'ACCUEIL",
+    onboardingButtonCompactComplete: "Accueil · Terminé",
+    onboardingButtonCompactDay: "Accueil · Jour {{day}}",
+    onboardingButtonA11yHint: "Ouvre les réponses et le parcours d’accueil de ce résident.",
   },
   clientOnboardingScreen: {
     title: "Réponses d'accueil",
@@ -287,7 +305,8 @@ const fr: LocaleTranslations = {
     loading: "Chargement…",
     error: "Impossible de charger les données d'accueil.",
     captureCount: "{{count}} réponses",
-    empty: "Aucune réponse pour ce filtre.",
+    emptyAllDays: "Aucune réponse d’intégration enregistrée pour l’instant.",
+    emptyForDay: "L’intégration du jour {{day}} n’a pas encore été effectuée.",
     flag: {
       safety: "Sécurité",
       memory: "Mémoire",
@@ -437,6 +456,13 @@ const fr: LocaleTranslations = {
     allTime: "Tout le temps",
     noClientSelected: "Aucun client sélectionné",
     selectClientToView: "Veuillez sélectionner un client depuis l'écran d'accueil pour voir son analyse de sentiment.",
+    sessionRequiredTitle: "Connexion requise",
+    sessionRequiredMessage:
+      "Votre session a peut-être expiré. Reconnectez-vous pour voir l’analyse de sentiment. Si la fenêtre de connexion est déjà ouverte, terminez la connexion là.",
+    signInToContinueButton: "Se connecter",
+    accessDeniedTitle: "Impossible de charger ce rapport",
+    accessDeniedMessage:
+      "Vous n’avez peut-être pas accès aux données de sentiment de ce client, ou vos droits ont changé. Réessayez depuis l’accueil ou contactez un administrateur.",
     // Dashboard
     clientSentimentAnalysis: "Analyse de sentiment du client",
     emotionalWellnessInsights: "Insights sur le bien-être émotionnel et les tendances",

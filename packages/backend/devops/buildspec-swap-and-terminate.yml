@@ -67,7 +67,68 @@ phases:
           echo "⚠️  No blue instance found (this might be the first deployment)"
           BLUE_INSTANCE_ID=""
         else
-          echo "Blue instance: $BLUE_INSTANCE_ID"
+          echo "Blue instance (initial discovery): $BLUE_INSTANCE_ID"
+        fi
+        
+        # Duplicate Name=BLUE_TAG fix: the MongoDB volume may be on a different running instance than
+        # DeploymentType=blue (Terraform drift / failed prior swap). Prefer the volume holder as blue.
+        DUPLICATE_BLUE_INSTANCE_IDS=""
+        if [ -n "$GREEN_INSTANCE_ID" ] && [ -n "${MONGODB_DATA_VOLUME_TAG:-}" ]; then
+          ALL_BLUES_RAW=$(aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$BLUE_TAG" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[*].Instances[*].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          ALL_BLUES=""
+          for _bid in $ALL_BLUES_RAW; do
+            [ "$_bid" = "None" ] && continue
+            [ "$_bid" = "$GREEN_INSTANCE_ID" ] && continue
+            ALL_BLUES="$ALL_BLUES $_bid"
+          done
+        
+          VOL_OWNER=""
+          for cand in $ALL_BLUES; do
+            [ -z "$cand" ] && continue
+            vtest=$(aws ec2 describe-volumes \
+              --filters "Name=attachment.instance-id,Values=$cand" "Name=tag:Name,Values=$MONGODB_DATA_VOLUME_TAG" \
+              --query 'Volumes[0].VolumeId' \
+              --output text 2>/dev/null || echo "")
+            [ "$vtest" = "None" ] && vtest=""
+            if [ -z "$vtest" ]; then
+              vtest=$(aws ec2 describe-volumes \
+                --filters "Name=attachment.instance-id,Values=$cand" "Name=attachment.device,Values=/dev/sdf" \
+                --query 'Volumes[0].VolumeId' \
+                --output text 2>/dev/null || echo "")
+              [ "$vtest" = "None" ] && vtest=""
+            fi
+            if [ -n "$vtest" ]; then
+              VOL_OWNER="$cand"
+              echo "MongoDB data volume $vtest is on $cand — using as blue for Step 0 migration."
+              break
+            fi
+          done
+        
+          if [ -n "$VOL_OWNER" ]; then
+            if [ -n "$BLUE_INSTANCE_ID" ] && [ "$BLUE_INSTANCE_ID" != "$VOL_OWNER" ]; then
+              echo "⚠️  Previously selected blue was $BLUE_INSTANCE_ID (no volume there); switching to $VOL_OWNER."
+            fi
+            BLUE_INSTANCE_ID="$VOL_OWNER"
+            for cand in $ALL_BLUES; do
+              [ -z "$cand" ] && continue
+              [ "$cand" = "$BLUE_INSTANCE_ID" ] && continue
+              if [ -z "$DUPLICATE_BLUE_INSTANCE_IDS" ]; then
+                DUPLICATE_BLUE_INSTANCE_IDS="$cand"
+              else
+                DUPLICATE_BLUE_INSTANCE_IDS="$DUPLICATE_BLUE_INSTANCE_IDS $cand"
+              fi
+            done
+          fi
+        fi
+        
+        if [ -n "$BLUE_INSTANCE_ID" ]; then
+          echo "Blue instance (final): $BLUE_INSTANCE_ID"
+        fi
+        if [ -n "$DUPLICATE_BLUE_INSTANCE_IDS" ]; then
+          echo "Will terminate stale duplicate(s) after primary blue: $DUPLICATE_BLUE_INSTANCE_IDS"
         fi
         
         # Terraform-managed SIP Elastic IP (staging vs production via env from CodeBuild)
@@ -364,6 +425,21 @@ phases:
           echo "  Waiting for blue instance to terminate..."
           aws ec2 wait instance-terminated --instance-ids $BLUE_INSTANCE_ID
           echo "  ✅ Blue instance terminated"
+        
+          if [ -n "$DUPLICATE_BLUE_INSTANCE_IDS" ]; then
+            echo ""
+            echo "Step 4b: Terminating stale duplicate instance(s) (same Name tag, no data volume)..."
+            for dup in $DUPLICATE_BLUE_INSTANCE_IDS; do
+              [ -z "$dup" ] && continue
+              echo "  Terminating duplicate $dup..."
+              aws ec2 terminate-instances --instance-ids "$dup" || echo "  ⚠️  Could not terminate $dup"
+            done
+            for dup in $DUPLICATE_BLUE_INSTANCE_IDS; do
+              [ -z "$dup" ] && continue
+              aws ec2 wait instance-terminated --instance-ids "$dup" 2>/dev/null || true
+            done
+            echo "  ✅ Duplicate instance cleanup finished"
+          fi
         else
           echo ""
           echo "Step 3: No blue instance to terminate (first deployment or already terminated)"

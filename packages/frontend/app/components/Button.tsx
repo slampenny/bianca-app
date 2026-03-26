@@ -1,9 +1,11 @@
 import React, { ComponentType } from "react"
+import i18n from "i18n-js"
 import {
   Pressable,
   PressableProps,
   PressableStateCallbackType,
   StyleProp,
+  Text as RNText,
   TextStyle,
   ViewStyle,
   ActivityIndicator,
@@ -11,8 +13,7 @@ import {
 import { spacing, typography } from "../theme"
 import { useTheme } from "../theme/ThemeContext"
 import { useKeyboardFocus } from "../hooks/useKeyboardFocus"
-import { translate } from "../i18n"
-import { Text, TextProps } from "./Text"
+import { translate, TxKeyPath, isRTL } from "../i18n"
 
 /**
  * Button Preset Guide - Consistent Button Color System
@@ -41,16 +42,16 @@ export interface ButtonProps extends PressableProps {
   /**
    * Text which is looked up via i18n.
    */
-  tx?: TextProps["tx"]
+  tx?: TxKeyPath
   /**
    * The text to display if not using `tx` or nested components.
    */
-  text?: TextProps["text"]
+  text?: string
   /**
    * Optional options to pass to i18n. Useful for interpolation
    * as well as explicitly setting locale or translation fallbacks.
    */
-  txOptions?: TextProps["txOptions"]
+  txOptions?: i18n.TranslateOptions
   /**
    * An optional style override useful for padding & margin.
    */
@@ -118,7 +119,7 @@ export interface ButtonProps extends PressableProps {
 
 /**
  * A component that allows users to take actions and make choices.
- * Wraps the Text component with a Pressable component.
+ * Wraps React Native `Text` (not the app `Text` preset wrapper) so label colors match button presets on web.
  * @see [Documentation and Examples]{@link https://docs.infinite.red/ignite-cli/boilerplate/components/Button/}
  * @param {ButtonProps} props - The props for the `Button` component.
  * @returns {JSX.Element} The rendered `Button` component.
@@ -130,9 +131,18 @@ export interface ButtonProps extends PressableProps {
  *   onPress={handleButtonPress}
  * />
  */
+/** Light text on primary/success/danger fills. In dark theme, `palette.neutral100` is a dark surface color, not white — use `neutral900` there instead. */
+function textOnAccentColor(colors: any, darkMode: boolean): string {
+  if (darkMode) {
+    return colors.palette?.neutral900 ?? "#FAFAFA"
+  }
+  return colors.palette?.neutral100 ?? "#FFFFFF"
+}
+
 export function Button(props: ButtonProps) {
-  const { colors, fontScale } = useTheme()
+  const { colors, fontScale, themeInfo } = useTheme()
   const keyboardFocusStyle = useKeyboardFocus()
+  const onAccentText = textOnAccentColor(colors, themeInfo.accessibility.darkMode)
   
   const {
     tx,
@@ -171,7 +181,7 @@ export function Button(props: ButtonProps) {
   
   // Create presets dynamically based on current theme colors
   const $viewPresets = getViewPresets(colors)
-  const $textPresets = getTextPresets(colors, fontScale)
+  const $textPresets = getTextPresets(colors, fontScale, onAccentText)
   const $pressedViewPresets = getPressedViewPresets(colors)
   const $pressedTextPresets = getPressedTextPresets(colors, fontScale)
   
@@ -203,10 +213,18 @@ export function Button(props: ButtonProps) {
     ]
   }
   
+  const $rtlTextStyle: TextStyle = isRTL ? { writingDirection: "rtl" } : {}
+
   // Determine spinner color based on preset
   const getSpinnerColor = () => {
-    if (preset === 'primary' || preset === 'success' || preset === 'danger' || preset === 'warning') {
-      return colors.palette.neutral100 // White spinner on colored buttons
+    if (
+      preset === "primary" ||
+      preset === "success" ||
+      preset === "danger" ||
+      preset === "warning" ||
+      preset === "medical"
+    ) {
+      return onAccentText
     }
     return (colors.palette as any).biancaHeader || colors.text // Dark spinner on default buttons
   }
@@ -238,9 +256,9 @@ export function Button(props: ButtonProps) {
             />
           )}
 
-          <Text tx={tx} text={text} txOptions={txOptions} style={$textStyle(state)}>
-            {children}
-          </Text>
+          <RNText style={[$rtlTextStyle, $textStyle(state)]}>
+            {(tx && translate(tx, txOptions)) || text || children}
+          </RNText>
 
           {!!RightAccessory && !loading && (
             <RightAccessory
@@ -344,7 +362,11 @@ function getViewPresets(colors: any): Record<PresetNames, StyleProp<ViewStyle>> 
   }
 }
 
-function getTextPresets(colors: any, fontScale: number): Record<PresetNames, StyleProp<TextStyle>> {
+function getTextPresets(
+  colors: any,
+  fontScale: number,
+  onAccentText: string,
+): Record<PresetNames, StyleProp<TextStyle>> {
   const scaledBaseTextStyle = {
     ...$baseTextStyle,
     fontSize: 16 * fontScale,
@@ -362,13 +384,13 @@ function getTextPresets(colors: any, fontScale: number): Record<PresetNames, Sty
       color: colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 
     }],
     // Reversed uses dark background (neutral800), so always use light text
-    reversed: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
-    // Colored presets always use white/light text for contrast
-    primary: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
-    success: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
-    danger: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
-    warning: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
-    medical: [scaledBaseTextStyle, { color: colors.palette?.neutral100 || "#FFFFFF" }],
+    reversed: [scaledBaseTextStyle, { color: onAccentText }],
+    // Colored presets: onAccentText is white in light theme, near-white in dark (neutral100 is not white there)
+    primary: [scaledBaseTextStyle, { color: onAccentText }],
+    success: [scaledBaseTextStyle, { color: onAccentText }],
+    danger: [scaledBaseTextStyle, { color: onAccentText }],
+    warning: [scaledBaseTextStyle, { color: onAccentText }],
+    medical: [scaledBaseTextStyle, { color: onAccentText }],
     link: [scaledBaseTextStyle, { color: colors.tint || colors.palette?.primary500 || "#007AFF" }],
   }
 }

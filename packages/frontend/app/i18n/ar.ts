@@ -15,6 +15,7 @@ const ar: LocaleTranslations = {
     loading: "جاري التحميل...",
     back: "خلف",
     logOut: "تسجيل خروج",
+    signInToContinue: "يرجى تسجيل الدخول للمتابعة.",
   },
   alertScreen: {
     markAllAsRead: "تحديد الكل كمقروء",
@@ -29,6 +30,11 @@ const ar: LocaleTranslations = {
     client: "العميل:",
     importance: "الأهمية:",
     expires: "ينتهي:",
+    filteredByClientBanner: "عرض التنبيهات لـ {{name}}",
+    clearAlertFilter: "عرض الكل",
+    noAlertsForFilteredClientTitle: "لا توجد تنبيهات لهذا العميل",
+    noAlertsForFilteredClientSubtitle:
+      "لا توجد تنبيهات مرتبطة بـ {{name}}. أزل التصفية لعرض كل التنبيهات أو اختر عميلاً آخر من الرئيسية.",
   },
   welcomeScreen: {
     postscript:
@@ -264,6 +270,9 @@ const ar: LocaleTranslations = {
     onboardingCapturesLine: "{{count}} إجابات مواضيع مسجلة",
     onboardingComplete: "اكتملت التهيئة — انتهت جميع المكالمات الأربع",
     viewOnboardingDetails: "عرض إجابات التهيئة",
+    onboardingButtonCompactComplete: "تهيئة · مكتملة",
+    onboardingButtonCompactDay: "تهيئة · اليوم {{day}}",
+    onboardingButtonA11yHint: "يفتح إجابات التهيئة وتفاصيل المسار لهذا العميل.",
   },
   clientOnboardingScreen: {
     title: "إجابات التهيئة",
@@ -274,7 +283,8 @@ const ar: LocaleTranslations = {
     loading: "جاري التحميل…",
     error: "تعذر تحميل بيانات التهيئة.",
     captureCount: "{{count}} إجابات",
-    empty: "لا توجد إجابات لهذا التصفية بعد.",
+    emptyAllDays: "لا توجد إجابات تهيئة مسجلة بعد.",
+    emptyForDay: "لم تُكمل بعد تهيئة اليوم {{day}}.",
     flag: {
       safety: "السلامة",
       memory: "الذاكرة",
@@ -423,6 +433,15 @@ const ar: LocaleTranslations = {
     noClientsFound: "لم يتم العثور على مرضى",
     viewSchedules: "عرض الجداول",
     noScheduleWarning: "⚠ لم يتم تعيين جدول",
+    glanceAlerts: "التنبيهات",
+    glanceHintAlertsTitle: "تنبيهات هذا العميل",
+    glanceHintAlertsBody:
+      "عدد التنبيهات في قائمتك المرتبطة بهذا المقيم (مثل تنبيهات العميل أو المحادثة أو الجدول). افتح تبويب التنبيهات لقراءتها أو إدارتها. التنبيهات غير المرتبطة بعميل لا تُحسب هنا.",
+    glanceAlertsA11y: "{{count}} تنبيهات مرتبطة بهذا العميل",
+    glanceSentimentActionHint: "يفتح تحليل المشاعر لآخر مكالمة في التقارير.",
+    glanceHealthActionHint: "يفتح تقرير التحليل الصحي لهذا العميل في التقارير.",
+    glanceRiskActionHint: "يفتح تقرير الاحتيال والسلامة لهذا العميل في التقارير.",
+    glanceAlertsActionHint: "يفتح قائمة التنبيهات المصفاة لهذا العميل.",
   },
   tabs: {
     home: "الرئيسية",
@@ -510,6 +529,13 @@ const ar: LocaleTranslations = {
     allTime: "كل الوقت",
     noClientSelected: "لم يتم اختيار عميل",
     selectClientToView: "يرجى اختيار عميل من الشاشة الرئيسية لعرض تحليل المشاعر.",
+    sessionRequiredTitle: "يلزم تسجيل الدخول",
+    sessionRequiredMessage:
+      "قد تكون انتهت جلستك. سجّل الدخول مجدداً لعرض تحليل المشاعر. إذا كانت نافذة تسجيل الدخول مفتوحة بالفعل، أكمل تسجيل الدخول هناك.",
+    signInToContinueButton: "تسجيل الدخول",
+    accessDeniedTitle: "تعذر تحميل هذا التقرير",
+    accessDeniedMessage:
+      "قد لا يكون لديك حق الوصول إلى بيانات المشاعر لهذا العميل أو تغيّرت صلاحياتك. حاول اختيار العميل مرة أخرى من الرئيسية أو اتصل بالمسؤول.",
     // Dashboard
     clientSentimentAnalysis: "تحليل مشاعر العميل",
     emotionalWellnessInsights: "رؤى حول الرفاهية العاطفية والاتجاهات",

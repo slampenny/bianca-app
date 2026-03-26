@@ -15,6 +15,7 @@ const pt: LocaleTranslations = {
     ending: "Finalizando...",
     endCall: "Finalizar chamada",
     loading: "Carregando...",
+    signInToContinue: "Inicie sessão para continuar.",
   },
   alertScreen: {
     markAllAsRead: "Marcar tudo como lido",
@@ -29,6 +30,11 @@ const pt: LocaleTranslations = {
     client: "Cliente:",
     importance: "Importância:",
     expires: "Expira:",
+    filteredByClientBanner: "Mostrando alertas para {{name}}",
+    clearAlertFilter: "Ver todas",
+    noAlertsForFilteredClientTitle: "Nenhum alerta para este cliente",
+    noAlertsForFilteredClientSubtitle:
+      "Não há alertas ligados a {{name}}. Limpe o filtro para ver todos os alertas ou escolha outro cliente a partir de Início.",
   },
   legalLinks: {
     privacyPolicy: "Política de privacidade",
@@ -201,6 +207,9 @@ const pt: LocaleTranslations = {
     onboardingCapturesLine: "{{count}} respostas de tópicos registradas",
     onboardingComplete: "Integração concluída — as 4 chamadas foram finalizadas",
     viewOnboardingDetails: "VER RESPOSTAS DE INTEGRAÇÃO",
+    onboardingButtonCompactComplete: "Integração · Concluída",
+    onboardingButtonCompactDay: "Integração · Dia {{day}}",
+    onboardingButtonA11yHint: "Abre as respostas e o percurso de integração deste cliente.",
   },
   clientOnboardingScreen: {
     title: "Respostas de integração",
@@ -211,7 +220,8 @@ const pt: LocaleTranslations = {
     loading: "Carregando…",
     error: "Não foi possível carregar os dados de integração.",
     captureCount: "{{count}} respostas",
-    empty: "Ainda não há respostas para este filtro.",
+    emptyAllDays: "Ainda não há respostas de integração registradas.",
+    emptyForDay: "A integração do dia {{day}} ainda não foi concluída.",
     flag: {
       safety: "Segurança",
       memory: "Memória",
@@ -421,6 +431,13 @@ const pt: LocaleTranslations = {
     allTime: "Todo o tempo",
     noClientSelected: "Nenhum cliente selecionado",
     selectClientToView: "Por favor, selecione um cliente da tela inicial para ver sua análise de sentimentos.",
+    sessionRequiredTitle: "É necessário iniciar sessão",
+    sessionRequiredMessage:
+      "A sua sessão pode ter expirado. Inicie sessão novamente para ver a análise de sentimentos. Se a janela de início de sessão já estiver aberta, conclua o acesso lá.",
+    signInToContinueButton: "Iniciar sessão",
+    accessDeniedTitle: "Não foi possível carregar este relatório",
+    accessDeniedMessage:
+      "Pode não ter acesso aos dados de sentimento deste cliente, ou as suas permissões podem ter mudado. Tente novamente a partir de Início ou contacte um administrador.",
     clientSentimentAnalysis: "Análise de sentimentos do cliente",
     emotionalWellnessInsights: "Insights de bem-estar emocional e tendências",
     timeRange: "Período:",
@@ -619,6 +636,15 @@ const pt: LocaleTranslations = {
     noClientsFound: "Nenhum cliente encontrado",
     viewSchedules: "Ver agendas",
     noScheduleWarning: "⚠ Nenhum horário configurado",
+    glanceAlerts: "Alertas",
+    glanceHintAlertsTitle: "Alertas para este cliente",
+    glanceHintAlertsBody:
+      "Quantos alertas da sua lista estão ligados a este residente (por exemplo alertas de cliente, conversa ou agenda). Abra a aba Alertas para ler ou gerenciar. Alertas sem cliente associado não entram nesta contagem.",
+    glanceAlertsA11y: "{{count}} alertas ligados a este cliente",
+    glanceSentimentActionHint: "Abre a análise de sentimento da última chamada em Relatórios.",
+    glanceHealthActionHint: "Abre o relatório de análise de saúde deste cliente em Relatórios.",
+    glanceRiskActionHint: "Abre o relatório de fraude e segurança deste cliente em Relatórios.",
+    glanceAlertsActionHint: "Abre a lista de alertas filtrada por este cliente.",
   },
   tabs: {
     home: "Início",

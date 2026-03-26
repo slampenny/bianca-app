@@ -43,6 +43,8 @@ import { useTheme } from "./theme/ThemeContext"
 
 export const NAVIGATION_PERSISTENCE_KEY = "NAVIGATION_STATE"
 
+const HAS_CUSTOM_FONTS_TO_LOAD = Object.keys(customFontsToLoad).length > 0
+
 // Web linking configuration
 const prefix = Linking.createURL("/")
 const config = {
@@ -141,6 +143,32 @@ function ThemedWebContainer({ children }: { children: React.ReactNode }) {
 }
 
 /**
+ * Loads custom fonts when configured. Skipped entirely when `customFontsToLoad` is empty so web does not
+ * run expo-font / FontFaceObserver (avoids 6000ms timeout uncaught rejections with no real fonts to load).
+ */
+function AppWithFontLoading(props: AppProps & { isNavigationStateRestored: boolean; initialNavigationState: any; onNavigationStateChange: (state: any) => void }) {
+  const [fontsLoaded, fontError] = useFonts(customFontsToLoad)
+
+  React.useEffect(() => {
+    if (fontError) {
+      console.warn("[App] Custom fonts failed to load; continuing with system fallbacks.", fontError)
+    }
+  }, [fontError])
+
+  // Expo pattern: only block while loading; on error, render anyway (see expo-font / useFonts docs).
+  const fontsBlocking = !fontsLoaded && !fontError
+
+  return <AppShell {...props} fontsBlocking={fontsBlocking} />
+}
+
+type AppShellProps = AppProps & {
+  isNavigationStateRestored: boolean
+  initialNavigationState: any
+  onNavigationStateChange: (state: any) => void
+  fontsBlocking: boolean
+}
+
+/**
  * This is the root component of our app.
  * @param {AppProps} props - The props for the `App` component.
  * @returns {JSX.Element} The rendered `App` component.
@@ -153,7 +181,21 @@ function App(props: AppProps) {
     isRestored: isNavigationStateRestored,
   } = useNavigationPersistence(storage, NAVIGATION_PERSISTENCE_KEY)
 
-  const [areFontsLoaded] = useFonts(customFontsToLoad)
+  const persistenceProps = {
+    isNavigationStateRestored,
+    initialNavigationState,
+    onNavigationStateChange,
+  }
+
+  if (HAS_CUSTOM_FONTS_TO_LOAD) {
+    return <AppWithFontLoading {...props} {...persistenceProps} />
+  }
+
+  return <AppShell {...props} {...persistenceProps} fontsBlocking={false} />
+}
+
+function AppShell(props: AppShellProps) {
+  const { hideSplashScreen, isNavigationStateRestored, fontsBlocking } = props
 
   const onBeforeLiftPersistGate = () => {
     // Expose store on window after rehydration for testing (web only)
@@ -183,12 +225,14 @@ function App(props: AppProps) {
   // In iOS: application:didFinishLaunchingWithOptions:
   // In Android: https://stackoverflow.com/a/45838109/204044
   // You can replace with your own loading component if you wish.
-  if (!isNavigationStateRestored || !areFontsLoaded) return null
+  if (!isNavigationStateRestored || fontsBlocking) return null
 
   const linking = {
     prefixes: [prefix],
     config,
   }
+
+  const { initialNavigationState, onNavigationStateChange } = props
 
   // otherwise, we're ready to render the app
   return (

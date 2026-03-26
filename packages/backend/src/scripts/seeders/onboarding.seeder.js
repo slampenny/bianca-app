@@ -1,9 +1,9 @@
 /**
- * Seeds dedicated clients with OnboardingResponse + Call rows at different journey stages
- * for local / demo testing of GET /clients/:id/onboarding and the caregiver UI.
+ * Seeds OnboardingResponse + Call rows for the three primary test clients under fake@example.org
+ * (fixture clients + Margaret) so the caregiver UI can exercise different journey stages locally.
  * Aligns with onboardingPrompts.js question_id slugs and onboarding.service getDashboardForClient.
  */
-const { Client, Call, OnboardingResponse } = require('../../models');
+const { Call, OnboardingResponse } = require('../../models');
 
 const DAY1_TOPICS = [
   ['day1_emotional_orientation', 'Doing pretty well, thanks.'],
@@ -81,108 +81,51 @@ async function insertCaptures(clientId, dayNumber, topicPairs, extraByQuestionId
   }
 }
 
-const PREFERRED_NAMES = ['Ruth', 'Pat', 'Sam', 'Lee', 'May'];
+/** Partial day-1 answers; latest day-1 onboarding call not completed → currentDay 1 */
+async function seedDay1InProgress(clientId, caregiverId) {
+  await insertCaptures(clientId, 1, DAY1_TOPICS.slice(0, 3));
+  await createOnboardingCall(clientId, 1, { caregiverId, completed: false, daysAgo: 1 });
+}
 
-const SCENARIOS = [
-  {
-    name: 'Onboarding (not started)',
-    email: 'onboarding.none@example.org',
-    phone: '1234567911',
-    notes: 'Seed: no onboarding captures or onboarding calls — journey shows not started.',
-    seed: async () => {
-      /* client only — no onboarding calls */
-    },
-  },
-  {
-    name: 'Onboarding (day 1 in progress)',
-    email: 'onboarding.day1wip@example.org',
-    phone: '1234567912',
-    notes: 'Seed: partial day-1 captures; latest day-1 onboarding call not completed.',
-    seed: async (client, caregiverId) => {
-      await insertCaptures(client._id, 1, DAY1_TOPICS.slice(0, 3));
-      await createOnboardingCall(client._id, 1, { caregiverId, completed: false, daysAgo: 1 });
-    },
-  },
-  {
-    name: 'Onboarding (day 2 in progress)',
-    email: 'onboarding.day2wip@example.org',
-    phone: '1234567913',
-    notes: 'Seed: day 1 session completed with captures; partial day 2 captures.',
-    seed: async (client, caregiverId) => {
-      await insertCaptures(client._id, 1, DAY1_TOPICS);
-      await createOnboardingCall(client._id, 1, { caregiverId, completed: true, daysAgo: 5 });
-      await insertCaptures(client._id, 2, DAY2_TOPICS.slice(0, 2));
-    },
-  },
-  {
-    name: 'Onboarding (day 4 in progress)',
-    email: 'onboarding.day4wip@example.org',
-    phone: '1234567914',
-    notes: 'Seed: days 1–3 completed; day 4 partial captures only.',
-    seed: async (client, caregiverId) => {
-      await insertCaptures(client._id, 1, DAY1_TOPICS);
-      await createOnboardingCall(client._id, 1, { caregiverId, completed: true, daysAgo: 14 });
-      await insertCaptures(client._id, 2, DAY2_TOPICS);
-      await createOnboardingCall(client._id, 2, { caregiverId, completed: true, daysAgo: 11 });
-      await insertCaptures(client._id, 3, DAY3_TOPICS, {
-        day3_mood: { mood_flag: true },
-      });
-      await createOnboardingCall(client._id, 3, { caregiverId, completed: true, daysAgo: 8 });
-      await insertCaptures(client._id, 4, DAY4_TOPICS.slice(0, 2));
-    },
-  },
-  {
-    name: 'Onboarding (complete)',
-    email: 'onboarding.complete@example.org',
-    phone: '1234567915',
-    notes: 'Seed: all four onboarding calls completed with captures.',
-    seed: async (client, caregiverId) => {
-      await insertCaptures(client._id, 1, DAY1_TOPICS);
-      await createOnboardingCall(client._id, 1, { caregiverId, completed: true, daysAgo: 21 });
-      await insertCaptures(client._id, 2, DAY2_TOPICS);
-      await createOnboardingCall(client._id, 2, { caregiverId, completed: true, daysAgo: 18 });
-      await insertCaptures(client._id, 3, DAY3_TOPICS);
-      await createOnboardingCall(client._id, 3, { caregiverId, completed: true, daysAgo: 15 });
-      await insertCaptures(client._id, 4, DAY4_TOPICS);
-      await createOnboardingCall(client._id, 4, { caregiverId, completed: true, daysAgo: 12 });
-    },
-  },
-];
+/** Day 1 done + partial day 2 → currentDay 2 */
+async function seedDay2InProgress(clientId, caregiverId) {
+  await insertCaptures(clientId, 1, DAY1_TOPICS);
+  await createOnboardingCall(clientId, 1, { caregiverId, completed: true, daysAgo: 5 });
+  await insertCaptures(clientId, 2, DAY2_TOPICS.slice(0, 2));
+}
+
+/** All four days completed with full captures */
+async function seedJourneyComplete(clientId, caregiverId) {
+  await insertCaptures(clientId, 1, DAY1_TOPICS);
+  await createOnboardingCall(clientId, 1, { caregiverId, completed: true, daysAgo: 21 });
+  await insertCaptures(clientId, 2, DAY2_TOPICS);
+  await createOnboardingCall(clientId, 2, { caregiverId, completed: true, daysAgo: 18 });
+  await insertCaptures(clientId, 3, DAY3_TOPICS, {
+    day3_mood: { mood_flag: true },
+  });
+  await createOnboardingCall(clientId, 3, { caregiverId, completed: true, daysAgo: 15 });
+  await insertCaptures(clientId, 4, DAY4_TOPICS);
+  await createOnboardingCall(clientId, 4, { caregiverId, completed: true, daysAgo: 12 });
+}
 
 /**
- * @param {import('mongoose').Document} caregiver - caregiver with org and clients array
- * @returns {Promise<import('mongoose').Document[]>}
+ * Agnes Alphabet: day 1 in progress (answers + incomplete session).
+ * Barnaby Button: day 1 complete, day 2 in progress.
+ * Margaret Thompson: full journey complete with answers (incl. mood flag on day 3).
+ *
+ * @param {import('mongoose').Document} client1
+ * @param {import('mongoose').Document} client2
+ * @param {import('mongoose').Document} client3
+ * @param {import('mongoose').Types.ObjectId} caregiverId
  */
-async function seedOnboardingScenarioClients(caregiver) {
-  console.log('Seeding onboarding scenario clients (captures + calls)...');
-  const created = [];
-
-  for (let i = 0; i < SCENARIOS.length; i += 1) {
-    const scenario = SCENARIOS[i];
-    const client = new Client({
-      name: scenario.name,
-      email: scenario.email,
-      phone: scenario.phone,
-      preferredName: PREFERRED_NAMES[i] || 'Friend',
-      preferredLanguage: 'en',
-      age: 78,
-      notes: scenario.notes,
-      caregivers: [caregiver._id],
-      org: caregiver.org,
-      schedules: [],
-      isEmailVerified: true,
-    });
-    await client.save();
-    caregiver.clients.push(client._id);
-    await scenario.seed(client, caregiver._id);
-    created.push(client);
-  }
-
-  await caregiver.save();
-  console.log(`Seeded ${created.length} onboarding scenario clients`);
-  return created;
+async function seedPrimaryTestClientsOnboarding(client1, client2, client3, caregiverId) {
+  console.log('Seeding onboarding on primary test clients (day-1 WIP, day-2 WIP, complete)...');
+  await seedDay1InProgress(client1._id, caregiverId);
+  await seedDay2InProgress(client2._id, caregiverId);
+  await seedJourneyComplete(client3._id, caregiverId);
+  console.log('Onboarding seed: Agnes (day 1 WIP), Barnaby (day 2 WIP), Margaret (complete)');
 }
 
 module.exports = {
-  seedOnboardingScenarioClients,
+  seedPrimaryTestClientsOnboarding,
 };

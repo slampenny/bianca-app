@@ -15,6 +15,7 @@ const de: LocaleTranslations = {
     ending: "Beenden...",
     endCall: "Anruf beenden",
     loading: "Laden...",
+    signInToContinue: "Bitte melde dich an, um fortzufahren.",
   },
   alertScreen: {
     markAllAsRead: "Alle als gelesen markieren",
@@ -29,6 +30,11 @@ const de: LocaleTranslations = {
     client: "Klient:",
     importance: "Wichtigkeit:",
     expires: "Läuft ab:",
+    filteredByClientBanner: "Hinweise für {{name}}",
+    clearAlertFilter: "Alle anzeigen",
+    noAlertsForFilteredClientTitle: "Keine Hinweise für diesen Klienten",
+    noAlertsForFilteredClientSubtitle:
+      "Es sind keine Hinweise mit {{name}} verknüpft. Filter aufheben, um alle Hinweise zu sehen, oder auf Start einen anderen Klienten wählen.",
   },
   legalLinks: {
     privacyPolicy: "Datenschutzrichtlinie",
@@ -119,6 +125,15 @@ const de: LocaleTranslations = {
     addClient: "Klient hinzufügen",
     adminOnlyMessage: "Nur Organisationsadministratoren und Super-Administratoren können Klienten hinzufügen",
     noClientsFound: "Keine Klienten gefunden",
+    glanceAlerts: "Hinweise",
+    glanceHintAlertsTitle: "Hinweise für diesen Klienten",
+    glanceHintAlertsBody:
+      "Wie viele Hinweise in Ihrer Liste mit diesem Bewohner verknüpft sind (z. B. Klient-, Gesprächs- oder Termin-Hinweise). Öffnen Sie den Tab „Benachrichtigungen“, um sie zu lesen oder zu verwalten. Hinweise ohne verknüpften Klienten werden hier nicht gezählt.",
+    glanceAlertsA11y: "{{count}} Hinweise mit diesem Klienten verknüpft",
+    glanceSentimentActionHint: "Öffnet die Stimmungsanalyse zum letzten Anruf unter Berichte.",
+    glanceHealthActionHint: "Öffnet den Gesundheitsanalysebericht für diesen Klienten unter Berichte.",
+    glanceRiskActionHint: "Öffnet den Betrugs- und Sicherheitsbericht für diesen Klienten unter Berichte.",
+    glanceAlertsActionHint: "Öffnet die Hinweisliste, gefiltert nach diesem Klienten.",
   },
   tabs: {
     home: "Start",
@@ -263,6 +278,9 @@ const de: LocaleTranslations = {
     onboardingCapturesLine: "{{count}} Themenantworten erfasst",
     onboardingComplete: "Einführung abgeschlossen — alle 4 Anrufe beendet",
     viewOnboardingDetails: "EINFÜHRUNGSANTWORTEN ANZEIGEN",
+    onboardingButtonCompactComplete: "Einführung · Abgeschlossen",
+    onboardingButtonCompactDay: "Einführung · Tag {{day}}",
+    onboardingButtonA11yHint: "Öffnet Einführungsantworten und Ablauf für diesen Klienten.",
   },
   clientOnboardingScreen: {
     title: "Einführungsantworten",
@@ -273,7 +291,8 @@ const de: LocaleTranslations = {
     loading: "Wird geladen…",
     error: "Einführungsdaten konnten nicht geladen werden.",
     captureCount: "{{count}} Erfassungen",
-    empty: "Für diesen Filter noch keine Erfassungen.",
+    emptyAllDays: "Noch keine Onboarding-Antworten erfasst.",
+    emptyForDay: "Onboarding für Tag {{day}} wurde noch nicht durchgeführt.",
     flag: {
       safety: "Sicherheit",
       memory: "Gedächtnis",
@@ -465,6 +484,13 @@ const de: LocaleTranslations = {
     allTime: "Gesamtzeit",
     noClientSelected: "Kein Klient ausgewählt",
     selectClientToView: "Bitte wähle einen Klienten vom Startbildschirm aus, um seine Stimmungsanalyse anzuzeigen.",
+    sessionRequiredTitle: "Anmeldung erforderlich",
+    sessionRequiredMessage:
+      "Deine Sitzung ist möglicherweise abgelaufen. Melde dich erneut an, um die Stimmungsanalyse zu sehen. Wenn das Anmeldefenster bereits offen ist, schließe die Anmeldung dort ab.",
+    signInToContinueButton: "Anmelden",
+    accessDeniedTitle: "Bericht kann nicht geladen werden",
+    accessDeniedMessage:
+      "Du hast möglicherweise keinen Zugriff auf die Stimmungsdaten dieses Klienten oder deine Berechtigungen haben sich geändert. Wähle den Klienten auf dem Startbildschirm erneut oder wende dich an eine Administratorin.",
     clientSentimentAnalysis: "Klienten-Stimmungsanalyse",
     emotionalWellnessInsights: "Einblicke in emotionales Wohlbefinden und Trends",
     timeRange: "Zeitraum:",

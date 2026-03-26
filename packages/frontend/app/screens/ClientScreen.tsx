@@ -16,6 +16,7 @@ import { CaregiverAssignmentModal } from "../components/CaregiverAssignmentModal
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { HomeStackParamList } from "app/navigators/navigationTypes"
 import { getClient, setClient, setClientsForCaregiver, getClientsForCaregiver } from "../store/clientSlice"
+import { getAlerts } from "../store/alertSlice"
 import { getCurrentUser } from "../store/authSlice"
 import { store } from "../store/store"
 import {
@@ -25,6 +26,7 @@ import {
   useUploadClientAvatarMutation,
   useGetClientOnboardingQuery,
 } from "../services/api/clientApi"
+import { useGetAllAlertsQuery } from "../services/api/alertApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
 import { Button, TextField, PhoneInputWeb } from "app/components"
@@ -36,6 +38,26 @@ import { TIMEOUTS } from "../constants"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
+
+type ClientOnboardingJourneyCard = {
+  journey: {
+    journeyComplete: boolean
+    hasAnyOnboardingActivity: boolean
+    sessionsCompletedCount: number
+    currentDay: number | null
+  }
+  questionCount: number
+}
+
+/** Single-line label: "Onboarding · Day n" or "Onboarding · Complete". */
+function onboardingButtonCompactLine(data: ClientOnboardingJourneyCard): string {
+  const j = data.journey
+  if (j.journeyComplete) {
+    return translate("clientScreen.onboardingButtonCompactComplete")
+  }
+  const day = j.currentDay != null ? String(j.currentDay) : "1"
+  return translate("clientScreen.onboardingButtonCompactDay", { day })
+}
 
 // Helper to extract error messages from API errors
 const extractErrorMessage = (error: any): string => {
@@ -57,8 +79,27 @@ const extractErrorMessage = (error: any): string => {
 function ClientScreen() {
   const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
   const dispatch = useDispatch()
+  const currentUser = useSelector(getCurrentUser)
   const client = useSelector(getClient)
+  const alertsFromStore = useSelector(getAlerts)
+  const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
+    skip: !currentUser?.id,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  })
   const { colors, isLoading: themeLoading } = useTheme()
+
+  const alertsForClientCheck = React.useMemo(() => {
+    if (alertsFromApi !== undefined) {
+      return Array.from(new Map(alertsFromApi.map((a) => [a.id, a])).values())
+    }
+    return alertsFromStore
+  }, [alertsFromApi, alertsFromStore])
+
+  const hasAlertsForClient = React.useMemo(
+    () => !!client?.id && alertsForClientCheck.some((a) => a.relatedClient === client.id),
+    [alertsForClientCheck, client?.id],
+  )
 
   // Local form data state
   const [name, setName] = useState("")
@@ -83,9 +124,6 @@ function ClientScreen() {
     return () => { isMountedRef.current = false }
   }, [])
 
-  // Get current user for role-based access control
-  const currentUser = useSelector(getCurrentUser)
-  
   // Check if user has permission to create or edit clients
   const canCreateOrEditClient = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
   const canManageCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
@@ -216,7 +254,7 @@ function ClientScreen() {
           // Check if component is still mounted before updating state
           if (isMountedRef.current) {
             dispatch(setClient(null))
-            ;(navigation as { navigate: (name: string) => void }).navigate("Home") // Navigate away on delete
+            ;(navigation as NavigationProp<HomeStackParamList>).navigate("HomeDetail")
           }
         })
         .catch((err: unknown) => {
@@ -299,7 +337,7 @@ function ClientScreen() {
         
         // Navigate back to home screen after successful update
         successTimeoutRef.current = setTimeout(() => {
-          (navigation.navigate as (name: string) => void)("Home")
+          ;(navigation as NavigationProp<HomeStackParamList>).navigate("HomeDetail")
           successTimeoutRef.current = null
         }, TIMEOUTS.NAVIGATION_DELAY)
       } else {
@@ -530,62 +568,33 @@ function ClientScreen() {
           />
 
           {client && client.id ? (
-            <View
-              style={styles.onboardingSection}
-              testID="client-onboarding-section"
-              accessibilityLabel="client-onboarding-summary"
-            >
-              <Text style={styles.fieldLabel}>{translate("clientScreen.onboardingCardTitle")}</Text>
-              {(onboardingLoading || onboardingFetching) && !onboardingData ? (
-                <Text style={styles.onboardingMeta}>{translate("clientOnboardingScreen.loading")}</Text>
-              ) : null}
+            <View style={styles.onboardingSection} testID="client-onboarding-section">
               {onboardingQueryError ? (
                 <Text style={styles.apiError}>{translate("clientOnboardingScreen.error")}</Text>
               ) : null}
-              {onboardingData ? (
-                <>
-                  <Text style={styles.onboardingMeta}>
-                    {onboardingData.journey.journeyComplete
-                      ? translate("clientScreen.onboardingComplete")
-                      : !onboardingData.journey.hasAnyOnboardingActivity
-                        ? translate("clientScreen.onboardingNotStarted")
-                        : translate("clientScreen.onboardingInProgress")}
-                  </Text>
-                  {!onboardingData.journey.journeyComplete &&
-                    onboardingData.journey.hasAnyOnboardingActivity ? (
-                    <Text style={styles.onboardingMeta}>
-                      {translate("clientScreen.onboardingCallsCompleted", {
-                        completed: String(onboardingData.journey.sessionsCompletedCount),
-                      })}
-                    </Text>
-                  ) : null}
-                  {!onboardingData.journey.journeyComplete &&
-                  onboardingData.journey.currentDay != null &&
-                  onboardingData.journey.hasAnyOnboardingActivity ? (
-                    <Text style={styles.onboardingMeta}>
-                      {translate("clientScreen.onboardingNextDay", {
-                        day: String(onboardingData.journey.currentDay),
-                      })}
-                    </Text>
-                  ) : null}
-                  {onboardingData.questionCount > 0 ? (
-                    <Text style={styles.onboardingMeta}>
-                      {translate("clientScreen.onboardingCapturesLine", {
-                        count: String(onboardingData.questionCount),
-                      })}
-                    </Text>
-                  ) : null}
-                </>
+              {(onboardingLoading || onboardingFetching) && !onboardingData ? (
+                <Button
+                  loading
+                  text={translate("clientOnboardingScreen.loading")}
+                  disabled
+                  testID="view-onboarding-responses-button"
+                  preset={hasAlertsForClient ? "danger" : "success"}
+                  style={[styles.button, styles.manageButton, styles.onboardingButton]}
+                  textStyle={styles.onboardingButtonText}
+                />
+              ) : onboardingData ? (
+                <Button
+                  onPress={handleViewOnboarding}
+                  disabled={isLoading}
+                  text={onboardingButtonCompactLine(onboardingData)}
+                  testID="view-onboarding-responses-button"
+                  preset={hasAlertsForClient ? "danger" : "success"}
+                  accessibilityLabel={onboardingButtonCompactLine(onboardingData)}
+                  accessibilityHint={translate("clientScreen.onboardingButtonA11yHint")}
+                  style={[styles.button, styles.manageButton, styles.onboardingButton]}
+                  textStyle={styles.onboardingButtonText}
+                />
               ) : null}
-              <Button
-                text={translate("clientScreen.viewOnboardingDetails")}
-                onPress={handleViewOnboarding}
-                disabled={isLoading}
-                testID="view-onboarding-responses-button"
-                preset="default"
-                style={[styles.button, styles.manageButton, styles.onboardingButton]}
-                textStyle={styles.buttonText}
-              />
             </View>
           ) : null}
 
@@ -779,18 +788,22 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   onboardingSection: {
     marginTop: 8,
     marginBottom: 16,
-    paddingTop: 16,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: colors.palette.neutral300,
   },
-  onboardingMeta: {
-    fontSize: 14,
-    color: colors.text || colors.palette.neutral700,
-    marginBottom: 6,
-  },
   onboardingButton: {
-    marginTop: 12,
+    marginTop: 4,
     marginBottom: 0,
+    minHeight: 52,
+    paddingVertical: 14,
+    alignSelf: "stretch",
+  },
+  /** Match other client actions (e.g. MANAGE SCHEDULES): uppercase; color comes from Button preset (avoid neutral100 in dark theme — it is a dark surface). */
+  onboardingButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    textTransform: "uppercase",
   },
   formCard: {
     backgroundColor: colors.palette.neutral100,

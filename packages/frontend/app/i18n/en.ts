@@ -12,6 +12,11 @@ const en = {
     client: "Client:",
     importance: "Importance:",
     expires: "Expires:",
+    filteredByClientBanner: "Showing alerts for {{name}}",
+    clearAlertFilter: "Show all",
+    noAlertsForFilteredClientTitle: "No alerts for this client",
+    noAlertsForFilteredClientSubtitle:
+      "There are no alerts linked to {{name}}. Clear the filter to see all alerts, or pick another client from Home.",
   },
   errorScreen: {
     title: "Something went wrong!",
@@ -199,6 +204,9 @@ const en = {
     onboardingCapturesLine: "{{count}} topic captures recorded",
     onboardingComplete: "Onboarding complete — all 4 calls finished",
     viewOnboardingDetails: "VIEW ONBOARDING RESPONSES",
+    onboardingButtonCompactComplete: "Onboarding · Complete",
+    onboardingButtonCompactDay: "Onboarding · Day {{day}}",
+    onboardingButtonA11yHint: "Opens onboarding responses and journey details for this client.",
   },
   clientOnboardingScreen: {
     title: "Onboarding responses",
@@ -209,7 +217,8 @@ const en = {
     loading: "Loading…",
     error: "Could not load onboarding data.",
     captureCount: "{{count}} captures",
-    empty: "No captures yet for this filter.",
+    emptyAllDays: "No onboarding responses recorded yet.",
+    emptyForDay: "Day {{day}} onboarding hasn't been completed yet.",
     flag: {
       safety: "Safety",
       memory: "Memory",
@@ -393,6 +402,7 @@ const en = {
     glanceSentiment: "Mood",
     glanceHealth: "Health",
     glanceRisk: "Risk",
+    glanceAlerts: "Alerts",
     sentimentTrendImproving: "Up",
     sentimentTrendStable: "Steady",
     sentimentTrendDeclining: "Down",
@@ -408,6 +418,14 @@ const en = {
       "Overall risk score from the latest fraud and safety analysis (0–100, higher means more concern). It reflects patterns in what was said about money, safety, isolation, and similar topics. Check the fraud and abuse report for specifics.",
     glanceHealthA11y: "Health score {{score}} out of one hundred",
     glanceRiskA11y: "Risk score {{score}} out of one hundred",
+    glanceHintAlertsTitle: "Alerts for this client",
+    glanceHintAlertsBody:
+      "How many alerts in your list are linked to this resident (for example client, conversation, or schedule alerts). Open the Alerts tab to read or manage them. Alerts with no linked client are not counted here.",
+    glanceAlertsA11y: "{{count}} alerts linked to this client",
+    glanceSentimentActionHint: "Opens sentiment analysis for the latest call in Reports.",
+    glanceHealthActionHint: "Opens the health analysis report for this client in Reports.",
+    glanceRiskActionHint: "Opens the fraud and safety report for this client in Reports.",
+    glanceAlertsActionHint: "Opens the alerts list filtered to this client.",
   },
   tabs: {
     home: "Home",
@@ -431,6 +449,7 @@ const en = {
     loading: "Loading...",
     delete: "Delete",
     continue: "Continue",
+    signInToContinue: "Please sign in to continue.",
   },
   onboarding: {
     aboutYou: {
@@ -929,6 +948,13 @@ This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.
     allTime: "All Time",
     noClientSelected: "No Client Selected",
     selectClientToView: "Please select a client from the Home screen to view their sentiment analysis.",
+    sessionRequiredTitle: "Sign in required",
+    sessionRequiredMessage:
+      "Your session may have expired. Sign in again to view sentiment analysis. If you already see the sign-in window, complete sign-in there.",
+    signInToContinueButton: "Sign in",
+    accessDeniedTitle: "Unable to load this report",
+    accessDeniedMessage:
+      "You may not have access to this client’s sentiment data, or your permissions may have changed. Try choosing the client again from Home, or contact an administrator.",
     // Dashboard
     clientSentimentAnalysis: "Client Sentiment Analysis",
     emotionalWellnessInsights: "Emotional wellness insights and trends",

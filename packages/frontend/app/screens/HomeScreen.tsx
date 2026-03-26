@@ -3,23 +3,35 @@ import { View, StyleSheet, FlatList, Platform } from "react-native"
 import { AutoImage, Card, Button, Text, ClientGlanceStat } from "app/components"
 import { Ionicons } from "@expo/vector-icons"
 import { useSelector, useDispatch } from "react-redux"
-import { getCurrentUser } from "../store/authSlice"
+import { getCurrentUser, getAuthTokens } from "../store/authSlice"
+import { useAuthModal } from "../contexts/AuthModalContext"
+import { hasUsableAccessToken } from "../utils/accessToken"
 import { setClient, getClientsForCaregiver, clearClient, setClientsForCaregiver } from "../store/clientSlice"
+import { getAlerts } from "../store/alertSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
 import { setPendingCallData, clearCallData } from "../store/callSlice"
 import { clearConversation } from "../store/conversationSlice"
 import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { isAuthCancelledError } from "../services/api/baseQueryWithAuth"
-import { useNavigation, NavigationProp, useFocusEffect } from "@react-navigation/native"
+import type { CompositeNavigationProp } from "@react-navigation/native"
+import { useNavigation, useFocusEffect } from "@react-navigation/native"
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs"
+import type { StackNavigationProp } from "@react-navigation/stack"
 import { Caregiver, Client } from "../services/api/api.types"
-import { HomeStackParamList } from "app/navigators/navigationTypes"
+import type { DrawerParamList, HomeStackParamList } from "app/navigators/navigationTypes"
 import { RootState } from "../store/store"
+
+type HomeScreenNavigationProp = CompositeNavigationProp<
+  StackNavigationProp<HomeStackParamList, "HomeDetail">,
+  BottomTabNavigationProp<DrawerParamList>
+>
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
 import { logger } from "../utils/logger"
 import { PhoneVerificationBanner } from "../components/PhoneVerificationBanner"
 import { caregiverApi } from "../services/api/caregiverApi"
+import { useGetAllAlertsQuery } from "../services/api/alertApi"
 import { formatRelativeFromIso } from "../utils/formatDate"
 
 function formatSentimentGlanceLabel(
@@ -60,6 +72,32 @@ export function HomeScreen() {
     if (!user || !user.id) return []
     return getClientsForCaregiver(state, user.id)
   })
+
+  const alertsFromStore = useSelector(getAlerts)
+
+  const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
+    skip: !currentUser?.id,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  })
+
+  /** Prefer RTK cache when loaded so home counts stay fresh without clobbering alert Redux merge logic */
+  const alertsForCounts = React.useMemo(() => {
+    if (alertsFromApi !== undefined) {
+      return Array.from(new Map(alertsFromApi.map((a) => [a.id, a])).values())
+    }
+    return alertsFromStore
+  }, [alertsFromApi, alertsFromStore])
+
+  const alertCountByClientId = React.useMemo(() => {
+    const m = new Map<string, number>()
+    for (const a of alertsForCounts) {
+      const cid = a.relatedClient
+      if (!cid) continue
+      m.set(cid, (m.get(cid) ?? 0) + 1)
+    }
+    return m
+  }, [alertsForCounts])
   
   React.useEffect(() => {
     if (clients.length > 0 && currentUser?.id) {
@@ -84,8 +122,18 @@ export function HomeScreen() {
   )
 
   
-  const navigation = useNavigation<NavigationProp<HomeStackParamList>>()
+  const navigation = useNavigation<HomeScreenNavigationProp>()
+  const { showAuthModal } = useAuthModal()
+  const authTokens = useSelector(getAuthTokens)
   const [showTooltip, setShowTooltip] = React.useState(false)
+
+  const ensureSignedInForGlanceNavigation = React.useCallback(() => {
+    if (!hasUsableAccessToken(authTokens)) {
+      showAuthModal(translate("common.signInToContinue"))
+      return false
+    }
+    return true
+  }, [authTokens, showAuthModal])
   
   // More defensive role checking
   const isStaff = currentUser?.role === "staff"
@@ -98,6 +146,11 @@ export function HomeScreen() {
   const shouldDisableButton = isStaff
   
   const tooltipMessage = translate("homeScreen.adminOnlyMessage")
+
+  const primeClientForReports = (client: Client) => {
+    dispatch(setClient(client))
+    dispatch(setSchedules(client.schedules ?? []))
+  }
 
   const handleClientPress = (client: Client) => {
     dispatch(setClient(client))
@@ -173,6 +226,8 @@ export function HomeScreen() {
       ? formatRelativeFromIso(item.lastAnsweredCallAt)
       : translate("homeScreen.noAnsweredCallsYet")
 
+    const clientAlertCount = item.id ? alertCountByClientId.get(item.id) ?? 0 : 0
+
     const sentimentIcon = sentimentGlanceIcon(
       item.sentimentTrendDirection,
       item.sentimentAnalyzedConversations,
@@ -203,13 +258,25 @@ export function HomeScreen() {
           <View style={styles.glanceStats}>
             <ClientGlanceStat
               labelTx="homeScreen.glanceSentiment"
-              hintTitleTx="homeScreen.glanceHintSentimentTitle"
-              hintBodyTx="homeScreen.glanceHintSentimentBody"
               valueTestID={`client-glance-mood-${item.id}`}
               value={formatSentimentGlanceLabel(
                 item.sentimentTrendDirection,
                 item.sentimentAnalyzedConversations,
               )}
+              accessibilityHint={translate("homeScreen.glanceSentimentActionHint")}
+              onPress={() => {
+                if (!item.id) return
+                if (!ensureSignedInForGlanceNavigation()) return
+                primeClientForReports(item)
+                navigation.navigate("Reports", {
+                  screen: "SentimentReport",
+                  params: {
+                    clientId: item.id,
+                    clientName: item.name,
+                    timeRange: "lastCall",
+                  },
+                })
+              }}
               leftAccessory={
                 sentimentIcon ? (
                   <Ionicons name={sentimentIcon} size={14} color={sentimentIconColor} />
@@ -218,28 +285,50 @@ export function HomeScreen() {
             />
             <ClientGlanceStat
               labelTx="homeScreen.glanceHealth"
-              hintTitleTx="homeScreen.glanceHintHealthTitle"
-              hintBodyTx="homeScreen.glanceHintHealthBody"
               value={formatScoreGlance(item.latestOverallHealthScore)}
-              valueAccessibilityLabel={
-                item.latestOverallHealthScore != null
-                  ? translate("homeScreen.glanceHealthA11y", {
-                      score: String(item.latestOverallHealthScore),
-                    })
-                  : undefined
-              }
+              accessibilityHint={translate("homeScreen.glanceHealthActionHint")}
+              onPress={() => {
+                if (!item.id) return
+                if (!ensureSignedInForGlanceNavigation()) return
+                primeClientForReports(item)
+                navigation.navigate("Reports", {
+                  screen: "MedicalAnalysis",
+                  params: { clientId: item.id, clientName: item.name },
+                })
+              }}
             />
             <ClientGlanceStat
               labelTx="homeScreen.glanceRisk"
-              hintTitleTx="homeScreen.glanceHintRiskTitle"
-              hintBodyTx="homeScreen.glanceHintRiskBody"
               value={formatScoreGlance(item.latestOverallRiskScore)}
-              valueAccessibilityLabel={
-                item.latestOverallRiskScore != null
-                  ? translate("homeScreen.glanceRiskA11y", {
-                      score: String(item.latestOverallRiskScore),
-                    })
-                  : undefined
+              accessibilityHint={translate("homeScreen.glanceRiskActionHint")}
+              onPress={() => {
+                if (!item.id) return
+                if (!ensureSignedInForGlanceNavigation()) return
+                primeClientForReports(item)
+                navigation.navigate("Reports", {
+                  screen: "FraudAbuseAnalysis",
+                  params: { clientId: item.id, clientName: item.name },
+                })
+              }}
+            />
+            <ClientGlanceStat
+              labelTx="homeScreen.glanceAlerts"
+              value={String(clientAlertCount)}
+              valueTestID={`client-glance-alerts-${item.id}`}
+              tone={clientAlertCount > 0 ? "danger" : "default"}
+              accessibilityHint={translate("homeScreen.glanceAlertsActionHint")}
+              onPress={() => {
+                if (!item.id) return
+                if (!ensureSignedInForGlanceNavigation()) return
+                navigation.navigate("Alert", {
+                  screen: "AlertList",
+                  params: { filterClientId: item.id, filterClientName: item.name },
+                })
+              }}
+              leftAccessory={
+                clientAlertCount > 0 ? (
+                  <Ionicons name="notifications-outline" size={14} color={colors.palette.biancaError} />
+                ) : undefined
               }
             />
           </View>
@@ -331,7 +420,7 @@ export function HomeScreen() {
         contentContainerStyle={styles.listContentContainer}
         ListEmptyComponent={ListEmpty}
         testID="client-list"
-        extraData={clients.length}
+        extraData={{ c: clients.length, a: alertsForCounts.length }}
         removeClippedSubviews={false} // Ensure all items are rendered (important for testing)
       />
 
@@ -506,11 +595,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   glanceStats: {
     flex: 1,
     minWidth: 0,
-    maxWidth: 248,
+    maxWidth: 320,
     flexDirection: "row",
     alignItems: "stretch",
     justifyContent: "flex-end",
-    flexWrap: "nowrap",
+    flexWrap: "wrap",
     gap: 6,
   },
   buttonContainer: {

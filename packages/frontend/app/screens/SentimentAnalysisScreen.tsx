@@ -1,33 +1,51 @@
 import React, { useState, useCallback } from "react"
 import { View, StyleSheet } from "react-native"
-import { useRoute, RouteProp } from "@react-navigation/native"
+import { useRoute } from "@react-navigation/native"
 import { useSelector } from "react-redux"
 import { Screen } from "../components/Screen"
 import { SentimentDashboard } from "../components/SentimentDashboard"
 import { useTheme } from "../theme/ThemeContext"
-import { Text } from "../components"
+import { Text, Button } from "../components"
+import { useAuthModal } from "../contexts/AuthModalContext"
+import { getQueryErrorMessage, getQueryErrorStatus } from "../utils/rtkQueryError"
 import { translate } from "../i18n"
 import {
   useGetSentimentTrendQuery,
   useGetSentimentSummaryQuery,
 } from "../services/api/sentimentApi"
-import { HomeStackParamList } from "../navigators/navigationTypes"
+import type { SentimentAnalysisScreenParams } from "../navigators/navigationTypes"
 import { getClient } from "../store/clientSlice"
 import { logger } from "../utils/logger"
 
-type SentimentAnalysisScreenRouteProp = RouteProp<HomeStackParamList, "SentimentAnalysis">
+function sentimentParamsFromRoute(route: { params?: object }): SentimentAnalysisScreenParams {
+  return (route.params ?? {}) as SentimentAnalysisScreenParams
+}
 
 export function SentimentAnalysisScreen() {
-  const route = useRoute<SentimentAnalysisScreenRouteProp>()
-  
-  const routeClientId = route.params?.clientId
-  const routeClientName = route.params?.clientName
+  const route = useRoute()
+  const { showAuthModal } = useAuthModal()
+
+  const sp = sentimentParamsFromRoute(route)
+  const routeClientId = sp.clientId
+  const routeClientName = sp.clientName
+  const timeRangeFromParams = sp.timeRange
   const selectedClient = useSelector(getClient)
   const { colors, isLoading: themeLoading } = useTheme()
   const clientId = routeClientId || selectedClient?.id
   const clientName = routeClientName || selectedClient?.name
 
-  const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">("lastCall")
+  const resolveTimeRange = (tr: SentimentAnalysisScreenParams["timeRange"]): "lastCall" | "month" | "lifetime" => {
+    if (tr === "month" || tr === "lifetime" || tr === "lastCall") return tr
+    return "lastCall"
+  }
+
+  const [selectedTimeRange, setSelectedTimeRange] = useState<"lastCall" | "month" | "lifetime">(() =>
+    resolveTimeRange(timeRangeFromParams),
+  )
+
+  React.useEffect(() => {
+    setSelectedTimeRange(resolveTimeRange(timeRangeFromParams))
+  }, [timeRangeFromParams])
 
   const shouldFetchData = !!clientId && (typeof clientId === 'string' ? clientId.trim().length > 0 : true)
 
@@ -86,15 +104,31 @@ export function SentimentAnalysisScreen() {
 
   // Only show loading if we're actually fetching (not just skipped)
   const isLoading = shouldFetchData && (isTrendLoading || isSummaryLoading || isTrendFetching || isSummaryFetching)
-  
-  // Log errors for debugging
+
+  const trendStatus = getQueryErrorStatus(trendError)
+  const summaryStatus = getQueryErrorStatus(summaryError)
+  const showSessionRequired =
+    shouldFetchData && !isLoading && (trendStatus === 401 || summaryStatus === 401)
+  const showAccessDenied =
+    shouldFetchData &&
+    !isLoading &&
+    !showSessionRequired &&
+    (trendStatus === 403 || summaryStatus === 403)
+
+  // Log errors for debugging (401/403 are handled in UI; avoid error-level noise)
   React.useEffect(() => {
-    if (trendError) {
-      logger.error('[SentimentAnalysis] Trend query error:', trendError)
+    if (!trendError && !summaryError) return
+    const ts = getQueryErrorStatus(trendError)
+    const ss = getQueryErrorStatus(summaryError)
+    if (ts === 401 || ss === 401 || ts === 403 || ss === 403) {
+      logger.warn("[SentimentAnalysis] Trend/summary unavailable:", {
+        trendStatus: ts,
+        summaryStatus: ss,
+      })
+      return
     }
-    if (summaryError) {
-      logger.error('[SentimentAnalysis] Summary query error:', summaryError)
-    }
+    if (trendError) logger.error("[SentimentAnalysis] Trend query error:", trendError)
+    if (summaryError) logger.error("[SentimentAnalysis] Summary query error:", summaryError)
   }, [trendError, summaryError])
 
   if (themeLoading) {
@@ -115,6 +149,39 @@ export function SentimentAnalysisScreen() {
           <Text style={styles.noClientMessage}>
             {translate("sentimentAnalysis.selectClientToView")}
           </Text>
+        </View>
+      </Screen>
+    )
+  }
+
+  if (showSessionRequired) {
+    return (
+      <Screen style={styles.container} preset="scroll" safeAreaEdges={["top"]}>
+        <View style={styles.noClientContainer}>
+          <Text style={styles.noClientTitle}>{translate("sentimentAnalysis.sessionRequiredTitle")}</Text>
+          <Text style={styles.noClientMessage}>{translate("sentimentAnalysis.sessionRequiredMessage")}</Text>
+          <Button
+            preset="primary"
+            text={translate("sentimentAnalysis.signInToContinueButton")}
+            onPress={() => showAuthModal(translate("common.signInToContinue"))}
+            style={styles.authActionButton}
+          />
+        </View>
+      </Screen>
+    )
+  }
+
+  if (showAccessDenied) {
+    const detail =
+      getQueryErrorMessage(trendError) || getQueryErrorMessage(summaryError)
+    return (
+      <Screen style={styles.container} preset="scroll" safeAreaEdges={["top"]}>
+        <View style={styles.noClientContainer}>
+          <Text style={styles.noClientTitle}>{translate("sentimentAnalysis.accessDeniedTitle")}</Text>
+          <Text style={styles.noClientMessage}>{translate("sentimentAnalysis.accessDeniedMessage")}</Text>
+          {detail ? (
+            <Text style={[styles.noClientMessage, styles.errorDetail]}>{detail}</Text>
+          ) : null}
         </View>
       </Screen>
     )
@@ -162,6 +229,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.palette.neutral600,
     textAlign: "center",
     lineHeight: 24,
+  },
+  authActionButton: {
+    marginTop: 20,
+    minWidth: 200,
+    alignSelf: "center",
+  },
+  errorDetail: {
+    marginTop: 12,
+    fontSize: 14,
+    opacity: 0.9,
   },
 })
 

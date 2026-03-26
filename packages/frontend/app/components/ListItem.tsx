@@ -213,7 +213,7 @@ const $separatorBottom: ViewStyle = {
 
 const $textStyle: TextStyle = {
   paddingVertical: spacing.xs,
-  alignSelf: "center",
+  alignSelf: "stretch",
   flexGrow: 1,
   flexShrink: 1,
 }

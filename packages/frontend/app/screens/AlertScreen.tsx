@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { FlatList, View, StyleSheet, ActivityIndicator, Pressable } from "react-native"
+import { useRoute, useNavigation, RouteProp } from "@react-navigation/native"
+import type { StackNavigationProp } from "@react-navigation/stack"
+import type { AlertStackParamList } from "app/navigators/navigationTypes"
 import { Ionicons } from "@expo/vector-icons"
 import { Toggle, Button, ListItem, Text } from "../components"
 import {
@@ -17,13 +20,27 @@ import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { logger } from "../utils/logger"
 
+type AlertListRouteProp = RouteProp<AlertStackParamList, "AlertList">
+type AlertListNavProp = StackNavigationProp<AlertStackParamList, "AlertList">
+
 export function AlertScreen() {
   const dispatch = useDispatch()
+  const route = useRoute<AlertListRouteProp>()
+  const navigation = useNavigation<AlertListNavProp>()
+  const filterClientId = route.params?.filterClientId
+  const filterClientName = route.params?.filterClientName
+
   const alerts = useSelector(getAlerts)
   const unreadAlertCount = useSelector(selectUnreadAlertCount)
   const currentUser = useSelector(getCurrentUser) as Caregiver | null
   const [showUnread, setShowUnread] = useState(true)
   const { colors, isLoading: themeLoading } = useTheme()
+
+  useEffect(() => {
+    if (filterClientId) {
+      setShowUnread(false)
+    }
+  }, [filterClientId])
 
   // Determine polling interval - check dynamically to handle test mode
   const getPollingInterval = React.useMemo(() => {
@@ -129,9 +146,12 @@ export function AlertScreen() {
 
   const handleMarkAllAsRead = async () => {
     if (!currentUser) return
-    const filteredAlerts = showUnread
-      ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!))
+    const inScope = filterClientId
+      ? alerts.filter((a) => a.relatedClient === filterClientId)
       : alerts
+    const filteredAlerts = showUnread
+      ? inScope.filter((alert) => !alert.readBy?.includes(currentUser.id!))
+      : inScope
 
     try {
       await markAllAsRead({ alerts: filteredAlerts }).unwrap()
@@ -282,29 +302,34 @@ export function AlertScreen() {
     </ListItem>
   )
 
+  const alertsInClientScope = React.useMemo(() => {
+    if (!filterClientId) return alerts
+    return alerts.filter((a) => a.relatedClient === filterClientId)
+  }, [alerts, filterClientId])
+
   // Compute filtered alerts - use useMemo to ensure it updates when dependencies change
   // CRITICAL: When showUnread is false, we MUST show ALL alerts (both read and unread)
   const filteredAlerts = React.useMemo(() => {
     logger.debug('[AlertScreen] Computing filteredAlerts:', {
       showUnread,
+      filterClientId,
       totalAlerts: alerts.length,
+      inScope: alertsInClientScope.length,
       currentUserId: currentUser?.id,
       alertIds: alerts.map(a => ({ id: a.id, readBy: a.readBy }))
     })
     
     if (showUnread) {
-      // Filter to only show unread alerts
       const unread = currentUser 
-        ? alerts.filter((alert) => !alert.readBy?.includes(currentUser.id!)) 
+        ? alertsInClientScope.filter((alert) => !alert.readBy?.includes(currentUser.id!)) 
         : []
       logger.debug('[AlertScreen] Unread alerts:', unread.length)
       return unread
     } else {
-      // CRITICAL: Show ALL alerts when not filtering by unread (both read and unread)
-      logger.debug('[AlertScreen] Showing ALL alerts (read + unread):', alerts.length)
-      return alerts
+      logger.debug('[AlertScreen] Showing ALL alerts in scope (read + unread):', alertsInClientScope.length)
+      return alertsInClientScope
     }
-  }, [showUnread, alerts, currentUser?.id])
+  }, [showUnread, alertsInClientScope, currentUser?.id, filterClientId, alerts.length])
 
   // Debug logging
   React.useEffect(() => {
@@ -340,6 +365,14 @@ export function AlertScreen() {
     setShowUnread(newValue)
     // Don't refetch - just update the filter state
   }
+
+  const clearClientFilter = () => {
+    navigation.setParams({ filterClientId: undefined, filterClientName: undefined })
+  }
+
+  const filteredClientDisplayName =
+    filterClientName ||
+    (filterClientId ? getClientName(filterClientId) : "")
 
   return (
     <View style={styles.container} testID="alert-screen" accessibilityLabel="alert-screen">
@@ -382,7 +415,24 @@ export function AlertScreen() {
           </Pressable>
         </View>
 
-        {alerts.length > 0 && (
+        {filterClientId ? (
+          <View style={styles.filterBanner} testID="alert-client-filter-banner">
+            <Text style={styles.filterBannerText} numberOfLines={2}>
+              {translate("alertScreen.filteredByClientBanner", { name: filteredClientDisplayName })}
+            </Text>
+            <Pressable
+              onPress={clearClientFilter}
+              style={styles.filterBannerClear}
+              accessibilityRole="button"
+              accessibilityLabel={translate("alertScreen.clearAlertFilter")}
+              testID="alert-clear-client-filter"
+            >
+              <Text style={styles.filterBannerClearText}>{translate("alertScreen.clearAlertFilter")}</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {alertsInClientScope.length > 0 && (
           <View style={styles.markAllContainer}>
             <Button
               text={translate("alertScreen.markAllAsRead")}
@@ -400,12 +450,22 @@ export function AlertScreen() {
             <View style={styles.emptyStateIcon}>
               <Ionicons name="checkmark-circle-outline" size={64} color={colors.palette.success500 || colors.palette.neutral100 || "#FFFFFF"} />
             </View>
-            <Text style={styles.emptyStateTitle}>{translate("alertScreen.noAlertsTitle")}</Text>
-            <Text style={styles.emptyStateSubtitle}>{translate("alertScreen.noAlertsSubtitle")}</Text>
+            <Text style={styles.emptyStateTitle}>
+              {filterClientId
+                ? translate("alertScreen.noAlertsForFilteredClientTitle")
+                : translate("alertScreen.noAlertsTitle")}
+            </Text>
+            <Text style={styles.emptyStateSubtitle}>
+              {filterClientId
+                ? translate("alertScreen.noAlertsForFilteredClientSubtitle", {
+                    name: filteredClientDisplayName,
+                  })
+                : translate("alertScreen.noAlertsSubtitle")}
+            </Text>
           </View>
         ) : (
           <FlatList
-            key={`alert-list-${showUnread ? 'unread' : 'all'}`}
+            key={`alert-list-${showUnread ? "unread" : "all"}-${filterClientId ?? "all"}`}
             data={filteredAlerts}
             renderItem={renderItem}
             keyExtractor={(item) => item.id || ""}
@@ -458,6 +518,34 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
+  },
+  filterBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: colors.palette.neutral100,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.palette.biancaBorder || colors.palette.neutral300,
+  },
+  filterBannerText: {
+    flex: 1,
+    color: colors.palette.biancaHeader,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  filterBannerClear: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  filterBannerClearText: {
+    color: colors.palette.biancaButtonSelected,
+    fontSize: 14,
+    fontWeight: "600",
   },
   emptyState: {
     marginTop: 40,

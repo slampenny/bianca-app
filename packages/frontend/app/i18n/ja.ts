@@ -15,6 +15,7 @@ const ja: LocaleTranslations = {
     ending: "終了中...",
     endCall: "通話終了",
     loading: "読み込み中...",
+    signInToContinue: "続行するにはサインインしてください。",
   },
   alertScreen: {
     markAllAsRead: "すべて既読にする",
@@ -29,6 +30,11 @@ const ja: LocaleTranslations = {
     client: "クライアント：",
     importance: "重要度：",
     expires: "期限：",
+    filteredByClientBanner: "{{name}} さんのアラートを表示中",
+    clearAlertFilter: "すべて表示",
+    noAlertsForFilteredClientTitle: "このクライアントのアラートはありません",
+    noAlertsForFilteredClientSubtitle:
+      "{{name}} に紐づくアラートはありません。フィルターを解除してすべて表示するか、ホームで別のクライアントを選んでください。",
   },
   legalLinks: {
     privacyPolicy: "プライバシーポリシー",
@@ -201,6 +207,9 @@ const ja: LocaleTranslations = {
     onboardingCapturesLine: "トピック回答{{count}}件を記録",
     onboardingComplete: "オンボーディング完了 — 4回の通話がすべて終了",
     viewOnboardingDetails: "オンボーディング回答を表示",
+    onboardingButtonCompactComplete: "オンボーディング · 完了",
+    onboardingButtonCompactDay: "オンボーディング · {{day}}日目",
+    onboardingButtonA11yHint: "このクライアントのオンボーディング回答と進行状況を開きます。",
   },
   clientOnboardingScreen: {
     title: "オンボーディング回答",
@@ -211,7 +220,8 @@ const ja: LocaleTranslations = {
     loading: "読み込み中…",
     error: "オンボーディングデータを読み込めませんでした。",
     captureCount: "回答{{count}}件",
-    empty: "この条件の回答はまだありません。",
+    emptyAllDays: "オンボーディングの回答はまだありません。",
+    emptyForDay: "デイ{{day}}のオンボーディングはまだ完了していません。",
     flag: {
       safety: "安全",
       memory: "記憶",
@@ -434,6 +444,13 @@ const ja: LocaleTranslations = {
     allTime: "全期間",
     noClientSelected: "クライアントが選択されていません",
     selectClientToView: "感情分析を表示するには、ホーム画面からクライアントを選択してください。",
+    sessionRequiredTitle: "サインインが必要です",
+    sessionRequiredMessage:
+      "セッションの有効期限が切れている可能性があります。感情分析を表示するには再度サインインしてください。サインイン画面がすでに開いている場合はそこで完了してください。",
+    signInToContinueButton: "サインイン",
+    accessDeniedTitle: "このレポートを読み込めません",
+    accessDeniedMessage:
+      "このクライアントの感情データにアクセスできないか、権限が変更された可能性があります。ホームからクライアントを選び直すか、管理者に問い合わせてください。",
     clientSentimentAnalysis: "クライアント感情分析",
     emotionalWellnessInsights: "感情的健康の洞察とトレンド",
     timeRange: "時間範囲：",
@@ -632,6 +649,15 @@ const ja: LocaleTranslations = {
     noClientsFound: "クライアントが見つかりません",
     viewSchedules: "スケジュールを表示",
     noScheduleWarning: "⚠ スケジュールが設定されていません",
+    glanceAlerts: "アラート",
+    glanceHintAlertsTitle: "このクライアントのアラート",
+    glanceHintAlertsBody:
+      "リスト内でこの利用者に紐づくアラートの件数です（クライアント、会話、スケジュールなど）。内容の確認や管理はアラートタブから行ってください。クライアント未紐づけのアラートはここに含まれません。",
+    glanceAlertsA11y: "このクライアントに紐づくアラート {{count}} 件",
+    glanceSentimentActionHint: "レポートで直近の通話の感情分析を開きます。",
+    glanceHealthActionHint: "レポートでこのクライアントの健康分析レポートを開きます。",
+    glanceRiskActionHint: "レポートでこのクライアントの詐欺・安全レポートを開きます。",
+    glanceAlertsActionHint: "このクライアントに絞ったアラート一覧を開きます。",
   },
   tabs: {
     home: "ホーム",

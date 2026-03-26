@@ -15,6 +15,7 @@ const zh: LocaleTranslations = {
     ending: "结束中...",
     endCall: "结束通话",
     loading: "加载中...",
+    signInToContinue: "请登录后继续。",
   },
   alertScreen: {
     markAllAsRead: "全部标记为已读",
@@ -29,6 +30,11 @@ const zh: LocaleTranslations = {
     client: "客户：",
     importance: "重要性：",
     expires: "过期：",
+    filteredByClientBanner: "正在显示 {{name}} 的提醒",
+    clearAlertFilter: "显示全部",
+    noAlertsForFilteredClientTitle: "此客户没有提醒",
+    noAlertsForFilteredClientSubtitle:
+      "没有与 {{name}} 关联的提醒。清除筛选可查看全部提醒，或在首页选择其他客户。",
   },
   legalLinks: {
     privacyPolicy: "隐私政策",
@@ -201,6 +207,9 @@ const zh: LocaleTranslations = {
     onboardingCapturesLine: "已记录 {{count}} 条主题回答",
     onboardingComplete: "入职引导已完成 — 4次通话均已结束",
     viewOnboardingDetails: "查看入职引导回答",
+    onboardingButtonCompactComplete: "入职引导 · 已完成",
+    onboardingButtonCompactDay: "入职引导 · 第{{day}}天",
+    onboardingButtonA11yHint: "打开此客户的入职引导回答与进度详情。",
   },
   clientOnboardingScreen: {
     title: "入职引导回答",
@@ -211,7 +220,8 @@ const zh: LocaleTranslations = {
     loading: "加载中…",
     error: "无法加载入职引导数据。",
     captureCount: "{{count}} 条回答",
-    empty: "此筛选条件下尚无回答。",
+    emptyAllDays: "尚未记录任何入职引导回答。",
+    emptyForDay: "第 {{day}} 天的入职引导尚未完成。",
     flag: {
       safety: "安全",
       memory: "记忆",
@@ -434,6 +444,13 @@ const zh: LocaleTranslations = {
     allTime: "全部时间",
     noClientSelected: "未选择客户",
     selectClientToView: "请从主屏幕选择一个客户以查看其情感分析。",
+    sessionRequiredTitle: "需要登录",
+    sessionRequiredMessage:
+      "您的会话可能已过期。请重新登录以查看情感分析。如果登录窗口已打开，请在其中完成登录。",
+    signInToContinueButton: "登录",
+    accessDeniedTitle: "无法加载此报告",
+    accessDeniedMessage:
+      "您可能没有权限查看该客户的情感数据，或权限已变更。请从首页重新选择客户，或联系管理员。",
     clientSentimentAnalysis: "客户情感分析",
     emotionalWellnessInsights: "情感健康洞察和趋势",
     timeRange: "时间范围：",
@@ -632,6 +649,15 @@ const zh: LocaleTranslations = {
     noClientsFound: "未找到客户",
     viewSchedules: "查看日程",
     noScheduleWarning: "⚠ 未设置日程",
+    glanceAlerts: "提醒",
+    glanceHintAlertsTitle: "此客户的提醒",
+    glanceHintAlertsBody:
+      "您的提醒列表中有多少条与此住户关联（例如客户、对话或日程提醒）。请打开「提醒」标签查看或处理。未关联客户的提醒不计入此处。",
+    glanceAlertsA11y: "此客户关联 {{count}} 条提醒",
+    glanceSentimentActionHint: "在报告中打开最近一次通话的情绪分析。",
+    glanceHealthActionHint: "在报告中打开此客户的健康分析报告。",
+    glanceRiskActionHint: "在报告中打开此客户的欺诈与安全报告。",
+    glanceAlertsActionHint: "打开仅显示此客户的提醒列表。",
   },
   tabs: {
     home: "首页",

@@ -14,6 +14,11 @@ const es: LocaleTranslations = {
     client: "Cliente:",
     importance: "Importancia:",
     expires: "Expira:",
+    filteredByClientBanner: "Mostrando alertas para {{name}}",
+    clearAlertFilter: "Ver todas",
+    noAlertsForFilteredClientTitle: "No hay alertas para este cliente",
+    noAlertsForFilteredClientSubtitle:
+      "No hay alertas vinculadas a {{name}}. Quita el filtro para ver todas las alertas u elige otro cliente en Inicio.",
   },
   errorScreen: {
     title: "¡Algo salió mal!",
@@ -169,6 +174,9 @@ const es: LocaleTranslations = {
     onboardingCapturesLine: "{{count}} respuestas de temas registradas",
     onboardingComplete: "Incorporación completa — las 4 llamadas finalizadas",
     viewOnboardingDetails: "VER RESPUESTAS DE INCORPORACIÓN",
+    onboardingButtonCompactComplete: "Incorporación · Completa",
+    onboardingButtonCompactDay: "Incorporación · Día {{day}}",
+    onboardingButtonA11yHint: "Abre las respuestas y el detalle de incorporación de este cliente.",
   },
   clientOnboardingScreen: {
     title: "Respuestas de incorporación",
@@ -179,7 +187,8 @@ const es: LocaleTranslations = {
     loading: "Cargando…",
     error: "No se pudieron cargar los datos de incorporación.",
     captureCount: "{{count}} respuestas",
-    empty: "Aún no hay respuestas para este filtro.",
+    emptyAllDays: "Aún no hay respuestas de incorporación registradas.",
+    emptyForDay: "La incorporación del día {{day}} aún no se ha completado.",
     flag: {
       safety: "Seguridad",
       memory: "Memoria",
@@ -332,6 +341,7 @@ const es: LocaleTranslations = {
     glanceSentiment: "Ánimo",
     glanceHealth: "Salud",
     glanceRisk: "Riesgo",
+    glanceAlerts: "Alertas",
     sentimentTrendImproving: "Alza",
     sentimentTrendStable: "Estable",
     sentimentTrendDeclining: "Baja",
@@ -347,6 +357,14 @@ const es: LocaleTranslations = {
       "Puntuación global del último análisis de fraude y seguridad (0–100, más alto indica más preocupación). Refleja patrones en lo dicho sobre dinero, seguridad, aislamiento y temas similares. Consulta el informe de fraude y abuso para detalles.",
     glanceHealthA11y: "Puntuación de salud {{score}} de cien",
     glanceRiskA11y: "Puntuación de riesgo {{score}} de cien",
+    glanceHintAlertsTitle: "Alertas para este cliente",
+    glanceHintAlertsBody:
+      "Cuántas alertas de tu lista están vinculadas a este residente (por ejemplo alertas de cliente, conversación u horario). Abre la pestaña Alertas para leerlas o gestionarlas. Las alertas sin cliente vinculado no se cuentan aquí.",
+    glanceAlertsA11y: "{{count}} alertas vinculadas a este cliente",
+    glanceSentimentActionHint: "Abre el análisis de sentimiento de la última llamada en Informes.",
+    glanceHealthActionHint: "Abre el informe de análisis de salud de este cliente en Informes.",
+    glanceRiskActionHint: "Abre el informe de fraude y seguridad de este cliente en Informes.",
+    glanceAlertsActionHint: "Abre la lista de alertas filtrada por este cliente.",
   },
   tabs: {
     home: "Inicio",
@@ -383,6 +401,7 @@ const es: LocaleTranslations = {
     ending: "Finalizando...",
     endCall: "Finalizar llamada",
     loading: "Cargando...",
+    signInToContinue: "Inicia sesión para continuar.",
   },
   legalLinks: {
     privacyPolicy: "Política de privacidad",
@@ -447,6 +466,13 @@ const es: LocaleTranslations = {
     allTime: "Todo el tiempo",
     noClientSelected: "Ningún cliente seleccionado",
     selectClientToView: "Por favor selecciona un cliente desde la pantalla de inicio para ver su análisis de sentimientos.",
+    sessionRequiredTitle: "Inicio de sesión necesario",
+    sessionRequiredMessage:
+      "Tu sesión puede haber expirado. Vuelve a iniciar sesión para ver el análisis de sentimientos. Si ya ves la ventana de inicio de sesión, complétala allí.",
+    signInToContinueButton: "Iniciar sesión",
+    accessDeniedTitle: "No se puede cargar este informe",
+    accessDeniedMessage:
+      "Es posible que no tengas acceso a los datos de sentimiento de este cliente o que tus permisos hayan cambiado. Prueba a elegir de nuevo al cliente en Inicio o contacta a un administrador.",
     clientSentimentAnalysis: "Análisis de sentimientos del cliente",
     emotionalWellnessInsights: "Perspectivas y tendencias de bienestar emocional",
     timeRange: "Rango de tiempo:",
