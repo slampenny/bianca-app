@@ -730,4 +730,50 @@ Then('the alert should be visible again', async function() {
   await expect(alertItem.first()).toBeVisible({ timeout: 15000 });
 });
 
+When('I open the test alert details', async function() {
+  if (!this.testAlertMessage && !this.testAlertPattern) {
+    throw new Error('No test alert message stored — use "I have an unread alert" first');
+  }
+
+  const alertItem = alertItemLocator(this);
+  await alertItem.first().waitFor({ state: 'visible', timeout: 20000 });
+
+  const openDetails = alertItem.locator('[data-testid="alert-item-open-details"]').first();
+  await openDetails.waitFor({ state: 'visible', timeout: 10000 });
+  await openDetails.click({ force: true });
+
+  await this.page.locator('[data-testid="alert-detail-screen"]').first().waitFor({ state: 'visible', timeout: 20000 });
+  await this.page.locator('[data-testid="alert-detail-resolution-form"]').first().waitFor({ state: 'visible', timeout: 10000 });
+});
+
+When('I enter {string} into the alert resolution note', async function(text) {
+  const input = this.page.locator('[data-testid="alert-detail-resolution-input"]');
+  await input.waitFor({ state: 'visible', timeout: 10000 });
+  await input.fill(text);
+});
+
+When('I submit the alert resolution', async function() {
+  const patchPromise = this.page.waitForResponse(
+    (res) =>
+      res.url().includes('/alerts') &&
+      res.request().method() === 'PATCH' &&
+      res.status() === 200,
+    { timeout: 25000 }
+  );
+
+  await this.page.locator('[data-testid="alert-detail-resolve-submit"]').click({ force: true });
+  await patchPromise;
+
+  await this.page.waitForResponse(
+    (res) => res.url().includes('/alerts') && res.request().method() === 'GET' && res.status() === 200,
+    { timeout: 25000 }
+  ).catch(() => {});
+});
+
+Then('I should see the alert resolution summary including {string}', async function(fragment) {
+  const summary = this.page.locator('[data-testid="alert-detail-resolution-summary"]');
+  await summary.waitFor({ state: 'visible', timeout: 20000 });
+  await expect(summary).toContainText(fragment);
+});
+
 

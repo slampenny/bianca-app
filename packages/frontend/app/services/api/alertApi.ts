@@ -34,6 +34,7 @@ export const alertApi = createApi({
         method: "PATCH",
         body: alert,
       }),
+      invalidatesTags: ["Alert"],
     }),
     deleteAlert: builder.mutation<void, { alertId: string }>({
       query: ({ alertId }) => ({

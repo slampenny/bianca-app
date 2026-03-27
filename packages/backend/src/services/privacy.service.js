@@ -389,7 +389,7 @@ const enrichGlobalConsentRows = async (results) => {
     if (o.userModel === 'Client') {
       const c = clientMap.get(uid);
       o.subjectDisplayName = c ? c.preferredName || c.name || uid : uid;
-      o.subjectKind = 'resident';
+      o.subjectKind = 'client';
       if (c && c.org) {
         const org = c.org;
         o.organizationName = org.name || '';
@@ -464,7 +464,7 @@ const runOrgScopedConsentAudit = async (oid, query) => {
     const uid = o.userId ? o.userId.toString() : String(o.userId);
     if (o.userModel === 'Client') {
       o.subjectDisplayName = clientNameById.get(uid) || uid;
-      o.subjectKind = 'resident';
+      o.subjectKind = 'client';
     } else {
       o.subjectDisplayName = caregiverNameById.get(uid) || uid;
       o.subjectKind = 'caregiver';

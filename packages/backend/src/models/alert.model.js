@@ -84,6 +84,16 @@ const alertSchema = new mongoose.Schema(
         ),
       },
     ],
+    /** How staff resolved this alert (set only via PATCH with resolutionNote; resolvedBy set server-side) */
+    resolutionNote: {
+      type: String,
+      trim: true,
+    },
+    resolvedAt: Date,
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Caregiver',
+    },
   },
   {
     timestamps: true,
@@ -96,6 +106,7 @@ alertSchema.index({ relevanceUntil: 1 }); // For relevance filtering
 alertSchema.index({ createdBy: 1, relevanceUntil: 1 }); // Compound for alert queries
 alertSchema.index({ readBy: 1 }); // For read status queries
 alertSchema.index({ createdAt: -1 }); // For sorting
+alertSchema.index({ resolvedBy: 1 });
 
 // Plugin to convert mongoose to JSON, and paginate results
 alertSchema.plugin(toJSON);

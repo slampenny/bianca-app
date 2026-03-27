@@ -51,7 +51,7 @@ export interface ConsentRecord {
 export interface ConsentAuditRow {
   id?: string
   _id?: string
-  subjectKind: "resident" | "caregiver"
+  subjectKind: "client" | "caregiver"
   subjectDisplayName: string
   userModel: string
   userId: string

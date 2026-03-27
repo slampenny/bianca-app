@@ -25,8 +25,10 @@ describe('alertService', () => {
   let org;
   let caregiver;
   let client;
+  let adminCargiver;
   let alert1;
   let alert2;
+  let alert3;
 
   afterEach(async () => {
     await Alert.deleteMany();
@@ -63,8 +65,39 @@ describe('alertService', () => {
 
   it('should update an alert by id', async () => {
     const updateBody = { message: 'Updated Message' };
-    const updatedAlert = await alertService.updateAlertById(alert1.id, updateBody);
+    const updatedAlert = await alertService.updateAlertById(alert1.id, updateBody, {
+      caregiverId: adminCargiver.id,
+    });
     expect(updatedAlert).toHaveProperty('message', updateBody.message);
+  });
+
+  it('should resolve an alert with a note and resolver metadata', async () => {
+    const updatedAlert = await alertService.updateAlertById(
+      alert1.id,
+      { resolutionNote: '  Called the family.  ' },
+      { caregiverId: adminCargiver.id }
+    );
+    expect(updatedAlert.resolutionNote).toBe('Called the family.');
+    expect(updatedAlert.resolvedBy).toBe(adminCargiver.id.toString());
+    expect(updatedAlert.resolvedByCaregiver).toMatchObject({
+      id: adminCargiver.id.toString(),
+      name: expect.any(String),
+    });
+    expect(updatedAlert.resolvedAt).toEqual(expect.any(String));
+  });
+
+  it('should reject resolving an alert twice', async () => {
+    await alertService.updateAlertById(alert1.id, { resolutionNote: 'First' }, { caregiverId: adminCargiver.id });
+    await expect(
+      alertService.updateAlertById(alert1.id, { resolutionNote: 'Second' }, { caregiverId: adminCargiver.id })
+    ).rejects.toThrow('already resolved');
+  });
+
+  it('should not allow a caregiver to resolve an alert they cannot see', async () => {
+    const [notAdmin] = await insertCaregiversAndAddToOrg(org, [caregiverOne]);
+    await expect(
+      alertService.updateAlertById(alert2.id, { resolutionNote: 'Nope' }, { caregiverId: notAdmin.id })
+    ).rejects.toThrow('Alert not found');
   });
 
   it('should mark an alert as read', async () => {

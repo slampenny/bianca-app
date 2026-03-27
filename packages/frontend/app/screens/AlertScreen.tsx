@@ -261,6 +261,7 @@ export function AlertScreen() {
             accessibilityRole="button"
             accessibilityLabel={translate("alertScreen.openDetails")}
             accessibilityHint={translate("alertScreen.openDetailsHint")}
+            testID="alert-item-open-details"
           >
             <Text style={styles.alertMessage} numberOfLines={2}>
               {item.message}

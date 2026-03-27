@@ -106,6 +106,15 @@ export const alertSlice = createSlice({
       }
       // DO NOT filter or remove alerts - keep ALL alerts in the array
     })
+
+    builder.addMatcher(alertApi.endpoints.updateAlert.matchFulfilled, (state, { payload }) => {
+      const index = state.alerts.findIndex((alertInState) => alertInState.id === payload.id)
+      if (index !== -1) {
+        state.alerts[index] = payload
+      } else {
+        state.alerts.push(payload)
+      }
+    })
   },
 })
 

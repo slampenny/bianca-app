@@ -1,5 +1,5 @@
 import React from "react"
-import { View, StyleSheet, ScrollView, Pressable } from "react-native"
+import { View, StyleSheet, ScrollView, Pressable, TextInput } from "react-native"
 import { useRoute, useNavigation, RouteProp } from "@react-navigation/native"
 import type { StackNavigationProp } from "@react-navigation/stack"
 import type { AlertStackParamList } from "app/navigators/navigationTypes"
@@ -7,7 +7,7 @@ import { useSelector, useDispatch } from "react-redux"
 import { Text, Button } from "app/components"
 import { getAlerts } from "app/store/alertSlice"
 import { getCurrentUser } from "app/store/authSlice"
-import { useGetAllClientsQuery } from "app/services/api"
+import { useGetAllClientsQuery, useUpdateAlertMutation } from "app/services/api"
 import { setClient } from "app/store/clientSlice"
 import type { Alert, Client } from "app/services/api/api.types"
 import { useTheme } from "app/theme/ThemeContext"
@@ -34,6 +34,10 @@ export function AlertDetailScreen() {
   const styles = createStyles(colors)
 
   const alert = React.useMemo(() => alerts.find((a) => a.id === alertId), [alerts, alertId])
+
+  const [resolutionDraft, setResolutionDraft] = React.useState("")
+  const [resolveError, setResolveError] = React.useState<string | null>(null)
+  const [updateAlert, { isLoading: isResolving }] = useUpdateAlertMutation()
 
   const { data: clientsData } = useGetAllClientsQuery({})
 
@@ -101,6 +105,29 @@ export function AlertDetailScreen() {
   const showConsentCenterLink =
     (currentUser?.role === "orgAdmin" || currentUser?.role === "superAdmin") && !!client?.id
 
+  const isResolved = Boolean(alert?.resolvedAt && alert?.resolvedByCaregiver)
+
+  const submitResolution = async () => {
+    if (!alert?.id) return
+    const note = resolutionDraft.trim()
+    if (!note) return
+    setResolveError(null)
+    try {
+      await updateAlert({ alertId: alert.id, alert: { resolutionNote: note } }).unwrap()
+      setResolutionDraft("")
+    } catch (e: unknown) {
+      const status =
+        typeof e === "object" && e !== null && "status" in e
+          ? (e as { status?: number }).status
+          : undefined
+      setResolveError(
+        status === 409
+          ? translate("alertDetail.alreadyResolved" as TxKeyPath)
+          : translate("alertDetail.resolveError" as TxKeyPath)
+      )
+    }
+  }
+
   const handleAction = (actionType: string) => {
     switch (actionType) {
       case "review_conversation":
@@ -136,7 +163,12 @@ export function AlertDetailScreen() {
     ev?.confidence != null && Number.isFinite(ev.confidence) ? Math.round(ev.confidence * 100) : null
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      testID="alert-detail-screen"
+      accessibilityLabel="alert-detail-screen"
+    >
       <Text style={styles.title} text={translate("alertDetail.title" as TxKeyPath)} />
 
       <Text style={styles.message}>{alert.message}</Text>
@@ -146,6 +178,54 @@ export function AlertDetailScreen() {
           {translate("alertScreen.importance")} {alert.importance}
         </Text>
       </View>
+
+      {isResolved && alert.resolvedByCaregiver && alert.resolvedAt ? (
+        <View
+          style={[styles.card, styles.cardOk]}
+          accessibilityRole="text"
+          testID="alert-detail-resolution-summary"
+          accessibilityLabel="alert-detail-resolution-summary"
+        >
+          <Text style={styles.cardTitle} text={translate("alertDetail.resolutionHeading" as TxKeyPath)} />
+          <Text style={styles.cardBody}>
+            {translate("alertDetail.resolutionSummary" as TxKeyPath, {
+              name: alert.resolvedByCaregiver.name,
+              date: new Date(alert.resolvedAt).toLocaleString(),
+              resolution: alert.resolutionNote ?? "",
+            })}
+          </Text>
+        </View>
+      ) : (
+        <View
+          style={styles.card}
+          testID="alert-detail-resolution-form"
+          accessibilityLabel="alert-detail-resolution-form"
+        >
+          <Text style={styles.cardTitle} text={translate("alertDetail.resolutionHeading" as TxKeyPath)} />
+          <Text style={styles.cardMuted} text={translate("alertDetail.resolutionNoteLabel" as TxKeyPath)} />
+          <TextInput
+            style={styles.resolutionInput}
+            value={resolutionDraft}
+            onChangeText={setResolutionDraft}
+            placeholder={translate("alertDetail.resolutionPlaceholder" as TxKeyPath)}
+            placeholderTextColor={colors.palette.neutral500}
+            multiline
+            editable={!isResolving}
+            testID="alert-detail-resolution-input"
+            accessibilityLabel={translate("alertDetail.resolutionNoteLabel" as TxKeyPath)}
+          />
+          {resolveError ? <Text style={styles.resolveError}>{resolveError}</Text> : null}
+          <Button
+            text={translate("alertDetail.markResolved" as TxKeyPath)}
+            onPress={submitResolution}
+            preset="primary"
+            style={styles.actionBtn}
+            disabled={!resolutionDraft.trim()}
+            loading={isResolving}
+            testID="alert-detail-resolve-submit"
+          />
+        </View>
+      )}
 
       {consent ? (
         <View
@@ -213,7 +293,7 @@ export function AlertDetailScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle} text={translate("alertDetail.contextHeading" as TxKeyPath)} />
         <Button
-          text={translate("alertDetail.openResident" as TxKeyPath)}
+          text={translate("alertDetail.openClient" as TxKeyPath)}
           onPress={goClientProfile}
           preset="default"
           style={styles.actionBtn}
@@ -309,4 +389,17 @@ const createStyles = (colors: any) =>
       borderBottomColor: colors.palette.neutral300,
     },
     title: { fontSize: 18, fontWeight: "700", color: colors.palette.biancaHeader },
+    resolutionInput: {
+      marginTop: 8,
+      minHeight: 88,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.palette.neutral300,
+      borderRadius: 8,
+      backgroundColor: colors.palette.neutral200,
+      color: colors.palette.biancaHeader,
+      fontSize: 15,
+      textAlignVertical: "top",
+    },
+    resolveError: { color: colors.palette.error500 || "#c00", fontSize: 14, marginTop: 8 },
   })

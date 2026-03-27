@@ -48,6 +48,15 @@ Feature: Alert Management
     Then the alert should be marked as unread
     And the checkbox should be unchecked
 
+  @alert_resolution
+  Scenario: Resolve an alert from the detail screen
+    Given I am on the alerts screen
+    And I have an unread alert
+    When I open the test alert details
+    And I enter "Called the family and documented follow-up" into the alert resolution note
+    And I submit the alert resolution
+    Then I should see the alert resolution summary including "Called the family and documented follow-up"
+
   # Skipped: same 401 GET /alerts issue as above
   @skip
   Scenario: Alert visibility in tabs based on read status

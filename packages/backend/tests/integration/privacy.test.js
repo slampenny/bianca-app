@@ -631,7 +631,7 @@ describe('Privacy API routes', () => {
         expect(res.body.scopeLabel).toBeDefined();
         const row = res.body.results.find((r) => r.consentType === 'recording' && r.userModel === 'Client');
         expect(row).toBeDefined();
-        expect(row.subjectKind).toBe('resident');
+        expect(row.subjectKind).toBe('client');
         expect(row.organizationId).toBeDefined();
       });
 
@@ -674,7 +674,7 @@ describe('Privacy API routes', () => {
         expect(headerLine).toContain('organizationName');
         expect(headerLine).toContain('organizationId');
         expect(res.text).toContain('recording');
-        expect(res.text).toContain('resident');
+        expect(res.text).toContain('client');
       });
 
       it('should export consent audit as PDF', async () => {

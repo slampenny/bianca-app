@@ -56,6 +56,7 @@ const updateAlert = {
       relevanceUntil: Joi.date().optional(),
       evidence: evidenceSchema.optional(),
       recommendedActions: Joi.array().items(recommendedActionSchema).optional(),
+      resolutionNote: Joi.string().trim().min(1).max(2000).optional(),
     })
     .min(1),
 };

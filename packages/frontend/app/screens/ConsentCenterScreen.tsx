@@ -323,8 +323,8 @@ export function ConsentCenterScreen() {
 
 function AuditRow({ row, styles }: { row: ConsentAuditRow; styles: ReturnType<typeof createStyles> }) {
   const kindLabel =
-    row.subjectKind === "resident"
-      ? translate("consentCenter.rowResident" as TxKeyPath)
+    row.subjectKind === "client"
+      ? translate("consentCenter.rowClient" as TxKeyPath)
       : translate("consentCenter.rowStaff" as TxKeyPath)
   const grantedLabel = row.granted
     ? translate("consentCenter.yes" as TxKeyPath)

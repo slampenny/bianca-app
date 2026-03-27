@@ -82,6 +82,12 @@ export interface RelatedResidentConsent {
   recordedAt?: string | null
 }
 
+/** Populated on the server when an alert has been resolved */
+export interface AlertResolvedByCaregiver {
+  id: string
+  name: string
+}
+
 export interface Alert {
   id?: string
   message: string
@@ -97,6 +103,10 @@ export interface Alert {
   evidence?: AlertEvidence
   recommendedActions?: AlertRecommendedAction[]
   relatedResidentConsent?: RelatedResidentConsent
+  resolutionNote?: string
+  resolvedAt?: string
+  resolvedBy?: string
+  resolvedByCaregiver?: AlertResolvedByCaregiver
 }
 
 export interface OrgPages {
