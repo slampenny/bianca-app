@@ -60,7 +60,7 @@ Given('I am an organization admin', async function() {
   await loginButton.waitFor({ state: 'visible', timeout: 10000 });
   
   const loginPromise = this.page.waitForResponse(response => 
-    response.url().includes('/api/v1/auth/login') && response.status() === 200,
+    response.url().includes('/v1/auth/login') && response.status() === 200,
     { timeout: 10000 }
   ).catch(() => null);
   

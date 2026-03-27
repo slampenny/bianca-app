@@ -32,15 +32,22 @@ AfterAll(async function() {
 // Before each scenario
 Before(async function() {
   await this.init(sharedBrowser);
-  
-  // Set playwright test mode in localStorage for faster polling (3s instead of 30s)
-  // This must be set BEFORE any page navigation so AlertScreen picks it up
+
+  // Hit app origin first so localStorage applies to the same origin as the app (not about:blank).
+  const base = (this.baseURL || 'http://localhost:8084').replace(/\/$/, '');
+  try {
+    await this.page.goto(`${base}/`, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  } catch (e) {
+    // Dev server may still be starting; auth step will retry navigation
+  }
+
+  // Set playwright test mode for faster alert polling (3s); must exist before AlertScreen mounts
   try {
     await this.page.evaluate(() => {
       localStorage.setItem('playwright_test', '1');
     });
   } catch (e) {
-    // Page might not be loaded yet, that's okay
+    // Non-fatal
   }
 });
 

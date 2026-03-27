@@ -159,8 +159,15 @@ async function startServer() {
       logger.warn('Continuing without medical analysis scheduler. Scheduled analysis will be unavailable.');
     }
 
-    // Create and start the HTTP server
+    // Create HTTP server and attach Socket.IO (optional Redis adapter for multi-instance)
     const server = http.createServer(app);
+    try {
+      const { initAlertSocketServer } = require('./realtime/alertSocket.server');
+      await initAlertSocketServer(server);
+    } catch (socketErr) {
+      logger.error('[AlertSocket] Failed to initialize:', socketErr);
+    }
+
     const port = config.port || 3000;
     server.listen(port, '0.0.0.0', () => {
       logger.info(`🚀 Server listening on port ${port}`);
@@ -207,6 +214,14 @@ function setupShutdownHandlers(server) {
   // Handler for graceful shutdown
   const gracefulShutdown = async (server) => {
     logger.info('Initiating graceful shutdown...');
+
+    try {
+      const { shutdownAlertSocketServer } = require('./realtime/alertSocket.server');
+      await shutdownAlertSocketServer();
+      logger.info('Alert Socket.IO server closed');
+    } catch (err) {
+      logger.error('Error shutting down Alert Socket.IO:', err);
+    }
     
     try {
       // 1. Shutdown ARI client first (this will cleanup all active calls)

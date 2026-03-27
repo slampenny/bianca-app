@@ -21,6 +21,28 @@ import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { logger } from "../utils/logger"
 
+/**
+ * A GET /alerts that started before PATCH resolve can still settle after the mutation and return
+ * a pre-resolution row. AlertScreen dispatches that list via setAlerts and would otherwise wipe
+ * resolution fields from Redux — AlertDetail stays on the form and resolution E2E flakes.
+ */
+function mergeResolutionFromLocalIfStaleGet(apiAlerts: Alert[], localAlerts: Alert[]): Alert[] {
+  return apiAlerts.map((apiA) => {
+    if (!apiA.id) return apiA
+    const local = localAlerts.find((l) => l.id === apiA.id)
+    if (local?.resolvedAt && !apiA.resolvedAt) {
+      return {
+        ...apiA,
+        resolutionNote: local.resolutionNote ?? apiA.resolutionNote,
+        resolvedAt: local.resolvedAt,
+        resolvedBy: local.resolvedBy,
+        resolvedByCaregiver: local.resolvedByCaregiver,
+      }
+    }
+    return apiA
+  })
+}
+
 type AlertListRouteProp = RouteProp<AlertStackParamList, "AlertList">
 type AlertListNavProp = StackNavigationProp<AlertStackParamList, "AlertList" | "AlertDetail">
 
@@ -95,12 +117,13 @@ export function AlertScreen() {
       // CRITICAL: Only merge if we detect the API is missing read alerts that we know exist
       // This handles race conditions where an alert was just marked as read but the API hasn't updated yet
       const currentAlerts = alertsRef.current
+      const mergedResolutionAlerts = mergeResolutionFromLocalIfStaleGet(uniqueApiAlerts, currentAlerts)
       const currentReadAlerts = currentUser 
         ? currentAlerts.filter(a => a.readBy?.includes(currentUser.id!))
         : []
       
       // Create a map of API alerts by ID for quick lookup
-      const apiAlertsMap = new Map(uniqueApiAlerts.map(a => [a.id, a]))
+      const apiAlertsMap = new Map(mergedResolutionAlerts.map(a => [a.id, a]))
       
       // Check if any read alerts from local state are missing from API response
       const missingReadAlerts = currentReadAlerts.filter(localReadAlert => 
@@ -110,7 +133,7 @@ export function AlertScreen() {
       if (missingReadAlerts.length > 0) {
         logger.debug('[AlertScreen] API missing read alerts, merging:', missingReadAlerts.length)
         // Only merge if we detect missing alerts - otherwise trust the API completely
-        const mergedAlerts = [...uniqueApiAlerts, ...missingReadAlerts]
+        const mergedAlerts = [...mergedResolutionAlerts, ...missingReadAlerts]
         // Remove duplicates (shouldn't be any, but be safe)
         const finalAlerts = Array.from(
           new Map(mergedAlerts.map(a => [a.id, a])).values()
@@ -124,7 +147,7 @@ export function AlertScreen() {
       } else {
         // API has all alerts, just use it directly (no merging needed)
         logger.debug('[AlertScreen] API has all alerts, using directly')
-        dispatch(setAlerts(uniqueApiAlerts))
+        dispatch(setAlerts(mergedResolutionAlerts))
       }
     }
   }, [fetchAllAlerts, dispatch, currentUser?.id])

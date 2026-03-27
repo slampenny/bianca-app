@@ -116,12 +116,21 @@ Given('I am logged in as {string}', async function(username) {
     // Already logged in - verify we're on home screen
     const homeHeader = await this.page.getByTestId('home-header').count().catch(() => 0);
     if (homeHeader > 0) {
+      await this.waitForReduxAccessToken();
       return; // Already logged in and on home screen
     }
-    // Might be logged in but on different screen - navigate to home
-    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load' });
-    await this.page.locator('[data-testid="home-header"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    return;
+    // Might be logged in but on a deep link — load root and require a real shell (don’t swallow errors; empty catch hid broken bundles)
+    await this.page.goto(`${this.baseURL}/`, { waitUntil: 'load', timeout: 30000 });
+    await this.page
+      .locator('[data-testid="home-header"], [data-testid^="tab-"], [data-testid="email-input"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 25000 });
+    const emailAfterNav = await this.page.getByTestId('email-input').count();
+    if (emailAfterNav === 0) {
+      await this.waitForReduxAccessToken();
+      return;
+    }
+    // Login form is visible — fall through to the same UI login as below
   }
 
   // Fill in login form
@@ -235,6 +244,9 @@ Given('I am logged in as {string}', async function(username) {
     const errorText = await this.page.locator('[data-testid*="error"], .error, [role="alert"]').first().textContent().catch(() => 'Unknown error');
     throw new Error(`Login verification failed - still see login form. Error: ${errorText}`);
   }
+
+  // Same JWT the app uses for GET /v1/alerts (redux-persist may lag behind UI after load)
+  await this.waitForReduxAccessToken();
 });
 
 Given('I am not logged in', async function() {

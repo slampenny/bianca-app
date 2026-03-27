@@ -59,7 +59,7 @@ When('I navigate to the home screen', async function() {
     await loginButton.waitFor({ state: 'visible', timeout: 10000 });
 
     const loginPromise = this.page.waitForResponse(response =>
-      response.url().includes('/api/v1/auth/login') && response.status() === 200,
+      response.url().includes('/v1/auth/login') && response.status() === 200,
       { timeout: 10000 }
     ).catch(() => null);
 
@@ -579,7 +579,7 @@ When('I click the {string} button', async function(buttonText) {
           .or(this.page.getByRole('button', { name: /login/i }).first());
         
         const loginPromise = this.page.waitForResponse(response => 
-          response.url().includes('/api/v1/auth/login') && response.status() === 200,
+          response.url().includes('/v1/auth/login') && response.status() === 200,
           { timeout: 10000 }
         ).catch(() => null);
         
@@ -613,7 +613,7 @@ When('I click the {string} button', async function(buttonText) {
             .or(this.page.getByRole('button', { name: /login/i }).first());
           
           const retryLoginPromise = this.page.waitForResponse(response => 
-            response.url().includes('/api/v1/auth/login') && response.status() === 200,
+            response.url().includes('/v1/auth/login') && response.status() === 200,
             { timeout: 10000 }
           ).catch(() => null);
           

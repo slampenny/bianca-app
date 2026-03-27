@@ -68,6 +68,8 @@ When('I navigate to the alerts screen', async function() {
   
   await this.page.locator('[data-testid="tab-alert"], [data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
+  await this.waitForReduxAccessToken();
+
   // Click on alert tab - try multiple selectors
   // React Native Web tabs might render differently, so try both getByTestId and locator
   let alertTab = null;
@@ -165,7 +167,15 @@ When('I navigate to the alerts screen', async function() {
   // Ensure alertTab is valid before clicking
   if (alertTab && tabCount > 0) {
     await alertTab.waitFor({ state: 'visible', timeout: 10000 });
+    const navAlertsOk = this.page.waitForResponse(
+      (res) =>
+        res.url().includes('/v1/alerts') &&
+        res.request().method() === 'GET' &&
+        res.status() === 200,
+      { timeout: 35000 }
+    );
     await alertTab.click({ force: true });
+    await navAlertsOk;
     await this.page.locator('[data-testid="alert-screen"], [data-testid="alert-list"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
   } else {
     throw new Error('Alert tab not found or invalid');
@@ -277,8 +287,8 @@ Given('I am on the alerts screen', async function() {
     
     await loginButton.waitFor({ state: 'visible', timeout: 10000 });
     
-    const loginPromise = this.page.waitForResponse(response => 
-      response.url().includes('/api/v1/auth/login') && response.status() === 200,
+    const loginPromise = this.page.waitForResponse(
+      (response) => response.url().includes('/v1/auth/login') && response.status() === 200,
       { timeout: 10000 }
     ).catch(() => null);
     
@@ -288,6 +298,8 @@ Given('I am on the alerts screen', async function() {
   }
 
   await this.page.waitForSelector('[data-testid="home-header"], [data-testid^="tab-"]', { timeout: 15000 }).catch(() => {});
+
+  await this.waitForReduxAccessToken();
 
   // Try multiple ways to find the alert tab (from old Playwright test)
   let alertTab = this.page.getByTestId('tab-alert').first();
@@ -331,7 +343,17 @@ Given('I am on the alerts screen', async function() {
   }
   
   await alertTab.waitFor({ state: 'visible', timeout: 15000 });
+
+  const alertsFetchOk = this.page.waitForResponse(
+    (res) =>
+      res.url().includes('/v1/alerts') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
+    { timeout: 35000 }
+  );
+
   await alertTab.click({ force: true });
+  await alertsFetchOk;
   await this.page.locator('[data-testid="alert-screen"], [data-testid="alert-list"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
   // CRITICAL: Switch to "All Alerts" tab so read/unread toggles don't hide alerts
@@ -480,9 +502,11 @@ When('I mark all alerts as read', async function() {
   await markAllReadButton.waitFor({ state: 'visible', timeout: 10000 });
   
   // Wait for API call
-  const markReadPromise = this.page.waitForResponse(response => 
-    response.url().includes('/api/v1/alerts/mark-all-read') && 
-    response.status() === 200,
+  const markReadPromise = this.page.waitForResponse(
+    (response) =>
+      response.url().includes('/v1/alerts/markAsRead') &&
+      response.request().method() === 'POST' &&
+      response.status() === 200,
     { timeout: 10000 }
   ).catch(() => null);
   
@@ -568,8 +592,8 @@ Given('I have an unread alert', async function() {
     throw new Error('Could not create test alert');
   }
 
-  // Match by pattern so we find the item even if the message is truncated in the UI (e.g. numberOfLines={1})
-  this.testAlertPattern = /Checkbox Test Alert -\d+/;
+  // Message is `Checkbox Test Alert - ${Date.now()}` (space before digits); allow optional whitespace after hyphen.
+  this.testAlertPattern = /Checkbox Test Alert -\s*\d+/;
 
   // Wait for several GET /alerts 200 so the frontend has polled after our create (polling interval 3s)
   for (let i = 0; i < 4; i++) {
@@ -749,10 +773,16 @@ When('I open the test alert details', async function() {
 When('I enter {string} into the alert resolution note', async function(text) {
   const input = this.page.locator('[data-testid="alert-detail-resolution-input"]');
   await input.waitFor({ state: 'visible', timeout: 10000 });
+  await input.click();
   await input.fill(text);
+  const submit = this.page.locator('[data-testid="alert-detail-resolve-submit"]');
+  await expect(submit).toBeEnabled({ timeout: 15000 });
 });
 
 When('I submit the alert resolution', async function() {
+  const submit = this.page.locator('[data-testid="alert-detail-resolve-submit"]');
+  await expect(submit).toBeEnabled({ timeout: 15000 });
+
   const patchPromise = this.page.waitForResponse(
     (res) =>
       res.url().includes('/alerts') &&
@@ -761,7 +791,7 @@ When('I submit the alert resolution', async function() {
     { timeout: 25000 }
   );
 
-  await this.page.locator('[data-testid="alert-detail-resolve-submit"]').click({ force: true });
+  await submit.click({ force: true });
   await patchPromise;
 
   await this.page.waitForResponse(

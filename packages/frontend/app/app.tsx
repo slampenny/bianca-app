@@ -34,6 +34,7 @@ import Config from "./config"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { ViewStyle, Platform, View } from "react-native"
 import useRefreshToken from "./effects/useRefreshToken"
+import { useAlertRealtime } from "./effects/useAlertRealtime"
 import { SSOCallbackGate } from "./components/SSOCallbackGate"
 import { useLanguage } from "./hooks/useLanguage"
 import { AuthModalProvider } from "./contexts/AuthModalContext"
@@ -76,7 +77,8 @@ interface AppProps {
 function InnerApp() {
   useRefreshToken()
   useLanguage()
-  
+  useAlertRealtime()
+
   return null
 }
 

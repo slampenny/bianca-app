@@ -3,6 +3,7 @@ const httpStatus = require('http-status');
 const { Alert, Caregiver } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { translateAlertMessage, parseAlertMessage } = require('../utils/alertTranslations');
+const { scheduleBroadcastAfterAlertChange } = require('./alertBroadcast.service');
 
 const RELATED_CLIENT_SELECT = 'name preferredName consented consentedAt';
 
@@ -123,6 +124,7 @@ function formatAlertForResponse(doc) {
 const createAlert = async (alertData) => {
   const created = await Alert.create(alertData);
   const populated = await Alert.findById(created._id).populate(alertPopulate);
+  scheduleBroadcastAfterAlertChange(populated);
   return formatAlertForResponse(populated);
 };
 
@@ -252,6 +254,7 @@ const updateAlertById = async (alertId, updateBody, options = {}) => {
 
   await alert.save();
   const populated = await Alert.findById(alertId).populate(alertPopulate);
+  scheduleBroadcastAfterAlertChange(populated);
   return formatAlertForResponse(populated);
 };
 
@@ -266,6 +269,7 @@ const markAlertAsRead = async (alertId, caregiverId) => {
     await alert.save();
   }
   const populated = await Alert.findById(alertId).populate(alertPopulate);
+  scheduleBroadcastAfterAlertChange(populated);
   return formatAlertForResponse(populated);
 };
 
@@ -278,12 +282,17 @@ const markAlertAsUnread = async (alertId, caregiverId) => {
   alert.readBy = alert.readBy.filter((id) => !id.equals(objectCaregiverId));
   await alert.save();
   const populated = await Alert.findById(alertId).populate(alertPopulate);
+  scheduleBroadcastAfterAlertChange(populated);
   return formatAlertForResponse(populated);
 };
 
 const deleteAlertById = async (alertId) => {
-  const alert = await Alert.findByIdAndDelete(alertId);
-  return alert;
+  const existing = await Alert.findById(alertId);
+  if (!existing) {
+    return null;
+  }
+  scheduleBroadcastAfterAlertChange(existing);
+  return Alert.findByIdAndDelete(alertId);
 };
 
 module.exports = {

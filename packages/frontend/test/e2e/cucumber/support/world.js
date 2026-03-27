@@ -155,6 +155,53 @@ class PlaywrightWorld {
     }
     this._backendSeeded = true; // Don't retry every scenario
   }
+
+  /**
+   * UI login stores the JWT in Redux, but redux-persist rehydration is async after a full reload.
+   * RTK Query may fire GET /v1/alerts before `prepareHeaders` sees a token → 401 "JWT token not valid".
+   * Waits until the same store the app uses (exposed as __REDUX_STORE__ on web) has an access token.
+   */
+  async waitForReduxAccessToken(timeoutMs = 30000) {
+    if (!this.page || this.page.isClosed()) {
+      throw new Error('No page for waitForReduxAccessToken');
+    }
+    const deadline = Date.now() + timeoutMs;
+    let ticksWithoutStore = 0;
+    while (Date.now() < deadline) {
+      // eslint-disable-next-line no-await-in-loop
+      const { hasStore, token } = await this.page.evaluate(() => {
+        try {
+          const store = window.__REDUX_STORE__;
+          if (store && typeof store.getState === 'function') {
+            const st = store.getState();
+            const t = st.auth && st.auth.tokens && st.auth.tokens.access && st.auth.tokens.access.token;
+            return { hasStore: true, token: t || null };
+          }
+        } catch (e) {
+          return { hasStore: false, token: null };
+        }
+        return { hasStore: false, token: null };
+      });
+      if (!hasStore) {
+        ticksWithoutStore += 1;
+        if (ticksWithoutStore >= 50) {
+          throw new Error(
+            'window.__REDUX_STORE__ never appeared — the web bundle may not be loading (e.g. index.bundle 500, wrong FRONTEND_URL/port, or Metro not ready). Fix the dev server, then re-run Cucumber.'
+          );
+        }
+      } else {
+        ticksWithoutStore = 0;
+      }
+      if (token && String(token).length > 20) {
+        return;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await this.page.waitForTimeout(100);
+    }
+    throw new Error(
+      'Timed out waiting for JWT in Redux after login. If the app is up, check persist rehydration or complete the login form (fake@example.org / seed user).'
+    );
+  }
 }
 
 setWorldConstructor(PlaywrightWorld);

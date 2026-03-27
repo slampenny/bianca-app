@@ -134,7 +134,7 @@ When('I navigate to the privacy request screen', async function() {
       .or(this.page.getByRole('button', { name: /login/i }).first());
     
     const loginPromise = this.page.waitForResponse(response => 
-      response.url().includes('/api/v1/auth/login') && response.status() === 200,
+      response.url().includes('/v1/auth/login') && response.status() === 200,
       { timeout: 10000 }
     ).catch(() => null);
     
@@ -212,7 +212,7 @@ When('I submit a privacy request', async function() {
       .or(this.page.getByRole('button', { name: /login/i }).first());
     
     const loginPromise = this.page.waitForResponse(response => 
-      response.url().includes('/api/v1/auth/login') && response.status() === 200,
+      response.url().includes('/v1/auth/login') && response.status() === 200,
       { timeout: 10000 }
     ).catch(() => null);
     
