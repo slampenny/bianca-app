@@ -631,7 +631,11 @@ class OpenAIRealtimeService {
       const currentState = this.getConversationState(callId);
       if (currentState === CONVERSATION_STATES.WAITING_FOR_GREETING) {
         this.transitionState(callId, CONVERSATION_STATES.GREETING_ACTIVE, 'initial_greeting_triggered');
-      } else if (currentState === CONVERSATION_STATES.GREETING_COMPLETE || currentState === CONVERSATION_STATES.CONVERSATION_ACTIVE) {
+      } else if (
+        currentState === CONVERSATION_STATES.GREETING_COMPLETE ||
+        currentState === CONVERSATION_STATES.CONVERSATION_ACTIVE ||
+        currentState === CONVERSATION_STATES.USER_SPEAKING
+      ) {
         this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'ai_response_triggered');
       }
 

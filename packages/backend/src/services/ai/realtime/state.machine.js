@@ -128,13 +128,21 @@ class StateMachine {
    * Check if we're in a state where AI can respond
    * @param {Object} connection - Connection object
    * @returns {boolean} True if AI can respond
+   *
+   * USER_SPEAKING: required for input_audio_buffer.speech_stopped — after speech_started we are in
+   * USER_SPEAKING until we transition; without this, canAIRespond stays false forever on user turns.
+   *
+   * AI_RESPONDING: speech_stopped transitions USER_SPEAKING → AI_RESPONDING before sendResponseCreate;
+   * sendResponseCreate must still be allowed to perform the WebSocket send in that state.
    */
   static canAIRespond(connection) {
     const state = StateMachine.getCurrentState(connection);
     return [
       CONVERSATION_STATES.WAITING_FOR_GREETING,
       CONVERSATION_STATES.GREETING_COMPLETE,
-      CONVERSATION_STATES.CONVERSATION_ACTIVE
+      CONVERSATION_STATES.CONVERSATION_ACTIVE,
+      CONVERSATION_STATES.USER_SPEAKING,
+      CONVERSATION_STATES.AI_RESPONDING,
     ].includes(state);
   }
 
