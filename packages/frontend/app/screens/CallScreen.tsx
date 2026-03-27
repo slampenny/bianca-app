@@ -12,6 +12,8 @@ import { useGetCallStatusQuery } from "../services/api/callWorkflowApi"
 import { useTheme } from "app/theme/ThemeContext"
 import { logger } from "../utils/logger"
 import { STRINGS, POLLING_INTERVALS } from "../constants"
+import { translate } from "app/i18n"
+import type { CallOnboardingStatus } from "../services/api/callWorkflowApi"
 
 export function CallScreen() {
   const dispatch = useDispatch()
@@ -165,12 +167,45 @@ export function CallScreen() {
     )
   }
 
+  const polledOnboarding = callStatusData?.data?.onboarding as CallOnboardingStatus | undefined
+  const journeyComplete =
+    polledOnboarding?.journeyComplete ?? activeCall?.onboardingJourneyComplete ?? true
+  const isOnboardingCall =
+    polledOnboarding?.isOnboardingCall ?? activeCall?.isOnboardingCall ?? false
+  const onboardingDay =
+    polledOnboarding?.onboardingDay ?? activeCall?.onboardingDay ?? null
+  const sessionsCompleted =
+    polledOnboarding?.sessionsCompleted ?? activeCall?.onboardingSessionsCompleted ?? 0
+  const currentStageDay =
+    polledOnboarding?.currentStageDay ?? activeCall?.onboardingCurrentStageDay ?? null
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Call with {client.name} v1</Text>
       </View>
+
+      {!journeyComplete && (
+        <View style={styles.onboardingBanner} accessibilityRole="summary">
+          <Text style={styles.onboardingBannerTitle}>{translate("callScreen.onboardingTitle")}</Text>
+          <Text style={styles.onboardingBannerBody}>
+            {translate("callScreen.onboardingProgress", { completed: sessionsCompleted })}
+          </Text>
+          {isOnboardingCall && onboardingDay != null ? (
+            <Text style={styles.onboardingBannerBody}>
+              {translate("callScreen.onboardingThisCall", { day: onboardingDay })}
+            </Text>
+          ) : currentStageDay != null ? (
+            <Text style={styles.onboardingBannerBody}>
+              {translate("callScreen.onboardingNextWillBe", { day: currentStageDay })}
+            </Text>
+          ) : null}
+          <Text style={styles.onboardingBannerFootnote}>
+            {translate("callScreen.onboardingNextRegular")}
+          </Text>
+        </View>
+      )}
 
       {/* Call Status Banner - Prominently displayed */}
       {activeCall && activeCall.conversationId && (
@@ -299,6 +334,32 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.palette.biancaHeader,
     fontSize: 20,
     fontWeight: "600",
+  },
+  onboardingBanner: {
+    backgroundColor: colors.palette.accent100 || colors.palette.neutral200,
+    borderBottomColor: colors.palette.biancaBorder,
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  onboardingBannerTitle: {
+    color: colors.palette.biancaHeader,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  onboardingBannerBody: {
+    color: colors.palette.neutral800,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  onboardingBannerFootnote: {
+    color: colors.palette.neutral600,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 4,
+    fontStyle: "italic",
   },
   bannerContainer: {
     paddingHorizontal: 16,

@@ -132,17 +132,16 @@ agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async
     }
     
     // Initiate the retry call (lazy load to avoid circular dependency)
-    const { twilioCallService } = require('../services');
-    const newCallSid = await twilioCallService.initiateCall(clientId);
+    const { voiceTelephonyService } = require('../services');
+    const newCallSid = await voiceTelephonyService.initiateCall(clientId);
     
     // Find the new call record created by initiateCall
     const retryCall = await Call.findOne({ callSid: newCallSid });
     if (retryCall) {
-      // Update retry info
+      // Update retry info (callType + onboardingDay come from initiateCall / journey state)
       retryCall.retryAttempt = retryAttempt;
       retryCall.originalCallId = originalCallId || callId;
       retryCall.maxRetries = maxRetries;
-      retryCall.callType = originalCall.callType || 'wellness-check';
       await retryCall.save();
       
       logger.info(`[Agenda] Updated retry call ${retryCall._id} for original call ${originalCallId || callId}`);
@@ -243,10 +242,10 @@ async function runSchedules() {
     }
 
     try {
-      // Lazy load twilioCallService to avoid circular dependency
-      const { twilioCallService } = require('../services');
+      // Lazy load voiceTelephonyService to avoid circular dependency
+      const { voiceTelephonyService } = require('../services');
       logger.info(`Initiating call for client with ID: ${schedule.client}`);
-      await twilioCallService.initiateCall(schedule.client);
+      await voiceTelephonyService.initiateCall(schedule.client);
 
       await alertService.createAlert({
         message: `Called ${client.name} for their scheduled check-in at ${now.toISOString()}`,

@@ -5,10 +5,36 @@ import { useSelector } from "react-redux"
 import { getClient } from "../store/clientSlice"
 import { useGetClientOnboardingQuery } from "../services/api/clientApi"
 import { useTheme } from "app/theme/ThemeContext"
-import { translate } from "../i18n"
+import { translate, type TxKeyPath } from "../i18n"
 import type { OnboardingResponseRow } from "../services/api/api.types"
 
 const DAYS = [1, 2, 3, 4] as const
+
+type DayFlagKey = "safety" | "memory" | "mood" | "distress" | "confusion"
+
+const FLAG_KEYS_ORDER: DayFlagKey[] = ["safety", "memory", "mood", "distress", "confusion"]
+
+const FLAG_LABEL_KEY: Record<DayFlagKey, TxKeyPath> = {
+  safety: "clientOnboardingScreen.flag.safety",
+  memory: "clientOnboardingScreen.flag.memory",
+  mood: "clientOnboardingScreen.flag.mood",
+  distress: "clientOnboardingScreen.flag.distress",
+  confusion: "clientOnboardingScreen.flag.confusion",
+}
+
+function aggregateFlagsForDay(responses: OnboardingResponseRow[]): DayFlagKey[] | null {
+  if (!responses.length) return null
+  const on = new Set<DayFlagKey>()
+  for (const r of responses) {
+    if (r.safety_flag) on.add("safety")
+    if (r.memory_flag) on.add("memory")
+    if (r.mood_flag) on.add("mood")
+    if (r.distress_flag) on.add("distress")
+    if (r.confusion_flag) on.add("confusion")
+  }
+  if (on.size === 0) return null
+  return FLAG_KEYS_ORDER.filter((k) => on.has(k))
+}
 
 export function ClientOnboardingScreen() {
   const client = useSelector(getClient)
@@ -21,6 +47,12 @@ export function ClientOnboardingScreen() {
   )
 
   const styles = useMemo(() => createStyles(colors), [colors])
+
+  const activeDayFlags = useMemo(() => {
+    if (filterDay == null || !data?.responses?.length) return null
+    const rowsForDay = data.responses.filter((r) => r.dayNumber === filterDay)
+    return aggregateFlagsForDay(rowsForDay)
+  }, [filterDay, data?.responses])
 
   const renderRow = ({ item }: { item: OnboardingResponseRow }) => (
     <Card
@@ -95,25 +127,20 @@ export function ClientOnboardingScreen() {
         ))}
       </View>
 
-      {data?.flags && (
-        <View style={styles.flagRow}>
-          <View style={[styles.flagChip, data.flags.safety ? styles.flagOn : styles.flagOff]}>
-            <Text size="xxs">{translate("clientOnboardingScreen.flag.safety")}</Text>
-          </View>
-          <View style={[styles.flagChip, data.flags.memory ? styles.flagOn : styles.flagOff]}>
-            <Text size="xxs">{translate("clientOnboardingScreen.flag.memory")}</Text>
-          </View>
-          <View style={[styles.flagChip, data.flags.mood ? styles.flagOn : styles.flagOff]}>
-            <Text size="xxs">{translate("clientOnboardingScreen.flag.mood")}</Text>
-          </View>
-          <View style={[styles.flagChip, data.flags.distress ? styles.flagOn : styles.flagOff]}>
-            <Text size="xxs">{translate("clientOnboardingScreen.flag.distress")}</Text>
-          </View>
-          <View style={[styles.flagChip, data.flags.confusion ? styles.flagOn : styles.flagOff]}>
-            <Text size="xxs">{translate("clientOnboardingScreen.flag.confusion")}</Text>
+      {filterDay != null && activeDayFlags != null && activeDayFlags.length > 0 ? (
+        <View style={styles.flagSection}>
+          <Text style={styles.flagSectionLabel}>
+            {translate("clientOnboardingScreen.signalsForDay", { day: String(filterDay) })}
+          </Text>
+          <View style={styles.flagRow}>
+            {activeDayFlags.map((key) => (
+              <View key={key} style={[styles.flagChip, styles.flagOn]}>
+                <Text size="xxs">{translate(FLAG_LABEL_KEY[key])}</Text>
+              </View>
+            ))}
           </View>
         </View>
-      )}
+      ) : null}
 
       {isLoading && <Text>{translate("clientOnboardingScreen.loading")}</Text>}
       {error && <Text style={styles.err}>{translate("clientOnboardingScreen.error")}</Text>}
@@ -149,7 +176,14 @@ function createStyles(colors: any) {
     centered: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
     title: { marginBottom: 4 },
     subtitle: { color: colors.palette.neutral600, marginBottom: 12 },
-    flagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4, marginBottom: 12 },
+    flagSection: { marginTop: 4, marginBottom: 12 },
+    flagSectionLabel: {
+      color: colors.palette.neutral600,
+      fontSize: 13,
+      fontWeight: "600",
+      marginBottom: 8,
+    },
+    flagRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     flagChip: {
       paddingHorizontal: 10,
       paddingVertical: 6,
@@ -158,7 +192,6 @@ function createStyles(colors: any) {
       borderColor: colors.palette.neutral400,
     },
     flagOn: { backgroundColor: colors.palette.angry100 || "#fee2e2" },
-    flagOff: { opacity: 0.5 },
     filterLabel: { marginBottom: 8, fontWeight: "600" },
     dayRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
     dayChip: {

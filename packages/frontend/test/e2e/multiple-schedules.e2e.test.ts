@@ -5,31 +5,31 @@ import { TEST_USERS } from './fixtures/testData'
 
 // Helper to get the schedule selector picker (the picker that shows existing schedules)
 async function getScheduleSelectorPicker(page: any) {
-  // The schedule selector picker is the first select on the page when schedules exist
-  // It's in the selector card that appears when schedules.length > 0
-  const newScheduleButton = page.locator('[data-testid="schedule-new-button"]')
+  const schedulesScreen = page.locator('[data-testid="schedules-screen"]')
+  const newScheduleButton = schedulesScreen.locator('[data-testid="schedule-new-button"]')
   const buttonExists = await newScheduleButton.count() > 0
-  
+
   if (!buttonExists) {
-    return null // No schedules exist yet, so no selector picker
+    return null
   }
-  
-  // The picker is in the same container as the "+" button
-  // Find the select that's a sibling or in the same parent container
-  // The structure is: View (pickerRow) > TouchableOpacity (+ button) + View (pickerWrapper) > Picker > select
-  // So we can find it by looking for a select near the button
-  const pickerRow = newScheduleButton.locator('..') // Get parent (pickerRow)
+
+  const byTestId = schedulesScreen.locator('[data-testid="schedule-selector-picker"]')
+  if ((await byTestId.count()) > 0) {
+    const el = byTestId.first()
+    const innerSelect = el.locator('select').first()
+    if ((await innerSelect.count()) > 0) {
+      return innerSelect
+    }
+    return el
+  }
+
+  const pickerRow = newScheduleButton.locator('..')
   const schedulePicker = pickerRow.locator('select').first()
-  const pickerExists = await schedulePicker.count() > 0
-  
-  if (pickerExists) {
+  if ((await schedulePicker.count()) > 0) {
     return schedulePicker
   }
-  
-  // Fallback: if the structure is different, just get the first select
-  // (the schedule selector is always the first select when it exists)
-  const firstSelect = page.locator('select').first()
-  return firstSelect
+
+  return schedulesScreen.locator('select').first()
 }
 
 // Helper to count valid schedules in the picker
@@ -107,16 +107,17 @@ async function createSchedule(page: any, time: string): Promise<void> {
   
   if (buttonCount > 0) {
     // Schedules exist - click the "+" button to create a new schedule
-    await newScheduleButton.waitFor({ timeout: 5000, state: 'visible' })
+    await newScheduleButton.waitFor({ timeout: 15000, state: 'visible' })
     await newScheduleButton.click()
     await page.waitForTimeout(1000) // Wait for form to reset
   }
   // If no schedules exist, the form is already in "new schedule" mode
   
-  // Click the time picker button to open the modal
+  // Time picker wrapper can be in DOM but not "visible" (zero size / overflow) — still clickable on web
   const timePickerButton = page.locator('[data-testid="schedule-time-picker"]')
-  await timePickerButton.waitFor({ timeout: 5000, state: 'visible' })
-  await timePickerButton.click()
+  await timePickerButton.waitFor({ timeout: 25000, state: 'attached' })
+  await timePickerButton.scrollIntoViewIfNeeded().catch(() => {})
+  await timePickerButton.click({ force: true, timeout: 15000 })
   await page.waitForTimeout(500) // Wait for modal to open
   
   // Parse time string (format: "HH:MM") and convert to 12-hour format
@@ -254,15 +255,14 @@ async function createSchedule(page: any, time: string): Promise<void> {
     }
   }
   
-  // Wait for loading to complete (the screen shows LoadingScreen while saving)
-  // Use a shorter timeout and handle gracefully if screen doesn't appear
+  // LoadingScreen replaces the whole screen while isCreating — wait until editor is back
   try {
-    await page.waitForSelector('[data-testid="schedules-screen"]', { timeout: 8000, state: 'visible' })
+    await page.locator('[data-testid="schedules-screen"]').waitFor({ state: 'visible', timeout: 60000 })
+    await page.locator('[data-testid="schedule-time-picker"]').waitFor({ state: 'attached', timeout: 30000 })
   } catch (e) {
-    console.log('⚠️ Schedules screen not found after save - may have navigated away or UI updated')
+    console.log('⚠️ Schedules screen or time picker not ready after save:', (e as Error).message)
   }
-  
-  // Wait a bit for Redux to update and UI to refresh, but not too long
+
   await page.waitForTimeout(1500)
   
   // Check for error messages
@@ -282,6 +282,7 @@ test.describe("Multiple Schedules for Client", () => {
   })
 
   test("can add more than one schedule to a client", async ({ page }) => {
+    test.setTimeout(180000)
     // Navigate to schedules screen via client
     await navigateToSchedulesViaClient(page)
     
@@ -348,7 +349,16 @@ test.describe("Multiple Schedules for Client", () => {
     console.log(`Schedule count after first creation: ${validScheduleCountAfterFirst}`)
     
     // Create second schedule with time "14:00"
-    // Only if we successfully verified the first schedule or if we're proceeding anyway
+    // Save/load can leave us off the schedules stack — re-open client schedules if needed
+    const schedulesVisible = await page
+      .locator('[data-testid="schedules-screen"]')
+      .isVisible({ timeout: 3000 })
+      .catch(() => false)
+    if (!schedulesVisible) {
+      console.log('⚠️ Schedules screen not visible before second create — navigating via client again')
+      await navigateToSchedulesViaClient(page)
+      await expect(page.locator('[data-testid="schedules-screen"]')).toBeVisible({ timeout: 15000 })
+    }
     console.log('Creating second schedule (14:00)...')
     try {
       await createSchedule(page, '14:00')

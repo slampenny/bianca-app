@@ -367,6 +367,7 @@ export const SchedulesScreen = () => {
                 </TouchableOpacity>
                 <View style={styles.pickerWrapper}>
                   <Picker
+                    testID="schedule-selector-picker"
                     key={`schedule-picker-${schedules.length}-${schedules.map(s => s.id).join('-')}`}
                     selectedValue={selectedSchedule?.id || undefined}
                     onValueChange={(itemValue) => {

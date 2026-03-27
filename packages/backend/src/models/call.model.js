@@ -15,7 +15,7 @@ const callSchema = mongoose.Schema(
     },
     callType: {
       type: String,
-      enum: ['inbound', 'outbound', 'wellness-check', 'follow-up'],
+      enum: ['inbound', 'outbound', 'wellness-check', 'follow-up', 'onboarding'],
       default: 'outbound',
     },
     status: {

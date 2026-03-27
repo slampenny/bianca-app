@@ -193,6 +193,13 @@ export function HomeScreen() {
         caregiverName: response.caregiverName,
         status: response.status || 'initiated',
         callStatus: response.callStatus,
+        callType: response.callType,
+        onboardingDay: response.onboardingDay,
+        onboardingJourneyComplete: response.onboardingJourneyComplete,
+        onboardingSessionsCompleted: response.onboardingSessionsCompleted,
+        onboardingCurrentStageDay: response.onboardingCurrentStageDay,
+        nextOutboundWillBeOnboarding: response.nextOutboundWillBeOnboarding,
+        isOnboardingCall: response.isOnboardingCall,
       }))
       
       // Navigate to dedicated call screen

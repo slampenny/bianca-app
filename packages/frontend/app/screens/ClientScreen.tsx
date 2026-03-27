@@ -583,17 +583,36 @@ function ClientScreen() {
                   textStyle={styles.onboardingButtonText}
                 />
               ) : onboardingData ? (
-                <Button
-                  onPress={handleViewOnboarding}
-                  disabled={isLoading}
-                  text={onboardingButtonCompactLine(onboardingData)}
-                  testID="view-onboarding-responses-button"
-                  preset={hasAlertsForClient ? "danger" : "success"}
-                  accessibilityLabel={onboardingButtonCompactLine(onboardingData)}
-                  accessibilityHint={translate("clientScreen.onboardingButtonA11yHint")}
-                  style={[styles.button, styles.manageButton, styles.onboardingButton]}
-                  textStyle={styles.onboardingButtonText}
-                />
+                <View>
+                  {!onboardingData.journey.journeyComplete ? (
+                    <View style={styles.onboardingCopyBlock}>
+                      <Text style={styles.onboardingSectionTitle}>
+                        {translate("clientScreen.onboardingCardTitle")}
+                      </Text>
+                      <Text style={styles.onboardingHint}>
+                        {translate("clientScreen.onboardingCallsCompleted", {
+                          completed: onboardingData.journey.sessionsCompletedCount,
+                        })}
+                      </Text>
+                      <Text style={styles.onboardingHint}>
+                        {translate("clientScreen.onboardingOutboundCallsHint", {
+                          day: onboardingData.journey.currentDay ?? 1,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Button
+                    onPress={handleViewOnboarding}
+                    disabled={isLoading}
+                    text={onboardingButtonCompactLine(onboardingData)}
+                    testID="view-onboarding-responses-button"
+                    preset={hasAlertsForClient ? "danger" : "success"}
+                    accessibilityLabel={onboardingButtonCompactLine(onboardingData)}
+                    accessibilityHint={translate("clientScreen.onboardingButtonA11yHint")}
+                    style={[styles.button, styles.manageButton, styles.onboardingButton]}
+                    textStyle={styles.onboardingButtonText}
+                  />
+                </View>
               ) : null}
             </View>
           ) : null}
@@ -791,6 +810,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: colors.palette.neutral300,
+  },
+  onboardingCopyBlock: {
+    marginBottom: 10,
+  },
+  onboardingSectionTitle: {
+    color: colors.palette.biancaHeader,
+    fontSize: 15,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  onboardingHint: {
+    color: colors.palette.neutral600,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 6,
   },
   onboardingButton: {
     marginTop: 4,

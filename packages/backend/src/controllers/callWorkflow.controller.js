@@ -1,7 +1,8 @@
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { conversationService, twilioCallService, clientService, caregiverService } = require('../services');
+const { conversationService, voiceTelephonyService, clientService, caregiverService } = require('../services');
+const onboardingService = require('../services/onboarding.service');
 const { ConversationDTO } = require('../dtos');
 const { Call, Conversation } = require('../models');
 const logger = require('../config/logger');
@@ -30,7 +31,13 @@ const initiateCall = catchAsync(async (req, res) => {
   }
 
   try {
-    const callSid = await twilioCallService.initiateCall(client.id);
+    const onboardingDash = await onboardingService.getDashboardForClient(client._id);
+    const nextOnboardingDay =
+      !onboardingDash.journey.journeyComplete && onboardingDash.journey.currentDay != null
+        ? onboardingDash.journey.currentDay
+        : null;
+
+    const callSid = await voiceTelephonyService.initiateCall(client.id);
     let call = await Call.findOne({ callSid });
     if (!call) {
       call = await Call.create({
@@ -38,10 +45,15 @@ const initiateCall = catchAsync(async (req, res) => {
         clientId: client.id,
         startTime: new Date(),
         callStartTime: new Date(),
-        callType: 'outbound',
+        callType: nextOnboardingDay != null ? 'onboarding' : 'outbound',
+        ...(nextOnboardingDay != null ? { onboardingDay: nextOnboardingDay } : {}),
         status: 'initiated',
         callStatus: 'initiating',
       });
+    } else if (nextOnboardingDay != null && (call.onboardingDay == null || call.onboardingDay < 1)) {
+      call.onboardingDay = nextOnboardingDay;
+      call.callType = 'onboarding';
+      await call.save();
     }
     
     // Add call workflow-specific fields
@@ -49,7 +61,9 @@ const initiateCall = catchAsync(async (req, res) => {
     call.callNotes = callNotes;
     call.status = 'in-progress';
     call.callStatus = 'ringing';
-    call.callType = 'outbound';
+    if (call.callType !== 'onboarding') {
+      call.callType = 'outbound';
+    }
     await call.save();
     
     // Create Conversation immediately when call is initiated
@@ -70,6 +84,8 @@ const initiateCall = catchAsync(async (req, res) => {
 
     logger.info(`[CallWorkflow] Call initiated for client ${client.name}, SID: ${callSid}, Conversation: ${conversation._id}`);
 
+    const isOnboardingCall = !!(call.onboardingDay >= 1 && call.onboardingDay <= 4);
+
     res.status(httpStatus.CREATED).send({
       callId: call._id.toString(),
       callSid,
@@ -83,6 +99,13 @@ const initiateCall = catchAsync(async (req, res) => {
       caregiverName: initiatingCaregiver.name,
       status: call.status,
       callStatus: call.callStatus,
+      callType: call.callType,
+      onboardingDay: call.onboardingDay ?? null,
+      onboardingJourneyComplete: onboardingDash.journey.journeyComplete,
+      onboardingSessionsCompleted: onboardingDash.journey.sessionsCompletedCount,
+      onboardingCurrentStageDay: onboardingDash.journey.currentDay,
+      nextOutboundWillBeOnboarding: !onboardingDash.journey.journeyComplete,
+      isOnboardingCall,
     });
 
   } catch (error) {
@@ -206,6 +229,10 @@ const getCallStatus = catchAsync(async (req, res) => {
     }
   }
   
+  const clientMongoId = call.clientId?._id || call.clientId;
+  const onboardingDash = await onboardingService.getDashboardForClient(clientMongoId);
+  const isOnboardingCall = !!(call.onboardingDay >= 1 && call.onboardingDay <= 4);
+
   const status = {
     conversationId: conversation._id,
     callId: call._id,
@@ -220,7 +247,16 @@ const getCallStatus = catchAsync(async (req, res) => {
     // Include all messages (patient and assistant) for live call display
     messages: messages,
     // Include AI speaking status
-    aiSpeaking: aiSpeakingStatus
+    aiSpeaking: aiSpeakingStatus,
+    callType: call.callType,
+    onboarding: {
+      isOnboardingCall,
+      onboardingDay: call.onboardingDay ?? null,
+      journeyComplete: onboardingDash.journey.journeyComplete,
+      sessionsCompleted: onboardingDash.journey.sessionsCompletedCount,
+      currentStageDay: onboardingDash.journey.currentDay,
+      nextOutboundWillBeOnboarding: !onboardingDash.journey.journeyComplete,
+    },
   };
   
   res.status(httpStatus.OK).send({ data: status });
@@ -368,7 +404,7 @@ const endCall = catchAsync(async (req, res) => {
       if (call.callSid) {
         try {
           logger.info(`[CallWorkflow] Attempting to hang up Twilio call ${call.callSid}`);
-          await twilioCallService.hangupCall(call.callSid);
+          await voiceTelephonyService.hangupCall(call.callSid);
           logger.info(`[CallWorkflow] Successfully hung up Twilio call ${call.callSid}`);
         } catch (err) {
           logger.error(`[CallWorkflow] FAILED to hang up Twilio call ${call.callSid}: ${err.message}`);
@@ -410,7 +446,7 @@ const endCall = catchAsync(async (req, res) => {
       
       if (call.callSid) {
         try {
-          await twilioCallService.hangupCall(call.callSid);
+          await voiceTelephonyService.hangupCall(call.callSid);
           logger.info(`[CallWorkflow] Hung up Twilio call ${call.callSid} (fallback)`);
         } catch (err) {
           logger.error(`[CallWorkflow] Error hanging up Twilio call (fallback): ${err.message}`);

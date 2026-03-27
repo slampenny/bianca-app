@@ -1,7 +1,7 @@
 // controllers/twilioCall.controller.js
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
-const { twilioCallService } = require('../services');
+const { voiceTelephonyService } = require('../services');
 const logger = require('../config/logger');
 
 // Controller to initiate the call
@@ -13,7 +13,7 @@ const initiateCall = catchAsync(async (req, res) => {
     return res.status(httpStatus.BAD_REQUEST).send({ message: 'Patient ID is required' });
   }
   
-  await twilioCallService.initiateCall(clientId);
+  await voiceTelephonyService.initiateCall(clientId);
   logger.info(`[Controller] Call initiation request processed for clientId: ${clientId}`);
   
   res.status(httpStatus.OK).json({ message: 'Call initiated successfully' });
@@ -24,7 +24,7 @@ const handleStartCall = (req, res) => {
   logger.info(`[Controller] handleStartCall invoked. CallSid: ${req.body.CallSid}`);
   
   // This service function generates TwiML with <Dial><Sip> to connect to Asterisk
-  const twiml = twilioCallService.generateCallTwiML(req);
+  const twiml = voiceTelephonyService.generateCallTwiML(req);
   
   res.type('text/xml');
   res.send(twiml);
@@ -35,7 +35,7 @@ const handleCallStatus = catchAsync(async (req, res) => {
   logger.info(`[Controller] Call-Status invoked. CallSid: ${req.body.CallSid}, Status: ${req.body.CallStatus}`);
   
   // Service function performs cleanup, summarization, etc.
-  await twilioCallService.handleCallStatus(req);
+  await voiceTelephonyService.handleCallStatus(req);
   
   // Acknowledge Twilio's status callback with an empty TwiML response
   logger.info(`[Controller] Call-Status processing complete for CallSid: ${req.body.CallSid}. Sending ACK response.`);
