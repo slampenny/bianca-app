@@ -104,7 +104,7 @@ afterAll(async () => {
 
 // Use real services - they'll use the mocked external dependencies
 const callWorkflowController = require('../../../src/controllers/callWorkflow.controller');
-const { conversationService, twilioCallService, clientService, caregiverService } = require('../../../src/services');
+const { conversationService, voiceTelephonyService, clientService, caregiverService } = require('../../../src/services');
 
 describe('CallWorkflow Controller - Initiate Call', () => {
   let req;
@@ -150,7 +150,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     // Mock services
     jest.spyOn(clientService, 'getClientById').mockResolvedValue(patient);
     jest.spyOn(caregiverService, 'getCaregiverById').mockResolvedValue(agent);
-    jest.spyOn(twilioCallService, 'initiateCall').mockResolvedValue('CA1234567890abcdef');
+    jest.spyOn(voiceTelephonyService, 'initiateCall').mockResolvedValue('CA1234567890abcdef');
 
     // Mock request and response
     req = {
@@ -255,8 +255,8 @@ describe('CallWorkflow Controller - Initiate Call', () => {
       existingCall.conversationId = existingConversation._id;
       await existingCall.save();
 
-      // Mock twilioCallService to return the same callSid
-      jest.spyOn(twilioCallService, 'initiateCall').mockResolvedValue('CA1234567890abcdef');
+      // Mock voiceTelephonyService to return the same callSid
+      jest.spyOn(voiceTelephonyService, 'initiateCall').mockResolvedValue('CA1234567890abcdef');
 
       await callWorkflowController.initiateCall(req, res, next);
 
@@ -270,7 +270,7 @@ describe('CallWorkflow Controller - Initiate Call', () => {
     });
 
     it('should handle Twilio service errors gracefully', async () => {
-      jest.spyOn(twilioCallService, 'initiateCall').mockRejectedValue(new Error('Twilio API error'));
+      jest.spyOn(voiceTelephonyService, 'initiateCall').mockRejectedValue(new Error('Twilio API error'));
 
       await callWorkflowController.initiateCall(req, res, next);
 
@@ -370,7 +370,7 @@ describe('CallWorkflow Controller - End Call', () => {
 
   describe('endCall', () => {
     it('should hang up Twilio call when ending a call', async () => {
-      const hangupSpy = jest.spyOn(twilioCallService, 'hangupCall');
+      const hangupSpy = jest.spyOn(voiceTelephonyService, 'hangupCall');
       
       await callWorkflowController.endCall(req, res, next);
 
@@ -425,7 +425,7 @@ describe('CallWorkflow Controller - End Call', () => {
         webSocket: { close: jest.fn(), readyState: 1 }
       });
 
-      const hangupSpy = jest.spyOn(twilioCallService, 'hangupCall');
+      const hangupSpy = jest.spyOn(voiceTelephonyService, 'hangupCall');
       
       await callWorkflowController.endCall(req, res, next);
 
@@ -438,7 +438,7 @@ describe('CallWorkflow Controller - End Call', () => {
     });
 
     it('should handle Twilio hangup errors gracefully', async () => {
-      jest.spyOn(twilioCallService, 'hangupCall').mockRejectedValueOnce(new Error('Twilio API error'));
+      jest.spyOn(voiceTelephonyService, 'hangupCall').mockRejectedValueOnce(new Error('Twilio API error'));
 
       await callWorkflowController.endCall(req, res, next);
 

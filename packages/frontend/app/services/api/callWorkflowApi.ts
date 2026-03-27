@@ -17,6 +17,13 @@ export interface InitiateCallResponse {
   caregiverName: string
   status: string
   callStatus?: string
+  callType?: string
+  onboardingDay?: number | null
+  onboardingJourneyComplete?: boolean
+  onboardingSessionsCompleted?: number
+  onboardingCurrentStageDay?: number | null
+  nextOutboundWillBeOnboarding?: boolean
+  isOnboardingCall?: boolean
 }
 
 export interface ConversationIdResponse {
@@ -24,6 +31,15 @@ export interface ConversationIdResponse {
   callSid: string
   conversationId: string | null
   hasConversation: boolean
+}
+
+export interface CallOnboardingStatus {
+  isOnboardingCall: boolean
+  onboardingDay: number | null
+  journeyComplete: boolean
+  sessionsCompleted: number
+  currentStageDay: number | null
+  nextOutboundWillBeOnboarding: boolean
 }
 
 export interface CallStatusResponse {
@@ -43,6 +59,8 @@ export interface CallStatusResponse {
   }
   callOutcome?: string
   callNotes?: string
+  callType?: string
+  onboarding?: CallOnboardingStatus
   aiSpeaking?: boolean | { isSpeaking?: boolean; userIsSpeaking?: boolean; conversationState?: string }
   messages?: Array<{ id?: string; role: string; content: string; createdAt?: string }>
 }

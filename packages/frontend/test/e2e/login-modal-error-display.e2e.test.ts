@@ -96,14 +96,14 @@ test.describe('Login Modal Error Display', () => {
       return // Test passes - fix is correct even if modal doesn't appear in test
     }
     
-    // Modal appeared! Now test the error display
-    // WHEN: I attempt to login with email/password for the SSO-only account
-    // Use data-testid for TextField inputs (TextField needs input[data-testid="..."] pattern)
-    const emailInput = page.locator('input[data-testid="email-input"]')
-    const passwordInput = page.locator('input[data-testid="password-input"]')
-    const loginButton = page.getByTestId('login-button')
-    
-    await emailInput.waitFor({ state: 'visible', timeout: 5000 })
+    // Modal appeared! Scope to auth-modal so we do not hit a hidden login-button elsewhere on the page.
+    const authModal = page.getByTestId('auth-modal')
+    await authModal.waitFor({ state: 'visible', timeout: 15000 })
+    const emailInput = authModal.locator('input[data-testid="email-input"]')
+    const passwordInput = authModal.locator('input[data-testid="password-input"]')
+    const loginButton = authModal.getByTestId('login-button')
+
+    await emailInput.waitFor({ state: 'visible', timeout: 10000 })
     await emailInput.fill('sso-unlinked@example.org')
     await passwordInput.fill('SomePassword123')
     await loginButton.click()

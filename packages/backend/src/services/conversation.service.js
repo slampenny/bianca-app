@@ -8,6 +8,7 @@ const logger = require('../config/logger');
     const { langChainAPI } = require('../api/langChainAPI');
 const { prompts } = require('../templates/prompts'); // Original Bianca system prompt
 const { prompts: refinedPrompts } = require('../templates/prompts.refined'); // Refined prompt with voice-first rules
+const { computeConversationEngagementMetrics } = require('./conversationEngagement.service');
 
 // ===== CONVERSATION METHODS =====
 const createConversationForClient = async (clientId, callId) => {
@@ -253,16 +254,51 @@ const getLanguageName = (languageCode) => {
 
 /**
  * Build enhanced prompt using your existing Bianca system prompt + client context
+ * @param {string} clientId
+ * @param {string} [callType]
+ * @param {{ onboardingDay?: 1|2|3|4 }} [options]
  */
-const buildEnhancedPrompt = async (clientId, callType = 'inbound') => {
+const buildEnhancedPrompt = async (clientId, callType = 'inbound', options = {}) => {
   try {
+    const onboardingDay =
+      options.onboardingDay >= 1 && options.onboardingDay <= 4 ? options.onboardingDay : null;
+
     // Get client info
     const client = await Client.findById(clientId)
-      .select('name preferredName medicalConditions allergies currentMedications age preferredLanguage')
+      .select('name preferredName medicalConditions allergies currentMedications age preferredLanguage org')
+      .populate('org', 'name')
       .lean();
 
     if (!client) {
       throw new ApiError(httpStatus.NOT_FOUND, `Client ${clientId} not found`);
+    }
+
+    if (onboardingDay) {
+      const { buildOnboardingInstructions } = require('../templates/onboardingPrompts');
+      const facilityName = client.org?.name || 'your care team';
+      const residentName = client.preferredName || client.name || '';
+      let enhancedPrompt = refinedPrompts.system.content;
+      enhancedPrompt += `\n\nCurrent Client Context:
+- Client Name: ${client.name}
+- Preferred Name: ${residentName}`;
+      if (client.age) {
+        enhancedPrompt += `\n- Age: ${client.age}`;
+      }
+      const preferredLanguage = client.preferredLanguage || 'en';
+      const languageName = getLanguageName(preferredLanguage);
+      if (preferredLanguage !== 'en') {
+        enhancedPrompt += `\n\nIMPORTANT LANGUAGE INSTRUCTION:
+- The client's preferred language is: ${languageName}
+- You MUST communicate exclusively in ${languageName} throughout this entire conversation
+- Do not switch to English unless the client explicitly asks you to
+- Use natural, conversational ${languageName} appropriate for the client's age and context`;
+      } else {
+        enhancedPrompt += `\n\nLanguage: Communicate in English as usual.`;
+      }
+      enhancedPrompt += `\n\n=== ONBOARDING SESSION (step ${onboardingDay} of 4) ===\n`;
+      enhancedPrompt += buildOnboardingInstructions(onboardingDay, { residentName, facilityName });
+      logger.info(`[Enhanced Prompt] Onboarding day ${onboardingDay} for client ${client.name}`);
+      return enhancedPrompt;
     }
 
     let clientFacts = [];
@@ -455,6 +491,17 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       }
     }
 
+    const conversationEngagement =
+      messages && messages.length > 0
+        ? computeConversationEngagementMetrics(
+            messages.map((m) => ({ role: m.role, content: m.content }))
+          )
+        : null;
+
+    if (conversationEngagement && conversationEngagement.lastTurnDeadEnd === true) {
+      logger.info(`[Finalize] Conversation ${conversationId} last assistant turn tagged as dead-end (no question/callback/invitation)`);
+    }
+
     // Determine user domain
     let userDomain = 'client wellness conversation';
     if (conversation.clientId?.age >= 65) {
@@ -509,6 +556,13 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       updateData['analyzedData.sentimentAnalyzedAt'] = new Date();
     }
 
+    if (conversationEngagement) {
+      updateData['analyzedData.conversationEngagement'] = {
+        ...conversationEngagement,
+        computedAt: new Date(),
+      };
+    }
+
     await Conversation.findByIdAndUpdate(conversationId, updateData);
     
     // Update the associated Call's endTime instead of Conversation
@@ -551,7 +605,8 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     
     return {
       summary,
-      sentimentAnalysis: sentimentAnalysis && sentimentAnalysis.success ? sentimentAnalysis.data : null
+      sentimentAnalysis: sentimentAnalysis && sentimentAnalysis.success ? sentimentAnalysis.data : null,
+      conversationEngagement,
     };
 
   } catch (err) {
@@ -570,7 +625,8 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     
     return {
       summary: 'Summary generation failed - manual review needed',
-      sentimentAnalysis: null
+      sentimentAnalysis: null,
+      conversationEngagement: null,
     };
   }
 };

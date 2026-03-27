@@ -375,8 +375,9 @@ export function AlertScreen() {
             }}
             style={styles.tabButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityLabel={translate("alertScreen.unreadAlerts")}
+            testID="alert-tab-unread"
           >
             <View style={styles.tabButtonContent}>
               <Text style={styles.tabText}>
@@ -395,6 +396,7 @@ export function AlertScreen() {
             accessibilityRole="tab"
             accessibilityLabel={translate("alertScreen.allAlerts") || "All alerts"}
             accessibilityState={{ selected: !showUnread }}
+            testID="alert-tab-all"
           >
             <View style={styles.tabButtonContent}>
               <Text style={styles.tabText}>

@@ -370,9 +370,11 @@ describe('Twilio SMS Service', () => {
   });
 
 
-  describe('Singleton instance', () => {
-    test('should export singleton instance', () => {
-      expect(twilioSmsService).toBeInstanceOf(TwilioSMSService);
+  describe('Singleton / facade export', () => {
+    test('should export shared SMS facade with the same API as the Twilio provider', () => {
+      expect(twilioSmsService).toBeDefined();
+      expect(typeof twilioSmsService.sendSMS).toBe('function');
+      expect(typeof twilioSmsService.formatPhoneNumber).toBe('function');
     });
   });
 });

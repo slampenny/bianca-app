@@ -145,7 +145,12 @@ export const AuthModalProvider: React.FC<AuthModalProviderProps> = ({ children }
           style={styles.modalContainer}
         >
           <Pressable style={styles.overlay} onPress={hideAuthModal}>
-            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <Pressable
+              style={styles.modalContent}
+              onPress={(e) => e.stopPropagation()}
+              testID="auth-modal"
+              accessibilityLabel="auth-modal"
+            >
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Please Sign In</Text>
                 <Pressable onPress={hideAuthModal} style={styles.closeButton}>

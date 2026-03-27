@@ -272,6 +272,18 @@ const en = {
     onboardingButtonCompactComplete: "Onboarding · Complete",
     onboardingButtonCompactDay: "Onboarding · Day {{day}}",
     onboardingButtonA11yHint: "Opens onboarding responses and journey details for this client.",
+    onboardingOutboundCallsHint:
+      "Outbound calls from Home or the schedule use the onboarding conversation for session {{day}} until that session completes on the phone. No answer means no progress — the next call stays on the same session.",
+  },
+  callScreen: {
+    onboardingTitle: "Resident onboarding",
+    onboardingThisCall:
+      "This call is onboarding session {{day}} of 4. The journey advances when the resident answers and the session completes.",
+    onboardingProgress: "{{completed}} of 4 onboarding sessions completed.",
+    onboardingNextRegular:
+      "After onboarding finishes, check-ins will use the usual wellness format.",
+    onboardingNextWillBe:
+      "Until onboarding is complete, the next outbound call will continue onboarding (session {{day}}).",
   },
   clientOnboardingScreen: {
     title: "Onboarding responses",
@@ -284,6 +296,7 @@ const en = {
     captureCount: "{{count}} captures",
     emptyAllDays: "No onboarding responses recorded yet.",
     emptyForDay: "Day {{day}} onboarding hasn't been completed yet.",
+    signalsForDay: "Signals recorded on day {{day}}",
     flag: {
       safety: "Safety",
       memory: "Memory",
