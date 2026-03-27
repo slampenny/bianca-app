@@ -652,12 +652,10 @@ class OpenAIRealtimeService {
                 const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
                   ? Date.now() - currentConn._initialGreetingCompletedAt 
                   : Infinity;
-                const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
-
-                if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
                   logger.info(
                     `[OpenAI Realtime] Skipping timeout recovery for ${callId} - in grace period ` +
-                    `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                    `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
                   );
                   return;
                 }
@@ -692,12 +690,10 @@ class OpenAIRealtimeService {
                   const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
                     ? Date.now() - currentConn._initialGreetingCompletedAt 
                     : Infinity;
-                  const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
-
-                  if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                  if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
                     logger.info(
                       `[OpenAI Realtime] Skipping aggressive timeout recovery for ${callId} - in grace period ` +
-                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
                     );
                     return;
                   }
@@ -992,12 +988,10 @@ class OpenAIRealtimeService {
               const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
                 ? Date.now() - currentConn._initialGreetingCompletedAt 
                 : Infinity;
-              const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
-
-              if (timeSinceGreeting < GRACE_PERIOD_MS) {
+              if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
                 logger.info(
                   `[OpenAI Realtime] Skipping reconnection recovery for ${callId} - in grace period ` +
-                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
                 );
               } else {
                 logger.info(`[OpenAI Realtime] Auto-triggering response generation after recovery for ${callId}`);
@@ -3484,12 +3478,10 @@ class OpenAIRealtimeService {
             const timeSinceGreeting = conn._initialGreetingCompletedAt 
               ? Date.now() - conn._initialGreetingCompletedAt 
               : Infinity;
-            const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
-
-            if (timeSinceGreeting < GRACE_PERIOD_MS) {
+            if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
               logger.info(
                 `[OpenAI Realtime] Skipping force recovery for ${callId} - in grace period ` +
-                `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
               );
             } else {
               logger.info(`[OpenAI Realtime] Auto-triggering response generation after force recovery for ${callId}`);

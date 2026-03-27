@@ -20,6 +20,8 @@ module.exports = {
   MAX_CONSECUTIVE_SILENCE_CHUNKS: 50,
   SPEECH_END_SILENCE_MS: 1000, // Aligned with OpenAI turn_detection silence floor (≥1s before end-of-speech)
   MIN_SPEECH_DURATION_MS: 800, // Conservative: 800ms instead of 500ms
-  GRACE_PERIOD_MS: 3000, // Grace period after greeting completion
+  // After initial voice greeting: ignore speech_stopped so bridge/echo doesn’t trigger a reply.
+  // Keep short — long windows feel like Bianca ignores the first real answer.
+  GRACE_PERIOD_MS: 1000,
 };
 
