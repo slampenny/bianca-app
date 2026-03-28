@@ -1,6 +1,9 @@
 # Dependencies
 logs
 node_modules
+
+# Vite / web package build output
+packages/web/dist
 uploads/
 .terraform/
 .terraform.lock.hcl

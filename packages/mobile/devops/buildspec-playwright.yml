@@ -1,0 +1,697 @@
+version: 0.2
+
+# CRITICAL: This buildspec is used by the RunTests stage (staging AND production pipelines).
+# NODE_ENV=test ensures tests use test configuration (Ethereal Mail, test DB, etc.)
+# This is DIFFERENT from staging deploy which uses NODE_ENV=staging
+#
+# ISOLATION — does NOT use production database or production APIs:
+# - MongoDB runs in a disposable Docker container on the CodeBuild host (localhost:27017, bianca-app-test).
+# - Backend MONGODB_URL points only at that container; production EC2/ECS DB is never used here.
+# - CodeBuild uses staging/test secrets (see Terraform aws_codebuild_project.*_tests), not prod billing keys.
+env:
+  variables:
+    NODE_ENV: test
+    API_BASE_URL: http://localhost:3000/v1
+    MONGODB_URL: mongodb://localhost:27017/bianca-app-test
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting Playwright E2E test setup using Docker containers..."
+      # ECR image tag: staging pipeline uses :staging; production pipeline uses :production (Build stage does not push :staging)
+      - export BIANCA_ECR_IMAGE_TAG="${BIANCA_ECR_IMAGE_TAG:-staging}"
+      - export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+      - echo "Using ECR image tag for backend/frontend=$BIANCA_ECR_IMAGE_TAG (set BIANCA_ECR_IMAGE_TAG in CodeBuild for production)"
+      - echo "Using CodePipeline name=$CODEPIPELINE_NAME for sequential build / S3 upload"
+      - echo "Getting sequential build number (read-only)..."
+      - |
+        # Read-only so tests don't increment the global counter
+        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" "$CODEPIPELINE_NAME" read-only)
+        export SEQUENTIAL_BUILD_NUMBER
+        echo "Sequential Build Number: $SEQUENTIAL_BUILD_NUMBER"
+      - echo "Configuring Git to preserve binary files..."
+      - git config --global core.autocrlf false
+      - git config --global core.eol lf
+      - echo "Refreshing Git attributes to ensure binary files are correct..."
+      - cd packages/mobile && git checkout -- assets/images/icon.png 2>/dev/null || true
+      - cd ../..
+      - echo "Setting up ECR registry..."
+      - |
+        # Get AWS account ID from STS if ECR_REGISTRY is not already set
+        if [ -z "$ECR_REGISTRY" ]; then
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          if [ -z "$AWS_ACCOUNT_ID" ]; then
+            echo "❌ ERROR: Could not determine AWS Account ID"
+            exit 1
+          fi
+          export ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+        fi
+        echo "ECR Registry: $ECR_REGISTRY"
+        echo "AWS Region: ${AWS_DEFAULT_REGION}"
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+      - echo "Pre-pulling base images to avoid rate limits..."
+      - |
+        # Pre-pull from ECR Public to avoid Docker Hub rate limits
+        echo "   Pulling node:20-bullseye from ECR Public..."
+        if docker pull public.ecr.aws/docker/library/node:20-bullseye 2>/dev/null; then
+          echo "✅ Pre-pulled node image from ECR Public"
+        else
+          echo "⚠️  Could not pre-pull from ECR Public, continuing..."
+          # Try to authenticate with Docker Hub if credentials are available (fallback)
+          if [ -n "$DOCKER_HUB_USERNAME" ] && [ -n "$DOCKER_HUB_PASSWORD" ]; then
+            echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin 2>/dev/null || true
+            echo "   Authenticated with Docker Hub as fallback"
+          fi
+        fi
+      - echo "Pulling Docker images from ECR..."
+      - |
+        # Pull images built by the pipeline's Build stage (tag matches BIANCA_ECR_IMAGE_TAG)
+        docker pull $ECR_REGISTRY/bianca-app-backend:$BIANCA_ECR_IMAGE_TAG
+        docker pull $ECR_REGISTRY/bianca-app-frontend:$BIANCA_ECR_IMAGE_TAG
+        echo "✅ Docker images pulled successfully ($BIANCA_ECR_IMAGE_TAG)"
+      - echo "Installing Node.js 20 for Playwright..."
+      - |
+        # Install Node.js 20 using nvm (needed for Playwright)
+        export NVM_DIR="$HOME/.nvm"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install 20
+        nvm use 20
+        echo "✅ Node.js 20 installed"
+      - echo "Locating source code for Playwright tests..."
+      - |
+        # Source code is in CODEBUILD_SRC_DIR (from SourceOutput)
+        echo "CODEBUILD_SRC_DIR: $CODEBUILD_SRC_DIR"
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/mobile"
+        if [ ! -f "$FRONTEND_DIR/package.json" ]; then
+          echo "ERROR: Frontend package.json not found"
+          exit 1
+        fi
+        echo "✅ Frontend test code found at: $FRONTEND_DIR"
+        export FRONTEND_DIR="$FRONTEND_DIR"
+      - echo "Installing Playwright dependencies..."
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        cd "$FRONTEND_DIR" || exit 1
+        # Only install Playwright and its dependencies, not the entire app
+        yarn install --frozen-lockfile --ignore-scripts || true
+        yarn playwright install --with-deps chromium || exit 1
+        echo "✅ Playwright installed"
+      - echo "Starting MongoDB container..."
+      - |
+        # Use AWS ECR public image to avoid Docker Hub rate limits
+        docker run -d --name mongodb-test \
+          -p 27017:27017 \
+          -e MONGO_INITDB_DATABASE=bianca-app-test \
+          public.ecr.aws/docker/library/mongo:7.0 || echo "MongoDB container may already exist"
+        # Wait for MongoDB to be ready
+        i=1
+        while [ $i -le 30 ]; do
+          if docker exec mongodb-test mongosh --eval "db.adminCommand('ping')" 2>/dev/null; then
+            echo "✅ MongoDB is ready!"
+            break
+          fi
+          sleep 1
+          i=$((i + 1))
+        done
+        if [ $i -gt 30 ]; then
+          echo "❌ MongoDB failed to start"
+          exit 1
+        fi
+      - echo "Verifying secrets are available..."
+      - |
+        # Secrets are automatically injected by CodeBuild from AWS Secrets Manager
+        # They are available as environment variables (JWT_SECRET, STRIPE_SECRET_KEY, etc.)
+        # Verify required secrets are set
+        if [ -z "$JWT_SECRET" ]; then
+          echo "❌ ERROR: JWT_SECRET is not set"
+          exit 1
+        fi
+        if [ -z "$MFA_ENCRYPTION_KEY" ]; then
+          echo "❌ ERROR: MFA_ENCRYPTION_KEY is not set"
+          exit 1
+        fi
+        echo "✅ Required secrets are available (injected from MySecretsManagerSecret-Staging)"
+      - echo "Starting backend container..."
+      - |
+        # Start backend container with test configuration
+        # Use host network so backend can access MongoDB on localhost:27017
+        docker run -d --name backend-test \
+          --network host \
+          -e NODE_ENV=test \
+          -e MONGODB_URL=mongodb://localhost:27017/bianca-app-test \
+          -e AWS_REGION="$AWS_REGION" \
+          -e AWS_SECRET_ID="$AWS_SECRET_ID" \
+          -e FORCE_ETHEREAL=true \
+          -e STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+          -e STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
+          -e JWT_SECRET="$JWT_SECRET" \
+          -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+          -e MFA_ENCRYPTION_KEY="$MFA_ENCRYPTION_KEY" \
+          -e TWILIO_AUTHTOKEN="$TWILIO_AUTHTOKEN" \
+          $ECR_REGISTRY/bianca-app-backend:$BIANCA_ECR_IMAGE_TAG
+        # Wait for backend to be ready
+        i=1
+        while [ $i -le 60 ]; do
+          if curl -f http://localhost:3000/health 2>/dev/null; then
+            echo "✅ Backend is ready!"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo "❌ Backend failed to start"
+            docker logs backend-test || true
+            exit 1
+          fi
+          sleep 2
+          i=$((i + 1))
+        done
+      - echo "Verifying backend environment configuration..."
+      - |
+        set -e  # Exit on error
+        echo "=== Backend Environment Verification ==="
+        # Verify NODE_ENV is set correctly in container
+        CONTAINER_NODE_ENV=$(docker exec backend-test printenv NODE_ENV 2>/dev/null | tr -d '\n\r\t ' || echo "NOT_SET")
+        echo "Container NODE_ENV: [$CONTAINER_NODE_ENV]"
+        # Check health endpoint for environment
+        HEALTH_RESPONSE=$(curl -s http://localhost:3000/health 2>/dev/null || echo "{}")
+        # Extract environment value - try jq first, then sed, then grep
+        BACKEND_ENV="UNKNOWN"
+        if command -v jq >/dev/null 2>&1; then
+          BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | jq -r '.environment // empty' 2>/dev/null | tr -d '\n\r\t ' || echo "UNKNOWN")
+        elif echo "$HEALTH_RESPONSE" | grep -q '"environment"'; then
+          BACKEND_ENV=$(echo "$HEALTH_RESPONSE" | sed -n 's/.*"environment"\s*:\s*"\([^"]*\)".*/\1/p' | tr -d '\n\r\t ' || echo "UNKNOWN")
+        fi
+        echo "Backend config.env from /health: [$BACKEND_ENV]"
+        # Verify both values are exactly "test" (case-sensitive, no whitespace)
+        ERROR_COUNT=0
+        if [ "$CONTAINER_NODE_ENV" != "test" ]; then
+          echo "❌ Container NODE_ENV mismatch: got [$CONTAINER_NODE_ENV], expected [test]"
+          ERROR_COUNT=$((ERROR_COUNT + 1))
+        fi
+        if [ "$BACKEND_ENV" != "test" ]; then
+          echo "❌ Backend config.env mismatch: got [$BACKEND_ENV], expected [test]"
+          ERROR_COUNT=$((ERROR_COUNT + 1))
+        fi
+        if [ $ERROR_COUNT -gt 0 ]; then
+          echo ""
+          echo "❌ ERROR: Backend is not in test mode!"
+          echo "This will cause:"
+          echo "  - Test routes to be blocked (403)"
+          echo "  - Rate limiting to be enabled (429 errors)"
+          echo ""
+          echo "Backend logs (last 50 lines):"
+          docker logs backend-test --tail 50 || true
+          exit 1
+        fi
+        echo "✅ Backend is confirmed to be in test mode"
+        # Test if test routes are accessible (should not return 403 in test mode)
+        TEST_ROUTE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:3000/v1/test/clean 2>/dev/null || echo "000")
+        echo "Test route /test/clean status: $TEST_ROUTE_STATUS"
+        if [ "$TEST_ROUTE_STATUS" = "403" ]; then
+          echo "❌ ERROR: Test routes are blocked (403) even though environment is test!"
+          echo "This suggests a code issue, not an environment variable issue."
+          echo "Backend logs (last 50 lines):"
+          docker logs backend-test --tail 50 || true
+          exit 1
+        elif [ "$TEST_ROUTE_STATUS" = "200" ] || [ "$TEST_ROUTE_STATUS" = "500" ]; then
+          echo "✅ Test routes are accessible (status $TEST_ROUTE_STATUS)"
+        else
+          echo "⚠️  Test route returned unexpected status: $TEST_ROUTE_STATUS"
+        fi
+        echo "========================================"
+      - echo "Seeding database..."
+      - |
+        sleep 3
+        SEED_SUCCESS=false
+        for attempt in 1 2 3; do
+          echo "Seeding attempt $attempt..."
+          SEED_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/test/seed)
+          SEED_HTTP_CODE=$(echo "$SEED_RESPONSE" | tail -n1)
+          if [ "$SEED_HTTP_CODE" = "200" ]; then
+            echo "✅ Database seeded successfully"
+            SEED_SUCCESS=true
+            break
+          else
+            echo "⚠️  Seeding attempt $attempt failed with HTTP $SEED_HTTP_CODE"
+            if [ $attempt -lt 3 ]; then
+              sleep 5
+            fi
+          fi
+        done
+        if [ "$SEED_SUCCESS" = "false" ]; then
+          echo "❌ ERROR: Database seeding failed - tests will fail without test users!"
+          echo "Backend logs (last 100 lines):"
+          docker logs backend-test --tail 100 || true
+          echo ""
+          echo "❌ Failing build - database must be seeded for tests to pass"
+          exit 1
+        fi
+        # Verify seeding worked by checking if we can login with test credentials
+        echo "Verifying test users exist by attempting login..."
+        LOGIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/auth/login \
+          -H "Content-Type: application/json" \
+          -d '{"email":"fake@example.org","password":"Password1"}' 2>/dev/null || echo "")
+        LOGIN_HTTP_CODE=$(echo "$LOGIN_RESPONSE" | tail -n1)
+        if [ "$LOGIN_HTTP_CODE" = "200" ]; then
+          echo "✅ Test user login successful - database seeded correctly"
+        else
+          echo "⚠️  Warning: Test user login failed (HTTP $LOGIN_HTTP_CODE)"
+          echo "This may cause test failures, but continuing..."
+          echo "Login response: $(echo "$LOGIN_RESPONSE" | head -n1)"
+        fi
+      - echo "Starting frontend container..."
+      - |
+        # Start frontend container
+        # Map container port 80 to host port 8081 (tests expect 8081)
+        # Frontend needs to access backend on host's localhost:3000
+        # Backend uses --network host, so it's on the host network
+        # Get host IP from Docker bridge network gateway
+        HOST_IP=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "")
+        # Fallback: try to get from ip route if Docker inspect fails
+        if [ -z "$HOST_IP" ] || [ "$HOST_IP" = "172.17.0.1" ]; then
+          # More robust method: get default gateway IP
+          HOST_IP=$(ip -4 route show default | grep -Po 'via \K\S+' 2>/dev/null || echo "")
+        fi
+        # Final fallback
+        if [ -z "$HOST_IP" ]; then
+          HOST_IP=$(ip route | grep default | awk '{print $3}' | head -1 || echo "172.17.0.1")
+        fi
+        # If still empty, use default
+        if [ -z "$HOST_IP" ]; then
+          HOST_IP="172.17.0.1"
+        fi
+        echo "Host IP for backend access: $HOST_IP"
+        # Test if we can reach backend from host first
+        if ! curl -f -s http://localhost:3000/health > /dev/null 2>&1; then
+          echo "⚠️  Warning: Backend health check failed from host, but continuing..."
+        fi
+        docker run -d --name frontend-test \
+          -p 8081:80 \
+          -e NODE_ENV=test \
+          -e API_BASE_URL=http://${HOST_IP}:3000/v1 \
+          $ECR_REGISTRY/bianca-app-frontend:$BIANCA_ECR_IMAGE_TAG
+        # Wait for frontend to be ready
+        FRONTEND_READY=false
+        i=1
+        while [ $i -le 90 ]; do
+          if curl -f -s http://localhost:8081 > /dev/null 2>&1; then
+            RESPONSE=$(curl -s http://localhost:8081)
+            if echo "$RESPONSE" | grep -q -i "html\|expo\|react\|root\|div" 2>/dev/null; then
+              echo "✅ Frontend is ready!"
+              FRONTEND_READY=true
+              break
+            fi
+          fi
+          if [ $i -eq 90 ]; then
+            echo "❌ Frontend failed to start"
+            echo "Checking container status..."
+            docker ps -a | grep frontend-test || true
+            echo "Container logs:"
+            docker logs frontend-test || true
+            echo "Testing port 8081:"
+            curl -v http://localhost:8081 2>&1 | head -20 || true
+            exit 1
+          fi
+          sleep 2
+          i=$((i + 1))
+        done
+        if [ "$FRONTEND_READY" = "true" ]; then
+          echo "Waiting 5 seconds for frontend to fully initialize..."
+          sleep 5
+        fi
+
+  build:
+    commands:
+      - echo "Running all tests - unit tests and Cucumber E2E tests..."
+      - |
+        # Ensure Node.js 20 is available
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        # Re-export variables (they may not persist from pre_build)
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/mobile"
+        BACKEND_DIR="$CODEBUILD_SRC_DIR/packages/backend"
+        export FRONTEND_DIR="$FRONTEND_DIR"
+        export BACKEND_DIR="$BACKEND_DIR"
+        
+        echo "Frontend directory: $FRONTEND_DIR"
+        echo "Backend directory: $BACKEND_DIR"
+        echo "Node version: $(node --version)"
+        
+        # Track overall test status
+        OVERALL_EXIT_CODE=0
+        
+        # Step 1: Run backend unit tests
+        echo ""
+        echo "=========================================="
+        echo "Step 1: Running Backend Unit Tests"
+        echo "=========================================="
+        cd "$BACKEND_DIR" || exit 1
+        set +e  # Don't exit on error, we'll handle it
+        # Stream logs and cap runtime to avoid silent hangs (use bash for pipefail)
+        bash -lc 'set -o pipefail; NODE_NO_IOURING=1 timeout 40m yarn test:unit --forceExit 2>&1 | tee /tmp/backend-unit-tests.log'
+        BACKEND_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show output
+        cat /tmp/backend-unit-tests.log
+        echo ""
+        echo "Backend unit tests exit code: $BACKEND_TEST_EXIT_CODE"
+        
+        if [ "$BACKEND_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Backend unit tests failed with exit code $BACKEND_TEST_EXIT_CODE"
+          OVERALL_EXIT_CODE=$BACKEND_TEST_EXIT_CODE
+        else
+          echo "✅ Backend unit tests passed!"
+        fi
+        
+        # Step 2: Run frontend unit tests
+        echo ""
+        echo "=========================================="
+        echo "Step 2: Running Frontend Unit Tests"
+        echo "=========================================="
+        cd "$FRONTEND_DIR" || exit 1
+        set +e  # Don't exit on error, we'll handle it
+        # Stream logs and cap runtime to avoid silent hangs (use bash for pipefail)
+        bash -lc 'set -o pipefail; NODE_ENV=test timeout 20m yarn test --forceExit --runInBand 2>&1 | tee /tmp/frontend-unit-tests.log'
+        FRONTEND_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show output
+        cat /tmp/frontend-unit-tests.log
+        echo ""
+        echo "Frontend unit tests exit code: $FRONTEND_TEST_EXIT_CODE"
+        
+        if [ "$FRONTEND_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Frontend unit tests failed with exit code $FRONTEND_TEST_EXIT_CODE"
+          OVERALL_EXIT_CODE=$FRONTEND_TEST_EXIT_CODE
+        else
+          echo "✅ Frontend unit tests passed!"
+        fi
+        
+        # Step 3: Run Cucumber E2E tests (requires Docker containers from pre_build)
+        echo ""
+        echo "=========================================="
+        echo "Step 3: Running Cucumber E2E Tests"
+        echo "=========================================="
+        cd "$FRONTEND_DIR" || exit 1
+        
+        # Re-seed database before Cucumber tests to ensure test users exist
+        # (Database might have been cleared or backend container might have restarted)
+        echo "Re-seeding database before Cucumber tests..."
+        sleep 2
+        SEED_SUCCESS=false
+        for attempt in 1 2 3; do
+          echo "Seeding attempt $attempt before Cucumber tests..."
+          SEED_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/test/seed)
+          SEED_HTTP_CODE=$(echo "$SEED_RESPONSE" | tail -n1)
+          if [ "$SEED_HTTP_CODE" = "200" ]; then
+            echo "✅ Database re-seeded successfully before Cucumber tests"
+            SEED_SUCCESS=true
+            break
+          else
+            echo "⚠️  Seeding attempt $attempt failed with HTTP $SEED_HTTP_CODE"
+            if [ $attempt -lt 3 ]; then
+              sleep 5
+            fi
+          fi
+        done
+        if [ "$SEED_SUCCESS" = "false" ]; then
+          echo "❌ ERROR: Database re-seeding failed before Cucumber tests"
+          echo "Backend logs (last 50 lines):"
+          docker logs backend-test --tail 50 || true
+          echo "Continuing anyway - tests may fail..."
+        fi
+        
+        # Verify test users exist by attempting login
+        echo "Verifying test users exist before Cucumber tests..."
+        LOGIN_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:3000/v1/auth/login \
+          -H "Content-Type: application/json" \
+          -d '{"email":"fake@example.org","password":"Password1"}' 2>/dev/null || echo "")
+        LOGIN_HTTP_CODE=$(echo "$LOGIN_RESPONSE" | tail -n1)
+        if [ "$LOGIN_HTTP_CODE" = "200" ]; then
+          echo "✅ Test user login successful - database ready for Cucumber tests"
+        else
+          echo "⚠️  Warning: Test user login failed (HTTP $LOGIN_HTTP_CODE) before Cucumber tests"
+          echo "Login response: $(echo "$LOGIN_RESPONSE" | head -n1)"
+          echo "This may cause Cucumber test failures"
+        fi
+        
+        # Set frontend URL/port to match Docker container (port 8081, not default 8082)
+        export FRONTEND_URL="http://localhost:8081"
+        export FRONTEND_PORT="8081"
+        export BASE_URL="http://localhost:8081"
+        
+        # Ensure reports directory exists
+        mkdir -p test/e2e/cucumber/reports
+        
+        # Run Cucumber tests
+        echo "Running Cucumber E2E tests against containers..."
+        echo "Frontend URL: $FRONTEND_URL"
+        echo "Backend URL: http://localhost:3000"
+        set +e  # Don't exit on error, we'll handle it
+        # Stream logs and cap runtime to avoid silent hangs (use bash for pipefail)
+        bash -lc 'set -o pipefail; NODE_ENV=test timeout 40m yarn test:cucumber 2>&1 | tee /tmp/cucumber-tests.log'
+        CUCUMBER_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show output
+        cat /tmp/cucumber-tests.log
+        echo ""
+        echo "Cucumber tests exit code: $CUCUMBER_TEST_EXIT_CODE"
+        
+        if [ "$CUCUMBER_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Cucumber E2E tests failed with exit code $CUCUMBER_TEST_EXIT_CODE"
+          echo "=== Backend Container Logs ==="
+          docker logs backend-test --tail 100 || true
+          echo "=== Frontend Container Logs ==="
+          docker logs frontend-test --tail 100 || true
+          OVERALL_EXIT_CODE=$CUCUMBER_TEST_EXIT_CODE
+        else
+          echo "✅ Cucumber E2E tests passed!"
+        fi
+        
+        # Step 4: Run OpenAI voice connection test (critical health check)
+        echo ""
+        echo "=========================================="
+        echo "Step 4: Running OpenAI Voice Connection Test"
+        echo "=========================================="
+        cd "$FRONTEND_DIR" || exit 1
+        
+        # Set frontend URL/port to match Docker container
+        export FRONTEND_URL="http://localhost:8081"
+        export FRONTEND_PORT="8081"
+        export BASE_URL="http://localhost:8081"
+        
+        set +e  # Don't exit on error, we'll handle it
+        # Run the OpenAI voice connection test
+        bash -lc 'set -o pipefail; NODE_ENV=test timeout 10m npx playwright test test/e2e/openai-voice-connection.e2e.test.ts --reporter=list 2>&1 | tee /tmp/openai-voice-test.log'
+        OPENAI_TEST_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+        
+        # Show output
+        cat /tmp/openai-voice-test.log
+        echo ""
+        echo "OpenAI voice connection test exit code: $OPENAI_TEST_EXIT_CODE"
+        
+        if [ "$OPENAI_TEST_EXIT_CODE" -ne 0 ]; then
+          echo "❌ OpenAI voice connection test failed with exit code $OPENAI_TEST_EXIT_CODE"
+          echo "=== Backend Container Logs ==="
+          docker logs backend-test --tail 100 || true
+          echo "=== Frontend Container Logs ==="
+          docker logs frontend-test --tail 100 || true
+          OVERALL_EXIT_CODE=$OPENAI_TEST_EXIT_CODE
+        else
+          echo "✅ OpenAI voice connection test passed!"
+        fi
+        
+        # Final summary
+        echo ""
+        echo "=========================================="
+        echo "Test Summary"
+        echo "=========================================="
+        echo "Backend Unit Tests: $([ $BACKEND_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo "Frontend Unit Tests: $([ $FRONTEND_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo "Cucumber E2E Tests: $([ $CUCUMBER_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo "OpenAI Voice Connection Test: $([ $OPENAI_TEST_EXIT_CODE -eq 0 ] && echo '✅ PASSED' || echo '❌ FAILED')"
+        echo ""
+        
+        if [ "$OVERALL_EXIT_CODE" -ne 0 ]; then
+          echo "❌ Some tests failed. Overall exit code: $OVERALL_EXIT_CODE"
+          exit $OVERALL_EXIT_CODE
+        fi
+        echo "✅ All tests passed!"
+
+  post_build:
+    commands:
+      - echo "Collecting test artifacts and logs..."
+      - |
+        # Create artifacts directory
+        mkdir -p /tmp/playwright-artifacts
+        
+        # Copy Cucumber reports and test results
+        if [ -d "$FRONTEND_DIR/test/e2e/cucumber/reports" ]; then
+          cp -r "$FRONTEND_DIR/test/e2e/cucumber/reports" /tmp/playwright-artifacts/cucumber-reports || true
+        fi
+        if [ -d "$FRONTEND_DIR/test-results" ]; then
+          cp -r "$FRONTEND_DIR/test-results" /tmp/playwright-artifacts/ || true
+        fi
+        
+        # Copy container logs
+        docker logs backend-test > /tmp/playwright-artifacts/backend.log 2>&1 || true
+        docker logs frontend-test > /tmp/playwright-artifacts/frontend.log 2>&1 || true
+        if [ -f /tmp/backend-unit-tests.log ]; then
+          cp /tmp/backend-unit-tests.log /tmp/playwright-artifacts/backend-unit-tests.log || true
+        fi
+        if [ -f /tmp/frontend-unit-tests.log ]; then
+          cp /tmp/frontend-unit-tests.log /tmp/playwright-artifacts/frontend-unit-tests.log || true
+        fi
+        if [ -f /tmp/cucumber-tests.log ]; then
+          cp /tmp/cucumber-tests.log /tmp/playwright-artifacts/cucumber-tests.log || true
+        fi
+        
+        # Create summary file
+        {
+          echo "Test Run Summary"
+          echo "================"
+          echo "Build ID: ${CODEBUILD_BUILD_ID}"
+          echo "Sequential Build Number: ${SEQUENTIAL_BUILD_NUMBER:-${CODEBUILD_BUILD_NUMBER}}"
+          echo "CodeBuild Build Number: ${CODEBUILD_BUILD_NUMBER}"
+          echo "Source Version: ${CODEBUILD_SOURCE_VERSION}"
+          echo "Start Time: ${CODEBUILD_START_TIME}"
+          echo "Environment: ${NODE_ENV}"
+          echo "Node Version: $(node --version)"
+          echo "Yarn Version: $(yarn --version)"
+          echo ""
+          echo "Test Execution:"
+          echo "- Backend Unit Tests: $([ ${BACKEND_TEST_EXIT_CODE:-1} -eq 0 ] && echo 'PASSED' || echo 'FAILED')"
+          echo "- Frontend Unit Tests: $([ ${FRONTEND_TEST_EXIT_CODE:-1} -eq 0 ] && echo 'PASSED' || echo 'FAILED')"
+          echo "- Cucumber E2E Tests: $([ ${CUCUMBER_TEST_EXIT_CODE:-1} -eq 0 ] && echo 'PASSED' || echo 'FAILED')"
+          echo "- Overall Exit Code: ${OVERALL_EXIT_CODE:-unknown}"
+          echo ""
+          echo "Test Environment:"
+          echo "- Frontend: http://localhost:8081"
+          echo "- Backend: http://localhost:3000"
+          echo "- MongoDB: mongodb://localhost:27017/bianca-app-test"
+          echo ""
+          echo "Artifacts:"
+          echo "- Cucumber Reports: cucumber-reports/"
+          echo "- Test Results: test-results/"
+          echo "- Backend Log: backend.log"
+          echo "- Frontend Log: frontend.log"
+          echo "- Backend Unit Tests: backend-unit-tests.log"
+          echo "- Frontend Unit Tests: frontend-unit-tests.log"
+          echo "- Cucumber Tests: cucumber-tests.log"
+        } > /tmp/playwright-artifacts/run-summary.txt
+        
+        # Copy artifacts to frontend directory for CodeBuild artifact collection
+        cp -r /tmp/playwright-artifacts/* "$FRONTEND_DIR/" 2>/dev/null || true
+        
+        echo "✅ Artifacts collected"
+        ls -la /tmp/playwright-artifacts/ || true
+      - echo "Getting sequential build number for test results..."
+      - |
+        # Get sequential build number from S3 (read-only, already incremented by build stage)
+        export BIANCA_ECR_IMAGE_TAG="${BIANCA_ECR_IMAGE_TAG:-staging}"
+        export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+        SEQUENTIAL_BUILD_NUMBER=$(bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/get-sequential-build-number.sh" "$CODEPIPELINE_NAME" read-only)
+        export SEQUENTIAL_BUILD_NUMBER
+        echo "Sequential Build Number: $SEQUENTIAL_BUILD_NUMBER"
+      - echo "Uploading test results to S3 for easy access..."
+      - |
+        # Get the S3 bucket name from the artifact store
+        # CodePipeline stores artifacts in: s3://bucket-name/pipeline-name/execution-id/artifact-name/
+        # We'll upload to a dedicated test-results location
+        export BIANCA_ECR_IMAGE_TAG="${BIANCA_ECR_IMAGE_TAG:-staging}"
+        export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+        PIPELINE_NAME="$CODEPIPELINE_NAME"
+        BUILD_ID="${CODEBUILD_BUILD_ID}"
+        # Use sequential build number instead of CodeBuild's per-project number
+        BUILD_NUMBER="${SEQUENTIAL_BUILD_NUMBER:-${CODEBUILD_BUILD_NUMBER}}"
+        
+        # Get S3 bucket from CodePipeline (it's in the artifact store)
+        # We'll use a predictable path structure
+        S3_BUCKET=$(aws codepipeline get-pipeline --name "$PIPELINE_NAME" --query 'pipeline.artifactStore.location' --output text 2>/dev/null || echo "")
+        
+        if [ -z "$S3_BUCKET" ]; then
+          echo "⚠️  Could not determine S3 bucket, skipping S3 upload"
+          echo "   Artifacts are still available via CodePipeline artifacts"
+        else
+          echo "Uploading to S3 bucket: $S3_BUCKET"
+          S3_PREFIX="test-results/${BUILD_NUMBER}-${BUILD_ID}"
+          
+          # Upload Cucumber HTML report (most important for viewing failures)
+          if [ -d "$FRONTEND_DIR/test/e2e/cucumber/reports" ]; then
+            echo "Uploading Cucumber HTML report..."
+            aws s3 sync "$FRONTEND_DIR/test/e2e/cucumber/reports" "s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-reports/" --quiet || true
+            if [ -f "$FRONTEND_DIR/test/e2e/cucumber/reports/cucumber-report.html" ]; then
+              echo "✅ HTML report uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-reports/cucumber-report.html"
+            fi
+          fi
+          
+          # Upload test results (screenshots, videos, traces)
+          if [ -d "$FRONTEND_DIR/test-results" ]; then
+            echo "Uploading test results (screenshots, videos, traces)..."
+            aws s3 sync "$FRONTEND_DIR/test-results" "s3://${S3_BUCKET}/${S3_PREFIX}/test-results/" --quiet || true
+            echo "✅ Test results uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/test-results/"
+          fi
+          
+          # Upload logs
+          echo "Uploading logs..."
+          if [ -f /tmp/playwright-artifacts/backend.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/backend.log "s3://${S3_BUCKET}/${S3_PREFIX}/backend.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/frontend.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/frontend.log "s3://${S3_BUCKET}/${S3_PREFIX}/frontend.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/backend-unit-tests.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/backend-unit-tests.log "s3://${S3_BUCKET}/${S3_PREFIX}/backend-unit-tests.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/frontend-unit-tests.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/frontend-unit-tests.log "s3://${S3_BUCKET}/${S3_PREFIX}/frontend-unit-tests.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/cucumber-tests.log ]; then
+            aws s3 cp /tmp/playwright-artifacts/cucumber-tests.log "s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-tests.log" --quiet || true
+          fi
+          if [ -f /tmp/playwright-artifacts/run-summary.txt ]; then
+            aws s3 cp /tmp/playwright-artifacts/run-summary.txt "s3://${S3_BUCKET}/${S3_PREFIX}/run-summary.txt" --quiet || true
+          fi
+          
+          # Upload JUnit XML if it exists (from Cucumber)
+          if [ -f "$FRONTEND_DIR/test/e2e/cucumber/reports/cucumber-report.json" ]; then
+            aws s3 cp "$FRONTEND_DIR/test/e2e/cucumber/reports/cucumber-report.json" "s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-report.json" --quiet || true
+            echo "✅ Cucumber JSON report uploaded to: s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-report.json"
+          fi
+          
+          # Create a latest symlink (upload a metadata file pointing to latest)
+          echo "{\"build_id\": \"${BUILD_ID}\", \"build_number\": \"${BUILD_NUMBER}\", \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"s3_prefix\": \"${S3_PREFIX}\"}" | \
+            aws s3 cp - "s3://${S3_BUCKET}/test-results/latest.json" --content-type "application/json" --quiet || true
+          
+          echo ""
+          echo "✅ Test results uploaded to S3:"
+          echo "   Base path: s3://${S3_BUCKET}/${S3_PREFIX}/"
+          echo "   Cucumber HTML Report: s3://${S3_BUCKET}/${S3_PREFIX}/cucumber-reports/cucumber-report.html"
+          echo "   Latest marker: s3://${S3_BUCKET}/test-results/latest.json"
+        fi
+      - echo "Cleaning up Docker containers..."
+      - |
+        docker stop backend-test frontend-test mongodb-test 2>/dev/null || true
+        docker rm backend-test frontend-test mongodb-test 2>/dev/null || true
+      - echo "Test run completed"
+
+artifacts:
+  files:
+    - '**/cucumber-reports/**/*'
+    - '**/test-results/**/*'
+    - '**/backend.log'
+    - '**/frontend.log'
+    - '**/backend-unit-tests.log'
+    - '**/frontend-unit-tests.log'
+    - '**/cucumber-tests.log'
+    - '**/run-summary.txt'
+  base-directory: '**'
+  name: TestResults
+

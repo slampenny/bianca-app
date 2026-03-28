@@ -26,9 +26,9 @@ This document lists remaining `patient` / `Patient` references after the client 
 | `packages/backend/scripts/migrate-patient-orgs.js`, `list-patients-staging.js` | Ops scripts; rename for clarity only. |
 | `packages/backend/docs/MIGRATION_PATIENT_TO_CLIENT_ID.md`, `README-PATIENT-ORG-MIGRATION.md` | Docs tied to migration names. |
 | `packages/backend/tests/unit/config/agenda.checkPatientsWithoutSchedules.test.js` | Test name; job may still say “patients” in code. |
-| `packages/frontend/test/e2e/cucumber/features/patient-management.feature` | Gherkin / legacy name. |
-| `packages/frontend/test/e2e/cucumber/features/patient-complete-management.feature` | Same. |
-| `packages/frontend/test/e2e/cucumber/step_definitions/patient_steps.js` | Step defs; may still match “patient” in scenarios. |
+| `packages/mobile/test/e2e/cucumber/features/patient-management.feature` | Gherkin / legacy name. |
+| `packages/mobile/test/e2e/cucumber/features/patient-complete-management.feature` | Same. |
+| `packages/mobile/test/e2e/cucumber/step_definitions/patient_steps.js` | Step defs; may still match “patient” in scenarios. |
 
 ---
 
@@ -36,7 +36,7 @@ This document lists remaining `patient` / `Patient` references after the client 
 
 ### Production app
 
-- **`packages/frontend/app/screens/SchedulesScreen.tsx`**  
+- **`packages/mobile/app/screens/SchedulesScreen.tsx`**  
   Destructures legacy `patient` on schedule objects when saving:  
   `const { id, patient: _omitLegacyPatientField, ...scheduleData } = ...`  
   **Action:** keep until API never returns `patient`; or map to `client` only.
@@ -53,11 +53,11 @@ This document lists remaining `patient` / `Patient` references after the client 
 
 ### Docs
 
-- **`packages/frontend/test/e2e/NON-WORKFLOW-TESTS.md`** — may mention old filenames like `schedule-patient-workflow.e2e.test.ts`; current schedule E2E is `schedule-integration.e2e.test.ts`.
+- **`packages/mobile/test/e2e/NON-WORKFLOW-TESTS.md`** — may mention old filenames like `schedule-patient-workflow.e2e.test.ts`; current schedule E2E is `schedule-integration.e2e.test.ts`.
 
 ### Tooling
 
-- **`packages/frontend/update-translations.js`** — `commonTranslations.patient` maps the **word** “patient” to other languages (medical glossary). Review if product language should be “client” everywhere.
+- **`packages/mobile/update-translations.js`** — `commonTranslations.patient` maps the **word** “patient” to other languages (medical glossary). Review if product language should be “client” everywhere.
 
 ---
 

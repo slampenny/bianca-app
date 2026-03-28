@@ -13,9 +13,9 @@ on_err() {
   echo "  Scroll up to the section above for the real error — the process stopped here."
   echo "  Re-run only the failing step, e.g.:"
   echo "    yarn workspace @bianca-app/backend test:unit"
-  echo "    yarn workspace @bianca-app/frontend test"
+  echo "    yarn workspace @bianca-app/mobile test"
   echo "    yarn test:integration"
-  echo "    yarn workspace @bianca-app/frontend test:web:e2e"
+  echo "    yarn workspace @bianca-app/mobile test:web:e2e"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   exit "${status}"
 }
@@ -26,16 +26,16 @@ echo ">>> test:all — 1/4 backend unit tests"
 yarn workspace @bianca-app/backend test:unit
 
 echo ""
-echo ">>> test:all — 2/4 frontend unit tests"
-yarn workspace @bianca-app/frontend test
+echo ">>> test:all — 2/4 mobile unit tests"
+yarn workspace @bianca-app/mobile test
 
 echo ""
 echo ">>> test:all — 3/4 backend integration tests"
 yarn test:integration
 
 echo ""
-echo ">>> test:all — 4/4 frontend Playwright e2e"
-yarn workspace @bianca-app/frontend test:web:e2e
+echo ">>> test:all — 4/4 mobile Playwright e2e (Expo web)"
+yarn workspace @bianca-app/mobile test:web:e2e
 
 trap - ERR
 echo ""

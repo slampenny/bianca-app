@@ -66,6 +66,21 @@ const PHI_ROUTES = {
   'GET /v1/reports': { action: 'READ', resource: 'report', phiAccessed: true },
   'POST /v1/reports': { action: 'CREATE', resource: 'report', phiAccessed: true },
 
+  // Family weekly call digest (PHI — derived from calls/conversations; external send)
+  'POST /v1/family-weekly-digests/preview': { action: 'READ', resource: 'familyDigest', phiAccessed: true },
+  'POST /v1/family-weekly-digests': { action: 'CREATE', resource: 'familyDigest', phiAccessed: true, highRisk: true },
+  'GET /v1/family-weekly-digests': { action: 'READ', resource: 'familyDigest', phiAccessed: true },
+  'GET /v1/family-weekly-digests/:digestId': { action: 'READ', resource: 'familyDigest', phiAccessed: true },
+  'POST /v1/family-weekly-digests/:digestId/send': {
+    action: 'EXPORT',
+    resource: 'familyDigest',
+    phiAccessed: true,
+    highRisk: true,
+  },
+
+  'GET /facility-reports/call-completion-log': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
+  'GET /facility-reports/alert-audit-trail': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
+
   // Export/Download operations (high risk)
   'GET /v1/clients/:id/export': { action: 'EXPORT', resource: 'client', phiAccessed: true, highRisk: true },
   'GET /v1/conversations/:id/export': { action: 'EXPORT', resource: 'conversation', phiAccessed: true, highRisk: true },

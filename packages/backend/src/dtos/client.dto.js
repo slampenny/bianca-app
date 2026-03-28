@@ -29,6 +29,9 @@ const ClientDTO = (client) => {
     sentimentAnalyzedConversations,
     latestOverallHealthScore,
     latestOverallRiskScore,
+    room,
+    moveInDate,
+    emergencyContact,
   } = client;
   // Use direct property access for populated array (destructuring can miss it on Mongoose docs)
   const schedulesRaw = client.schedules;
@@ -61,6 +64,22 @@ const ClientDTO = (client) => {
       latestOverallHealthScore == null ? null : Math.round(Number(latestOverallHealthScore)),
     latestOverallRiskScore:
       latestOverallRiskScore == null ? null : Math.round(Number(latestOverallRiskScore)),
+    room: room == null || room === '' ? null : String(room).trim(),
+    moveInDate: toIsoOrNull(moveInDate),
+    emergencyContact:
+      emergencyContact &&
+      typeof emergencyContact === 'object' &&
+      (emergencyContact.name ||
+        emergencyContact.relationship ||
+        emergencyContact.phone ||
+        emergencyContact.email)
+        ? {
+            name: emergencyContact.name || '',
+            relationship: emergencyContact.relationship || '',
+            phone: emergencyContact.phone || '',
+            email: emergencyContact.email ? String(emergencyContact.email).trim().toLowerCase() : '',
+          }
+        : null,
   };
 };
 

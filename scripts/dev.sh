@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start both backend and frontend dev servers
+# Start both backend and mobile (Expo web) dev servers
 # This script ensures both processes stay running and handles signals properly
 
 # Kill existing processes on ports
@@ -13,8 +13,8 @@ cleanup() {
   if [ ! -z "$BACKEND_PID" ]; then
     kill $BACKEND_PID 2>/dev/null || true
   fi
-  if [ ! -z "$FRONTEND_PID" ]; then
-    kill $FRONTEND_PID 2>/dev/null || true
+  if [ ! -z "$MOBILE_PID" ]; then
+    kill $MOBILE_PID 2>/dev/null || true
   fi
   if [ ! -z "$BACKEND_LOGS_PID" ]; then
     kill $BACKEND_LOGS_PID 2>/dev/null || true
@@ -45,16 +45,16 @@ BACKEND_LOGS_PID=$!
 # Wait a moment for logs to start
 sleep 1
 
-# Start frontend in background
-echo "Starting frontend..."
-yarn workspace @bianca-app/frontend web > /tmp/frontend-dev.log 2>&1 &
-FRONTEND_PID=$!
+# Start mobile Expo web in background
+echo "Starting mobile (Expo web)..."
+yarn workspace @bianca-app/mobile web > /tmp/mobile-dev.log 2>&1 &
+MOBILE_PID=$!
 
 # Wait for both processes
 echo ""
 echo "=========================================="
 echo "Backend PID: $BACKEND_PID"
-echo "Frontend PID: $FRONTEND_PID"
+echo "Mobile (Expo web) PID: $MOBILE_PID"
 echo "Backend logs PID: $BACKEND_LOGS_PID"
 echo "=========================================="
 echo "Both servers starting... Press Ctrl+C to stop"
@@ -66,7 +66,7 @@ echo ""
 # Use wait without arguments to wait for all background jobs
 while true; do
   # Check if processes are still running
-  if ! kill -0 $BACKEND_PID 2>/dev/null && ! kill -0 $FRONTEND_PID 2>/dev/null; then
+  if ! kill -0 $BACKEND_PID 2>/dev/null && ! kill -0 $MOBILE_PID 2>/dev/null; then
     echo "Both processes have exited"
     break
   fi

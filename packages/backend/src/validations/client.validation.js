@@ -2,6 +2,25 @@ const Joi = require('joi');
 const validator = require('validator');
 const { password, objectId } = require('./custom.validation');
 
+const emergencyContact = Joi.object()
+  .keys({
+    name: Joi.string().allow('').optional(),
+    relationship: Joi.string().allow('').optional(),
+    phone: Joi.string().allow('').optional(),
+    email: Joi.string()
+      .trim()
+      .allow('')
+      .optional()
+      .custom((value, helpers) => {
+        if (value === '' || value == null) return value;
+        if (!validator.isEmail(value)) {
+          return helpers.message('Invalid emergency contact email');
+        }
+        return value;
+      }),
+  })
+  .optional();
+
 const createClient = {
   body: Joi.object().keys({
     org: Joi.string().custom(objectId).optional(),
@@ -20,6 +39,9 @@ const createClient = {
     consented: Joi.boolean().optional(),
     consentedAt: Joi.date().optional(),
     consentEmailVersion: Joi.string().optional(),
+    room: Joi.string().trim().allow('', null).optional(),
+    moveInDate: Joi.date().optional(),
+    emergencyContact,
     caregivers: Joi.array().optional(),
     schedules: Joi.array()
       .items(
@@ -81,6 +103,9 @@ const updateClient = {
       consented: Joi.boolean().optional(),
       consentedAt: Joi.date().optional(),
       consentEmailVersion: Joi.string().optional(),
+      room: Joi.string().trim().allow('', null).optional(),
+      moveInDate: Joi.date().optional(),
+      emergencyContact,
       caregivers: Joi.array().optional(),
       schedules: Joi.array()
         .items(

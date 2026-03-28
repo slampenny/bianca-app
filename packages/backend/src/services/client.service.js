@@ -30,7 +30,15 @@ const updateClientById = async (clientId, updateBody) => {
   if (!client) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  Object.assign(client, updateBody);
+  const patch = { ...updateBody };
+  if (patch.emergencyContact && typeof patch.emergencyContact === 'object') {
+    const prev =
+      client.emergencyContact && typeof client.emergencyContact.toObject === 'function'
+        ? client.emergencyContact.toObject()
+        : client.emergencyContact || {};
+    patch.emergencyContact = { ...prev, ...patch.emergencyContact };
+  }
+  Object.assign(client, patch);
   await client.save();
   return client;
 };

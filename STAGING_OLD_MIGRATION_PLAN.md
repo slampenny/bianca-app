@@ -130,8 +130,8 @@ There are **42 commits** on `staging-old` that are not on `staging`. The changes
 - **Deployment Verification:** Added version labels (v1/v2) to call headers
 
 #### Files Modified:
-- `packages/frontend/app/screens/CallScreen.tsx`
-- `packages/frontend/app/components/CallStatusBanner.tsx`
+- `packages/mobile/app/screens/CallScreen.tsx`
+- `packages/mobile/app/components/CallStatusBanner.tsx`
 - `packages/backend/src/controllers/callWorkflow.controller.js`
 
 #### Migration Risk: **LOW** ✅
@@ -247,18 +247,18 @@ There are **42 commits** on `staging-old` that are not on `staging`. The changes
 - **LogoutScreen.tsx:** Enhanced with 31 new lines (improved logout flow)
 
 #### Files Modified:
-- `packages/frontend/app/components/CountryPicker.tsx` (NEW - 312 lines)
-- `packages/frontend/app/components/index.ts` (export added)
-- `packages/frontend/app/components/Toast.tsx` (minor updates)
-- `packages/frontend/app/screens/OrgScreen.tsx` (refactored, -130 lines)
-- `packages/frontend/app/screens/RegisterScreen.tsx` (refactored, -114 lines)
-- `packages/frontend/app/screens/ProfileScreen.tsx` (cleanup, -20 lines)
-- `packages/frontend/app/screens/LogoutScreen.tsx` (enhanced, +31 lines)
-- `packages/frontend/app/navigators/AppNavigator.tsx` (major updates, +255 lines)
-- `packages/frontend/app/navigators/AppNavigators.tsx` (minor updates)
-- `packages/frontend/app/navigators/navigationUtilities.ts` (enhanced, +24 lines)
-- `packages/frontend/app/theme/typography.ts` (updates, +25 lines)
-- `packages/frontend/app/i18n/i18n.ts` (translation updates, +7 lines)
+- `packages/mobile/app/components/CountryPicker.tsx` (NEW - 312 lines)
+- `packages/mobile/app/components/index.ts` (export added)
+- `packages/mobile/app/components/Toast.tsx` (minor updates)
+- `packages/mobile/app/screens/OrgScreen.tsx` (refactored, -130 lines)
+- `packages/mobile/app/screens/RegisterScreen.tsx` (refactored, -114 lines)
+- `packages/mobile/app/screens/ProfileScreen.tsx` (cleanup, -20 lines)
+- `packages/mobile/app/screens/LogoutScreen.tsx` (enhanced, +31 lines)
+- `packages/mobile/app/navigators/AppNavigator.tsx` (major updates, +255 lines)
+- `packages/mobile/app/navigators/AppNavigators.tsx` (minor updates)
+- `packages/mobile/app/navigators/navigationUtilities.ts` (enhanced, +24 lines)
+- `packages/mobile/app/theme/typography.ts` (updates, +25 lines)
+- `packages/mobile/app/i18n/i18n.ts` (translation updates, +7 lines)
 - `packages/backend/src/scripts/seeders/orgs.seeder.js` (test org change)
 - `packages/backend/docs/PATIENT_ENGAGEMENT_IMPLEMENTATION.md` (NEW - 1092 lines)
 - `packages/backend/docs/PATIENT_ENGAGEMENT_STRATEGY.md` (NEW - 681 lines)
@@ -329,10 +329,10 @@ There are **42 commits** on `staging-old` that are not on `staging`. The changes
 - Typography updates
 
 #### Files Modified:
-- `packages/frontend/plugins/withExpoFontDisabled.ts` (new)
-- `packages/frontend/app/utils/expo-font-polyfill.ts` (new)
-- `packages/frontend/app/theme/typography.ts`
-- `packages/frontend/app/navigators/AppNavigator.tsx`
+- `packages/mobile/plugins/withExpoFontDisabled.ts` (new)
+- `packages/mobile/app/utils/expo-font-polyfill.ts` (new)
+- `packages/mobile/app/theme/typography.ts`
+- `packages/mobile/app/navigators/AppNavigator.tsx`
 - Various frontend files
 
 #### Migration Risk: **LOW** ✅

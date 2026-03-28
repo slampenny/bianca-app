@@ -10,9 +10,11 @@ This is a monorepo managed with Yarn workspaces.
 bianca-app/
 ├── packages/
 │   ├── backend/          # Backend API service
-│   └── frontend/         # Frontend application
+│   ├── mobile/           # React Native / Expo app (iOS, Android, Expo web)
+│   ├── web/              # Pure React (Vite) desktop web app
+│   └── shared/           # Shared design tokens and types
 ├── package.json          # Root workspace configuration
-└── yarn.lock            # Workspace lock file
+└── yarn.lock             # Workspace lock file
 ```
 
 ## Getting Started
@@ -65,9 +67,17 @@ Backend API service providing:
 
 See `packages/backend/README.md` for more details.
 
-### `@bianca-app/frontend`
+### `@bianca-app/mobile`
 
-Frontend application (see `packages/frontend/` for details).
+React Native / Expo caregiver app (see `packages/mobile/`).
+
+### `@bianca-app/web`
+
+Vite + React desktop web app (org dashboard shell; see `packages/web/`).
+
+### `@bianca-app/shared`
+
+Design tokens and theme catalog shared by mobile and web.
 
 ## License
 

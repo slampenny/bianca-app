@@ -328,7 +328,7 @@ async function diagnoseNetworkIssue() {
 ## Related Files
 
 - `/packages/backend/devops/codedeploy/scripts/validate_service.sh` - Pipeline validation
-- `/packages/frontend/app/services/ssoService.ts` - SSO service
+- `/packages/mobile/app/services/ssoService.ts` - SSO service
 - `/packages/backend/src/app.js` - CORS configuration
 - `/packages/backend/src/routes/v1/sso.route.js` - SSO routes
-- `/packages/frontend/app/config/index.ts` - API URL configuration
+- `/packages/mobile/app/config/index.ts` - API URL configuration
