@@ -83,7 +83,7 @@ export function ResidentsPage() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+    <div data-testid="residents-page" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <div
         style={{
           display: "flex",
@@ -108,6 +108,7 @@ export function ResidentsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             aria-label="Search residents"
+            data-testid="residents-search"
           />
         </div>
       </div>
@@ -138,7 +139,12 @@ export function ResidentsPage() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} onClick={() => navigate(`/residents/${r.id}`)}>
+              <tr
+                key={r.id}
+                data-testid="resident-row"
+                data-resident-id={r.id}
+                onClick={() => navigate(`/residents/${r.id}`)}
+              >
                 <td style={{ fontWeight: 600, color: "var(--va-navy)" }}>
                   {r.firstName} {r.lastName}
                 </td>

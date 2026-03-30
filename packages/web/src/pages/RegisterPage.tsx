@@ -113,6 +113,7 @@ export function RegisterPage() {
       <div className="va-auth-segment" role="group" aria-label="Account type">
         <button
           type="button"
+          data-testid="register-account-individual"
           className={accountType === "individual" ? "va-auth-segment--active" : ""}
           onClick={() => setAccountType("individual")}
         >
@@ -120,6 +121,7 @@ export function RegisterPage() {
         </button>
         <button
           type="button"
+          data-testid="register-account-organization"
           className={accountType === "organization" ? "va-auth-segment--active" : ""}
           onClick={() => setAccountType("organization")}
         >
@@ -132,12 +134,13 @@ export function RegisterPage() {
           : "For a facility or company, use your official organization name."}
       </p>
 
-      <form className="va-login-form" onSubmit={handleSubmit}>
+      <form className="va-login-form" onSubmit={handleSubmit} noValidate>
         {accountType === "organization" ? (
           <label className="va-login-label">
             Organization name
             <input
               className="va-login-input"
+              data-testid="register-organization-name"
               value={organizationName}
               onChange={(ev) => setOrganizationName(ev.target.value)}
               autoComplete="organization"
@@ -149,6 +152,7 @@ export function RegisterPage() {
           Country / region
           <select
             className="va-login-input"
+            data-testid="register-country"
             value={country}
             onChange={(ev) => setCountry(ev.target.value)}
           >
@@ -164,6 +168,7 @@ export function RegisterPage() {
           {accountType === "organization" ? "Your name" : "Full name"}
           <input
             className="va-login-input"
+            data-testid="register-name"
             value={name}
             onChange={(ev) => setName(ev.target.value)}
             autoComplete="name"
@@ -176,6 +181,7 @@ export function RegisterPage() {
             type="email"
             autoComplete="email"
             className="va-login-input"
+            data-testid="register-email"
             value={email}
             onChange={(ev) => setEmail(ev.target.value)}
           />
@@ -185,6 +191,7 @@ export function RegisterPage() {
           Phone
           <input
             className="va-login-input"
+            data-testid="register-phone"
             value={phone}
             onChange={(ev) => setPhone(ev.target.value)}
             autoComplete="tel"
@@ -193,13 +200,23 @@ export function RegisterPage() {
 
         <label className="va-login-label">
           Password
-          <PasswordField autoComplete="new-password" value={password} onChange={(ev) => setPassword(ev.target.value)} />
+          <PasswordField
+            autoComplete="new-password"
+            inputTestId="register-password"
+            value={password}
+            onChange={(ev) => setPassword(ev.target.value)}
+          />
         </label>
         <p className="va-login-helper">At least 8 characters, with at least one letter and one number.</p>
 
         <label className="va-login-label">
           Confirm password
-          <PasswordField autoComplete="new-password" value={confirm} onChange={(ev) => setConfirm(ev.target.value)} />
+          <PasswordField
+            autoComplete="new-password"
+            inputTestId="register-confirm-password"
+            value={confirm}
+            onChange={(ev) => setConfirm(ev.target.value)}
+          />
         </label>
 
         {error ? (
@@ -220,7 +237,7 @@ export function RegisterPage() {
           .
         </p>
 
-        <button type="submit" className="va-btn-primary va-login-submit" disabled={isLoading}>
+        <button type="submit" className="va-btn-primary va-login-submit" data-testid="register-submit" disabled={isLoading}>
           {isLoading ? "Creating account…" : "Create account"}
         </button>
 

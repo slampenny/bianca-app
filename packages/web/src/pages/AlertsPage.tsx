@@ -56,7 +56,7 @@ export function AlertsPage() {
 
   if (alerts.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "4rem 1rem", maxWidth: 480, margin: "0 auto" }}>
+      <div data-testid="alerts-empty" style={{ textAlign: "center", padding: "4rem 1rem", maxWidth: 480, margin: "0 auto" }}>
         <div
           style={{
             width: 80,
@@ -81,7 +81,7 @@ export function AlertsPage() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <div data-testid="alerts-page" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)" }}>
         {/* WEB_API_GAP: No dedicated “facility alert” fields (confidence %, structured risk); mapped from message + importance. */}
         Severity and confidence are derived from API <code>importance</code> until richer fields exist.
@@ -97,6 +97,8 @@ export function AlertsPage() {
         <button
           key={a.id}
           type="button"
+          data-testid="alert-row"
+          data-alert-id={a.id}
           onClick={() => navigate(`/alerts/${a.id}`)}
           className="va-card"
           style={{

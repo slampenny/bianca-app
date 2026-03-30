@@ -114,7 +114,7 @@ export function DashboardPage() {
   }, [hourlyChartData])
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+    <div data-testid="home-header" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>
         {/* WEB_API_GAP: No facility dashboard rollup; metrics use GET /clients (+24h call timestamps) and GET /alerts. */}
         Metrics use live clients/alerts; today&apos;s hourly chart uses{" "}

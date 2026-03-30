@@ -150,10 +150,13 @@ export function AlertDetailPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem", paddingBottom: 48 }}>
+    <div
+      data-testid="alert-detail-page"
+      style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem", paddingBottom: 48 }}
+    >
       {/* GET /alerts/:id returns 403 once read — detail uses GET /alerts?showRead=true list. */}
 
-      <button type="button" className="va-btn-ghost" onClick={() => navigate("/alerts")}>
+      <button type="button" className="va-btn-ghost" data-testid="alert-detail-back" onClick={() => navigate("/alerts")}>
         <ChevronLeftIcon size={16} />
         Back to Alerts
       </button>

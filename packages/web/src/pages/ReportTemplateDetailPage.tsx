@@ -70,8 +70,8 @@ export function ReportTemplateDetailPage() {
   const showLiveLoading = loadLiveClients && authed && payload === null && !isError
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: 900, margin: "0 auto", paddingBottom: 48 }}>
-      <button type="button" className="va-btn-ghost" onClick={() => navigate("/reports")}>
+    <div data-testid="report-detail-page" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: 900, margin: "0 auto", paddingBottom: 48 }}>
+      <button type="button" className="va-btn-ghost" data-testid="report-detail-back" onClick={() => navigate("/reports")}>
         <ChevronLeftIcon size={16} />
         Back to Reports
       </button>

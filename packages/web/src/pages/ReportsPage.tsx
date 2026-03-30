@@ -209,7 +209,7 @@ export function ReportsPage() {
   )
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem", maxWidth: 1200, margin: "0 auto" }}>
+    <div data-testid="reports-page" style={{ display: "flex", flexDirection: "column", gap: "1.75rem", maxWidth: 1200, margin: "0 auto" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div
           style={{
@@ -349,6 +349,7 @@ export function ReportsPage() {
                   <Link
                     to={`/reports/${t.id}`}
                     className="va-btn-primary"
+                    data-testid={`report-open-${t.id}`}
                     style={{ alignSelf: "stretch", justifyContent: "center", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
                   >
                     View report

@@ -64,7 +64,7 @@ export function SettingsPhonePage() {
   }
 
   return (
-    <div style={{ maxWidth: 480, margin: "0 auto" }}>
+    <div data-testid="settings-phone-page" style={{ maxWidth: 480, margin: "0 auto" }}>
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
         ← Back to settings
       </Link>

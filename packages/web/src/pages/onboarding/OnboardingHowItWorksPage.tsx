@@ -38,7 +38,7 @@ export function OnboardingHowItWorksPage() {
       <p className="va-onboarding-body">{body}</p>
 
       <div style={{ marginTop: "2.25rem" }}>
-        <button type="button" className="va-btn-primary va-login-submit" onClick={handleContinue}>
+        <button type="button" className="va-btn-primary va-login-submit" data-testid="onboarding-how-it-works-continue" onClick={handleContinue}>
           {buttonLabel}
         </button>
       </div>

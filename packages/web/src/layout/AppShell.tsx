@@ -113,6 +113,7 @@ export function AppShell() {
               key={to}
               to={to}
               end={to === "/"}
+              data-testid={`nav-${label.toLowerCase()}`}
               className={({ isActive }) =>
                 `va-nav-link ${isActive ? "va-nav-link--active" : ""} ${sidebarCollapsed ? "justify-center" : ""}`
               }

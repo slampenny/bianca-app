@@ -116,6 +116,7 @@ export function LoginPage() {
               type="email"
               autoComplete="email"
               className="va-login-input"
+              data-testid="email-input"
               value={authEmail}
               onChange={(e) => dispatch(setAuthEmail(e.target.value))}
             />
@@ -124,6 +125,7 @@ export function LoginPage() {
             Password
             <PasswordField
               autoComplete="current-password"
+              inputTestId="password-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -149,13 +151,20 @@ export function LoginPage() {
             </p>
           ) : null}
 
-          <button type="submit" className="va-btn-primary va-login-submit" disabled={loading}>
+          <button
+            type="submit"
+            className="va-btn-primary va-login-submit"
+            disabled={loading}
+            data-testid="login-button"
+          >
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
         <div className="va-auth-footer">
-          <Link to="/forgot-password">Forgot password?</Link>
+          <Link to="/forgot-password" data-testid="login-forgot-password-link">
+            Forgot password?
+          </Link>
           <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
             |
           </span>

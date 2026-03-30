@@ -42,6 +42,8 @@ export type PasswordFieldProps = {
   inputClassName?: string
   id?: string
   disabled?: boolean
+  /** For E2E / Playwright (`data-testid` on the password input). */
+  inputTestId?: string
 }
 
 export function PasswordField({
@@ -51,6 +53,7 @@ export function PasswordField({
   inputClassName = "va-login-input",
   id: idProp,
   disabled,
+  inputTestId,
 }: PasswordFieldProps) {
   const reactId = useId()
   const id = idProp ?? reactId
@@ -66,6 +69,7 @@ export function PasswordField({
         value={value}
         onChange={onChange}
         disabled={disabled}
+        data-testid={inputTestId}
       />
       <button
         type="button"

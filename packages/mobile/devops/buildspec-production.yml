@@ -22,22 +22,19 @@ phases:
       - pwd
       - echo Source directory is $CODEBUILD_SRC_DIR
       - |
-        # Handle both monorepo and separate repo cases
-        if [ -d "packages/mobile" ]; then
-          echo "Monorepo detected, changing to packages/mobile..."
-          cd packages/mobile
-        elif [ ! -f "package.json" ]; then
-          echo "ERROR: package.json not found in current directory or packages/mobile"
+        if [ ! -f "package.json" ] || [ ! -d "packages/web" ]; then
+          echo "ERROR: Run from monorepo root (package.json + packages/web required)"
           ls -la
           exit 1
         fi
-        echo "Building from: $(pwd)"
+        echo "Building @bianca-app/web from monorepo root: $(pwd)"
       - echo Building frontend Docker image (production)...
       - |
         if docker build --build-arg BUILD_ENV=production \
+                     --build-arg VITE_API_URL=https://api.biancawellness.com/v1 \
                      -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG \
                      -t $REPOSITORY_URI_FRONTEND:production \
-                     -f devops/Dockerfile .; then
+                     -f packages/web/devops/Dockerfile .; then
           echo "✅ Frontend build complete"
         else
           echo "❌ Frontend build FAILED!"

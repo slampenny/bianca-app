@@ -33,6 +33,7 @@ export function CheckEmailPage() {
       subtitle="We sent a verification link to your inbox. You need to verify before signing in."
       wide
     >
+      <div data-testid="check-email-page">
       <p className="va-auth-muted">
         Didn’t get it? Check spam, or resend the verification email below.
       </p>
@@ -69,6 +70,7 @@ export function CheckEmailPage() {
           <Link to="/register">Create an account</Link>
         </div>
       </form>
+      </div>
     </AuthPageShell>
   )
 }

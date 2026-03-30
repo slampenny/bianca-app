@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:cucumber": "mkdir -p test/e2e/cucumber/reports test/e2e/cucumber/screenshots && NODE_ENV=test npx @cucumber/cucumber --config test/e2e/cucumber/cucumber.config.cjs test/e2e/cucumber/features",
+    "test:e2e": "NODE_ENV=test npx playwright test"
   },
   "dependencies": {
     "@bianca-app/shared": "*",
@@ -23,6 +25,9 @@
     "redux-persist": "^6.0.0"
   },
   "devDependencies": {
+    "@cucumber/cucumber": "^12.5.0",
+    "@cucumber/pretty-formatter": "^2.4.1",
+    "@playwright/test": "^1.52.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",

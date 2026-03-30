@@ -1,7 +1,7 @@
 version: 0.2
 
-# Smoke Tests - Quick verification that frontend builds and loads correctly
-# This runs between Build and Deploy to catch frontend issues before deployment
+# Smoke tests for @bianca-app/web (Vite build + static serve) before deploy.
+# Same stage shape as the previous mobile/Expo smoke job; no Playwright required.
 env:
   variables:
     NODE_ENV: test
@@ -10,7 +10,7 @@ env:
 phases:
   pre_build:
     commands:
-      - echo "Starting frontend smoke tests..."
+      - echo "Starting web frontend smoke tests..."
       - echo "Installing Node.js 20..."
       - |
         export NVM_DIR="$HOME/.nvm"
@@ -19,117 +19,80 @@ phases:
         nvm install 20
         nvm use 20
         echo "✅ Node.js 20 installed"
-      - echo "Locating frontend source code..."
+      - echo "Locating monorepo root and packages/web..."
       - |
-        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/mobile"
-        if [ ! -f "$FRONTEND_DIR/package.json" ]; then
-          echo "❌ ERROR: Frontend package.json not found at $FRONTEND_DIR"
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
+        if [ ! -f "$CODEBUILD_SRC_DIR/package.json" ] || [ ! -f "$FRONTEND_DIR/package.json" ]; then
+          echo "❌ ERROR: Monorepo root or packages/web not found"
           exit 1
         fi
-        echo "✅ Frontend source found at: $FRONTEND_DIR"
+        echo "✅ Web package: $FRONTEND_DIR"
         export FRONTEND_DIR="$FRONTEND_DIR"
-      - echo "Installing frontend dependencies..."
+      - echo "Installing dependencies (yarn workspaces)..."
       - |
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
-        cd "$FRONTEND_DIR" || exit 1
+        cd "$CODEBUILD_SRC_DIR" || exit 1
         yarn install --frozen-lockfile || (echo "⚠️  Lockfile out of sync, updating..." && yarn install)
         echo "✅ Dependencies installed"
 
   build:
     commands:
-      - echo "Building frontend for smoke tests..."
+      - echo "Building @bianca-app/web for smoke tests..."
       - |
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
-        cd "$FRONTEND_DIR" || exit 1
-        
-        # Build the frontend (use staging config for staging pipeline, production for production)
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
+        cd "$CODEBUILD_SRC_DIR" || exit 1
         if [ "$BUILD_ENV" = "staging" ] || [ -z "$BUILD_ENV" ]; then
-          echo "Building for staging environment..."
-          cp app.staging.json app.json 2>/dev/null || echo "app.staging.json not found, using default app.json"
-          EXPO_PUBLIC_ENVIRONMENT=staging yarn bundle:web:staging || EXPO_PUBLIC_ENVIRONMENT=staging node node_modules/.bin/expo export --platform web
+          echo "Build: staging API URL baked for sanity (localhost still used when served from 127.0.0.1 in app code)"
+          VITE_API_URL=https://staging-api.biancawellness.com/v1 yarn workspace @bianca-app/web build
         else
-          echo "Building for production environment..."
-          EXPO_PUBLIC_BUILD_VERSION=$BUILD_VERSION yarn bundle:web || node node_modules/.bin/expo export --platform web
+          VITE_API_URL=https://api.biancawellness.com/v1 yarn workspace @bianca-app/web build
         fi
-        
-        if [ ! -d "dist" ]; then
-          echo "❌ ERROR: Frontend build failed - dist directory not found"
+        if [ ! -d "$FRONTEND_DIR/dist" ]; then
+          echo "❌ ERROR: dist/ missing after build"
           exit 1
         fi
-        echo "✅ Frontend built successfully"
-      - echo "Installing Playwright for smoke tests..."
+        echo "✅ Vite build output present"
+      - echo "Serving dist and verifying HTML..."
       - |
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
         cd "$FRONTEND_DIR" || exit 1
-        yarn playwright install --with-deps chromium || exit 1
-        echo "✅ Playwright installed"
-      - echo "Starting frontend server and running smoke tests..."
-      - |
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-        nvm use 20
-        cd "$FRONTEND_DIR" || exit 1
-        
-        # Start server in background and save PID to file
-        npx serve dist -l $FRONTEND_PORT > /tmp/frontend-server.log 2>&1 &
+        npx --yes serve dist -l $FRONTEND_PORT > /tmp/frontend-server.log 2>&1 &
         echo $! > /tmp/frontend-server.pid
         SERVER_PID=$(cat /tmp/frontend-server.pid)
-        echo "Frontend server started with PID: $SERVER_PID"
-        
-        # Wait for server to be ready
-        echo "Waiting for frontend server to be ready..."
+        echo "Static server PID: $SERVER_PID"
         i=1
         while [ $i -le 30 ]; do
-          if curl -f http://localhost:$FRONTEND_PORT > /dev/null 2>&1; then
-            echo "✅ Frontend server is ready!"
+          if curl -f -s "http://localhost:$FRONTEND_PORT" > /tmp/smoke-page.html 2>/dev/null; then
             break
           fi
           sleep 1
           i=$((i + 1))
         done
-        
         if [ $i -gt 30 ]; then
-          echo "❌ ERROR: Frontend server failed to start"
-          echo "Server logs:"
-          cat /tmp/frontend-server.log
-          kill $SERVER_PID 2>/dev/null || true
+          echo "❌ Server did not become ready"
+          cat /tmp/frontend-server.log || true
+          kill "$SERVER_PID" 2>/dev/null || true
           exit 1
         fi
-        
-        # Set environment variables for Playwright
-        export FRONTEND_URL="http://localhost:$FRONTEND_PORT"
-        export BASE_URL="http://localhost:$FRONTEND_PORT"
-        export CODEBUILD_BUILD_ID="smoke-test"  # Disable webServer in playwright.config.ts
-        
-        # Run the app-loading smoke test
-        echo "Running app-loading smoke test..."
-        NODE_ENV=test npx playwright test test/e2e/app-loading.e2e.test.ts --reporter=list
-        TEST_EXIT_CODE=$?
-        
-        # Stop server
-        echo "Stopping frontend server..."
-        SERVER_PID=$(cat /tmp/frontend-server.pid 2>/dev/null || echo "")
-        if [ -n "$SERVER_PID" ]; then
-          kill $SERVER_PID 2>/dev/null || true
-          wait $SERVER_PID 2>/dev/null || true
+        if ! grep -qE 'id="root"|script.*src=.*\.js' /tmp/smoke-page.html; then
+          echo "❌ Unexpected index.html (no root mount or script)"
+          head -c 800 /tmp/smoke-page.html
+          kill "$SERVER_PID" 2>/dev/null || true
+          exit 1
         fi
-        
-        # Exit with test result
-        if [ $TEST_EXIT_CODE -ne 0 ]; then
-          echo "❌ Smoke test failed!"
-          exit $TEST_EXIT_CODE
-        fi
-        
-        echo "✅ Smoke tests passed!"
+        echo "✅ Smoke check passed (HTML looks like Vite app shell)"
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
 
   post_build:
     commands:
-      - echo "✅ Frontend smoke tests completed successfully"
-      - echo "Frontend is ready for deployment"
-
+      - echo "✅ Web frontend smoke tests completed"
+      - echo "Frontend image build can proceed"

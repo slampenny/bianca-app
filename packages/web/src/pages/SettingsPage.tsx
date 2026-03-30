@@ -161,7 +161,7 @@ export function SettingsPage() {
   const displayAvatar = avatarPreview || profile?.avatar
 
   return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
+    <div data-testid="settings-page" style={{ maxWidth: 560, margin: "0 auto" }}>
       <h1 className="va-page-title">Settings</h1>
       <p style={{ color: "var(--va-slate-500)", marginTop: 8, marginBottom: "1.5rem", fontSize: "0.875rem", lineHeight: 1.45 }}>
         Profile, security, and appearance — aligned with the mobile app.
@@ -286,7 +286,7 @@ export function SettingsPage() {
               <p style={{ fontSize: "0.8125rem", color: "var(--va-emerald-600)", marginBottom: 8 }}>✓ Phone verified</p>
             ) : phoneOk(phone) ? (
               <p style={{ fontSize: "0.8125rem", marginBottom: 8 }}>
-                <Link to="/settings/phone" className="va-link">
+                <Link to="/settings/phone" data-testid="settings-phone-link" className="va-link">
                   Verify phone with SMS code →
                 </Link>
               </p>
@@ -361,7 +361,12 @@ export function SettingsPage() {
           MFA:{" "}
           <strong>{mfaStatus?.mfaEnabled ? `On (${mfaStatus.backupCodesRemaining} backup codes left)` : "Off"}</strong>
         </p>
-        <Link to="/settings/mfa" className="va-btn-secondary" style={{ display: "inline-flex", textDecoration: "none", marginRight: 8 }}>
+        <Link
+          to="/settings/mfa"
+          data-testid="settings-mfa-link"
+          className="va-btn-secondary"
+          style={{ display: "inline-flex", textDecoration: "none", marginRight: 8 }}
+        >
           {mfaStatus?.mfaEnabled ? "Manage MFA" : "Set up MFA"}
         </Link>
       </div>
@@ -371,7 +376,7 @@ export function SettingsPage() {
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
           Access requests and your privacy history.
         </p>
-        <Link to="/settings/privacy" className="va-btn-secondary" style={{ display: "inline-flex", textDecoration: "none" }}>
+        <Link to="/settings/privacy" data-testid="settings-privacy-link" className="va-btn-secondary" style={{ display: "inline-flex", textDecoration: "none" }}>
           Privacy & data requests
         </Link>
       </div>
@@ -390,7 +395,14 @@ export function SettingsPage() {
 
       <div className="va-card va-card-pad">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Session</h2>
-        <button type="button" className="va-btn-secondary" style={{ width: "100%" }} disabled={signingOut} onClick={() => void signOut()}>
+        <button
+          type="button"
+          className="va-btn-secondary"
+          data-testid="settings-sign-out"
+          style={{ width: "100%" }}
+          disabled={signingOut}
+          onClick={() => void signOut()}
+        >
           {signingOut ? "Signing out…" : "Sign out"}
         </button>
         <p

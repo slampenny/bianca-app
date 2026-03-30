@@ -28,7 +28,7 @@ export function ForgotPasswordPage() {
           <p className="va-login-helper" style={{ textAlign: "center", marginBottom: "1rem" }}>
             If an account exists for <strong>{email}</strong>, you’ll receive an email with reset instructions shortly.
           </p>
-          <div className="va-login-success" role="status">
+          <div className="va-login-success" role="status" data-testid="forgot-password-success">
             For security, this message is the same whether or not the email is registered.
           </div>
           <div className="va-auth-footer">
@@ -44,6 +44,7 @@ export function ForgotPasswordPage() {
               autoComplete="email"
               required
               className="va-login-input"
+              data-testid="forgot-password-email"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
             />
@@ -53,7 +54,7 @@ export function ForgotPasswordPage() {
               {error}
             </div>
           ) : null}
-          <button type="submit" className="va-btn-primary va-login-submit" disabled={isLoading}>
+          <button type="submit" className="va-btn-primary va-login-submit" data-testid="forgot-password-submit" disabled={isLoading}>
             {isLoading ? "Sending…" : "Send reset link"}
           </button>
           <div className="va-auth-footer">

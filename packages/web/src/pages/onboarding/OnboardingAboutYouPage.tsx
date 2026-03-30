@@ -30,6 +30,7 @@ export function OnboardingAboutYouPage() {
           <button
             key={key}
             type="button"
+            data-testid={`onboarding-persona-${key}`}
             className={`va-onboarding-choice${persona === key ? " va-onboarding-choice--selected" : ""}`}
             onClick={() => setPersona(key)}
             aria-pressed={persona === key}
@@ -43,6 +44,7 @@ export function OnboardingAboutYouPage() {
         <button
           type="button"
           className="va-btn-primary va-login-submit"
+          data-testid="onboarding-about-you-continue"
           disabled={!persona}
           onClick={handleContinue}
         >

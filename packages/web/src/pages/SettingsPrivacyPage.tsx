@@ -25,7 +25,7 @@ export function SettingsPrivacyPage() {
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
+    <div data-testid="settings-privacy-page" style={{ maxWidth: 560, margin: "0 auto" }}>
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
         ← Back to settings
       </Link>

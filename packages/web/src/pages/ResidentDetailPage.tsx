@@ -140,8 +140,8 @@ export function ResidentDetailPage() {
   const displayName = `${resident.firstName} ${resident.lastName}`.trim()
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 900, margin: "0 auto" }}>
-      <button type="button" className="va-btn-ghost" onClick={() => navigate("/residents")}>
+    <div data-testid="resident-detail-page" style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 900, margin: "0 auto" }}>
+      <button type="button" className="va-btn-ghost" data-testid="resident-detail-back" onClick={() => navigate("/residents")}>
         <ChevronLeftIcon size={16} />
         Back to Residents
       </button>
