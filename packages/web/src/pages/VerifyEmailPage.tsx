@@ -7,7 +7,7 @@ import { setAuthEmail, setAuthTokens, setCurrentUser } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
-import "../vercel-app.css"
+import "../app.css"
 
 function errorText(err: unknown): string {
   const e = err as { status?: number; data?: { error?: string; message?: string } }

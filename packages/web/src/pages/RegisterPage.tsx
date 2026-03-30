@@ -1,16 +1,21 @@
-import { FormEvent, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { FormEvent, useEffect, useState } from "react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../config/legal"
 import { REGISTRATION_COUNTRY_OPTIONS } from "../lib/registrationCountries"
 import { validatePasswordRules, validatePhoneDigits } from "../lib/passwordRules"
 import { useRegisterMutation } from "../services/api/authApi"
-import "../vercel-app.css"
+import { PasswordField } from "../components/PasswordField"
+import type { OnboardingRegisterState } from "../lib/onboardingTypes"
+import "../app.css"
 
 type AccountType = "individual" | "organization"
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const onboarding = (location.state ?? null) as OnboardingRegisterState | null
+
   const [accountType, setAccountType] = useState<AccountType>("individual")
   const [organizationName, setOrganizationName] = useState("")
   const [country, setCountry] = useState("CA")
@@ -22,6 +27,25 @@ export function RegisterPage() {
   const [error, setError] = useState("")
 
   const [register, { isLoading }] = useRegisterMutation()
+
+  useEffect(() => {
+    if (!onboarding?.persona) return
+    if (onboarding.persona === "organization") {
+      setAccountType("organization")
+      if (onboarding.orgName) setOrganizationName(onboarding.orgName)
+      if (onboarding.orgCountry) setCountry(onboarding.orgCountry)
+    } else {
+      setAccountType("individual")
+      if (onboarding.orgCountry) setCountry(onboarding.orgCountry)
+    }
+    if (onboarding.orgTimezone) {
+      try {
+        sessionStorage.setItem("bianca_onboarding_org_timezone", onboarding.orgTimezone)
+      } catch {
+        /* ignore quota / private mode */
+      }
+    }
+  }, [onboarding])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -79,7 +103,11 @@ export function RegisterPage() {
   return (
     <AuthPageShell
       title="Create account"
-      subtitle="Register your organization to use the facility dashboard."
+      subtitle={
+        onboarding?.persona
+          ? "Finish creating your account. You can still adjust details below."
+          : "Register your organization to use the facility dashboard."
+      }
       wide
     >
       <div className="va-auth-segment" role="group" aria-label="Account type">
@@ -165,25 +193,13 @@ export function RegisterPage() {
 
         <label className="va-login-label">
           Password
-          <input
-            type="password"
-            autoComplete="new-password"
-            className="va-login-input"
-            value={password}
-            onChange={(ev) => setPassword(ev.target.value)}
-          />
+          <PasswordField autoComplete="new-password" value={password} onChange={(ev) => setPassword(ev.target.value)} />
         </label>
         <p className="va-login-helper">At least 8 characters, with at least one letter and one number.</p>
 
         <label className="va-login-label">
           Confirm password
-          <input
-            type="password"
-            autoComplete="new-password"
-            className="va-login-input"
-            value={confirm}
-            onChange={(ev) => setConfirm(ev.target.value)}
-          />
+          <PasswordField autoComplete="new-password" value={confirm} onChange={(ev) => setConfirm(ev.target.value)} />
         </label>
 
         {error ? (
@@ -211,6 +227,14 @@ export function RegisterPage() {
         <div className="va-auth-footer">
           <span style={{ color: "var(--va-slate-500)" }}>Already registered?</span>
           <Link to="/login">Sign in</Link>
+          {!onboarding?.persona ? (
+            <>
+              <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
+                |
+              </span>
+              <Link to="/onboarding">New here? Start the tour</Link>
+            </>
+          ) : null}
         </div>
       </form>
     </AuthPageShell>

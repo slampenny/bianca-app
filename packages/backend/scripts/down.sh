@@ -22,7 +22,7 @@ pkill -f 'npx expo' 2>/dev/null || true
 
 # Kill processes on common ports
 echo "Freeing up ports..."
-for port in 3000 8082 8084 8085 9229; do
+for port in 3000 3333 9090 8082 8084 8085 9229; do
   pid=$(lsof -ti:$port 2>/dev/null || true)
   if [ ! -z "$pid" ]; then
     echo "  Killing process on port $port (PID: $pid)"

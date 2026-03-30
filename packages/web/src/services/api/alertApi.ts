@@ -21,7 +21,15 @@ export const alertApi = createApi({
       }),
       invalidatesTags: ["Alert"],
     }),
+    resolveAlert: builder.mutation<ApiAlertRecord, { alertId: string; resolutionNote: string }>({
+      query: ({ alertId, resolutionNote }) => ({
+        url: `/alerts/${alertId}`,
+        method: "PATCH",
+        body: { resolutionNote },
+      }),
+      invalidatesTags: ["Alert"],
+    }),
   }),
 })
 
-export const { useGetAllAlertsQuery, useMarkAlertAsReadMutation } = alertApi
+export const { useGetAllAlertsQuery, useMarkAlertAsReadMutation, useResolveAlertMutation } = alertApi

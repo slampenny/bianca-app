@@ -138,6 +138,19 @@ export function mapApiAlertToFacilityAlert(
     indicators.push(`Importance: ${a.importance}`)
   }
   if (a.alertType) indicators.push(`Type: ${a.alertType}`)
+  if (a.evidence?.snippet) {
+    indicators.push(`Context: ${a.evidence.snippet}`)
+  }
+  if (typeof a.evidence?.confidence === "number") {
+    indicators.push(`Detector confidence: ${Math.round(a.evidence.confidence * 100)}%`)
+  }
+
+  const fromApiActions =
+    a.recommendedActions?.map((r) => ({
+      action: r.labelKey.replace(/^alertActions\./, "").replace(/([A-Z])/g, " $1").trim() || r.id,
+      priority: (a.importance as string) || "medium",
+      assignTo: "Care team",
+    })) ?? []
 
   return {
     id,
@@ -145,13 +158,16 @@ export function mapApiAlertToFacilityAlert(
     residentName: clientId ? clientNameById.get(clientId) ?? "Client" : "—",
     type: a.alertType || "system",
     severity: a.importance || "medium",
-    confidence: importanceConfidence(a.importance || "medium"),
+    confidence:
+      typeof a.evidence?.confidence === "number"
+        ? Math.min(1, Math.max(0, a.evidence.confidence))
+        : importanceConfidence(a.importance || "medium"),
     status: read ? "acknowledged" : "new",
     detectedAt: a.createdAt ?? new Date().toISOString(),
     summary: a.message,
     riskIndicators: indicators.length ? indicators : ["See alert message for details"],
     baselineComparison: { baseline: {}, current: {} },
-    recommendedActions: defaultActions(),
+    recommendedActions: fromApiActions.length ? fromApiActions : defaultActions(),
   }
 }
 

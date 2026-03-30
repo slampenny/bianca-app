@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { NavLink, Outlet } from "react-router-dom"
 import { isAlertUnreadForCaregiver } from "../lib/liveData"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { useGetCaregiverQuery } from "../services/api/caregiverApi"
 import { useDemo, useDemoActions } from "../state/DemoContext"
 import { useAppSelector } from "../store/store"
 import { getCurrentUser } from "../store/authSlice"
@@ -16,7 +17,7 @@ import {
   ZapIcon,
 } from "../icons"
 import { formatHeaderLastActivity } from "../lib/timeFormat"
-import "../vercel-app.css"
+import "../app.css"
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: DashboardIcon, badge: false },
@@ -39,7 +40,11 @@ export function AppShell() {
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const org = useAppSelector((s) => s.org)
   const facilityName = org?.name || "Sunrise Memory Care"
+  const userId = currentUser?.id != null ? String(currentUser.id) : ""
+  const { data: caregiverFresh } = useGetCaregiverQuery({ id: userId }, { skip: !authed || !userId })
   const avatarLabel = useMemo(() => userInitials(currentUser?.name), [currentUser?.name])
+  const avatarRaw = caregiverFresh?.avatar ?? currentUser?.avatar
+  const avatarUrl = avatarRaw && String(avatarRaw).trim() ? String(avatarRaw).trim() : ""
 
   const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
   const liveUnread = useMemo(
@@ -144,7 +149,16 @@ export function AppShell() {
               Last activity: <strong style={{ color: "var(--va-slate-600)" }}>{lastLabel}</strong>
             </span>
             <div className="va-avatar" title={currentUser?.email || undefined}>
-              {avatarLabel}
+              {avatarUrl ? (
+                <img
+                  className="va-avatar-img"
+                  src={avatarUrl}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                avatarLabel
+              )}
             </div>
           </div>
         </header>

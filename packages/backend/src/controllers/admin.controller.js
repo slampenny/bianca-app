@@ -1,0 +1,162 @@
+const httpStatus = require('http-status');
+const mongoose = require('mongoose');
+const catchAsync = require('../utils/catchAsync');
+const ApiError = require('../utils/ApiError');
+const { getAdminObservabilitySnapshot } = require('../services/observability.service');
+const { caregiverService, tokenService, alertService } = require('../services');
+const { AlertDTO, CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall } = require('../dtos');
+const { AuditLog } = require('../models');
+const logger = require('../config/logger');
+
+function assertSuperAdmin(req) {
+  if (req.caregiver.role !== 'superAdmin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Super admin access required');
+  }
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function resolveOrgForDto(orgOrCaregiverOrg) {
+  let orgForDTO = orgOrCaregiverOrg;
+  if (!orgForDTO) {
+    return null;
+  }
+  const isObjectId =
+    orgForDTO instanceof mongoose.Types.ObjectId ||
+    (orgForDTO.constructor && orgForDTO.constructor.name === 'ObjectId');
+  const isString = typeof orgForDTO === 'string';
+  const hasOrgProperties = orgForDTO.name !== undefined || orgForDTO.email !== undefined;
+
+  if ((isObjectId || isString) || !hasOrgProperties) {
+    const Org = require('../models/org.model');
+    const orgId = isObjectId ? orgForDTO : orgForDTO._id || orgForDTO.toString();
+    orgForDTO = await Org.findById(orgId);
+  }
+  return orgForDTO;
+}
+
+const getObservability = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  res.send(getAdminObservabilitySnapshot());
+});
+
+/**
+ * Search caregivers across all orgs (email or name substring). Super admin only.
+ */
+const searchCaregivers = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+
+  const q = String(req.query.q || '').trim();
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const page = parseInt(req.query.page, 10) || 1;
+
+  const or = [
+    { email: new RegExp(escapeRegex(q), 'i') },
+    { name: new RegExp(escapeRegex(q), 'i') },
+  ];
+  if (mongoose.Types.ObjectId.isValid(q) && String(new mongoose.Types.ObjectId(q)) === q) {
+    or.push({ _id: new mongoose.Types.ObjectId(q) });
+  }
+
+  const filter = { $or: or };
+  const result = await caregiverService.queryCaregivers(filter, {
+    limit,
+    page,
+    sortBy: req.query.sortBy || 'name:asc',
+    populate: 'org',
+  });
+
+  const results = (result.results || []).map((c) => {
+    const dto = CaregiverDTO(c);
+    const org = c.org;
+    if (!dto) {
+      return null;
+    }
+    return {
+      ...dto,
+      id: dto.id != null ? String(dto.id) : undefined,
+      orgName: org && typeof org === 'object' && org.name ? org.name : null,
+    };
+  }).filter(Boolean);
+
+  res.send({ ...result, results });
+});
+
+/**
+ * Issue tokens for another caregiver (same payload shape as POST /auth/login). Super admin only.
+ */
+const impersonate = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+
+  const { caregiverId } = req.body;
+  const sessionCtx = await caregiverService.getCaregiverSessionContextById(caregiverId);
+  if (!sessionCtx) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+
+  const { caregiver, clients, org } = sessionCtx;
+
+  if (caregiver.role === 'superAdmin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Cannot impersonate other super administrators');
+  }
+
+  if (caregiver.accountLocked) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'That account is locked');
+  }
+
+  const actingSuperAdminId = req.caregiver._id || req.caregiver.id;
+  const targetId = caregiver._id || caregiver.id;
+
+  const alerts = await alertService.getAlerts(targetId);
+  const alertDTOs = alerts.map((a) => AlertDTO(a));
+  const clientDTOs = await clientsToDTOsWithLastCall(clients);
+  const caregiverDTO = CaregiverDTO(caregiver);
+  const tokens = await tokenService.generateAuthTokens(caregiver);
+  const orgForDTO = await resolveOrgForDto(org || caregiver.org);
+
+  const metadata = new Map();
+  metadata.set('targetCaregiverId', String(targetId));
+  metadata.set('targetRole', String(caregiver.role || ''));
+  metadata.set('actingSuperAdminId', String(actingSuperAdminId));
+
+  await AuditLog.create({
+    timestamp: new Date(),
+    userId: actingSuperAdminId,
+    userRole: 'superAdmin',
+    action: 'IMPERSONATION',
+    resource: 'caregiver',
+    resourceId: String(targetId),
+    outcome: 'SUCCESS',
+    ipAddress: req.ip || req.connection.remoteAddress,
+    userAgent: req.get('user-agent'),
+    metadata,
+    complianceFlags: {
+      phiAccessed: false,
+      highRiskAction: true,
+      requiresReview: true,
+    },
+  });
+
+  logger.warn('[Admin] Super-admin impersonation session issued', {
+    actingSuperAdminId: String(actingSuperAdminId),
+    targetCaregiverId: String(targetId),
+    targetRole: caregiver.role,
+  });
+
+  res.send({
+    impersonation: true,
+    org: orgForDTO ? OrgDTO(orgForDTO) : null,
+    caregiver: caregiverDTO,
+    clients: clientDTOs,
+    alerts: alertDTOs,
+    tokens,
+  });
+});
+
+module.exports = {
+  getObservability,
+  searchCaregivers,
+  impersonate,
+};

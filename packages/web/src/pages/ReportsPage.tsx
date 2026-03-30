@@ -1,14 +1,12 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { ReportDocumentBody } from "../components/ReportDocumentBody"
 import {
   downloadFacilitySnapshotCsv,
-  downloadReportDataFile,
   downloadResidentDigestCsv,
   facilityReportStats,
-  getReportPayload,
   getResidentDigestPayload,
-  printReport,
   printResidentDigest,
   recentReportActivity,
   reportTemplates,
@@ -16,12 +14,11 @@ import {
   staffVersusFamilyDigestCopy,
   weeklyReportRuns,
   type ReportDeliveryChannel,
-  type ReportPayload,
   type ReportTemplateId,
   type ResidentReportSnapshot,
 } from "../data/reportsMock"
 import { BellIcon, ChartBarIcon, DownloadIcon, FileTextIcon, PhoneIcon, PrintIcon, UsersIcon } from "../icons"
-import "../vercel-app.css"
+import "../app.css"
 
 type ReportsTab = "library" | "activity" | "resident"
 
@@ -162,83 +159,6 @@ function CheckDot({ ok }: { ok: boolean }) {
   )
 }
 
-function ReportDocumentBody({ payload }: { payload: ReportPayload }) {
-  return (
-    <div className="va-report-doc">
-      <div className="va-report-doc-brand">
-        bianca<span className="va-report-doc-brand-dot">.</span>
-      </div>
-      <h2 className="va-report-doc-title">{payload.title}</h2>
-      <p className="va-report-doc-meta">
-        {payload.subtitle} · {payload.facilityLine} · {payload.generatedAtLabel}
-      </p>
-      {payload.narrative && payload.narrative.length > 0 ? (
-        <ul className="va-report-doc-narrative">
-          {payload.narrative.map((line) => (
-            <li key={line}>{line}</li>
-          ))}
-        </ul>
-      ) : null}
-      {payload.tables.map((tab, idx) => (
-        <div key={idx}>
-          {tab.caption ? <div className="va-report-doc-table-cap">{tab.caption}</div> : null}
-          <table className="va-report-doc-table">
-            <thead>
-              <tr>
-                {tab.headers.map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tab.rows.map((row, ri) => (
-                <tr key={ri}>
-                  {row.map((cell, ci) => (
-                    <td key={ci}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ReportPreviewModal({
-  templateId,
-  onClose,
-}: {
-  templateId: ReportTemplateId
-  onClose: () => void
-}) {
-  const payload = useMemo(() => getReportPayload(templateId), [templateId])
-  return (
-    <div className="va-modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="va-modal" role="dialog" aria-modal="true" aria-labelledby="report-preview-title" onClick={(e) => e.stopPropagation()}>
-        <div id="report-preview-title" className="sr-only">
-          {payload.title}
-        </div>
-        <ReportDocumentBody payload={payload} />
-        <div className="va-report-modal-actions">
-          <button type="button" className="va-btn-secondary" onClick={() => printReport(templateId)}>
-            <PrintIcon size={18} />
-            Print / Save as PDF
-          </button>
-          <button type="button" className="va-btn-secondary" onClick={() => downloadReportDataFile(templateId)}>
-            <DownloadIcon size={18} />
-            Download data (CSV)
-          </button>
-          <button type="button" className="va-btn-primary" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function riskStyles(label: ResidentReportSnapshot["riskLabel"]): { bg: string; color: string } {
   switch (label) {
     case "High":
@@ -276,7 +196,6 @@ function deliveryChipStyle(kind: ReportDeliveryChannel): { bg: string; color: st
 
 export function ReportsPage() {
   const [tab, setTab] = useState<ReportsTab>("library")
-  const [previewId, setPreviewId] = useState<ReportTemplateId | null>(null)
   const [residentId, setResidentId] = useState(residentReportSnapshots[0]?.id ?? "")
 
   const selectedResident = useMemo(
@@ -291,8 +210,6 @@ export function ReportsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem", maxWidth: 1200, margin: "0 auto" }}>
-      {previewId ? <ReportPreviewModal templateId={previewId} onClose={() => setPreviewId(null)} /> : null}
-
       <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
         <div
           style={{
@@ -429,9 +346,13 @@ export function ReportsPage() {
                       </span>
                     ))}
                   </div>
-                  <button type="button" className="va-btn-primary" style={{ alignSelf: "stretch", justifyContent: "center" }} onClick={() => setPreviewId(t.id)}>
+                  <Link
+                    to={`/reports/${t.id}`}
+                    className="va-btn-primary"
+                    style={{ alignSelf: "stretch", justifyContent: "center", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+                  >
                     View report
-                  </button>
+                  </Link>
                 </div>
               </article>
             )

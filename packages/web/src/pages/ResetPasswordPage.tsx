@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useResetPasswordMutation } from "../services/api/authApi"
 import { validatePasswordRules } from "../lib/passwordRules"
-import "../vercel-app.css"
+import { PasswordField } from "../components/PasswordField"
+import "../app.css"
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -53,24 +54,12 @@ export function ResetPasswordPage() {
       <form className="va-login-form" onSubmit={handleSubmit}>
         <label className="va-login-label">
           New password
-          <input
-            type="password"
-            autoComplete="new-password"
-            className="va-login-input"
-            value={password}
-            onChange={(ev) => setPassword(ev.target.value)}
-          />
+          <PasswordField autoComplete="new-password" value={password} onChange={(ev) => setPassword(ev.target.value)} />
         </label>
         <p className="va-login-helper">At least 8 characters, with at least one letter and one number.</p>
         <label className="va-login-label">
           Confirm password
-          <input
-            type="password"
-            autoComplete="new-password"
-            className="va-login-input"
-            value={confirm}
-            onChange={(ev) => setConfirm(ev.target.value)}
-          />
+          <PasswordField autoComplete="new-password" value={confirm} onChange={(ev) => setConfirm(ev.target.value)} />
         </label>
         {error ? (
           <div className="va-login-error" role="alert">

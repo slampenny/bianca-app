@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useResendVerificationEmailMutation } from "../services/api/authApi"
-import "../vercel-app.css"
+import "../app.css"
 
 type LocationState = { email?: string }
 

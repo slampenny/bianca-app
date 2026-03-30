@@ -17,6 +17,8 @@ const privacyRoute = require('./privacy.route');
 const reportRoute = require('./report.route');
 const familyWeeklyDigestRoute = require('./familyWeeklyDigest.route');
 const facilityReportsRoute = require('./facilityReports.route');
+const activityRoute = require('./activity.route');
+const adminRoute = require('./admin.route');
 const scheduleRoute = require('./schedule.route');
 const sentimentRoute = require('./sentiment.route');
 const ssoRoute = require('./sso.route');
@@ -105,6 +107,14 @@ const defaultRoutes = [
   {
     path: '/facility-reports',
     route: facilityReportsRoute,
+  },
+  {
+    path: '/activity',
+    route: activityRoute,
+  },
+  {
+    path: '/admin',
+    route: adminRoute,
   },
   {
     path: '/schedules',

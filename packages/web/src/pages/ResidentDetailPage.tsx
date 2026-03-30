@@ -9,7 +9,7 @@ import { useGetAllAlertsQuery } from "../services/api/alertApi"
 import { useGetClientQuery } from "../services/api/clientApi"
 import { useGetConversationsByClientQuery } from "../services/api/conversationApi"
 import { useGetSentimentSummaryQuery, useGetSentimentTrendQuery } from "../services/api/sentimentApi"
-import type { SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
+import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
 import { useAppSelector } from "../store/store"
 import { CheckIcon, ChevronLeftIcon, ClockIcon, MessageIcon, PhoneIcon } from "../icons"
 
@@ -18,6 +18,13 @@ function formatDurationSeconds(sec?: number | null): string {
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return `${m}m ${s}s`
+}
+
+function formatConsentTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return "—"
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 }
 
 type SentimentTimeRange = "lastCall" | "month" | "lifetime"
@@ -134,11 +141,6 @@ export function ResidentDetailPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 900, margin: "0 auto" }}>
-      <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>
-        {/* WEB_API_GAP: Consent modal is illustrative — no signed PDF URL in API. */}
-        Consent “document” is a template only until a document storage URL is exposed.
-      </p>
-
       <button type="button" className="va-btn-ghost" onClick={() => navigate("/residents")}>
         <ChevronLeftIcon size={16} />
         Back to Residents
@@ -215,13 +217,30 @@ export function ResidentDetailPage() {
                       <span style={{ color: "var(--va-emerald-500)" }}>
                         <CheckIcon size={16} />
                       </span>
-                      <span style={{ color: "var(--va-emerald-700)" }}>On file (API: consented)</span>
+                      <span style={{ color: "var(--va-emerald-700)" }}>On file</span>
+                      {apiClient.consentedAt ? (
+                        <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>
+                          · {formatConsentTimestamp(apiClient.consentedAt)}
+                        </span>
+                      ) : null}
                       <button type="button" className="va-link" style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }} onClick={() => setConsentOpen(true)}>
-                        View document
+                        View details
+                      </button>
+                    </>
+                  ) : apiClient.consented === false ? (
+                    <>
+                      <span style={{ color: "var(--va-red-600)" }}>Not on file</span>
+                      <button type="button" className="va-link" style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }} onClick={() => setConsentOpen(true)}>
+                        View details
                       </button>
                     </>
                   ) : (
-                    <span style={{ color: "var(--va-red-600)" }}>Missing</span>
+                    <>
+                      <span style={{ color: "var(--va-amber-700)" }}>Pending</span>
+                      <button type="button" className="va-link" style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }} onClick={() => setConsentOpen(true)}>
+                        View details
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -522,7 +541,9 @@ export function ResidentDetailPage() {
         )}
       </div>
 
-      {consentOpen && <ConsentModal residentName={displayName} onClose={() => setConsentOpen(false)} />}
+      {consentOpen && (
+        <ConsentModal client={apiClient} displayName={displayName} onClose={() => setConsentOpen(false)} />
+      )}
 
       <style>{`
         @media (min-width: 768px) {
@@ -789,14 +810,25 @@ function InfoRow({
   )
 }
 
-function ConsentModal({ residentName, onClose }: { residentName: string; onClose: () => void }) {
+function ConsentModal({ client, displayName, onClose }: { client: Client; displayName: string; onClose: () => void }) {
+  const statusLabel =
+    client.consented === true ? "On file" : client.consented === false ? "Not on file" : "Pending"
+  const statusColor =
+    client.consented === true
+      ? "var(--va-emerald-700)"
+      : client.consented === false
+        ? "var(--va-red-600)"
+        : "var(--va-amber-700)"
+
   return (
     <div className="va-modal-backdrop" role="dialog" aria-modal onClick={onClose}>
       <div className="va-modal" onClick={(e) => e.stopPropagation()}>
         <div style={{ padding: "1.25rem 2rem", borderBottom: "1px solid var(--va-slate-200)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <h2 style={{ fontSize: "1.125rem", fontWeight: 600 }}>Resident Monitoring Consent Form</h2>
-            <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", marginTop: 4 }}>Bianca Wellness Platform — template (WEB_API_GAP: no signed document URL)</p>
+            <h2 style={{ fontSize: "1.125rem", fontWeight: 600 }}>Client consent</h2>
+            <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", marginTop: 4 }}>
+              Status from Bianca (same field as email consent flow). Signed PDF storage is not attached yet.
+            </p>
           </div>
           <button type="button" className="va-icon-btn" aria-label="Close" onClick={onClose} style={{ color: "var(--va-slate-400)" }}>
             ×
@@ -807,11 +839,25 @@ function ConsentModal({ residentName, onClose }: { residentName: string; onClose
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Resident</span>
-                <p style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{residentName}</p>
+                <p style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{displayName}</p>
               </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Status</span>
+                <p style={{ fontWeight: 600, color: statusColor }}>{statusLabel}</p>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Recorded</span>
+                <p style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{formatConsentTimestamp(client.consentedAt)}</p>
+              </div>
+              {client.consentEmailVersion ? (
+                <div>
+                  <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Email version</span>
+                  <p style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{client.consentEmailVersion}</p>
+                </div>
+              ) : null}
             </div>
           </div>
-          <p style={{ fontWeight: 600, marginBottom: 8 }}>The resident and/or authorized representative consents to the following:</p>
+          <p style={{ fontWeight: 600, marginBottom: 8 }}>Program scope (summary of what consent covers):</p>
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {CONSENT_BULLETS.map((b) => (
               <li key={b} style={{ display: "flex", gap: 12, marginBottom: 10 }}>

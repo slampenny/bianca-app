@@ -107,7 +107,7 @@ describe("LoginPage", () => {
     const user = userEvent.setup()
     unwrap.mockResolvedValue({ tokens, caregiver, org })
     const { store } = renderLogin()
-    await user.type(screen.getByLabelText(/password/i), "secret")
+    await user.type(screen.getByLabelText("Password", { exact: true }), "secret")
     await user.click(screen.getByRole("button", { name: /sign in/i }))
     await waitFor(() => {
       expect(loginMutate).toHaveBeenCalledWith({ email: "user@test.com", password: "secret" })

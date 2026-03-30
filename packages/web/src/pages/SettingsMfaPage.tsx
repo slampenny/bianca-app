@@ -7,7 +7,7 @@ import {
   useRegenerateBackupCodesMutation,
   useVerifyAndEnableMFAMutation,
 } from "../services/api/mfaApi"
-import "../vercel-app.css"
+import "../app.css"
 
 export function SettingsMfaPage() {
   const { data: mfaStatus, isLoading: statusLoading, refetch } = useGetMFAStatusQuery()

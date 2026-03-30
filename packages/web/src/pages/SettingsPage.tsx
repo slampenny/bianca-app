@@ -15,7 +15,7 @@ import { useGetMFAStatusQuery } from "../services/api/mfaApi"
 import { clearAuth, getAuthTokens, getCurrentUser } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
-import "../vercel-app.css"
+import "../app.css"
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || "1.0.0"
 

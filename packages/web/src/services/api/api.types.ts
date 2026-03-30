@@ -87,6 +87,9 @@ export interface Client {
   schedules: Schedule[]
   age?: number
   consented?: boolean
+  /** ISO string when consent was recorded */
+  consentedAt?: string | null
+  consentEmailVersion?: string | null
   preferredName?: string
   room?: string | null
   moveInDate?: string | null
@@ -107,6 +110,28 @@ export interface ClientPages {
   totalResults: number
 }
 
+/** Evidence / suggested actions (release/mvp alert model) */
+export interface ApiAlertEvidence {
+  snippet?: string
+  conversationId?: string
+  messageIds?: string[]
+  detector?: string
+  confidence?: number
+  language?: string
+}
+
+export interface ApiAlertRecommendedAction {
+  id: string
+  labelKey: string
+  actionType: string
+}
+
+export interface ApiAlertResolvedBy {
+  id?: string
+  name?: string
+  email?: string
+}
+
 /** Alert document as returned by GET /alerts */
 export interface ApiAlertRecord {
   id?: string
@@ -121,6 +146,11 @@ export interface ApiAlertRecord {
   visibility?: string
   createdBy?: string
   createdModel?: string
+  evidence?: ApiAlertEvidence
+  recommendedActions?: ApiAlertRecommendedAction[]
+  resolutionNote?: string | null
+  resolvedAt?: string | null
+  resolvedBy?: ApiAlertResolvedBy | string | null
 }
 
 export interface ConversationMessage {
@@ -128,6 +158,31 @@ export interface ConversationMessage {
   role: string
   content: string
   timestamp?: string
+}
+
+/** Populated message from GET /conversations/:id (Message model + timestamps). */
+export interface ConversationMessageApi extends ConversationMessage {
+  _id?: string
+  createdAt?: string
+  updatedAt?: string
+  metadata?: Record<string, unknown>
+}
+
+/** Single conversation returned by GET /conversations/:conversationId (ConversationDTO). */
+export interface ConversationDetail {
+  id?: string
+  callSid?: string
+  clientId: string
+  messages?: ConversationMessageApi[]
+  startTime?: string | null
+  endTime?: string | null
+  duration?: number
+  callStartTime?: string | null
+  callEndTime?: string | null
+  callDuration?: number
+  status?: string
+  callOutcome?: string
+  callNotes?: string | null
 }
 
 export interface Conversation {

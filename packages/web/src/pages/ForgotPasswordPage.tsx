@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react"
 import { Link } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useForgotPasswordMutation } from "../services/api/authApi"
-import "../vercel-app.css"
+import "../app.css"
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("")

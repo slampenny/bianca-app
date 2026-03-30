@@ -36,6 +36,47 @@ services:
     networks: # <-- Add this network assignment
       - node-network
 
+  # Optional: Prometheus + Grafana (local metrics). Start with:
+  #   yarn docker:observability
+  # Grafana: http://localhost:3333 (admin / admin) — change in production.
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v2.52.0
+    container_name: bianca-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - node-network
+    restart: unless-stopped
+
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:11.3.0
+    container_name: bianca-grafana
+    ports:
+      - "3333:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3333
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - node-network
+    restart: unless-stopped
+
   # ngrok:
   #   container_name: ngrok
   #   image: ngrok/ngrok
@@ -88,3 +129,4 @@ networks: # <-- Add this whole block
 volumes:
   bianca-app-node-modules:
   bianca-app-yarn-cache:
+  grafana-data:

@@ -139,6 +139,9 @@ const envVarsSchema = Joi.object({
   REDIS_URL: Joi.string().optional(), // Redis connection URL (e.g., redis://endpoint:6379)
   REDIS_ENDPOINT: Joi.string().optional(), // Redis endpoint (alternative to REDIS_URL)
   REDIS_PORT: Joi.number().optional().default(6379),
+
+  /** If set, GET /metrics requires Authorization: Bearer <token> in production and staging */
+  METRICS_SCRAPE_TOKEN: Joi.string().optional().allow(''),
   
 }).unknown();
 
@@ -249,6 +252,11 @@ const baselineConfig = {
   },
   // Merge domain-specific configurations
   ...buildAllConfigs(envVars),
+
+  metricsScrapeToken:
+    typeof envVars.METRICS_SCRAPE_TOKEN === 'string' && envVars.METRICS_SCRAPE_TOKEN.trim() !== ''
+      ? envVars.METRICS_SCRAPE_TOKEN.trim()
+      : null,
 };
 
 // CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation

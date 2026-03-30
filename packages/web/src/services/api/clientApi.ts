@@ -22,7 +22,19 @@ export const clientApi = createApi({
       query: ({ id }) => `/clients/${id}`,
       providesTags: (_r, _e, { id }) => [{ type: "Client", id }],
     }),
+    /** Public — used from /client-consent (email link). GET does not require auth. */
+    verifyConsent: builder.mutation<
+      { success: boolean; message: string; alreadyConsented?: boolean },
+      { token: string }
+    >({
+      query: ({ token }) => ({
+        url: `/clients/consent/verify`,
+        method: "GET",
+        params: { token },
+        headers: { Accept: "application/json" },
+      }),
+    }),
   }),
 })
 
-export const { useGetAllClientsQuery, useGetClientQuery } = clientApi
+export const { useGetAllClientsQuery, useGetClientQuery, useVerifyConsentMutation } = clientApi

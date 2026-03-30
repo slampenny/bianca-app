@@ -61,6 +61,7 @@ const PHI_ROUTES = {
   'GET /v1/alerts/:id': { action: 'READ', resource: 'alert', phiAccessed: true },
   'POST /v1/alerts': { action: 'CREATE', resource: 'alert', phiAccessed: true },
   'PATCH /v1/alerts/:id': { action: 'UPDATE', resource: 'alert', phiAccessed: true },
+  'PATCH /v1/alerts/:alertId': { action: 'UPDATE', resource: 'alert', phiAccessed: true },
 
   // Reports (aggregated PHI)
   'GET /v1/reports': { action: 'READ', resource: 'report', phiAccessed: true },
@@ -80,11 +81,17 @@ const PHI_ROUTES = {
 
   'GET /facility-reports/call-completion-log': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
   'GET /facility-reports/alert-audit-trail': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
+  'GET /activity/recent': { action: 'READ', resource: 'activityFeed', phiAccessed: true },
 
   // Export/Download operations (high risk)
   'GET /v1/clients/:id/export': { action: 'EXPORT', resource: 'client', phiAccessed: true, highRisk: true },
   'GET /v1/conversations/:id/export': { action: 'EXPORT', resource: 'conversation', phiAccessed: true, highRisk: true },
   'POST /v1/reports/export': { action: 'EXPORT', resource: 'report', phiAccessed: true, highRisk: true },
+
+  // Privacy router is mounted under /v1/privacy — Express uses route path relative to the mount
+  'GET /consent/audit': { action: 'READ', resource: 'consentAudit', phiAccessed: true, highRisk: true },
+  'GET /consent/audit/export': { action: 'EXPORT', resource: 'consentAudit', phiAccessed: true, highRisk: true },
+  'GET /consent/audit/export/pdf': { action: 'EXPORT', resource: 'consentAudit', phiAccessed: true, highRisk: true },
 };
 
 // Authentication events that need auditing

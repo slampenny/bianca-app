@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { PRIVACY_POLICY_URL } from "../config/legal"
 import { useCreateAccessRequestMutation, useGetPrivacyRequestsQuery } from "../services/api/privacyApi"
-import "../vercel-app.css"
+import "../app.css"
 
 export function SettingsPrivacyPage() {
   const { data: pages, isLoading } = useGetPrivacyRequestsQuery({ page: 1, limit: 20 })

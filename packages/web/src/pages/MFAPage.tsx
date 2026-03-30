@@ -6,7 +6,7 @@ import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
 import { parseLoginError } from "../lib/loginError"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
-import "../vercel-app.css"
+import "../app.css"
 
 type MfaState = {
   email: string

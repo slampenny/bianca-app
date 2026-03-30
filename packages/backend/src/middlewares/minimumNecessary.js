@@ -29,11 +29,20 @@ const FIELD_ACCESS_RULES = {
       'avatar',
       'language',
       'lastContact',
+      'lastCallAttemptAt',
+      'lastAnsweredCallAt',
+      'sentimentTrendDirection',
+      'sentimentAnalyzedConversations',
+      'latestOverallHealthScore',
+      'latestOverallRiskScore',
       'status',
       'assignedCaregivers',
       'caregivers',
       'schedules', // For care coordination / schedule views
       'org',
+      'consented',
+      'consentedAt',
+      'consentEmailVersion',
     ],
     
     conversation: [
@@ -85,6 +94,12 @@ const FIELD_ACCESS_RULES = {
       'avatar',
       'language',
       'lastContact',
+      'lastCallAttemptAt',
+      'lastAnsweredCallAt',
+      'sentimentTrendDirection',
+      'sentimentAnalyzedConversations',
+      'latestOverallHealthScore',
+      'latestOverallRiskScore',
       'status',
       'assignedCaregivers',
       'caregivers',
@@ -92,6 +107,9 @@ const FIELD_ACCESS_RULES = {
       'org',
       'dateOfBirth',
       'address',
+      'consented',
+      'consentedAt',
+      'consentEmailVersion',
     ],
     
     conversation: [

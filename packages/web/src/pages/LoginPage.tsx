@@ -12,7 +12,8 @@ import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import { mapValidationErrorToMessage, parseLoginError } from "../lib/loginError"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
-import "../vercel-app.css"
+import { PasswordField } from "../components/PasswordField"
+import "../app.css"
 
 type LoginLocationState = {
   from?: { pathname: string; search?: string }
@@ -121,10 +122,8 @@ export function LoginPage() {
           </label>
           <label className="va-login-label">
             Password
-            <input
-              type="password"
+            <PasswordField
               autoComplete="current-password"
-              className="va-login-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -160,7 +159,7 @@ export function LoginPage() {
           <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
             |
           </span>
-          <Link to="/register">Create account</Link>
+          <Link to="/onboarding">Create account</Link>
           <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
             |
           </span>

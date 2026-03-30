@@ -186,6 +186,33 @@ const getLoginCaregiverData = async (email) => {
 };
 
 /**
+ * Load caregiver + org + clients (same shape as login) by id — for super-admin impersonation.
+ * @param {string|mongoose.Types.ObjectId} id
+ * @returns {Promise<{ org: *, caregiver: *, clients: * } | null>}
+ */
+const getCaregiverSessionContextById = async (id) => {
+  const caregiver = await Caregiver.findById(id)
+    .populate('org')
+    .populate({
+      path: 'clients',
+      populate: {
+        path: 'schedules',
+        model: 'Schedule',
+      },
+    });
+
+  if (!caregiver) {
+    return null;
+  }
+
+  return {
+    org: caregiver.org,
+    caregiver,
+    clients: caregiver.clients || [],
+  };
+};
+
+/**
  * Update caregiver by id
  * @param {ObjectId} caregiverId
  * @param {Object} updateBody
@@ -378,6 +405,7 @@ module.exports = {
   getCaregiverById,
   getCaregiverByEmail,
   getLoginCaregiverData,
+  getCaregiverSessionContextById,
   updateCaregiverById,
   deleteCaregiverById,
   getClientById,

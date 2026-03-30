@@ -1,15 +1,18 @@
 import { skipToken } from "@reduxjs/toolkit/query"
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
 import { useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { mapConversationToTranscript } from "../lib/mapConversationToTranscript"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
-import { useGetAllAlertsQuery, useMarkAlertAsReadMutation } from "../services/api/alertApi"
+import { useGetAllAlertsQuery, useMarkAlertAsReadMutation, useResolveAlertMutation } from "../services/api/alertApi"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
+import { useGetConversationByIdQuery } from "../services/api/conversationApi"
 import { useDemo, useDemoActions } from "../state/DemoContext"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { formatAlertType, formatDetectedDate, formatDetectedTime } from "../lib/timeFormat"
 import { AlertOctagonIcon, CheckIcon, ChevronLeftIcon, MessageIcon } from "../icons"
-import type { Alert as FacilityAlert, TranscriptLine } from "../types"
+import type { Alert as FacilityAlert, Transcript, TranscriptLine } from "../types"
 
 const SENTIMENT_DOT: Record<string, string> = {
   neutral: "var(--va-slate-300)",
@@ -36,6 +39,9 @@ export function AlertDetailPage() {
   const { acknowledgeAlert } = useDemoActions()
   const [assigned, setAssigned] = useState<Set<number>>(() => new Set())
   const [markRead, { isLoading: marking }] = useMarkAlertAsReadMutation()
+  const [resolveAlert, { isLoading: resolving }] = useResolveAlertMutation()
+  const [resolutionNote, setResolutionNote] = useState("")
+  const [resolveError, setResolveError] = useState("")
 
   const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
   const { data: clientPages } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
@@ -64,8 +70,32 @@ export function AlertDetailPage() {
 
   const demoAlert = demo.alerts.find((a) => a.id === alertId)
   const alert: FacilityAlert | null = facilityFromApi ?? demoAlert ?? null
-  const transcript = demo.transcripts.find((t) => t.alertId === alertId)
+  const demoTranscript = demo.transcripts.find((t) => t.alertId === alertId)
   const fromApi = Boolean(facilityFromApi)
+
+  const linkedConversationId = useMemo(() => {
+    if (!rawApi) return undefined
+    const rc = rawApi.relatedConversation
+    if (rc != null && String(rc).trim() !== "") return String(rc).trim()
+    const ev = rawApi.evidence?.conversationId
+    if (ev != null && String(ev).trim() !== "") return String(ev).trim()
+    return undefined
+  }, [rawApi])
+
+  const skipLiveTranscript =
+    !authed || !fromApi || !linkedConversationId || Boolean(demoTranscript)
+
+  const {
+    data: conversationDetail,
+    isLoading: transcriptLoading,
+    isError: transcriptError,
+    error: transcriptFetchError,
+  } = useGetConversationByIdQuery(linkedConversationId!, { skip: skipLiveTranscript })
+
+  const liveTranscript = useMemo(() => {
+    if (!conversationDetail) return null
+    return mapConversationToTranscript(conversationDetail)
+  }, [conversationDetail])
 
   const toggleAssign = (i: number) => {
     setAssigned((prev) => {
@@ -77,6 +107,23 @@ export function AlertDetailPage() {
   }
 
   const acknowledged = alert?.status === "acknowledged"
+  const apiResolved = Boolean(rawApi?.resolvedAt)
+
+  const handleResolve = async () => {
+    if (!rawApi || !alertId || apiResolved) return
+    const note = resolutionNote.trim()
+    if (note.length < 1) {
+      setResolveError("Enter a resolution note.")
+      return
+    }
+    setResolveError("")
+    try {
+      await resolveAlert({ alertId, resolutionNote: note }).unwrap()
+      setResolutionNote("")
+    } catch {
+      setResolveError("Could not save resolution.")
+    }
+  }
 
   const handleAcknowledge = async () => {
     if (!alert || acknowledged) return
@@ -104,8 +151,7 @@ export function AlertDetailPage() {
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem", paddingBottom: 48 }}>
-      {/* WEB_API_GAP: GET /alerts/:id returns 403 once read — detail uses GET /alerts?showRead=true list. */}
-      {/* WEB_API_GAP: No transcript on alert; wire GET /conversations/:conversationId for live transcript. */}
+      {/* GET /alerts/:id returns 403 once read — detail uses GET /alerts?showRead=true list. */}
 
       <button type="button" className="va-btn-ghost" onClick={() => navigate("/alerts")}>
         <ChevronLeftIcon size={16} />
@@ -203,7 +249,9 @@ export function AlertDetailPage() {
       <div className="va-card va-card-pad">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12 }}>Recommended actions</h2>
         <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginBottom: 12 }}>
-          {fromApi ? "Checklist is local only (not persisted)." : "Toggle to mark assignment tracking (demo)."}
+          {fromApi
+            ? "Suggested steps from the alerting pipeline; checking boxes is local tracking only."
+            : "Toggle to mark assignment tracking (demo)."}
         </p>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {alert.recommendedActions.map((act, i) => (
@@ -223,16 +271,157 @@ export function AlertDetailPage() {
         </ul>
       </div>
 
-      {transcript ? (
-        <TranscriptPanel transcript={transcript} />
-      ) : (
-        <TranscriptGapCard relatedConversationId={rawApi?.relatedConversation ? String(rawApi.relatedConversation) : undefined} />
-      )}
+      {fromApi && rawApi ? (
+        <div className="va-card va-card-pad">
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12 }}>Resolution</h2>
+          {apiResolved ? (
+            <div style={{ fontSize: "0.875rem", color: "var(--va-slate-700)", lineHeight: 1.5 }}>
+              <p style={{ margin: "0 0 8px" }}>
+                <strong>Resolved</strong>
+                {rawApi.resolvedAt ? ` · ${new Date(rawApi.resolvedAt).toLocaleString()}` : null}
+              </p>
+              {typeof rawApi.resolvedBy === "object" && rawApi.resolvedBy?.name ? (
+                <p style={{ margin: "0 0 8px", color: "var(--va-slate-500)" }}>By {rawApi.resolvedBy.name}</p>
+              ) : null}
+              {rawApi.resolutionNote ? (
+                <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{rawApi.resolutionNote}</p>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginBottom: 8 }}>
+                Record how this alert was addressed (stored for audit; cannot be resolved twice).
+              </p>
+              <textarea
+                className="va-login-input"
+                rows={4}
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+                placeholder="Resolution note…"
+                style={{ width: "100%", resize: "vertical", marginBottom: 8 }}
+              />
+              {resolveError ? (
+                <p className="va-login-error" style={{ marginBottom: 8 }} role="alert">
+                  {resolveError}
+                </p>
+              ) : null}
+              <button type="button" className="va-btn-primary" disabled={resolving} onClick={() => void handleResolve()}>
+                {resolving ? "Saving…" : "Mark resolved"}
+              </button>
+            </>
+          )}
+        </div>
+      ) : null}
+
+      <AlertTranscriptBlock
+        demoTranscript={demoTranscript}
+        fromApi={fromApi}
+        linkedConversationId={linkedConversationId}
+        liveTranscript={liveTranscript}
+        transcriptLoading={transcriptLoading}
+        transcriptError={transcriptError}
+        transcriptFetchError={transcriptFetchError}
+      />
     </div>
   )
 }
 
-function TranscriptGapCard({ relatedConversationId }: { relatedConversationId?: string }) {
+function transcriptErrorMessage(err: unknown): string {
+  const e = err as FetchBaseQueryError | undefined
+  const status = typeof e?.status === "number" ? e.status : null
+  if (status === 403) return "You do not have access to this conversation."
+  if (status === 404) return "That conversation could not be found."
+  return "Could not load the call transcript. Try again later."
+}
+
+function AlertTranscriptBlock({
+  demoTranscript,
+  fromApi,
+  linkedConversationId,
+  liveTranscript,
+  transcriptLoading,
+  transcriptError,
+  transcriptFetchError,
+}: {
+  demoTranscript: Transcript | undefined
+  fromApi: boolean
+  linkedConversationId: string | undefined
+  liveTranscript: ReturnType<typeof mapConversationToTranscript> | null
+  transcriptLoading: boolean
+  transcriptError: boolean
+  transcriptFetchError: unknown
+}) {
+  if (demoTranscript) {
+    return <TranscriptPanel transcript={demoTranscript} />
+  }
+
+  if (fromApi && linkedConversationId) {
+    if (transcriptLoading) {
+      return (
+        <div className="va-card va-card-pad">
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "var(--va-blue)" }}>
+              <MessageIcon size={18} />
+            </span>
+            Call Transcript
+          </h2>
+          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", margin: 0 }}>Loading transcript…</p>
+        </div>
+      )
+    }
+    if (transcriptError) {
+      return (
+        <div className="va-card va-card-pad">
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ color: "var(--va-blue)" }}>
+              <MessageIcon size={18} />
+            </span>
+            Call Transcript
+          </h2>
+          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }} role="alert">
+            {transcriptErrorMessage(transcriptFetchError)}
+          </p>
+        </div>
+      )
+    }
+    if (liveTranscript) {
+      if (liveTranscript.lines.length === 0) {
+        return (
+          <div className="va-card va-card-pad">
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: "var(--va-blue)" }}>
+                <MessageIcon size={18} />
+              </span>
+              Call Transcript
+            </h2>
+            <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }}>
+              This conversation has no stored messages yet, or only system messages were recorded.
+            </p>
+          </div>
+        )
+      }
+      return <TranscriptPanel transcript={liveTranscript} />
+    }
+
+    return (
+      <div className="va-card va-card-pad">
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ color: "var(--va-blue)" }}>
+            <MessageIcon size={18} />
+          </span>
+          Call Transcript
+        </h2>
+        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }}>
+          Transcript could not be loaded. Refresh the page or try again shortly.
+        </p>
+      </div>
+    )
+  }
+
+  return <TranscriptGapCard linkedConversationId={linkedConversationId} fromApi={fromApi} />
+}
+
+function TranscriptGapCard({ linkedConversationId, fromApi }: { linkedConversationId?: string; fromApi: boolean }) {
   return (
     <div className="va-card va-card-pad">
       <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
@@ -241,17 +430,18 @@ function TranscriptGapCard({ relatedConversationId }: { relatedConversationId?: 
         </span>
         Call Transcript
       </h2>
-      <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6 }}>
-        <strong>WEB_API_GAP:</strong> Transcript UI is not wired to{" "}
-        <code style={{ fontSize: "0.75rem" }}>GET /conversations/:conversationId</code> or client message
-        endpoints.{" "}
-        {relatedConversationId ? (
-          <>
-            This alert references conversation <code style={{ fontSize: "0.75rem" }}>{relatedConversationId}</code> — hook that
-            fetch here when ready.
-          </>
+      <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }}>
+        {fromApi ? (
+          linkedConversationId ? (
+            <>
+              Conversation <code style={{ fontSize: "0.75rem" }}>{linkedConversationId}</code> is linked, but no transcript
+              loaded. Refresh the page or try again shortly.
+            </>
+          ) : (
+            "This alert is not linked to a call conversation yet. When a conversation is attached on the alert, the transcript will appear here automatically."
+          )
         ) : (
-          "No relatedConversation on this alert."
+          "No demo transcript is available for this alert."
         )}
       </p>
     </div>

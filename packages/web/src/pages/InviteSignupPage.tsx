@@ -8,7 +8,8 @@ import { setAuthEmail } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
-import "../vercel-app.css"
+import { PasswordField } from "../components/PasswordField"
+import "../app.css"
 
 function inviteFetchError(err: unknown): string {
   const data = (err as { data?: { message?: string } })?.data
@@ -124,24 +125,12 @@ export function InviteSignupPage() {
           </label>
           <label className="va-login-label">
             Password
-            <input
-              type="password"
-              className="va-login-input"
-              value={password}
-              onChange={(ev) => setPassword(ev.target.value)}
-              autoComplete="new-password"
-            />
+            <PasswordField value={password} onChange={(ev) => setPassword(ev.target.value)} autoComplete="new-password" />
           </label>
           <p className="va-login-helper">At least 8 characters, with at least one letter and one number.</p>
           <label className="va-login-label">
             Confirm password
-            <input
-              type="password"
-              className="va-login-input"
-              value={confirm}
-              onChange={(ev) => setConfirm(ev.target.value)}
-              autoComplete="new-password"
-            />
+            <PasswordField value={confirm} onChange={(ev) => setConfirm(ev.target.value)} autoComplete="new-password" />
           </label>
           {formError ? (
             <div className="va-login-error" role="alert">

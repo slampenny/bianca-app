@@ -22,6 +22,7 @@ import { caregiverApi } from "../services/api/caregiverApi"
 import { mfaApi } from "../services/api/mfaApi"
 import { phoneVerificationApi } from "../services/api/phoneVerificationApi"
 import { privacyApi } from "../services/api/privacyApi"
+import { activityApi } from "../services/api/activityApi"
 
 const authPersistConfig = {
   key: "auth",
@@ -46,6 +47,7 @@ const rootReducer = combineReducers({
   [mfaApi.reducerPath]: mfaApi.reducer,
   [phoneVerificationApi.reducerPath]: phoneVerificationApi.reducer,
   [privacyApi.reducerPath]: privacyApi.reducer,
+  [activityApi.reducerPath]: activityApi.reducer,
 })
 
 export const store = configureStore({
@@ -65,6 +67,7 @@ export const store = configureStore({
       mfaApi.middleware,
       phoneVerificationApi.middleware,
       privacyApi.middleware,
+      activityApi.middleware,
     ),
 })
 

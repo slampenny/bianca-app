@@ -259,4 +259,5 @@ module.exports = {
   getAlertAuditTrail,
   parseDateRange,
   resolveOrgId,
+  getAccessibleClientIds,
 };

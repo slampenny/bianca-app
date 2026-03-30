@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { Link } from "react-router-dom"
-import "../vercel-app.css"
+import "../app.css"
 
 export function AuthPageShell({
   title,

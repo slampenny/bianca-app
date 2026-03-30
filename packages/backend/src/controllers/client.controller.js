@@ -6,7 +6,7 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const onboardingService = require('../services/onboarding.service');
 const { caregiverService, conversationService, clientService, scheduleService } = require('../services');
-const { ConversationDTO, ClientDTO } = require('../dtos');
+const { ConversationDTO, ClientDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
 
 /**
@@ -74,7 +74,8 @@ const getClients = catchAsync(async (req, res) => {
   const filter = pick(req.query, ['name', 'role']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
   const result = await clientService.queryClients(filter, options);
-  res.send(result);
+  const clientDTOs = await clientsToDTOsWithLastCall(result.results);
+  res.status(httpStatus.OK).json({ ...result, results: clientDTOs });
 });
 
 const getClient = catchAsync(async (req, res) => {
@@ -82,7 +83,8 @@ const getClient = catchAsync(async (req, res) => {
   if (!client) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  res.send(ClientDTO(client));
+  const [dto] = await clientsToDTOsWithLastCall([client]);
+  res.status(httpStatus.OK).json(dto);
 });
 
 const updateClient = catchAsync(async (req, res) => {

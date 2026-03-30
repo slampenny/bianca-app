@@ -8,7 +8,7 @@ import {
 } from "../services/api/phoneVerificationApi"
 import { getCurrentUser, setCurrentUser } from "../store/authSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
-import "../vercel-app.css"
+import "../app.css"
 
 export function SettingsPhonePage() {
   const navigate = useNavigate()

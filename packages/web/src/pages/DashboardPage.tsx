@@ -2,14 +2,27 @@ import { skipToken } from "@reduxjs/toolkit/query"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { isAlertUnreadForCaregiver, mapClientToResident } from "../lib/liveData"
-import { HOURLY_CALLS } from "../data/hourlyCalls"
 import { formatActivityRowTime } from "../lib/timeFormat"
+import { useGetCallsByHourTodayQuery } from "../services/api/activityApi"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import { useDemo } from "../state/DemoContext"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { CheckIcon, PhoneIcon } from "../icons"
+
+const BUSINESS_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17] as const
+
+function hourLabel12h(h: number): string {
+  if (h === 0) return "12am"
+  if (h < 12) return `${h}am`
+  if (h === 12) return "12pm"
+  return `${h - 12}pm`
+}
+
+function emptyBusinessHourChart() {
+  return BUSINESS_HOURS.map((h) => ({ hour: hourLabel12h(h), calls: 0 }))
+}
 
 const MS_DAY = 86_400_000
 
@@ -22,8 +35,17 @@ function withinMs(iso: string | null | undefined, ms: number): boolean {
 export function DashboardPage() {
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const currentUser = useAppSelector(getCurrentUser)
+  const org = useAppSelector((s) => s.org)
   const { state: demo } = useDemo()
   const { residents, activityFeed, alertTriggered, alerts: demoAlerts } = demo
+
+  const superAdminNeedsOrg = currentUser?.role === "superAdmin"
+  const skipHourlyChart = !authed || (superAdminNeedsOrg && !org?.id)
+
+  const { data: hourlyToday, isLoading: hourlyLoading, isError: hourlyError } = useGetCallsByHourTodayQuery(
+    superAdminNeedsOrg && org?.id ? { orgId: org.id } : undefined,
+    { skip: skipHourlyChart },
+  )
 
   const { data: clientPages } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
   const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
@@ -51,12 +73,20 @@ export function DashboardPage() {
     () => (clients.length ? clients.filter((cl) => withinMs(cl.lastCallAttemptAt, MS_DAY)).length : c),
     [clients, c],
   )
-  const successRate =
-    clients.length && attemptsToday > 0
-      ? ((callsCompleted / attemptsToday) * 100).toFixed(1)
-      : c > 0
-        ? (((alertTriggered ? 140 : 139) / c) * 100).toFixed(1)
-        : "95.2"
+  // lastAnsweredCallAt and lastCallAttemptAt are independent 24h windows — completed can exceed "attempts"
+  // in the API data, which would imply a rate >100%. Cap for display; denominator is best-effort.
+  const successRate = useMemo(() => {
+    if (clients.length && attemptsToday > 0) {
+      return Math.min(100, (callsCompleted / attemptsToday) * 100).toFixed(1)
+    }
+    if (clients.length && attemptsToday === 0 && callsCompleted > 0) {
+      return Math.min(100, (callsCompleted / Math.max(c, 1)) * 100).toFixed(1)
+    }
+    if (c > 0) {
+      return Math.min(100, ((alertTriggered ? 140 : 139) / c) * 100).toFixed(1)
+    }
+    return "95.2"
+  }, [clients.length, attemptsToday, callsCompleted, c, alertTriggered])
 
   const liveUnread = useMemo(
     () => (apiAlerts ?? []).filter((a) => isAlertUnreadForCaregiver(a, currentUser?.id)).length,
@@ -70,12 +100,25 @@ export function DashboardPage() {
 
   const atRiskFromApi = useMemo(() => clients.filter((cl) => mapClientToResident(cl).status === "at_risk").length, [clients])
 
+  const hourlyChartData = useMemo(() => {
+    if (hourlyToday?.buckets?.length) {
+      return hourlyToday.buckets.map((b) => ({ hour: b.label, calls: b.calls }))
+    }
+    return emptyBusinessHourChart()
+  }, [hourlyToday])
+
+  const hourlyYAxisMax = useMemo(() => {
+    const m = Math.max(...hourlyChartData.map((d) => d.calls), 0)
+    if (m <= 0) return 7
+    return Math.max(7, Math.ceil(m / 7) * 7)
+  }, [hourlyChartData])
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>
         {/* WEB_API_GAP: No facility dashboard rollup; metrics use GET /clients (+24h call timestamps) and GET /alerts. */}
-        {/* WEB_API_GAP: “Recent activity” feed and hourly bar chart are still demo/static — no matching list/calls-by-hour API. */}
-        Metrics use live clients/alerts where possible; activity list and hourly chart are placeholders until those APIs exist.
+        Metrics use live clients/alerts; today&apos;s hourly chart uses{" "}
+        <code style={{ fontSize: "0.7em" }}>GET /activity/calls-by-hour-today</code> (org timezone, 7am–5pm local).
       </p>
 
       <div
@@ -217,13 +260,33 @@ export function DashboardPage() {
           <div className="va-card">
             <div style={{ padding: "1.5rem 1.5rem 0.5rem" }}>
               <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>Today&apos;s Summary</h2>
-              <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: 4 }}>Static hourly shape — WEB_API_GAP</p>
+              <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: 4 }}>
+                {skipHourlyChart ? (
+                  <>Choose an organization to load call volume (super admin).</>
+                ) : hourlyError ? (
+                  <>Could not load today&apos;s call counts.</>
+                ) : hourlyLoading ? (
+                  <>Loading call volume…</>
+                ) : hourlyToday ? (
+                  <>
+                    Calls by hour · {hourlyToday.dateLabel} · <span title="IANA timezone">{hourlyToday.timezone}</span>
+                  </>
+                ) : (
+                  <>No data</>
+                )}
+              </p>
             </div>
             <div style={{ height: 192, padding: "0 1rem 1rem" }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[...HOURLY_CALLS]} barCategoryGap="20%">
+                <BarChart data={hourlyChartData} barCategoryGap="20%">
                   <XAxis dataKey="hour" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} width={28} />
+                  <YAxis
+                    domain={[0, hourlyYAxisMax]}
+                    tick={{ fontSize: 11, fill: "#94a3b8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={28}
+                  />
                   <Tooltip
                     contentStyle={{
                       backgroundColor: "#0f172a",

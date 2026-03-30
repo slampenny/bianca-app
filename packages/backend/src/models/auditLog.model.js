@@ -74,6 +74,7 @@ const auditLogSchema = mongoose.Schema(
         'PERMISSION_CHANGE',
         'BREACH_DETECTED',
         'BREACH_NOTIFICATION_SENT',
+        'IMPERSONATION',
       ],
       index: true,
     },

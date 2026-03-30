@@ -382,6 +382,14 @@ export function downloadMockCsv(filename: string, headers: string[], rows: strin
   URL.revokeObjectURL(url)
 }
 
+/** CSV from any report payload (live or mock). */
+export function downloadReportPayloadCsv(p: ReportPayload, filenameBase: string): void {
+  const day = new Date().toISOString().slice(0, 10)
+  const primary = p.tables[0]
+  if (!primary) return
+  downloadMockCsv(`${filenameBase}-${day}.csv`, primary.headers, primary.rows)
+}
+
 /** CSV from the same payload used for preview and print. */
 export function downloadReportDataFile(id: ReportTemplateId): void {
   const p = getReportPayload(id)

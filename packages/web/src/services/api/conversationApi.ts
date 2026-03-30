@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import type { ConversationPages } from "./api.types"
+import type { ConversationDetail, ConversationPages } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const conversationApi = createApi({
@@ -19,7 +19,13 @@ export const conversationApi = createApi({
         },
       }),
     }),
+    getConversationById: builder.query<ConversationDetail, string>({
+      query: (conversationId) => ({
+        url: `/conversations/${encodeURIComponent(conversationId)}`,
+        method: "GET",
+      }),
+    }),
   }),
 })
 
-export const { useGetConversationsByClientQuery } = conversationApi
+export const { useGetConversationsByClientQuery, useGetConversationByIdQuery } = conversationApi

@@ -1,0 +1,23 @@
+/** ISO 3166-1 alpha-2 codes aligned with mobile org settings. */
+export const ORG_COUNTRY_OPTIONS = [
+  { value: "US", label: "United States" },
+  { value: "CA", label: "Canada" },
+  { value: "GB", label: "United Kingdom" },
+  { value: "AU", label: "Australia" },
+  { value: "DE", label: "Germany" },
+  { value: "FR", label: "France" },
+  { value: "IT", label: "Italy" },
+  { value: "ES", label: "Spain" },
+  { value: "NL", label: "Netherlands" },
+  { value: "SE", label: "Sweden" },
+  { value: "CH", label: "Switzerland" },
+  { value: "JP", label: "Japan" },
+  { value: "CN", label: "China" },
+  { value: "HK", label: "Hong Kong" },
+  { value: "SG", label: "Singapore" },
+  { value: "AE", label: "United Arab Emirates" },
+  { value: "IN", label: "India" },
+  { value: "MX", label: "Mexico" },
+  { value: "BR", label: "Brazil" },
+  { value: "OTHER", label: "Other" },
+] as const
