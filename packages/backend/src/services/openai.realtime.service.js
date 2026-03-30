@@ -40,6 +40,7 @@
  */
 
 const WebSocket = require('ws');
+const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
@@ -631,11 +632,7 @@ class OpenAIRealtimeService {
       const currentState = this.getConversationState(callId);
       if (currentState === CONVERSATION_STATES.WAITING_FOR_GREETING) {
         this.transitionState(callId, CONVERSATION_STATES.GREETING_ACTIVE, 'initial_greeting_triggered');
-      } else if (
-        currentState === CONVERSATION_STATES.GREETING_COMPLETE ||
-        currentState === CONVERSATION_STATES.CONVERSATION_ACTIVE ||
-        currentState === CONVERSATION_STATES.USER_SPEAKING
-      ) {
+      } else if (currentState === CONVERSATION_STATES.GREETING_COMPLETE || currentState === CONVERSATION_STATES.CONVERSATION_ACTIVE) {
         this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'ai_response_triggered');
       }
 
@@ -656,10 +653,12 @@ class OpenAIRealtimeService {
                 const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
                   ? Date.now() - currentConn._initialGreetingCompletedAt 
                   : Infinity;
-                if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
+                const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+                if (timeSinceGreeting < GRACE_PERIOD_MS) {
                   logger.info(
                     `[OpenAI Realtime] Skipping timeout recovery for ${callId} - in grace period ` +
-                    `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
+                    `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
                   );
                   return;
                 }
@@ -694,10 +693,12 @@ class OpenAIRealtimeService {
                   const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
                     ? Date.now() - currentConn._initialGreetingCompletedAt 
                     : Infinity;
-                  if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
+                  const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+                  if (timeSinceGreeting < GRACE_PERIOD_MS) {
                     logger.info(
                       `[OpenAI Realtime] Skipping aggressive timeout recovery for ${callId} - in grace period ` +
-                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
+                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
                     );
                     return;
                   }
@@ -992,10 +993,12 @@ class OpenAIRealtimeService {
               const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
                 ? Date.now() - currentConn._initialGreetingCompletedAt 
                 : Infinity;
-              if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
+              const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+              if (timeSinceGreeting < GRACE_PERIOD_MS) {
                 logger.info(
                   `[OpenAI Realtime] Skipping reconnection recovery for ${callId} - in grace period ` +
-                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
+                  `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
                 );
               } else {
                 logger.info(`[OpenAI Realtime] Auto-triggering response generation after recovery for ${callId}`);
@@ -2117,11 +2120,16 @@ class OpenAIRealtimeService {
             const alertResult = await emergencyProcessor.createAlert(
               conn.clientId,
               emergencyResult.alertData,
-              content
+              content,
+              {
+                conversationId: conn.conversationId || null,
+                detectionSource: emergencyResult.detectionSource || 'phrase_match',
+                ...(message?._id ? { messageId: message._id } : {}),
+              }
             );
 
             if (alertResult.success) {
-              logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert._id}`);
+              logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert?.id || alertResult.alert?._id}`);
             } else {
               logger.error(`[Emergency Detection] ❌ Failed to create alert: ${alertResult.error}`);
             }
@@ -2343,6 +2351,11 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${transcript}"`);
     await this.persistUserTranscriptToPlaceholder(callId, transcript);
 
+    const evidenceUserMessageId =
+      conn.activeUserMessageId && mongoose.Types.ObjectId.isValid(conn.activeUserMessageId)
+        ? conn.activeUserMessageId
+        : null;
+
     // speech_stopped already ran and was waiting on ASR — finalize turn (placeholder already updated above).
     if (conn._waitingForUserTranscript && conn.activeUserMessageId && transcript.trim()) {
       logger.info(`[OpenAI Realtime] Transcript arrived after speech_stopped — finalizing user turn ${conn.activeUserMessageId}`);
@@ -2380,7 +2393,12 @@ class OpenAIRealtimeService {
           const alertResult = await emergencyProcessor.createAlert(
             conn.clientId,
             emergencyResult.alertData,
-            transcript
+            transcript,
+            {
+              conversationId: conn.conversationId || null,
+              detectionSource: emergencyResult.detectionSource || 'phrase_match',
+              ...(evidenceUserMessageId ? { messageId: evidenceUserMessageId } : {}),
+            }
           );
 
           logger.info(`[Emergency Detection] createAlert result - success: ${alertResult.success}, error: ${alertResult.error || 'none'}`);
@@ -2389,7 +2407,7 @@ class OpenAIRealtimeService {
           }
 
           if (alertResult.success) {
-            logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert._id}`);
+            logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert?.id || alertResult.alert?._id}`);
 
             try {
               const emergencyInstruction = `\n\nCRITICAL: An emergency alert has been AUTOMATICALLY sent to the patient's caregiver via text message. In your next response, you MUST inform them: "I've already sent an alert to your caregiver. They'll be notified right away. Please call emergency services right away if you need immediate medical help." Do NOT offer to call emergency services yourself - you cannot make calls. Use "emergency services" (not "911") as it works in all countries. ONLY say this because the system has confirmed an alert was sent.`;
@@ -2710,7 +2728,6 @@ class OpenAIRealtimeService {
     }
 
     const onboardingService = require('./onboarding.service');
-    const mongoose = require('mongoose');
 
     try {
       if (name === 'capture_onboarding_response' && args.question_id) {
@@ -3482,10 +3499,12 @@ class OpenAIRealtimeService {
             const timeSinceGreeting = conn._initialGreetingCompletedAt 
               ? Date.now() - conn._initialGreetingCompletedAt 
               : Infinity;
-            if (timeSinceGreeting < CONSTANTS.GRACE_PERIOD_MS) {
+            const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+            if (timeSinceGreeting < GRACE_PERIOD_MS) {
               logger.info(
                 `[OpenAI Realtime] Skipping force recovery for ${callId} - in grace period ` +
-                `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms)`
+                `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
               );
             } else {
               logger.info(`[OpenAI Realtime] Auto-triggering response generation after force recovery for ${callId}`);

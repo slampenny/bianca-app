@@ -10,7 +10,7 @@ const createAlert = catchAsync(async (req, res) => {
 
 const getAlertById = catchAsync(async (req, res) => {
   const { alertId } = req.params; // ID of the alert to retrieve
-  const caregiverId = req.caregiver; // Assuming the caregiver's ID is stored in req.user._id
+  const caregiverId = req.caregiver.id;
   // logger.debug(`Fetching alert with ID: ${alertId} for caregiver with ID: ${caregiverId}`);
   const alert = await alertService.getAlertById(alertId, caregiverId);
   if (!alert) {
@@ -29,7 +29,7 @@ const getAlerts = catchAsync(async (req, res) => {
 
 const updateAlert = catchAsync(async (req, res) => {
   const { alertId } = req.params; // ID of the alert to retrieve
-  const alert = await alertService.updateAlertById(alertId, req.body);
+  const alert = await alertService.updateAlertById(alertId, req.body, { caregiverId: req.caregiver.id });
   res.send(alert);
 });
 
