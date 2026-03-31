@@ -675,6 +675,69 @@
   justify-content: center;
   margin-top: 0.25rem;
 }
+
+.va-sso-block {
+  margin-top: 1.25rem;
+  width: 100%;
+}
+.va-sso-divider {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--va-slate-500);
+  margin: 0 0 0.75rem;
+}
+.va-sso-row {
+  display: flex;
+  gap: 0.625rem;
+  width: 100%;
+}
+.va-sso-google,
+.va-sso-microsoft {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--va-slate-200);
+  min-height: 2.75rem;
+}
+.va-sso-google {
+  background: #fff;
+  color: #171717;
+}
+.va-sso-google:hover:not(:disabled) {
+  background: var(--va-slate-50);
+  border-color: var(--va-slate-300);
+}
+.va-sso-microsoft {
+  background: #0078d4;
+  border-color: #0078d4;
+  color: #fff;
+}
+.va-sso-microsoft:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.va-sso-google:disabled,
+.va-sso-microsoft:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.va-sso-google-icon {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #4285f4;
+}
+.va-sso-ms-icon {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #fff;
+}
+
 .va-btn-secondary {
   display: inline-flex;
   align-items: center;

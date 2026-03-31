@@ -110,6 +110,14 @@ export interface ClientPages {
   totalResults: number
 }
 
+export interface CaregiverPages {
+  limit: number
+  page: number
+  results: Caregiver[]
+  totalPages: number
+  totalResults: number
+}
+
 /** Evidence / suggested actions (release/mvp alert model) */
 export interface ApiAlertEvidence {
   snippet?: string

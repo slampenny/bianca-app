@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AdminSessionHandoffBridge } from "./auth/AdminSessionHandoffBridge"
 import { AuthSessionBridge } from "./auth/AuthSessionBridge"
 import { RequireAuth } from "./auth/RequireAuth"
+import { SSOCallbackGate } from "./auth/SSOCallbackGate"
 import { DemoProvider } from "./state/DemoContext"
 import { AppShell } from "./layout/AppShell"
 import { LoginPage } from "./pages/LoginPage"
@@ -17,6 +18,7 @@ import { InviteSignupPage } from "./pages/InviteSignupPage"
 import { VerifyEmailPage } from "./pages/VerifyEmailPage"
 import { ClientConsentPage } from "./pages/ClientConsentPage"
 import { DashboardPage } from "./pages/DashboardPage"
+import { AddResidentPage } from "./pages/AddResidentPage"
 import { ResidentsPage } from "./pages/ResidentsPage"
 import { ResidentDetailPage } from "./pages/ResidentDetailPage"
 import { AlertsPage } from "./pages/AlertsPage"
@@ -32,38 +34,41 @@ export default function App() {
   return (
     <DemoProvider>
       <BrowserRouter>
-        <AuthSessionBridge />
-        <AdminSessionHandoffBridge />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/login/mfa" element={<MFAPage />} />
-          <Route path="/onboarding" element={<OnboardingAboutYouPage />} />
-          <Route path="/onboarding/how-it-works" element={<OnboardingHowItWorksPage />} />
-          <Route path="/onboarding/org" element={<OnboardingOrgInfoPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route path="/check-email" element={<CheckEmailPage />} />
-          <Route path="/signup" element={<InviteSignupPage />} />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/client/consent" element={<ClientConsentPage />} />
-          <Route element={<RequireAuth />}>
-            <Route element={<AppShell />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="alerts" element={<AlertsPage />} />
-              <Route path="alerts/:alertId" element={<AlertDetailPage />} />
-              <Route path="residents" element={<ResidentsPage />} />
-              <Route path="residents/:residentId" element={<ResidentDetailPage />} />
-              <Route path="reports/:templateId" element={<ReportTemplateDetailPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="settings/mfa" element={<SettingsMfaPage />} />
-              <Route path="settings/phone" element={<SettingsPhonePage />} />
-              <Route path="settings/privacy" element={<SettingsPrivacyPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+        <SSOCallbackGate>
+          <AuthSessionBridge />
+          <AdminSessionHandoffBridge />
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login/mfa" element={<MFAPage />} />
+            <Route path="/onboarding" element={<OnboardingAboutYouPage />} />
+            <Route path="/onboarding/how-it-works" element={<OnboardingHowItWorksPage />} />
+            <Route path="/onboarding/org" element={<OnboardingOrgInfoPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/check-email" element={<CheckEmailPage />} />
+            <Route path="/signup" element={<InviteSignupPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/client/consent" element={<ClientConsentPage />} />
+            <Route element={<RequireAuth />}>
+              <Route element={<AppShell />}>
+                <Route index element={<DashboardPage />} />
+                <Route path="alerts" element={<AlertsPage />} />
+                <Route path="alerts/:alertId" element={<AlertDetailPage />} />
+                <Route path="residents" element={<ResidentsPage />} />
+                <Route path="residents/new" element={<AddResidentPage />} />
+                <Route path="residents/:residentId" element={<ResidentDetailPage />} />
+                <Route path="reports/:templateId" element={<ReportTemplateDetailPage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="settings/mfa" element={<SettingsMfaPage />} />
+                <Route path="settings/phone" element={<SettingsPhonePage />} />
+                <Route path="settings/privacy" element={<SettingsPrivacyPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+        </SSOCallbackGate>
       </BrowserRouter>
     </DemoProvider>
   )

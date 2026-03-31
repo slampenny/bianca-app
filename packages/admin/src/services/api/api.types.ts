@@ -34,6 +34,32 @@ export interface AdminCaregiverSearchResponse {
   totalResults: number
 }
 
+export interface AdminOrgSearchRow {
+  id?: string
+  name: string
+  email: string
+}
+
+export interface AdminOrgSearchResponse {
+  results: AdminOrgSearchRow[]
+  page: number
+  limit: number
+  totalPages: number
+  totalResults: number
+}
+
+export interface ScimAdminStatus {
+  enabled: boolean
+  tokenHint: string | null
+  scimBaseUrl: string
+}
+
+export interface ScimTokenIssueResponse {
+  token: string
+  scimBaseUrl: string
+  tokenHint: string
+}
+
 export interface ImpersonateResponse {
   impersonation: boolean
   org: Org | null

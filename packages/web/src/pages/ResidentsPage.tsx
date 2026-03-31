@@ -1,12 +1,14 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
+import { Link, useNavigate } from "react-router-dom"
 import { mapClientToResident } from "../lib/liveData"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import { useAppSelector } from "../store/store"
-import { isAuthenticated } from "../store/authSlice"
+import { getCurrentUser, isAuthenticated } from "../store/authSlice"
 import type { Resident } from "../types"
 import { SearchIcon } from "../icons"
+import { canAddResidents } from "../lib/roleAccess"
 
 const FILTERS = [
   { key: "all" as const, label: "All" },
@@ -16,8 +18,11 @@ const FILTERS = [
 ]
 
 export function ResidentsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const authed = useAppSelector(isAuthenticated)
+  const user = useAppSelector(getCurrentUser)
+  const showAdd = canAddResidents(user?.role)
   const { data: pages, isLoading, isError, refetch, error } = useGetAllClientsQuery(
     authed ? { limit: 200, page: 1 } : skipToken,
   )
@@ -93,12 +98,19 @@ export function ResidentsPage() {
         }}
         className="va-res-head"
       >
-        <div>
-          <h1 className="va-page-title">Residents</h1>
-          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 4 }}>
-            {rows.length} resident{rows.length === 1 ? "" : "s"}
-            {pages?.totalResults != null ? ` (${pages.totalResults} in directory)` : ""}
-          </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", alignItems: "flex-start" }}>
+          <div>
+            <h1 className="va-page-title">Residents</h1>
+            <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 4 }}>
+              {rows.length} resident{rows.length === 1 ? "" : "s"}
+              {pages?.totalResults != null ? ` (${pages.totalResults} in directory)` : ""}
+            </p>
+          </div>
+          {showAdd ? (
+            <Link to="/residents/new" className="va-btn-primary" style={{ textDecoration: "none" }} data-testid="residents-add">
+              {t("residents.addResident")}
+            </Link>
+          ) : null}
         </div>
         <div className="va-search">
           <SearchIcon size={16} />

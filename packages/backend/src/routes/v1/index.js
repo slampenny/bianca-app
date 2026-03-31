@@ -19,6 +19,7 @@ const familyWeeklyDigestRoute = require('./familyWeeklyDigest.route');
 const facilityReportsRoute = require('./facilityReports.route');
 const activityRoute = require('./activity.route');
 const adminRoute = require('./admin.route');
+const scimRoute = require('./scim.route');
 const scheduleRoute = require('./schedule.route');
 const sentimentRoute = require('./sentiment.route');
 const ssoRoute = require('./sso.route');
@@ -115,6 +116,10 @@ const defaultRoutes = [
   {
     path: '/admin',
     route: adminRoute,
+  },
+  {
+    path: '/scim',
+    route: scimRoute,
   },
   {
     path: '/schedules',

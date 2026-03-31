@@ -101,6 +101,9 @@ export function ImpersonatePage() {
           </p>
         </div>
         <div className="admin-header-actions">
+          <Link to="/scim" className="admin-btn admin-btn--ghost">
+            SCIM
+          </Link>
           <Link to="/" className="admin-btn admin-btn--ghost">
             Observability
           </Link>

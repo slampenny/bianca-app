@@ -70,6 +70,9 @@ export function ObservabilityPage() {
         </div>
         <div className="admin-header-actions">
           <span className="admin-muted admin-header-user">{user?.email}</span>
+          <Link to="/scim" className="admin-btn admin-btn--ghost">
+            SCIM
+          </Link>
           <Link to="/impersonate" className="admin-btn admin-btn--ghost">
             Sign in as user
           </Link>

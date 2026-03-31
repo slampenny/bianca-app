@@ -34,7 +34,27 @@ export const clientApi = createApi({
         headers: { Accept: "application/json" },
       }),
     }),
+    createClient: builder.mutation<
+      Client,
+      { name: string; email: string; phone: string; preferredLanguage?: string }
+    >({
+      query: (body) => ({ url: "/clients", method: "POST", body }),
+      invalidatesTags: ["Client"],
+    }),
+    assignCaregiverToClient: builder.mutation<Client, { clientId: string; caregiverId: string }>({
+      query: ({ clientId, caregiverId }) => ({
+        url: `/clients/${clientId}/caregivers/${caregiverId}`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, { clientId }) => [{ type: "Client", id: clientId }, "Client"],
+    }),
   }),
 })
 
-export const { useGetAllClientsQuery, useGetClientQuery, useVerifyConsentMutation } = clientApi
+export const {
+  useGetAllClientsQuery,
+  useGetClientQuery,
+  useVerifyConsentMutation,
+  useCreateClientMutation,
+  useAssignCaregiverToClientMutation,
+} = clientApi

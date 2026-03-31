@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
 const { getAdminObservabilitySnapshot } = require('../services/observability.service');
-const { caregiverService, tokenService, alertService } = require('../services');
+const { caregiverService, tokenService, alertService, orgService } = require('../services');
+const scimService = require('../services/scim.service');
 const { AlertDTO, CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const { AuditLog } = require('../models');
 const logger = require('../config/logger');
@@ -85,6 +86,60 @@ const searchCaregivers = catchAsync(async (req, res) => {
 });
 
 /**
+ * Search organizations by name, email, or id (super admin only).
+ */
+const searchOrgs = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+
+  const q = String(req.query.q || '').trim();
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const page = parseInt(req.query.page, 10) || 1;
+
+  const or = [
+    { name: new RegExp(escapeRegex(q), 'i') },
+    { email: new RegExp(escapeRegex(q), 'i') },
+  ];
+  if (mongoose.Types.ObjectId.isValid(q) && String(new mongoose.Types.ObjectId(q)) === q) {
+    or.push({ _id: new mongoose.Types.ObjectId(q) });
+  }
+
+  const filter = { $or: or };
+  const result = await orgService.queryOrgs(filter, {
+    limit,
+    page,
+    sortBy: req.query.sortBy || 'name:asc',
+  });
+
+  const results = (result.results || [])
+    .map((o) => {
+      const dto = OrgDTO(o);
+      if (!dto) return null;
+      return { ...dto, id: dto.id != null ? String(dto.id) : undefined };
+    })
+    .filter(Boolean);
+
+  res.send({ ...result, results });
+});
+
+const getOrgScimStatus = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const status = await scimService.getScimStatusForAdmin(req.params.orgId);
+  res.send(status);
+});
+
+const issueOrgScimToken = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const out = await scimService.enableOrRotateScimToken(req.params.orgId);
+  res.send(out);
+});
+
+const disableOrgScim = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  await scimService.disableScim(req.params.orgId);
+  res.status(httpStatus.NO_CONTENT).send();
+});
+
+/**
  * Issue tokens for another caregiver (same payload shape as POST /auth/login). Super admin only.
  */
 const impersonate = catchAsync(async (req, res) => {
@@ -158,5 +213,9 @@ const impersonate = catchAsync(async (req, res) => {
 module.exports = {
   getObservability,
   searchCaregivers,
+  searchOrgs,
+  getOrgScimStatus,
+  issueOrgScimToken,
+  disableOrgScim,
   impersonate,
 };

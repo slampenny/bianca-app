@@ -13,6 +13,9 @@ import { useAppDispatch, useAppSelector } from "../store/store"
 import { mapValidationErrorToMessage, parseLoginError } from "../lib/loginError"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
 import { PasswordField } from "../components/PasswordField"
+import { SSOLoginButtons } from "../components/SSOLoginButtons"
+import { consumeSsoRedirectError } from "../services/webSsoService"
+import type { AuthTokens, Caregiver, Org } from "../services/api/api.types"
 import "../app.css"
 
 type LoginLocationState = {
@@ -48,6 +51,11 @@ export function LoginPage() {
       setNeedsEmailVerification(false)
     }
   }, [state.passwordReset])
+
+  useEffect(() => {
+    const msg = consumeSsoRedirectError()
+    if (msg) setErrorMessage(msg)
+  }, [])
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -160,6 +168,31 @@ export function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        <SSOLoginButtons
+          disabled={loading}
+          onSsoError={(err) => {
+            const message = err.description || err.error
+            setErrorMessage(
+              err.error.includes("not configured")
+                ? `Single sign-on is not available: ${message}`
+                : `Sign-in failed: ${message}`,
+            )
+          }}
+          onSsoSuccess={(user) => {
+            if (!user.tokens || !user.backendUser) return
+            dispatch(setAuthTokens(user.tokens as AuthTokens))
+            dispatch(setAuthEmail(user.email))
+            dispatch(setCurrentUser(user.backendUser as Caregiver))
+            if (user.backendOrg) dispatch(setOrg(user.backendOrg as Org))
+            notifyAuthSuccess()
+            const to =
+              state.from && typeof state.from.pathname === "string"
+                ? `${state.from.pathname}${state.from.search || ""}`
+                : "/"
+            navigate(to, { replace: true })
+          }}
+        />
 
         <div className="va-auth-footer">
           <Link to="/forgot-password" data-testid="login-forgot-password-link">

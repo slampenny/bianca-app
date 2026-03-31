@@ -14,7 +14,7 @@ const router = express.Router();
 router
   .route('/')
   .post(
-    auth('createOwn:client', 'createAny:client', 'updateOwn:client', 'updateAny:client'),
+    auth('createAny:client'),
     validate(clientValidation.createClient),
     clientController.createClient
   )
@@ -68,8 +68,8 @@ router
 
 router
   .route('/:clientId/caregivers/:caregiverId')
-  .post(auth('updateOwn:client', 'updateAny:client'), clientController.assignCaregiver)
-  .delete(auth('deleteOwn:client', 'deleteAny:client'), clientController.removeCaregiver);
+  .post(auth('updateAny:client'), clientController.assignCaregiver)
+  .delete(auth('deleteAny:client'), clientController.removeCaregiver);
 
 router
   .route('/:clientId/conversations')

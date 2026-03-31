@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import type { Caregiver } from "./api.types"
+import type { Caregiver, CaregiverPages } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const caregiverApi = createApi({
@@ -7,6 +7,13 @@ export const caregiverApi = createApi({
   baseQuery: baseQueryWithReauth(),
   tagTypes: ["Caregiver"],
   endpoints: (builder) => ({
+    getCaregivers: builder.query<
+      CaregiverPages,
+      { org?: string; name?: string; role?: string; sortBy?: string; limit?: number; page?: number }
+    >({
+      query: (params) => ({ url: "/caregivers", method: "GET", params }),
+      providesTags: ["Caregiver"],
+    }),
     getCaregiver: builder.query<Caregiver, { id: string }>({
       query: ({ id }) => `/caregivers/${id}`,
       providesTags: (_r, _e, { id }) => [{ type: "Caregiver", id }],
@@ -42,4 +49,9 @@ export const caregiverApi = createApi({
   }),
 })
 
-export const { useGetCaregiverQuery, useUpdateCaregiverMutation, useUploadAvatarMutation } = caregiverApi
+export const {
+  useGetCaregiversQuery,
+  useGetCaregiverQuery,
+  useUpdateCaregiverMutation,
+  useUploadAvatarMutation,
+} = caregiverApi

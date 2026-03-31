@@ -13,6 +13,7 @@ const { clientOne, insertClientsAndAddToCaregiver, insertClientsWithOrg } = requ
 
 const {
   caregiverOne,
+  caregiverTwo,
   admin,
   insertCaregivertoOrgAndReturnToken,
   insertCaregivertoOrgAndReturnTokenByRole,
@@ -193,6 +194,17 @@ describe('Client routes', () => {
           .send(clientDataWithoutPhone)
           .expect(httpStatus.BAD_REQUEST);
       });
+    });
+
+    test('should deny staff from creating a client', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+
+      await request(app)
+        .post('/v1/clients')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ ...clientOne, org: org._id, email: faker.internet.email() })
+        .expect(httpStatus.FORBIDDEN);
     });
   });
 
@@ -457,6 +469,19 @@ describe('Client routes', () => {
       expect(res.body.id).toBe(client.id);
       expect(res.body.caregivers).toEqual(expect.arrayContaining([expect.any(String)]));
       expect(res.body.caregivers).toContain(caregiver.id);
+    });
+
+    test('should deny staff from assigning a caregiver to a client', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver: staff, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [otherCaregiver] = await insertCaregiversAndAddToOrg(org, [caregiverTwo]);
+      const [client] = await insertClientsAndAddToCaregiver(staff, [{ ...clientOne, email: faker.internet.email() }]);
+
+      await request(app)
+        .post(`/v1/clients/${client.id}/caregivers/${otherCaregiver.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send()
+        .expect(httpStatus.FORBIDDEN);
     });
   });
 

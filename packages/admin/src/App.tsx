@@ -6,6 +6,7 @@ import { LoginPage } from "./pages/LoginPage"
 import { MFAPage } from "./pages/MFAPage"
 import { ImpersonatePage } from "./pages/ImpersonatePage"
 import { ObservabilityPage } from "./pages/ObservabilityPage"
+import { ScimProvisioningPage } from "./pages/ScimProvisioningPage"
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route element={<RequireSuperAdmin />}>
           <Route index element={<ObservabilityPage />} />
           <Route path="impersonate" element={<ImpersonatePage />} />
+          <Route path="scim" element={<ScimProvisioningPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
