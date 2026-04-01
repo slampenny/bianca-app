@@ -17,6 +17,7 @@ import { clearAuth, getAuthTokens, getCurrentUser } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import { i18n } from "../i18n/i18n"
+import { AvatarPicker } from "../components/AvatarPicker"
 import "../app.css"
 
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || "1.0.0"
@@ -49,7 +50,6 @@ export function ProfilePage() {
   const [phone, setPhone] = useState("")
   const [preferredLanguage, setPreferredLanguage] = useState("en")
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
   const [themeMode, setThemeMode] = useState<WebThemeMode>(() => getStoredThemeMode())
   const [fontPct, setFontPct] = useState(() => getStoredFontScalePct())
@@ -69,20 +69,7 @@ export function ProfilePage() {
     setPhone(profile.phone ?? "")
     setPreferredLanguage(profile.preferredLanguage || "en")
     setAvatarFile(null)
-    setAvatarPreview(null)
   }, [profile])
-
-  useEffect(() => {
-    return () => {
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-    }
-  }, [avatarPreview])
-
-  const onAvatarPick = (f: File | null) => {
-    setAvatarFile(f)
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-    setAvatarPreview(f ? URL.createObjectURL(f) : null)
-  }
 
   const onThemeChange = (mode: WebThemeMode) => {
     setThemeMode(mode)
@@ -138,8 +125,6 @@ export function ProfilePage() {
       }).unwrap()
       setFormSuccess(t("profile.profileUpdated"))
       setAvatarFile(null)
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-      setAvatarPreview(null)
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
       setFormError(typeof msg === "string" ? msg : t("profile.updateFailed"))
@@ -160,8 +145,6 @@ export function ProfilePage() {
     dispatch(setOrg(null))
     navigate("/login", { replace: true })
   }
-
-  const displayAvatar = avatarPreview || profile?.avatar
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto" }}>
@@ -207,40 +190,12 @@ export function ProfilePage() {
           <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("profile.loadingProfile")}</p>
         ) : (
           <form id="profile-details-form" onSubmit={handleSaveProfile} className="va-login-form">
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
-              {displayAvatar ? (
-                <img
-                  src={displayAvatar}
-                  alt=""
-                  style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--va-slate-200)" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: "50%",
-                    background: "var(--va-slate-200)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.25rem",
-                    color: "var(--va-slate-500)",
-                  }}
-                >
-                  {(name || profile?.name || "?").slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <label style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-                <span style={{ display: "block", marginBottom: 6 }}>{t("profile.photo")}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(ev) => onAvatarPick(ev.target.files?.[0] ?? null)}
-                  style={{ fontSize: "0.75rem" }}
-                />
-              </label>
-            </div>
+            <AvatarPicker
+              label={t("profile.photo")}
+              initialsSource={name || profile?.name || "?"}
+              existingAvatarUrl={profile?.avatar}
+              onPick={setAvatarFile}
+            />
 
             <label className="va-login-label">
               {t("profile.name")}

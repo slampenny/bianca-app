@@ -94,6 +94,7 @@ async function seedDatabase() {
       name: 'Margaret Thompson',
       preferredName: 'Margaret',
       age: 76,
+      room: '203C',
       email: 'vulnerable@example.org',
       phone: '1234567892',
       preferredLanguage: 'en',

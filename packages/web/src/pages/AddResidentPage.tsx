@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
+import { AvatarPicker } from "../components/AvatarPicker"
 import { useCreateClientMutation, useAssignCaregiverToClientMutation, useUploadClientAvatarMutation } from "../services/api/clientApi"
 import { useGetCaregiversQuery } from "../services/api/caregiverApi"
 import { getCurrentUser } from "../store/authSlice"
@@ -24,7 +25,6 @@ export function AddResidentPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const user = useAppSelector(getCurrentUser)
-  const currentId = user?.id != null ? String(user.id) : ""
   const role = user?.role
 
   const { data: caregiverPages, isLoading: loadingCaregivers, isError: caregiversError } = useGetCaregiversQuery(
@@ -55,14 +55,6 @@ export function AddResidentPage() {
     const raw = caregiverPages?.results ?? []
     return assignableCaregivers(raw).sort((a, b) => a.name.localeCompare(b.name))
   }, [caregiverPages?.results])
-  const selfCaregiver = useMemo(
-    () => peers.find((c) => String(c.id) === currentId),
-    [peers, currentId],
-  )
-  const otherCaregivers = useMemo(
-    () => peers.filter((c) => String(c.id) !== currentId),
-    [peers, currentId],
-  )
 
   const toggleCaregiver = (id: string) => {
     setExtraCaregiverIds((prev) => {
@@ -74,7 +66,7 @@ export function AddResidentPage() {
   }
 
   const selectAllCaregivers = () => {
-    setExtraCaregiverIds(new Set(otherCaregivers.map((c) => String(c.id))))
+    setExtraCaregiverIds(new Set(peers.map((c) => String(c.id))))
   }
 
   const clearAllCaregivers = () => {
@@ -204,15 +196,11 @@ export function AddResidentPage() {
               ))}
             </select>
           </label>
-          <label style={{ display: "block", marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>Resident photo (optional)</span>
-            <input
-              className="va-login-input"
-              type="file"
-              accept="image/*"
-              onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
+          <AvatarPicker
+            label="Resident photo (optional)"
+            initialsSource={name || "?"}
+            onPick={setAvatarFile}
+          />
 
           <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, marginBottom: 8 }}>{t("residents.caregiversHeading")}</h2>
           <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
@@ -238,7 +226,7 @@ export function AddResidentPage() {
                 background: "#fff",
               }}
             >
-              {otherCaregivers.length > 0 ? (
+              {peers.length > 0 ? (
                 <div style={{ display: "flex", gap: 8, margin: "0.35rem 0.25rem 0.5rem" }}>
                   <button type="button" className="va-btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }} onClick={selectAllCaregivers}>
                     Select all
@@ -249,21 +237,7 @@ export function AddResidentPage() {
                 </div>
               ) : null}
               <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                {selfCaregiver ? (
-                  <li
-                    key={String(selfCaregiver.id)}
-                    style={{
-                      padding: "0.45rem 0.25rem",
-                      borderBottom: otherCaregivers.length > 0 ? "1px solid var(--va-slate-100)" : "none",
-                    }}
-                  >
-                    <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-                      <input type="checkbox" checked disabled />
-                      <span>{selfCaregiver.name} (you, auto-assigned)</span>
-                    </label>
-                  </li>
-                ) : null}
-                {otherCaregivers.map((c) => {
+                {peers.map((c) => {
                   const id = String(c.id)
                   return (
                     <li key={id} style={{ padding: "0.45rem 0.25rem" }}>

@@ -63,7 +63,6 @@ const createClient = catchAsync(async (req, res) => {
       await scheduleService.createSchedule(client.id, schedule);
     }
   }
-  client = await caregiverService.addClient(req.caregiver._id || req.caregiver.id, client.id);
   try {
     await clientService.sendConsentEmailIfRequired(client);
   } catch (err) {
