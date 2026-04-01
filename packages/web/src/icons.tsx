@@ -123,6 +123,14 @@ export function ChevronLeftIcon(p: { size?: number; className?: string }) {
   )
 }
 
+export function ChevronDownIcon(p: { size?: number; className?: string }) {
+  return (
+    <S {...p}>
+      <path d="m6 9 6 6 6-6" />
+    </S>
+  )
+}
+
 export function SearchIcon(p: { size?: number; className?: string }) {
   return (
     <S {...p}>
@@ -211,6 +219,27 @@ export function PrintIcon(p: { size?: number; className?: string }) {
       <polyline points="6 9 6 2 18 2 18 9" />
       <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
       <rect width="12" height="8" x="6" y="14" rx="1" />
+    </S>
+  )
+}
+
+export function PencilIcon(p: { size?: number; className?: string }) {
+  return (
+    <S {...p}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </S>
+  )
+}
+
+export function TrashIcon(p: { size?: number; className?: string }) {
+  return (
+    <S {...p}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+      <path d="M19 6v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
     </S>
   )
 }

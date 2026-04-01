@@ -26,6 +26,8 @@ export interface Caregiver {
   phone: string
   org: string
   role: CaregiverRole
+  active?: boolean
+  externalId?: string
   clients: string[]
   preferredLanguage?: string
   isEmailVerified?: boolean
@@ -73,11 +75,14 @@ export interface Schedule {
   intervals: { day?: number; weeks?: number }[]
   time: string
   isActive: boolean
+  nextCallDate?: string
 }
 
 export interface Client {
   id?: string
   name: string
+  preferredName?: string | null
+  notes?: string | null
   avatar?: string
   email: string
   phone: string

@@ -441,9 +441,9 @@ describe('Billing System Integration Tests', () => {
       const res = await request(app)
         .get(`/v1/payments/orgs/${nonExistentOrgId}/unbilled-costs`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(403);
 
-      expect(res.body.message).toContain('Organization not found');
+      expect(res.body.message).toContain('access');
     });
 
     it('should handle concurrent billing processes', async () => {

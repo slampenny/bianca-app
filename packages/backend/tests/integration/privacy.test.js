@@ -183,6 +183,19 @@ describe('Privacy API routes', () => {
         })
         .expect(httpStatus.BAD_REQUEST);
     });
+
+    it('should reject correctionDetails without required field values', async () => {
+      await request(app)
+        .post('/v1/privacy/requests/correction')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          correctionDetails: {
+            currentValue: 'old@example.com',
+            requestedValue: 'new@example.com',
+          },
+        })
+        .expect(httpStatus.BAD_REQUEST);
+    });
   });
 
   describe('GET /v1/privacy/requests', () => {
@@ -239,6 +252,13 @@ describe('Privacy API routes', () => {
       );
       expect(otherUserRequests.length).toBe(0);
     });
+
+    it('should reject invalid list query values', async () => {
+      await request(app)
+        .get('/v1/privacy/requests?limit=0&page=0')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.BAD_REQUEST);
+    });
   });
 
   describe('GET /v1/privacy/requests/:requestId', () => {
@@ -286,6 +306,13 @@ describe('Privacy API routes', () => {
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(httpStatus.FORBIDDEN);
     });
+
+    it('should reject malformed request id params', async () => {
+      await request(app)
+        .get('/v1/privacy/requests/not-an-object-id')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.BAD_REQUEST);
+    });
   });
 
   describe('POST /v1/privacy/consent', () => {
@@ -317,6 +344,16 @@ describe('Privacy API routes', () => {
       const consent = await ConsentRecord.findById(res.body.id);
       expect(consent).toBeDefined();
       expect(consent.userId.toString()).toBe(caregiverId.toString());
+    });
+
+    it('should reject invalid consent payloads', async () => {
+      await request(app)
+        .post('/v1/privacy/consent')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          consentType: 'collection',
+        })
+        .expect(httpStatus.BAD_REQUEST);
     });
   });
 
@@ -460,6 +497,16 @@ describe('Privacy API routes', () => {
         })
         .expect(httpStatus.FORBIDDEN);
     });
+
+    it('should reject malformed consent id params', async () => {
+      await request(app)
+        .post('/v1/privacy/consent/not-an-object-id/withdraw')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          reason: 'test',
+        })
+        .expect(httpStatus.BAD_REQUEST);
+    });
   });
 
   describe('GET /v1/privacy/consent/history', () => {
@@ -545,6 +592,13 @@ describe('Privacy API routes', () => {
           .get('/v1/privacy/requests/approaching-deadline')
           .set('Authorization', `Bearer ${accessToken}`)
           .expect(httpStatus.FORBIDDEN);
+      });
+
+      it('should reject invalid pagination query values', async () => {
+        await request(app)
+          .get('/v1/privacy/requests/approaching-deadline?limit=1000')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .expect(httpStatus.BAD_REQUEST);
       });
     });
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { isAlertUnreadForCaregiver, mapClientToResident } from "../lib/liveData"
 import { formatActivityRowTime } from "../lib/timeFormat"
-import { useGetCallsByHourTodayQuery } from "../services/api/activityApi"
+import { useGetCallsByHourTodayQuery, useGetRecentActivityQuery } from "../services/api/activityApi"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import { useDemo } from "../state/DemoContext"
@@ -25,6 +25,7 @@ function emptyBusinessHourChart() {
 }
 
 const MS_DAY = 86_400_000
+const RECENT_ACTIVITY_LIMIT = 15
 
 function withinMs(iso: string | null | undefined, ms: number): boolean {
   if (!iso) return false
@@ -41,10 +42,14 @@ export function DashboardPage() {
 
   const superAdminNeedsOrg = currentUser?.role === "superAdmin"
   const skipHourlyChart = !authed || (superAdminNeedsOrg && !org?.id)
+  const skipRecentActivity = !authed || (superAdminNeedsOrg && !org?.id)
 
   const { data: hourlyToday, isLoading: hourlyLoading, isError: hourlyError } = useGetCallsByHourTodayQuery(
     superAdminNeedsOrg && org?.id ? { orgId: org.id } : undefined,
     { skip: skipHourlyChart },
+  )
+  const { data: recentActivity, isLoading: activityLoading, isError: activityError } = useGetRecentActivityQuery(
+    skipRecentActivity ? skipToken : superAdminNeedsOrg && org?.id ? { orgId: org.id, limit: RECENT_ACTIVITY_LIMIT, sinceDays: 30 } : { limit: RECENT_ACTIVITY_LIMIT, sinceDays: 30 },
   )
 
   const { data: clientPages } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
@@ -96,7 +101,17 @@ export function DashboardPage() {
   const newCount = liveUnread + demoNewCount
 
   const showAlertBanner = alertTriggered || newCount > 0
-  const slice = activityFeed.slice(0, 15)
+  const recentRows = useMemo(
+    () =>
+      (recentActivity?.results ?? []).map((item) => ({
+        id: item.id,
+        type: item.type,
+        residentName: item.residentName,
+        timestamp: new Date(item.occurredAt),
+        message: item.alertSummary ?? "",
+      })),
+    [recentActivity?.results],
+  )
 
   const atRiskFromApi = useMemo(() => clients.filter((cl) => mapClientToResident(cl).status === "at_risk").length, [clients])
 
@@ -202,7 +217,15 @@ export function DashboardPage() {
         <div className="va-card" style={{ gridColumn: "span 1" }}>
           <div style={{ padding: "1.5rem 1.5rem 0.5rem" }}>
             <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>Recent Activity</h2>
-            <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: 4 }}>Demo feed — WEB_API_GAP</p>
+            <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: 4 }}>
+              {skipRecentActivity
+                ? "Choose an organization to load activity (super admin)."
+                : activityError
+                  ? "Unable to connect."
+                  : activityLoading
+                    ? "Loading live activity…"
+                    : "Live activity feed"}
+            </p>
           </div>
           <div
             style={{
@@ -211,12 +234,12 @@ export function DashboardPage() {
               padding: "0 1.5rem 1.5rem",
             }}
           >
-            {slice.length === 0 ? (
+            {recentRows.length === 0 ? (
               <p style={{ textAlign: "center", color: "var(--va-slate-400)", padding: "2rem" }}>
-                No activity yet — data loading...
+                {activityLoading ? "Loading recent activity..." : activityError ? "Unable to connect." : "No data available."}
               </p>
             ) : (
-              slice.map((e) => (
+              recentRows.map((e) => (
                 <div
                   key={e.id}
                   style={{

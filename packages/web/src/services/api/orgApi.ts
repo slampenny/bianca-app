@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import type { Org } from "./api.types"
+import type { Caregiver, Org } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export type OrgUpdatePayload = {
@@ -34,7 +34,17 @@ export const orgApi = createApi({
       }),
       invalidatesTags: (_r, _e, { orgId }) => [{ type: "Org", id: orgId }],
     }),
+    sendOrgInvite: builder.mutation<
+      Caregiver,
+      { orgId: string; body: { name: string; email: string; phone: string } }
+    >({
+      query: ({ orgId, body }) => ({
+        url: `/orgs/${orgId}/invite`,
+        method: "PATCH",
+        body,
+      }),
+    }),
   }),
 })
 
-export const { useGetOrgQuery, useUpdateOrgMutation } = orgApi
+export const { useGetOrgQuery, useUpdateOrgMutation, useSendOrgInviteMutation } = orgApi

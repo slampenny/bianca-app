@@ -7,9 +7,10 @@ const emailService = require('./email.service');
 const tokenService = require('./token.service');
 const config = require('../config/config');
 const { tokenTypes } = require('../config/tokens');
+const { toIdString, assertCaregiverOrgAccess } = require('../utils/accessControl');
 
 const createClient = async (clientBody) => {
-  return await Client.create(clientBody);
+  return Client.create(clientBody);
 };
 
 const queryClients = async (filter, options) => {
@@ -111,14 +112,16 @@ const getActiveClients = async () => {
   }
 };
 
-const getUnassignedClients = async () => {
+const getUnassignedClients = async (requestingCaregiver) => {
   try {
-    return await Client.find({
-      $or: [
-        { caregivers: { $exists: false } },
-        { caregivers: { $size: 0 } },
-      ],
-    }).populate('schedules');
+    const filter = {
+      $or: [{ caregivers: { $exists: false } }, { caregivers: { $size: 0 } }],
+    };
+    if (!requestingCaregiver || requestingCaregiver.role !== 'superAdmin') {
+      assertCaregiverOrgAccess(requestingCaregiver, requestingCaregiver.org, 'You do not have access to this organization');
+      filter.org = toIdString(requestingCaregiver.org);
+    }
+    return Client.find(filter).populate('schedules');
   } catch (error) {
     logger.error('Error getting unassigned clients:', error);
     throw error;
@@ -131,7 +134,7 @@ const getUnassignedClients = async () => {
  * @param {string[]} clientIds
  * @returns {Promise<import('mongoose').Document[]>}
  */
-const assignUnassignedClients = async (caregiverId, clientIds) => {
+const assignUnassignedClients = async (caregiverId, clientIds, requestingCaregiver) => {
   if (!Array.isArray(clientIds) || clientIds.length === 0) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'clientIds must be a non-empty array');
   }
@@ -140,36 +143,39 @@ const assignUnassignedClients = async (caregiverId, clientIds) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid caregiver ID');
   }
   const caregiverOrgId = toOrgIdString(caregiver.org);
-  const results = [];
-  for (const clientId of clientIds) {
-    const client = await Client.findById(clientId);
-    if (!client) {
-      logger.warn(`[assignUnassignedClients] Skipping missing client ${clientId}`);
-      continue;
-    }
-    const clientOrgId = toOrgIdString(client.org);
-    if (caregiverOrgId && clientOrgId && caregiverOrgId !== clientOrgId) {
-      logger.warn(`[assignUnassignedClients] Client ${clientId} is not in the same organization as the caregiver; skipping`);
-      continue;
-    }
-    const hasNoCaregivers = !client.caregivers || client.caregivers.length === 0;
-    if (!hasNoCaregivers) {
-      logger.warn(`[assignUnassignedClients] Client ${clientId} already has caregivers; skipping`);
-      continue;
-    }
-    const updated = await assignCaregiver(caregiverId, clientId);
-    results.push(updated);
+  if (!requestingCaregiver || requestingCaregiver.role !== 'superAdmin') {
+    assertCaregiverOrgAccess(requestingCaregiver, caregiverOrgId, 'You do not have access to this organization');
   }
-  return results;
+  const updates = await Promise.all(
+    clientIds.map(async (clientId) => {
+      const client = await Client.findById(clientId);
+      if (!client) {
+        logger.warn(`[assignUnassignedClients] Skipping missing client ${clientId}`);
+        return null;
+      }
+      const clientOrgId = toOrgIdString(client.org);
+      if (caregiverOrgId && clientOrgId && caregiverOrgId !== clientOrgId) {
+        logger.warn(
+          `[assignUnassignedClients] Client ${clientId} is not in the same organization as the caregiver; skipping`
+        );
+        return null;
+      }
+      const hasNoCaregivers = !client.caregivers || client.caregivers.length === 0;
+      if (!hasNoCaregivers) {
+        logger.warn(`[assignUnassignedClients] Client ${clientId} already has caregivers; skipping`);
+        return null;
+      }
+      return assignCaregiver(caregiverId, clientId);
+    })
+  );
+  return updates.filter(Boolean);
 };
 
 const sendConsentEmailIfRequired = async (client) => {
   try {
     const clientId = client._id || client.id;
-    const clientFresh = await Client.findById(clientId)
-      .select('email name consented preferredLanguage org')
-      .lean();
-    if (!clientFresh?.org) {
+    const clientFresh = await Client.findById(clientId).select('email name consented preferredLanguage org').lean();
+    if (!clientFresh || !clientFresh.org) {
       logger.warn(`[Client Service] Cannot send consent email: client ${clientId} has no org`);
       return;
     }
@@ -183,7 +189,7 @@ const sendConsentEmailIfRequired = async (client) => {
     if (!orgFresh || !orgFresh.requireClientConsent) {
       logger.warn(
         `[Client Service] Skipping consent email for client ${clientId}: org ${orgId} missing or requireClientConsent=${Boolean(
-          orgFresh?.requireClientConsent
+          orgFresh && orgFresh.requireClientConsent
         )}`
       );
       return;
@@ -191,9 +197,7 @@ const sendConsentEmailIfRequired = async (client) => {
     if (clientFresh.consented === true) {
       return;
     }
-    const consentToken = await tokenService.generateClientConsentToken(
-      await Client.findById(clientId)
-    );
+    const consentToken = await tokenService.generateClientConsentToken(await Client.findById(clientId));
     const consentLink = `${config.frontendUrl}/client/consent?token=${consentToken}`;
     const consentEmailVersion = '1.0';
     await emailService.sendClientConsentRequestEmail(
@@ -216,7 +220,7 @@ const checkClientConsent = async (clientId) => {
     if (!client || !client.org) {
       return false;
     }
-    const org = client.org;
+    const { org } = client;
     if (!org.requireClientConsent) {
       return true;
     }
@@ -231,7 +235,7 @@ const verifyConsentToken = async (consentToken) => {
   try {
     const consentTokenDoc = await tokenService.verifyToken(consentToken, tokenTypes.CLIENT_CONSENT);
     const clientRef = consentTokenDoc.client;
-    const clientId = (clientRef && clientRef._id) ? clientRef._id : clientRef;
+    const clientId = clientRef && clientRef._id ? clientRef._id : clientRef;
     if (!clientId) {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid consent token');
     }

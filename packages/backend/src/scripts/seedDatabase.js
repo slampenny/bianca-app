@@ -92,8 +92,19 @@ async function seedDatabase() {
     // Create a third client for fraud/abuse testing
     const client3 = new Client({
       name: 'Margaret Thompson',
+      preferredName: 'Margaret',
+      age: 76,
       email: 'vulnerable@example.org',
       phone: '1234567892',
+      preferredLanguage: 'en',
+      notes: 'Needs extra reassurance during calls; monitor for potential vulnerability cues.',
+      moveInDate: new Date('2024-03-20T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Elaine Thompson',
+        relationship: 'Niece',
+        phone: '1234567803',
+        email: 'elaine.thompson@example.org',
+      },
       caregivers: [caregiverOneRecord.id],
       org: caregiverOneRecord.org,
       schedules: [],

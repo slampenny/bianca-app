@@ -1,10 +1,10 @@
 /**
  * Minimum Necessary Data Access Middleware
- * 
+ *
  * HIPAA Requirements:
  * - §164.502(b) - Minimum Necessary Standard
  * - Limit PHI disclosure to the minimum necessary to accomplish intended purpose
- * 
+ *
  * Implementation:
  * - Field-level access control based on user role
  * - Filters response data before sending to client
@@ -15,7 +15,7 @@ const logger = require('../config/logger');
 
 /**
  * Define field access rules by role
- * 
+ *
  * Format: { role: { resource: [allowedFields] } }
  */
 const FIELD_ACCESS_RULES = {
@@ -26,8 +26,13 @@ const FIELD_ACCESS_RULES = {
       'id',
       'name',
       'preferredName',
+      'age',
       'avatar',
-      'language',
+      'preferredLanguage',
+      'room',
+      'moveInDate',
+      'emergencyContact',
+      'notes',
       'lastContact',
       'lastCallAttemptAt',
       'lastAnsweredCallAt',
@@ -44,7 +49,7 @@ const FIELD_ACCESS_RULES = {
       'consentedAt',
       'consentEmailVersion',
     ],
-    
+
     conversation: [
       '_id',
       'id', // DTO transforms _id to id
@@ -58,7 +63,7 @@ const FIELD_ACCESS_RULES = {
       'summary',
       // EXCLUDED: recordings, fullTranscript (unless specifically authorized)
     ],
-    
+
     medicalAnalysis: [
       '_id',
       'client', // ID only
@@ -67,7 +72,7 @@ const FIELD_ACCESS_RULES = {
       'analysisDate',
       // EXCLUDED: Detailed metrics, cognitive scores, psychiatric details
     ],
-    
+
     alert: [
       '_id',
       'client', // ID only
@@ -89,10 +94,15 @@ const FIELD_ACCESS_RULES = {
       'id',
       'name',
       'preferredName',
+      'age',
       'email',
       'phone',
       'avatar',
-      'language',
+      'preferredLanguage',
+      'room',
+      'moveInDate',
+      'emergencyContact',
+      'notes',
       'lastContact',
       'lastCallAttemptAt',
       'lastAnsweredCallAt',
@@ -111,7 +121,7 @@ const FIELD_ACCESS_RULES = {
       'consentedAt',
       'consentEmailVersion',
     ],
-    
+
     conversation: [
       '_id',
       'id', // DTO transforms _id to id
@@ -127,7 +137,7 @@ const FIELD_ACCESS_RULES = {
       'cost', // For billing
       // EXCLUDED: Raw recordings (unless specifically authorized)
     ],
-    
+
     medicalAnalysis: [
       '_id',
       'client',
@@ -138,7 +148,7 @@ const FIELD_ACCESS_RULES = {
       'riskLevel',
       // EXCLUDED: Detailed medical notes (unless medically trained)
     ],
-    
+
     alert: '*', // Full access to all alert fields
 
     clientOnboarding: ['journey', 'responses', 'flags', 'questionCount'],
@@ -150,8 +160,8 @@ const FIELD_ACCESS_RULES = {
     conversation: '*',
     medicalAnalysis: '*',
     alert: '*',
-    auditLog: '*'
-  }
+    auditLog: '*',
+  },
 };
 
 /**
@@ -159,19 +169,19 @@ const FIELD_ACCESS_RULES = {
  */
 function filterFields(obj, allowedFields) {
   if (!obj || typeof obj !== 'object') return obj;
-  
+
   // If allowedFields is '*', return all fields
   if (allowedFields === '*') return obj;
-  
+
   // If it's an array, filter each item
   if (Array.isArray(obj)) {
-    return obj.map(item => filterFields(item, allowedFields));
+    return obj.map((item) => filterFields(item, allowedFields));
   }
-  
+
   // Filter object fields
   const filtered = {};
-  
-  allowedFields.forEach(field => {
+
+  allowedFields.forEach((field) => {
     if (field in obj) {
       // Handle nested objects (e.g., 'assignedCaregivers.name')
       if (field.includes('.')) {
@@ -184,7 +194,7 @@ function filterFields(obj, allowedFields) {
       }
     }
   });
-  
+
   return filtered;
 }
 
@@ -193,7 +203,7 @@ function filterFields(obj, allowedFields) {
  */
 function getAllowedFields(userRole, resourceType) {
   const roleRules = FIELD_ACCESS_RULES[userRole] || FIELD_ACCESS_RULES.staff;
-  return roleRules[resourceType] || '*'; // Default to all if not specified
+  return roleRules[resourceType] || [];
 }
 
 /**
@@ -214,63 +224,33 @@ const minimumNecessaryMiddleware = (resourceType) => {
       return next();
     }
 
-    // Intercept res.json to filter data
-    const originalJson = res.json;
-    
-    res.json = function (data) {
-      // Filter the data
-      let filteredData = data;
-      
-      // Debug: Log before filtering
-      const beforeSample = data && data.results && data.results[0] ? {
-        hasClientId: 'clientId' in data.results[0],
-        clientIdValue: data.results[0].clientId,
-        keys: Object.keys(data.results[0])
-      } : null;
-      
-      if (data && typeof data === 'object') {
-        // Handle different response structures
-        if (data.results && Array.isArray(data.results)) {
-          // Paginated response
-          filteredData = {
-            ...data,
-            results: filterFields(data.results, allowedFields)
-          };
-          
-          // Debug: Log after filtering
-          const afterSample = filteredData.results && filteredData.results[0] ? {
-            hasClientId: 'clientId' in filteredData.results[0],
-            clientIdValue: filteredData.results[0].clientId,
-            keys: Object.keys(filteredData.results[0])
-          } : null;
-          
-          logger.debug('[MINIMUM_NECESSARY] Before/After filtering', {
-            resourceType,
-            role: userRole,
-            allowedFields,
-            before: beforeSample,
-            after: afterSample,
-          });
-        } else if (Array.isArray(data)) {
-          // Array response
-          filteredData = filterFields(data, allowedFields);
-        } else if (data.data) {
-          // Wrapped response
-          filteredData = {
-            ...data,
-            data: filterFields(data.data, allowedFields)
-          };
-        } else {
-          // Single object response
-          filteredData = filterFields(data, allowedFields);
-        }
+    const filterPayload = (data) => {
+      if (!data || typeof data !== 'object') return data;
+      if (data.results && Array.isArray(data.results)) {
+        return {
+          ...data,
+          results: filterFields(data.results, allowedFields),
+        };
       }
+      if (Array.isArray(data)) return filterFields(data, allowedFields);
+      if (data.data) {
+        return {
+          ...data,
+          data: filterFields(data.data, allowedFields),
+        };
+      }
+      return filterFields(data, allowedFields);
+    };
 
-      // Log field filtering (without PHI)
+    const originalJson = res.json.bind(res);
+    const originalSend = res.send.bind(res);
+    res.json = function wrappedJson(data) {
       logger.debug(`[MINIMUM_NECESSARY] Filtered ${resourceType} fields for role: ${userRole}`);
-
-      // Call original json method with filtered data
-      originalJson.call(this, filteredData);
+      return originalJson(filterPayload(data));
+    };
+    res.send = function wrappedSend(data) {
+      logger.debug(`[MINIMUM_NECESSARY] Filtered ${resourceType} fields for role: ${userRole}`);
+      return originalSend(filterPayload(data));
     };
 
     next();
@@ -282,11 +262,11 @@ const minimumNecessaryMiddleware = (resourceType) => {
  */
 const filterDataForRole = (data, resourceType, userRole) => {
   const allowedFields = getAllowedFields(userRole, resourceType);
-  
+
   if (allowedFields === '*') {
     return data;
   }
-  
+
   return filterFields(data, allowedFields);
 };
 
@@ -295,11 +275,11 @@ const filterDataForRole = (data, resourceType, userRole) => {
  */
 const canAccessField = (userRole, resourceType, fieldName) => {
   const allowedFields = getAllowedFields(userRole, resourceType);
-  
+
   if (allowedFields === '*') {
     return true;
   }
-  
+
   return allowedFields.includes(fieldName);
 };
 
@@ -321,6 +301,5 @@ module.exports = {
   filterDataForRole,
   canAccessField,
   addFieldPermission,
-  getFieldAccessRules
+  getFieldAccessRules,
 };
-

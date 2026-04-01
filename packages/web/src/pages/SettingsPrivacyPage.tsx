@@ -1,12 +1,19 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
 import { PRIVACY_POLICY_URL } from "../config/legal"
-import { useCreateAccessRequestMutation, useGetPrivacyRequestsQuery } from "../services/api/privacyApi"
+import {
+  useCreateAccessRequestMutation,
+  useCreateCorrectionRequestMutation,
+  useGetPrivacyRequestsQuery,
+  useRequestDataDeletionMutation,
+} from "../services/api/privacyApi"
 import "../app.css"
 
 export function SettingsPrivacyPage() {
   const { data: pages, isLoading } = useGetPrivacyRequestsQuery({ page: 1, limit: 20 })
   const [createAccess, { isLoading: submitting }] = useCreateAccessRequestMutation()
+  const [createCorrection, { isLoading: correcting }] = useCreateCorrectionRequestMutation()
+  const [requestDeletion, { isLoading: deleting }] = useRequestDataDeletionMutation()
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
 
@@ -24,6 +31,33 @@ export function SettingsPrivacyPage() {
     }
   }
 
+  const submitCorrection = async () => {
+    setError("")
+    setMessage("")
+    try {
+      await createCorrection({
+        field: "fullName",
+        currentValue: "Name and profile details",
+        requestedValue: "Updated profile details",
+        reason: "Please update my profile details to match current records.",
+      }).unwrap()
+      setMessage("Your correction request was submitted.")
+    } catch (e: unknown) {
+      setError((e as { data?: { message?: string } })?.data?.message || "Request failed.")
+    }
+  }
+
+  const submitDeletion = async () => {
+    setError("")
+    setMessage("")
+    try {
+      await requestDeletion({ dataType: "all" }).unwrap()
+      setMessage("Your data deletion request was submitted.")
+    } catch (e: unknown) {
+      setError((e as { data?: { message?: string } })?.data?.message || "Request failed.")
+    }
+  }
+
   return (
     <div data-testid="settings-privacy-page" style={{ maxWidth: 560, margin: "0 auto" }}>
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
@@ -33,14 +67,14 @@ export function SettingsPrivacyPage() {
         Privacy & data
       </h1>
       <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem", lineHeight: 1.45 }}>
-        Request a copy of your personal data (access request). For corrections, complaints, or deletion, use the{" "}
+        Request access, correction, or deletion of your personal data. For complaints, use the{" "}
         <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer" className="va-link">
           privacy policy
         </a>{" "}
-        contact options or the mobile app’s full privacy tools.
+        contact options.
       </p>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
+      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-access">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Request my data</h2>
         <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginBottom: "1rem", lineHeight: 1.45 }}>
           Submits an access request. Delivery is typically by email as a JSON export, per our processes.
@@ -55,8 +89,49 @@ export function SettingsPrivacyPage() {
             {error}
           </div>
         ) : null}
-        <button type="button" className="va-btn-primary" style={{ width: "100%" }} disabled={submitting} onClick={() => void submitAccess()}>
+        <button
+          type="button"
+          data-testid="privacy-submit-access"
+          className="va-btn-primary"
+          style={{ width: "100%" }}
+          disabled={submitting}
+          onClick={() => void submitAccess()}
+        >
           {submitting ? "Submitting…" : "Submit access request"}
+        </button>
+      </div>
+
+      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-correction">
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Request a correction</h2>
+        <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginBottom: "1rem", lineHeight: 1.45 }}>
+          Submits a correction request for personal information in your account.
+        </p>
+        <button
+          type="button"
+          data-testid="privacy-submit-correction"
+          className="va-btn-primary"
+          style={{ width: "100%" }}
+          disabled={correcting}
+          onClick={() => void submitCorrection()}
+        >
+          {correcting ? "Submitting…" : "Submit correction request"}
+        </button>
+      </div>
+
+      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-deletion">
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Request data deletion</h2>
+        <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginBottom: "1rem", lineHeight: 1.45 }}>
+          Request deletion of your account data according to applicable retention policies.
+        </p>
+        <button
+          type="button"
+          data-testid="privacy-submit-deletion"
+          className="va-btn-ghost"
+          style={{ width: "100%", color: "var(--va-red-600)", borderColor: "var(--va-red-200)" }}
+          disabled={deleting}
+          onClick={() => void submitDeletion()}
+        >
+          {deleting ? "Submitting…" : "Submit deletion request"}
         </button>
       </div>
 

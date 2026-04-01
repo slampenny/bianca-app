@@ -4,9 +4,14 @@ const pick = require('../utils/pick');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { caregiverService } = require('../services');
-const config = require('../config/config');
 const { CaregiverDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const logger = require('../config/logger');
+
+const assertOrgAdminCannotAccessSuperAdmin = (requesterRole, targetCaregiver) => {
+  if (requesterRole === 'orgAdmin' && targetCaregiver && targetCaregiver.role === 'superAdmin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'You are not authorized to access this resource');
+  }
+};
 
 const getCaregivers = catchAsync(async (req, res) => {
   // Start with query filters for name and role from req.query
@@ -23,15 +28,18 @@ const getCaregivers = catchAsync(async (req, res) => {
     // Ensure org is converted to ObjectId if it's a string
     const orgId = req.caregiver.org;
     filter.org = orgId;
-    
+    if (req.caregiver.role === 'orgAdmin' && !filter.role) {
+      filter.role = { $ne: 'superAdmin' };
+    }
+
     // Debug logging to help diagnose issues
     logger.debug('getCaregivers query:', {
       requesterRole: req.caregiver.role,
       requesterId: req.caregiver.id,
-      orgId: orgId,
+      orgId,
       orgIdType: typeof orgId,
-      filter: filter,
-      queryParams: req.query
+      filter,
+      queryParams: req.query,
     });
   }
 
@@ -41,14 +49,14 @@ const getCaregivers = catchAsync(async (req, res) => {
   logger.debug('getCaregivers result:', {
     totalResults: result.totalResults,
     resultsCount: results.length,
-    roles: results.map((c) => ({ id: c.id, name: c.name, role: c.role, email: c.email }))
+    roles: results.map((c) => ({ id: c.id, name: c.name, role: c.role, email: c.email })),
   });
 
   res.send({ ...result, results });
 });
 
 const getCaregiver = catchAsync(async (req, res) => {
-  if (req.params.caregiverId == req.caregiver.id) {
+  if (String(req.params.caregiverId) === String(req.caregiver.id)) {
     return res.status(httpStatus.OK).send(CaregiverDTO(req.caregiver));
   }
   if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
@@ -58,26 +66,42 @@ const getCaregiver = catchAsync(async (req, res) => {
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
+  assertOrgAdminCannotAccessSuperAdmin(req.caregiver.role, caregiver);
   res.send(CaregiverDTO(caregiver));
 });
 
 const createCaregiver = catchAsync(async (req, res) => {
-  const caregiver = await caregiverService.createCaregiver(req.body.orgId, req.body);
+  if (req.caregiver.role === 'invited' || req.caregiver.role === 'staff') {
+    return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
+  }
+  const requesterOrg = req.caregiver.org;
+  const requesterOrgId = requesterOrg && requesterOrg._id ? requesterOrg._id : requesterOrg;
+  const orgId = req.body.orgId || requesterOrgId;
+  if (!orgId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Organization is required');
+  }
+  const caregiver = await caregiverService.createCaregiver(orgId, req.body);
   if (!caregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
-  res.send(caregiver);
+  res.status(httpStatus.CREATED).send(CaregiverDTO(caregiver));
 });
 
 const updateCaregiver = catchAsync(async (req, res) => {
   const { org, clients, ...caregiverData } = req.body;
   const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
   // Check if trying to access another caregiver's resource
-  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+  const isAccessingOthersResource = String(req.params.caregiverId) !== String(req.caregiver.id);
 
   if (hasRestrictedAccess && isAccessingOthersResource) {
     return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
   }
+
+  const targetCaregiver = await caregiverService.getCaregiverById(req.params.caregiverId);
+  if (!targetCaregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+  assertOrgAdminCannotAccessSuperAdmin(req.caregiver.role, targetCaregiver);
 
   const caregiver = await caregiverService.updateCaregiverById(req.params.caregiverId, caregiverData);
   res.send(CaregiverDTO(caregiver));
@@ -91,7 +115,7 @@ const uploadCaregiverAvatar = catchAsync(async (req, res) => {
 
   const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
   // Check if trying to access another caregiver's resource
-  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+  const isAccessingOthersResource = String(req.params.caregiverId) !== String(req.caregiver.id);
 
   if (hasRestrictedAccess && isAccessingOthersResource) {
     return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
@@ -111,11 +135,17 @@ const uploadCaregiverAvatar = catchAsync(async (req, res) => {
 const deleteCaregiver = catchAsync(async (req, res) => {
   const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
   // Check if trying to access another caregiver's resource
-  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+  const isAccessingOthersResource = String(req.params.caregiverId) !== String(req.caregiver.id);
 
   if (hasRestrictedAccess && isAccessingOthersResource) {
     return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
   }
+
+  const targetCaregiver = await caregiverService.getCaregiverById(req.params.caregiverId);
+  if (!targetCaregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+  assertOrgAdminCannotAccessSuperAdmin(req.caregiver.role, targetCaregiver);
 
   await caregiverService.deleteCaregiverById(req.params.caregiverId);
   res.status(httpStatus.NO_CONTENT).send();
@@ -125,7 +155,7 @@ const updateThemePreference = catchAsync(async (req, res) => {
   const { themePreference } = req.body;
   const hasRestrictedAccess = req.caregiver.role === 'invited' || req.caregiver.role === 'staff';
   // Check if trying to access another caregiver's resource
-  const isAccessingOthersResource = req.params.caregiverId != req.caregiver.id;
+  const isAccessingOthersResource = String(req.params.caregiverId) !== String(req.caregiver.id);
 
   if (hasRestrictedAccess && isAccessingOthersResource) {
     return res.status(httpStatus.FORBIDDEN).send({ message: 'You are not authorized to access this resource' });
@@ -149,6 +179,11 @@ const removeClient = catchAsync(async (req, res) => {
 
 const getClients = catchAsync(async (req, res) => {
   const { caregiverId } = req.params;
+  const targetCaregiver = await caregiverService.getCaregiverById(caregiverId);
+  if (!targetCaregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+  assertOrgAdminCannotAccessSuperAdmin(req.caregiver.role, targetCaregiver);
   const clients = await caregiverService.getClients(caregiverId);
   const clientDTOs = await clientsToDTOsWithLastCall(clients);
   res.status(httpStatus.OK).send(clientDTOs);

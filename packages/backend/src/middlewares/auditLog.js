@@ -4,11 +4,11 @@ const logger = require('../config/logger');
 
 /**
  * HIPAA Audit Logging Middleware
- * 
+ *
  * HIPAA Requirements:
  * - §164.312(b) - Audit Controls
  * - §164.308(a)(1)(ii)(D) - Information System Activity Review
- * 
+ *
  * This middleware automatically logs all PHI access and modifications
  */
 
@@ -42,13 +42,21 @@ const PHI_ROUTES = {
   // Fraud/abuse analysis routes (contain PHI)
   'GET /v1/fraud-abuse-analysis/:clientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
   'GET /v1/fraud-abuse-analysis/results/:clientId': { action: 'READ', resource: 'fraudAbuseAnalysis', phiAccessed: true },
-  'POST /v1/fraud-abuse-analysis/trigger-client/:clientId': { action: 'CREATE', resource: 'fraudAbuseAnalysis', phiAccessed: true },
+  'POST /v1/fraud-abuse-analysis/trigger-client/:clientId': {
+    action: 'CREATE',
+    resource: 'fraudAbuseAnalysis',
+    phiAccessed: true,
+  },
 
   // Sentiment analysis routes
   'GET /v1/sentiment/client/:clientId/trend': { action: 'READ', resource: 'client', phiAccessed: true },
   'GET /v1/sentiment/client/:clientId/summary': { action: 'READ', resource: 'client', phiAccessed: true },
   'GET /v1/sentiment/conversation/:conversationId': { action: 'READ', resource: 'conversation', phiAccessed: true },
-  'POST /v1/sentiment/conversation/:conversationId/analyze': { action: 'CREATE', resource: 'conversation', phiAccessed: true },
+  'POST /v1/sentiment/conversation/:conversationId/analyze': {
+    action: 'CREATE',
+    resource: 'conversation',
+    phiAccessed: true,
+  },
 
   // Call routes
   'POST /v1/calls/initiate': { action: 'CREATE', resource: 'conversation', phiAccessed: true },
@@ -102,26 +110,65 @@ const AUTH_ROUTES = {
   'POST /v1/auth/reset-password': { action: 'PASSWORD_CHANGED', resource: 'caregiver' },
 };
 
+const normalizeRoutePath = (baseUrl, routePath) => {
+  const base = (baseUrl || '').replace(/\/$/, '');
+  const route = routePath || '';
+  if (!route) return base || '/';
+  if (route.startsWith('/')) return `${base}${route}` || '/';
+  return `${base}/${route}`;
+};
+
+const routeParts = (path) => path.split('/').filter(Boolean);
+
+const routePatternMatches = (patternPath, actualPath) => {
+  const pattern = routeParts(patternPath);
+  const actual = routeParts(actualPath);
+  if (pattern.length !== actual.length) return false;
+  return pattern.every((segment, idx) => segment.startsWith(':') || segment === actual[idx]);
+};
+
+const getAuditConfigForRequest = (method, fullPath) => {
+  const key = `${method} ${fullPath}`;
+  if (PHI_ROUTES[key]) return PHI_ROUTES[key];
+  if (AUTH_ROUTES[key]) return AUTH_ROUTES[key];
+
+  const phiMatch = Object.entries(PHI_ROUTES).find(([patternKey]) => {
+    const firstSpace = patternKey.indexOf(' ');
+    const patternMethod = patternKey.slice(0, firstSpace);
+    const patternPath = patternKey.slice(firstSpace + 1);
+    return patternMethod === method && routePatternMatches(patternPath, fullPath);
+  });
+  if (phiMatch) return phiMatch[1];
+
+  const authMatch = Object.entries(AUTH_ROUTES).find(([patternKey]) => {
+    const firstSpace = patternKey.indexOf(' ');
+    const patternMethod = patternKey.slice(0, firstSpace);
+    const patternPath = patternKey.slice(firstSpace + 1);
+    return patternMethod === method && routePatternMatches(patternPath, fullPath);
+  });
+  return authMatch ? authMatch[1] : null;
+};
+
 /**
  * Extract resource ID from request
  */
-function extractResourceId(req, config) {
+function extractResourceId(req) {
   // Check params for common ID fields
   if (req.params.id) return req.params.id;
   if (req.params.clientId) return req.params.clientId;
   if (req.params.clientId) return req.params.clientId;
   if (req.params.conversationId) return req.params.conversationId;
-  
+
   // For POST requests creating new resources, use "new" or "pending"
   if (req.method === 'POST') {
     return req.body._id || req.body.id || 'new';
   }
-  
+
   // For GET requests without ID, it's a list operation
   if (req.method === 'GET' && !req.params.id) {
     return 'multiple';
   }
-  
+
   return 'unknown';
 }
 
@@ -135,12 +182,12 @@ const auditMiddleware = async (req, res, next) => {
   }
 
   // Construct route key
-  const routePath = req.route?.path || req.path;
+  const routePath = normalizeRoutePath(req.baseUrl, req.route && req.route.path ? req.route.path : req.path);
   const routeKey = `${req.method} ${routePath}`;
-  
+
   // Check if this route needs auditing
-  const auditConfig = PHI_ROUTES[routeKey] || AUTH_ROUTES[routeKey];
-  
+  const auditConfig = getAuditConfigForRequest(req.method, routePath);
+
   if (!auditConfig) {
     return next(); // Not a PHI-related or auth endpoint
   }
@@ -148,7 +195,7 @@ const auditMiddleware = async (req, res, next) => {
   // Capture original response methods
   const originalJson = res.json;
   const originalSend = res.send;
-  
+
   // Flag to ensure we only log once
   let logged = false;
 
@@ -158,12 +205,12 @@ const auditMiddleware = async (req, res, next) => {
     logged = true;
 
     try {
-      const resourceId = extractResourceId(req, auditConfig);
-      
+      const resourceId = extractResourceId(req);
+
       const auditData = {
         timestamp: new Date(),
-        userId: req.caregiver?._id || req.caregiver?.id || new mongoose.Types.ObjectId(),
-        userRole: req.caregiver?.role || 'staff',
+        userId: (req.caregiver && (req.caregiver._id || req.caregiver.id)) || new mongoose.Types.ObjectId(),
+        userRole: (req.caregiver && req.caregiver.role) || 'staff',
         action: auditConfig.action,
         resource: auditConfig.resource,
         resourceId: resourceId.toString(),
@@ -176,7 +223,7 @@ const auditMiddleware = async (req, res, next) => {
         complianceFlags: {
           phiAccessed: auditConfig.phiAccessed || false,
           highRiskAction: auditConfig.highRisk || false,
-          requiresReview: (auditConfig.highRisk || outcome === 'FAILURE'),
+          requiresReview: auditConfig.highRisk || outcome === 'FAILURE',
         },
       };
 
@@ -205,15 +252,14 @@ const auditMiddleware = async (req, res, next) => {
         userId: auditData.userId,
         ipAddress: auditData.ipAddress,
       });
-
     } catch (error) {
       // Critical: Audit logging failed
       logger.error('[AUDIT] Failed to create audit log:', {
         error: error.message,
         route: routeKey,
-        userId: req.caregiver?._id,
+        userId: req.caregiver && req.caregiver._id,
       });
-      
+
       // Don't fail the request, but this should trigger alerts
       // In production, you might want to queue failed audit logs for retry
     }
@@ -222,8 +268,8 @@ const auditMiddleware = async (req, res, next) => {
   // Intercept res.json
   res.json = function (data) {
     const outcome = res.statusCode < 400 ? 'SUCCESS' : 'FAILURE';
-    const errorMessage = res.statusCode >= 400 ? (data?.message || 'Request failed') : null;
-    
+    const errorMessage = res.statusCode >= 400 ? (data && data.message) || 'Request failed' : null;
+
     createAudit(outcome, errorMessage).then(() => {
       originalJson.call(this, data);
     });
@@ -233,7 +279,7 @@ const auditMiddleware = async (req, res, next) => {
   res.send = function (data) {
     const outcome = res.statusCode < 400 ? 'SUCCESS' : 'FAILURE';
     const errorMessage = res.statusCode >= 400 ? 'Request failed' : null;
-    
+
     createAudit(outcome, errorMessage).then(() => {
       originalSend.call(this, data);
     });
@@ -257,7 +303,7 @@ const auditAuthFailure = async (email, ipAddress, userAgent, errorMessage) => {
   try {
     // Create a system ObjectId for failed logins
     const systemUserId = new mongoose.Types.ObjectId();
-    
+
     await AuditLog.createLog({
       timestamp: new Date(),
       userId: systemUserId, // Use ObjectId for system
@@ -298,4 +344,3 @@ module.exports = {
   auditAuthFailure,
   createManualAuditLog,
 };
-

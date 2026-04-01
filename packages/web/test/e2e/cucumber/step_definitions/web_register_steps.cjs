@@ -64,7 +64,10 @@ Then("I should see web forgot password confirmation", async function () {
 })
 
 When("I navigate directly to web settings phone", async function () {
-  await this.page.goto(`${this.baseURL}/settings/phone`, { waitUntil: "load", timeout: 30000 })
+  // Keep navigation in-app to preserve in-memory auth state.
+  await this.page.getByTestId("nav-settings").click()
+  await this.page.getByTestId("settings-phone-link").click()
+  await this.page.waitForURL(/\/settings\/phone|\/profile\/phone/, { timeout: 15000 })
 })
 
 Then("I should see the web phone verification page", async function () {

@@ -1,7 +1,8 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { NavLink, Outlet } from "react-router-dom"
+import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import { isAlertUnreadForCaregiver } from "../lib/liveData"
+import { canManageCaregivers } from "../lib/roleAccess"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
 import { useGetCaregiverQuery } from "../services/api/caregiverApi"
 import { useDemo, useDemoActions } from "../state/DemoContext"
@@ -23,6 +24,7 @@ const NAV = [
   { to: "/", label: "Dashboard", icon: DashboardIcon, badge: false },
   { to: "/alerts", label: "Alerts", icon: BellIcon, badge: true },
   { to: "/residents", label: "Residents", icon: UsersIcon, badge: false },
+  { to: "/caregivers", label: "Caregivers", icon: UsersIcon, badge: false, orgAdminOnly: true },
   { to: "/reports", label: "Reports", icon: FileTextIcon, badge: false },
   { to: "/settings", label: "Settings", icon: SettingsIcon, badge: false },
 ] as const
@@ -36,6 +38,7 @@ function userInitials(name: string | undefined): string {
 }
 
 export function AppShell() {
+  const navigate = useNavigate()
   const currentUser = useAppSelector(getCurrentUser)
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const org = useAppSelector((s) => s.org)
@@ -57,6 +60,10 @@ export function AppShell() {
   const { sidebarCollapsed, activityFeed, alerts, toastVisible, toastMessage } = state
   const demoNew = alerts.filter((a) => a.status === "new").length
   const newAlertCount = liveUnread + demoNew
+  const navItems = useMemo(
+    () => NAV.filter((n) => !n.orgAdminOnly || canManageCaregivers(currentUser?.role)),
+    [currentUser?.role],
+  )
   const first = activityFeed[0]
   const [lastLabel, setLastLabel] = useState(
     () => (first ? formatHeaderLastActivity(first.timestamp) : "No activity"),
@@ -108,7 +115,7 @@ export function AppShell() {
           </button>
         </div>
         <nav className="va-nav">
-          {NAV.map(({ to, label, icon: Icon, badge }) => (
+          {navItems.map(({ to, label, icon: Icon, badge }) => (
             <NavLink
               key={to}
               to={to}
@@ -149,7 +156,14 @@ export function AppShell() {
             <span>
               Last activity: <strong style={{ color: "var(--va-slate-600)" }}>{lastLabel}</strong>
             </span>
-            <div className="va-avatar" title={currentUser?.email || undefined}>
+            <button
+              type="button"
+              className="va-avatar"
+              title={currentUser?.email || undefined}
+              aria-label="Your profile"
+              onClick={() => navigate("/profile")}
+              style={{ cursor: "pointer" }}
+            >
               {avatarUrl ? (
                 <img
                   className="va-avatar-img"
@@ -160,7 +174,7 @@ export function AppShell() {
               ) : (
                 avatarLabel
               )}
-            </div>
+            </button>
           </div>
         </header>
         <main className="va-scroll">

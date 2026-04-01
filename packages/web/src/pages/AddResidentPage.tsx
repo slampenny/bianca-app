@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
-import { useCreateClientMutation, useAssignCaregiverToClientMutation } from "../services/api/clientApi"
+import { useCreateClientMutation, useAssignCaregiverToClientMutation, useUploadClientAvatarMutation } from "../services/api/clientApi"
 import { useGetCaregiversQuery } from "../services/api/caregiverApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -11,11 +11,10 @@ import "../app.css"
 
 function assignableCaregivers(
   results: { id?: string; role?: string; name: string }[],
-  currentId: string,
 ) {
   return results.filter((c) => {
     const id = c.id != null ? String(c.id) : ""
-    if (!id || id === currentId) return false
+    if (!id) return false
     const r = c.role
     return r === "staff" || r === "orgAdmin" || r === "superAdmin"
   })
@@ -37,12 +36,14 @@ export function AddResidentPage() {
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [preferredLanguage, setPreferredLanguage] = useState("en")
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [extraCaregiverIds, setExtraCaregiverIds] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState("")
   const [partialCreateId, setPartialCreateId] = useState<string | null>(null)
 
   const [createClient, { isLoading: creating }] = useCreateClientMutation()
   const [assignCaregiver] = useAssignCaregiverToClientMutation()
+  const [uploadClientAvatar] = useUploadClientAvatarMutation()
 
   useEffect(() => {
     if (!canAddResidents(role)) {
@@ -52,8 +53,16 @@ export function AddResidentPage() {
 
   const peers = useMemo(() => {
     const raw = caregiverPages?.results ?? []
-    return assignableCaregivers(raw, currentId).sort((a, b) => a.name.localeCompare(b.name))
-  }, [caregiverPages?.results, currentId])
+    return assignableCaregivers(raw).sort((a, b) => a.name.localeCompare(b.name))
+  }, [caregiverPages?.results])
+  const selfCaregiver = useMemo(
+    () => peers.find((c) => String(c.id) === currentId),
+    [peers, currentId],
+  )
+  const otherCaregivers = useMemo(
+    () => peers.filter((c) => String(c.id) !== currentId),
+    [peers, currentId],
+  )
 
   const toggleCaregiver = (id: string) => {
     setExtraCaregiverIds((prev) => {
@@ -62,6 +71,14 @@ export function AddResidentPage() {
       else next.add(id)
       return next
     })
+  }
+
+  const selectAllCaregivers = () => {
+    setExtraCaregiverIds(new Set(otherCaregivers.map((c) => String(c.id))))
+  }
+
+  const clearAllCaregivers = () => {
+    setExtraCaregiverIds(new Set())
   }
 
   const onSubmit = async (e: FormEvent) => {
@@ -88,15 +105,19 @@ export function AddResidentPage() {
         return
       }
       const toAssign = [...extraCaregiverIds]
-      let assignFailed = false
-      for (const cgId of toAssign) {
-        try {
-          await assignCaregiver({ clientId: cid, caregiverId: cgId }).unwrap()
-        } catch {
-          assignFailed = true
+      const assignResults = await Promise.allSettled(
+        toAssign.map((cgId) => assignCaregiver({ clientId: cid, caregiverId: cgId }).unwrap()),
+      )
+      if (avatarFile) {
+        const up = await uploadClientAvatar({ clientId: cid, file: avatarFile })
+        if ("error" in up) {
+          setFormError("Resident created, but image upload failed.")
+          setPartialCreateId(cid)
+          return
         }
       }
-      if (assignFailed) {
+      const failedCount = assignResults.filter((r) => r.status === "rejected").length
+      if (failedCount > 0) {
         setFormError(t("residents.assignPartialError"))
         setPartialCreateId(cid)
         return
@@ -183,6 +204,15 @@ export function AddResidentPage() {
               ))}
             </select>
           </label>
+          <label style={{ display: "block", marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
+            <span style={{ display: "block", marginBottom: 6 }}>Resident photo (optional)</span>
+            <input
+              className="va-login-input"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
 
           <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, marginBottom: 8 }}>{t("residents.caregiversHeading")}</h2>
           <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
@@ -197,24 +227,60 @@ export function AddResidentPage() {
               {t("residents.caregiversEmpty")}
             </p>
           ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem", maxHeight: 220, overflowY: "auto" }}>
-              {peers.map((c) => {
-                const id = String(c.id)
-                return (
-                  <li key={id} style={{ marginBottom: 8 }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: "0.875rem" }}>
-                      <input
-                        type="checkbox"
-                        checked={extraCaregiverIds.has(id)}
-                        onChange={() => toggleCaregiver(id)}
-                        data-testid={`add-resident-cg-${id}`}
-                      />
-                      <span>{c.name}</span>
+            <div
+              style={{
+                border: "1px solid var(--va-slate-200)",
+                borderRadius: 10,
+                padding: "0.25rem 0.5rem",
+                marginBottom: "1rem",
+                maxHeight: 260,
+                overflowY: "auto",
+                background: "#fff",
+              }}
+            >
+              {otherCaregivers.length > 0 ? (
+                <div style={{ display: "flex", gap: 8, margin: "0.35rem 0.25rem 0.5rem" }}>
+                  <button type="button" className="va-btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }} onClick={selectAllCaregivers}>
+                    Select all
+                  </button>
+                  <button type="button" className="va-btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }} onClick={clearAllCaregivers}>
+                    Clear all
+                  </button>
+                </div>
+              ) : null}
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {selfCaregiver ? (
+                  <li
+                    key={String(selfCaregiver.id)}
+                    style={{
+                      padding: "0.45rem 0.25rem",
+                      borderBottom: otherCaregivers.length > 0 ? "1px solid var(--va-slate-100)" : "none",
+                    }}
+                  >
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
+                      <input type="checkbox" checked disabled />
+                      <span>{selfCaregiver.name} (you, auto-assigned)</span>
                     </label>
                   </li>
-                )
-              })}
-            </ul>
+                ) : null}
+                {otherCaregivers.map((c) => {
+                  const id = String(c.id)
+                  return (
+                    <li key={id} style={{ padding: "0.45rem 0.25rem" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: "0.875rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={extraCaregiverIds.has(id)}
+                          onChange={() => toggleCaregiver(id)}
+                          data-testid={`add-resident-cg-${id}`}
+                        />
+                        <span>{c.name}</span>
+                      </label>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
           )}
 
           {formError ? (

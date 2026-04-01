@@ -130,7 +130,7 @@ describe('clientService', () => {
       email: 'bulk2@example.org',
       phone: '2222222222',
     });
-    const results = await clientService.assignUnassignedClients(caregiver.id, [c1.id, c2.id]);
+    const results = await clientService.assignUnassignedClients(caregiver.id, [c1.id, c2.id], caregiver);
     expect(results).toHaveLength(2);
     const again = await clientService.getClientById(c1.id);
     expect(again.caregivers.map((id) => id.toString())).toContain(caregiver.id.toString());

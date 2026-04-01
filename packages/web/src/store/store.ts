@@ -23,11 +23,15 @@ import { mfaApi } from "../services/api/mfaApi"
 import { phoneVerificationApi } from "../services/api/phoneVerificationApi"
 import { privacyApi } from "../services/api/privacyApi"
 import { activityApi } from "../services/api/activityApi"
+import { medicalAnalysisApi } from "../services/api/medicalAnalysisApi"
+import { callWorkflowApi } from "../services/api/callWorkflowApi"
+import { scheduleApi } from "../services/api/scheduleApi"
+import { paymentMethodApi } from "../services/api/paymentMethodApi"
 
 const authPersistConfig = {
   key: "auth",
   storage,
-  blacklist: ["authEmail"],
+  blacklist: ["tokens", "currentUser", "inviteToken", "pendingOnboarding"],
 }
 
 const orgPersistConfig = {
@@ -48,6 +52,10 @@ const rootReducer = combineReducers({
   [phoneVerificationApi.reducerPath]: phoneVerificationApi.reducer,
   [privacyApi.reducerPath]: privacyApi.reducer,
   [activityApi.reducerPath]: activityApi.reducer,
+  [medicalAnalysisApi.reducerPath]: medicalAnalysisApi.reducer,
+  [callWorkflowApi.reducerPath]: callWorkflowApi.reducer,
+  [scheduleApi.reducerPath]: scheduleApi.reducer,
+  [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
 })
 
 export const store = configureStore({
@@ -68,6 +76,10 @@ export const store = configureStore({
       phoneVerificationApi.middleware,
       privacyApi.middleware,
       activityApi.middleware,
+      medicalAnalysisApi.middleware,
+      callWorkflowApi.middleware,
+      scheduleApi.middleware,
+      paymentMethodApi.middleware,
     ),
 })
 

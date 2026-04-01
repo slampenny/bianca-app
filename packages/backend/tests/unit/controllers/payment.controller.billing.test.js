@@ -208,13 +208,13 @@ describe('Payment Controller - Billing', () => {
       await Call.updateMany({}, { $unset: { lineItemId: 1 } });
     });
 
-    it('should return 404 for non-existent organization', async () => {
+    it('should return 403 for non-accessible organization id', async () => {
       const nonExistentOrgId = new mongoose.Types.ObjectId();
       
       await request(app)
         .get(`/v1/payments/orgs/${nonExistentOrgId}/unbilled-costs`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(404);
+        .expect(403);
     });
 
     it('should require authentication', async () => {
@@ -401,15 +401,13 @@ describe('Payment Controller - Billing', () => {
       expect(pastRes.body).toHaveLength(0);
     });
 
-    it('should return empty array for non-existent organization', async () => {
+    it('should return 403 for non-accessible organization id', async () => {
       const nonExistentOrgId = new mongoose.Types.ObjectId();
       
-      const res = await request(app)
+      await request(app)
         .get(`/v1/payments/orgs/${nonExistentOrgId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200);
-
-      expect(res.body).toHaveLength(0);
+        .expect(403);
     });
 
     it('should require authentication', async () => {

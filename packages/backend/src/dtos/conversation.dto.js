@@ -77,28 +77,45 @@ const ConversationDTO = (conversation) => {
   // This can cause issues with destructuring. Use explicit access for clientId
   // to ensure we get the value even when other fields are populated
   const _id = conversationObj._id || conversation._id;
-  const callSid = conversationObj.callSid || conversation.callSid;
+  const populatedCall =
+    conversation && conversation.callId && typeof conversation.callId === 'object' && !Array.isArray(conversation.callId)
+      ? conversation.callId
+      : null;
+  const callSid = conversationObj.callSid || conversation.callSid || (populatedCall && populatedCall.callSid);
   const clientId = conversationObj.clientId || conversation.clientId;
-  const lineItemId = conversationObj.lineItemId || conversation.lineItemId;
+  const lineItemId = conversationObj.lineItemId || conversation.lineItemId || (populatedCall && populatedCall.lineItemId);
   const messages = conversationObj.messages || conversation.messages;
   const history = conversationObj.history || conversation.history;
   const analyzedData = conversationObj.analyzedData || conversation.analyzedData;
   const metadata = conversationObj.metadata || conversation.metadata;
-  const startTime = conversationObj.startTime || conversation.startTime;
-  const endTime = conversationObj.endTime || conversation.endTime;
-  const duration = conversationObj.duration || conversation.duration;
-  const callStatus = conversationObj.callStatus || conversation.callStatus;
-  const callStartTime = conversationObj.callStartTime || conversation.callStartTime;
-  const callEndTime = conversationObj.callEndTime || conversation.callEndTime;
-  const callDuration = conversationObj.callDuration || conversation.callDuration;
-  const callOutcome = conversationObj.callOutcome || conversation.callOutcome;
-  const callNotes = conversationObj.callNotes || conversation.callNotes;
+  const startTime =
+    conversationObj.startTime ||
+    conversation.startTime ||
+    (populatedCall && (populatedCall.startTime || populatedCall.callStartTime));
+  const endTime =
+    conversationObj.endTime ||
+    conversation.endTime ||
+    (populatedCall && (populatedCall.endTime || populatedCall.callEndTime));
+  const duration =
+    conversationObj.duration ||
+    conversation.duration ||
+    (populatedCall && (populatedCall.duration || populatedCall.callDuration));
+  const callStatus = conversationObj.callStatus || conversation.callStatus || (populatedCall && populatedCall.callStatus);
+  const callStartTime =
+    conversationObj.callStartTime || conversation.callStartTime || (populatedCall && (populatedCall.callStartTime || populatedCall.startTime));
+  const callEndTime =
+    conversationObj.callEndTime || conversation.callEndTime || (populatedCall && (populatedCall.callEndTime || populatedCall.endTime));
+  const callDuration =
+    conversationObj.callDuration || conversation.callDuration || (populatedCall && (populatedCall.callDuration || populatedCall.duration));
+  const callOutcome = conversationObj.callOutcome || conversation.callOutcome || (populatedCall && populatedCall.callOutcome);
+  const callNotes = conversationObj.callNotes || conversation.callNotes || (populatedCall && populatedCall.callNotes);
   const caregiverIdRaw =
     conversationObj.caregiverId ||
     conversation.caregiverId ||
+    (populatedCall && populatedCall.caregiverId) ||
     conversationObj.agentId ||
     conversation.agentId;
-  const status = conversationObj.status || conversation.status;
+  const status = conversationObj.status || conversation.status || (populatedCall && populatedCall.status);
 
   // Convert _id (ObjectId) to string, or use id if already converted by toJSON plugin
   // Priority: conversation.id (if already transformed) > _id.toString() > _id (if already string)

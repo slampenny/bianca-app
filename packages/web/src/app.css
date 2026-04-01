@@ -507,6 +507,8 @@
   color: var(--va-slate-600);
 }
 .va-login-input {
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.625rem 0.75rem;
   border-radius: 0.5rem;
   border: 1px solid var(--va-slate-200);

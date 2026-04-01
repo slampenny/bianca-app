@@ -38,6 +38,7 @@ const allRoles = {
     'updateOwn:org',
     'deleteOwn:org',
     'readAny:caregiver',
+    'createAny:caregiver',
     'updateAny:caregiver',
     'deleteAny:caregiver',
     'readAny:client',
@@ -63,6 +64,8 @@ const allRoles = {
     'readAny:familyDigest',
     'createAny:familyDigest',
     'readAny:facilityReport',
+    'readAny:privacy',
+    'updateAny:privacy',
   ],
   superAdmin: [], // superAdmin can do everything without explicit permissions
 };

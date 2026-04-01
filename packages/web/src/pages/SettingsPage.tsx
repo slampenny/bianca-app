@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { canManageBilling } from "../lib/roleAccess"
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../config/legal"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import {
@@ -58,6 +59,7 @@ export function SettingsPage() {
   const isSsoUser = Boolean(profile?.ssoProvider)
   const isEmailVerified = Boolean(profile?.isEmailVerified || isSsoUser)
   const hasMissingPhone = !profile?.phone || String(profile.phone).trim() === ""
+  const canSeeBilling = canManageBilling(user?.role)
 
   useEffect(() => {
     if (!profile) return
@@ -380,6 +382,18 @@ export function SettingsPage() {
           Privacy & data requests
         </Link>
       </div>
+
+      {canSeeBilling ? (
+        <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Billing</h2>
+          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
+            Manage organization payment methods and default charge source.
+          </p>
+          <Link to="/settings/billing" data-testid="settings-billing-link" className="va-btn-secondary" style={{ display: "inline-flex", textDecoration: "none" }}>
+            Payment methods
+          </Link>
+        </div>
+      ) : null}
 
       <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Legal</h2>

@@ -1,6 +1,8 @@
 const express = require('express');
 const auth = require('../../middlewares/auth');
+const validate = require('../../middlewares/validate');
 const privacyController = require('../../controllers/privacy.controller');
+const { privacyValidation } = require('../../validations');
 
 const router = express.Router();
 
@@ -9,116 +11,92 @@ router
   .route('/requests')
   .post(
     auth(), // Any authenticated user can create a request
+    validate(privacyValidation.requestAccess),
     privacyController.createAccessRequest
   )
   .get(
     auth(), // Users can see their own requests, admins can see all
+    validate(privacyValidation.getRequests),
     privacyController.getPrivacyRequests
   );
 
 router
   .route('/requests/access')
-  .post(
-    auth(),
-    privacyController.createAccessRequest
-  );
+  .post(auth(), validate(privacyValidation.requestAccess), privacyController.createAccessRequest);
 
 router
   .route('/requests/correction')
-  .post(
-    auth(),
-    privacyController.createCorrectionRequest
-  );
+  .post(auth(), validate(privacyValidation.requestCorrection), privacyController.createCorrectionRequest);
 
-router
-  .route('/requests/approaching-deadline')
-  .get(
-    auth('readAny:privacy'), // Admin only
-    privacyController.getApproachingDeadline
-  );
+router.route('/requests/approaching-deadline').get(
+  auth('readAny:privacy'), // Admin only
+  validate(privacyValidation.getRequests),
+  privacyController.getApproachingDeadline
+);
 
-router
-  .route('/requests/overdue')
-  .get(
-    auth('readAny:privacy'), // Admin only
-    privacyController.getOverdueRequests
-  );
+router.route('/requests/overdue').get(
+  auth('readAny:privacy'), // Admin only
+  validate(privacyValidation.getRequests),
+  privacyController.getOverdueRequests
+);
 
 router
   .route('/requests/:requestId')
   .get(
     auth(), // Users can see their own, admins can see all
+    validate(privacyValidation.privacyRequestIdParam),
     privacyController.getPrivacyRequest
   )
   .patch(
     auth('updateAny:privacy'), // Admin only
+    validate(privacyValidation.updatePrivacyRequest),
     privacyController.updatePrivacyRequest
   );
 
-router
-  .route('/requests/:requestId/process-access')
-  .post(
-    auth('updateAny:privacy'), // Admin only
-    privacyController.processAccessRequest
-  );
+router.route('/requests/:requestId/process-access').post(
+  auth('updateAny:privacy'), // Admin only
+  validate(privacyValidation.privacyRequestIdParam),
+  privacyController.processAccessRequest
+);
 
-router
-  .route('/requests/:requestId/process-correction')
-  .post(
-    auth('updateAny:privacy'), // Admin only
-    privacyController.processCorrectionRequest
-  );
+router.route('/requests/:requestId/process-correction').post(
+  auth('updateAny:privacy'), // Admin only
+  validate(privacyValidation.processCorrection),
+  privacyController.processCorrectionRequest
+);
 
 // Consent Management
 router
   .route('/consent')
-  .post(
-    auth(),
-    privacyController.createConsent
-  )
-  .get(
-    auth(),
-    privacyController.getActiveConsent
-  );
+  .post(auth(), validate(privacyValidation.createConsent), privacyController.createConsent)
+  .get(auth(), validate(privacyValidation.getRequests), privacyController.getActiveConsent);
 
-router
-  .route('/consent/check')
-  .get(
-    auth(),
-    privacyController.checkConsent
-  );
+router.route('/consent/check').get(auth(), validate(privacyValidation.getRequests), privacyController.checkConsent);
 
-router
-  .route('/consent/history')
-  .get(
-    auth(),
-    privacyController.getConsentHistory
-  );
+router.route('/consent/history').get(auth(), validate(privacyValidation.getRequests), privacyController.getConsentHistory);
 
 router
   .route('/consent/:consentId/withdraw')
-  .post(
-    auth(),
-    privacyController.withdrawConsent
-  );
+  .post(auth(), validate(privacyValidation.withdrawConsent), privacyController.withdrawConsent);
 
 // Statistics (Admin only)
-router
-  .route('/statistics')
-  .get(
-    auth('readAny:privacy'), // Admin only
-    privacyController.getPrivacyStatistics
-  );
+router.route('/statistics').get(
+  auth('readAny:privacy'), // Admin only
+  validate(privacyValidation.getRequests),
+  privacyController.getPrivacyStatistics
+);
 
 // Complaints (PIPEDA and HIPAA)
 router
   .route('/complaints')
   .post(
     auth(), // Any authenticated user can create a complaint
+    validate(privacyValidation.createComplaint),
     privacyController.createComplaint
   )
   .get(
     auth(), // Users can see their own complaints, admins can see all
+    validate(privacyValidation.getRequests),
     privacyController.getComplaints
   );
 
@@ -126,22 +104,20 @@ router
   .route('/complaints/:complaintId')
   .get(
     auth(), // Users can see their own, admins can see all
+    validate(privacyValidation.complaintIdParam),
     privacyController.getComplaint
   )
   .patch(
     auth('updateAny:privacy'), // Admin only
+    validate(privacyValidation.updateComplaint),
     privacyController.updateComplaint
   );
 
 // Data Deletion Requests
-router
-  .route('/deletion')
-  .post(
-    auth(), // Any authenticated user can request deletion
-    privacyController.requestDataDeletion
-  );
+router.route('/deletion').post(
+  auth(), // Any authenticated user can request deletion
+  validate(privacyValidation.requestDeletion),
+  privacyController.requestDataDeletion
+);
 
 module.exports = router;
-
-
-

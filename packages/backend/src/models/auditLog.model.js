@@ -3,12 +3,12 @@ const crypto = require('crypto');
 
 /**
  * HIPAA Audit Log Model
- * 
+ *
  * HIPAA Requirements:
  * - §164.312(b) - Audit Controls: Record and examine activity in systems containing ePHI
  * - §164.308(a)(1)(ii)(D) - Information System Activity Review
  * - §164.308(a)(3)(ii)(A) - Log-in Monitoring
- * 
+ *
  * Features:
  * - Immutable logs (cannot be modified or deleted)
  * - Tamper-proof chain with cryptographic signatures
@@ -94,6 +94,11 @@ const auditLogSchema = mongoose.Schema(
         'payment',
         'invoice',
         'report',
+        'familyDigest',
+        'facilityReport',
+        'activityFeed',
+        'consentAudit',
+        'paymentMethod',
         'schedule',
         'session',
         'database',
@@ -293,12 +298,12 @@ auditLogSchema.statics.verifyChainIntegrity = async function (limit = 1000) {
     errors: [],
   };
 
-  for (let i = 1; i < logs.length; i++) {
+  for (let i = 1; i < logs.length; i += 1) {
     const currentLog = logs[i];
     const previousLog = logs[i - 1];
 
     if (currentLog.previousLogHash !== previousLog.signature) {
-      results.failed++;
+      results.failed += 1;
       results.errors.push({
         logId: currentLog._id,
         timestamp: currentLog.timestamp,
@@ -320,9 +325,9 @@ auditLogSchema.statics.verifyChainIntegrity = async function (limit = 1000) {
       const expectedSignature = crypto.createHmac('sha256', secret).update(dataToSign).digest('hex');
 
       if (currentLog.signature === expectedSignature) {
-        results.verified++;
+        results.verified += 1;
       } else {
-        results.failed++;
+        results.failed += 1;
         results.errors.push({
           logId: currentLog._id,
           timestamp: currentLog.timestamp,
@@ -436,9 +441,9 @@ auditLogSchema.statics.generateAuditReport = async function (startDate, endDate)
     report.summary.byUser[userId] = (report.summary.byUser[userId] || 0) + 1;
 
     // Compliance flags
-    if (log.complianceFlags.phiAccessed) report.summary.phiAccessCount++;
-    if (log.complianceFlags.highRiskAction) report.summary.highRiskActions++;
-    if (log.outcome === 'FAILURE') report.summary.failedActions++;
+    if (log.complianceFlags.phiAccessed) report.summary.phiAccessCount += 1;
+    if (log.complianceFlags.highRiskAction) report.summary.highRiskActions += 1;
+    if (log.outcome === 'FAILURE') report.summary.failedActions += 1;
   });
 
   return report;
@@ -451,4 +456,3 @@ auditLogSchema.statics.generateAuditReport = async function (startDate, endDate)
 const AuditLog = mongoose.model('AuditLog', auditLogSchema);
 
 module.exports = AuditLog;
-

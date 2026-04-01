@@ -1,14 +1,35 @@
 const { Given, When, Then } = require("@cucumber/cucumber")
 const { expect } = require("@playwright/test")
 
+async function detectReachableFrontendBase(world, preferredBase) {
+  const envBase = process.env.FRONTEND_URL || process.env.BASE_URL
+  const candidates = [
+    envBase,
+    world.parameters?.baseURL,
+    preferredBase,
+    ...Array.from({ length: 13 }, (_, i) => `http://localhost:${5173 + i}`),
+  ]
+    .filter(Boolean)
+    .map((u) => String(u).replace(/\/$/, ""))
+    .filter((u, idx, arr) => arr.indexOf(u) === idx)
+
+  for (const base of candidates) {
+    try {
+      await world.page.goto(`${base}/login`, { waitUntil: "load", timeout: 8000 })
+      const emailVisible = await world.page
+        .getByTestId("email-input")
+        .isVisible({ timeout: 1500 })
+        .catch(() => false)
+      if (emailVisible) return base
+    } catch (_) {
+      // Try next candidate.
+    }
+  }
+  return String(preferredBase || "http://localhost:5173").replace(/\/$/, "")
+}
+
 Given("the web frontend is available at {string}", async function (frontendBase) {
-  this.baseURL = (
-    process.env.FRONTEND_URL ||
-    process.env.BASE_URL ||
-    this.parameters?.baseURL ||
-    frontendBase ||
-    "http://localhost:5173"
-  ).replace(/\/$/, "")
+  this.baseURL = await detectReachableFrontendBase(this, frontendBase || "http://localhost:5173")
 })
 
 Given("the API is available at {string}", async function (apiBase) {

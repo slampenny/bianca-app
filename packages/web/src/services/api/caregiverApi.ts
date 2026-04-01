@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import type { Caregiver, CaregiverPages } from "./api.types"
+import type { Caregiver, CaregiverPages, Client } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const caregiverApi = createApi({
@@ -18,6 +18,34 @@ export const caregiverApi = createApi({
       query: ({ id }) => `/caregivers/${id}`,
       providesTags: (_r, _e, { id }) => [{ type: "Caregiver", id }],
     }),
+    getCaregiverClients: builder.query<Client[], { id: string }>({
+      query: ({ id }) => ({
+        url: `/caregivers/${id}/clients`,
+        method: "GET",
+      }),
+    }),
+    createCaregiver: builder.mutation<
+      Caregiver,
+      {
+        caregiver: {
+          orgId?: string
+          name: string
+          email: string
+          phone?: string
+          role?: "invited" | "staff" | "orgAdmin" | "superAdmin"
+          externalId?: string
+          active?: boolean
+          preferredLanguage?: string
+        }
+      }
+    >({
+      query: ({ caregiver }) => ({
+        url: "/caregivers",
+        method: "POST",
+        body: caregiver,
+      }),
+      invalidatesTags: ["Caregiver"],
+    }),
     updateCaregiver: builder.mutation<Caregiver, { id: string; caregiver: Partial<Caregiver> }>({
       query: ({ id, caregiver }) => {
         const body: Record<string, unknown> = {}
@@ -33,6 +61,13 @@ export const caregiverApi = createApi({
         }
       },
       invalidatesTags: (_r, _e, { id }) => [{ type: "Caregiver", id }],
+    }),
+    deleteCaregiver: builder.mutation<void, { id: string }>({
+      query: ({ id }) => ({
+        url: `/caregivers/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Caregiver"],
     }),
     uploadAvatar: builder.mutation<Caregiver, { id: string; avatar: Blob | File }>({
       query: ({ id, avatar }) => {
@@ -52,6 +87,9 @@ export const caregiverApi = createApi({
 export const {
   useGetCaregiversQuery,
   useGetCaregiverQuery,
+  useGetCaregiverClientsQuery,
+  useCreateCaregiverMutation,
   useUpdateCaregiverMutation,
+  useDeleteCaregiverMutation,
   useUploadAvatarMutation,
 } = caregiverApi

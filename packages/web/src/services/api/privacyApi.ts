@@ -37,6 +37,28 @@ export const privacyApi = createApi({
       }),
       invalidatesTags: [{ type: "PrivacyRequest", id: "LIST" }],
     }),
+    createCorrectionRequest: builder.mutation<PrivacyRequestItem, { field?: string; currentValue?: string; requestedValue?: string; reason?: string }>({
+      query: (body) => ({
+        url: "/privacy/requests/correction",
+        method: "POST",
+        body: {
+          correctionDetails: {
+            field: body.field || "fullName",
+            currentValue: body.currentValue || "Existing profile value",
+            requestedValue: body.requestedValue || "Updated profile value",
+            reason: body.reason || "Profile information needs correction.",
+          },
+        },
+      }),
+      invalidatesTags: [{ type: "PrivacyRequest", id: "LIST" }],
+    }),
+    requestDataDeletion: builder.mutation<{ message?: string; status?: string }, { dataType?: string }>({
+      query: (body) => ({
+        url: "/privacy/deletion",
+        method: "POST",
+        body: { dataType: body.dataType || "all" },
+      }),
+    }),
     getPrivacyRequests: builder.query<PrivacyRequestPages, { page?: number; limit?: number }>({
       query: (params) => ({
         url: "/privacy/requests",
@@ -56,4 +78,9 @@ export const privacyApi = createApi({
   }),
 })
 
-export const { useCreateAccessRequestMutation, useGetPrivacyRequestsQuery } = privacyApi
+export const {
+  useCreateAccessRequestMutation,
+  useCreateCorrectionRequestMutation,
+  useRequestDataDeletionMutation,
+  useGetPrivacyRequestsQuery,
+} = privacyApi

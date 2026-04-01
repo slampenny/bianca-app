@@ -75,9 +75,9 @@ function caregiverToScimUser(c, orgIdForPath) {
   return {
     schemas: [USER_SCHEMA],
     id,
-    externalId: id,
+    externalId: c.externalId || id,
     userName: c.email,
-    active: true,
+    active: c.active !== false,
     name: {
       formatted: c.name || c.email,
     },
@@ -155,6 +155,8 @@ const createUser = async (orgId, body) => {
     email: userName,
     password: tempPassword,
     role: 'staff',
+    externalId: body.externalId || undefined,
+    active: body.active !== false,
     isEmailVerified: true,
   });
 
@@ -173,8 +175,12 @@ const patchUser = async (orgId, userId, body) => {
     if (o !== 'replace') continue;
     const path = String(op.path || '').toLowerCase();
     if (path === 'active' && op.value === false) {
-      await caregiver.delete();
-      return null;
+      caregiver.active = false;
+      continue;
+    }
+    if (path === 'active' && op.value === true) {
+      caregiver.active = true;
+      continue;
     }
     if (path === 'name.formatted' || path === 'name') {
       caregiver.name = String(op.value || '').trim() || caregiver.name;
@@ -201,7 +207,8 @@ const deleteUser = async (orgId, userId) => {
   if (!caregiver) {
     throw scimError(httpStatus.NOT_FOUND, 'User not found');
   }
-  await caregiver.delete();
+  caregiver.active = false;
+  await caregiver.save();
 };
 
 const serviceProviderConfig = (orgId) => {

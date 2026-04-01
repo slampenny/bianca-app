@@ -22,7 +22,7 @@ const CaregiverDTO = (caregiver) => {
     return null;
   }
   
-  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, clients, ssoProvider, ssoProviderId, onboardingComplete, persona, mfaEnabled, accountLocked, failedLoginAttempts } = caregiverObj;
+  const { _id, name, avatar, email, phone, role, isEmailVerified, isPhoneVerified, org, clients, ssoProvider, ssoProviderId, externalId, active, onboardingComplete, persona, mfaEnabled, accountLocked, failedLoginAttempts } = caregiverObj;
   
   const id = _id;
 
@@ -47,6 +47,8 @@ const CaregiverDTO = (caregiver) => {
     clients: clientIds,
     ssoProvider: ssoProvider || undefined,
     ssoProviderId: ssoProviderId || undefined,
+    externalId: externalId || undefined,
+    active: active !== false,
     onboardingComplete: completed,
     persona: persona || undefined,
     mfaEnabled: mfaEnabled === true,

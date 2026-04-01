@@ -27,6 +27,9 @@ const createClient = {
     email: Joi.string().required().email(),
     avatar: Joi.string().optional(),
     name: Joi.string().required(),
+    preferredName: Joi.string().allow('').optional(),
+    age: Joi.number().integer().min(0).max(150).optional(),
+    notes: Joi.string().allow('').optional(),
     phone: Joi.string()
       .required()
       .custom((value, helpers) => {
@@ -90,6 +93,9 @@ const updateClient = {
       avatar: Joi.string().optional(),
       email: Joi.string().email().optional(),
       name: Joi.string().optional(),
+      preferredName: Joi.string().allow('').optional(),
+      age: Joi.number().integer().min(0).max(150).optional(),
+      notes: Joi.string().allow('').optional(),
       phone: Joi.string()
         .optional()
         .custom((value, helpers) => {

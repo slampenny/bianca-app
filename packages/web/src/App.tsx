@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AdminSessionHandoffBridge } from "./auth/AdminSessionHandoffBridge"
 import { AuthSessionBridge } from "./auth/AuthSessionBridge"
 import { RequireAuth } from "./auth/RequireAuth"
+import { RequireRole } from "./auth/RequireRole"
 import { SSOCallbackGate } from "./auth/SSOCallbackGate"
 import { DemoProvider } from "./state/DemoContext"
 import { AppShell } from "./layout/AppShell"
@@ -20,15 +21,19 @@ import { ClientConsentPage } from "./pages/ClientConsentPage"
 import { DashboardPage } from "./pages/DashboardPage"
 import { AddResidentPage } from "./pages/AddResidentPage"
 import { ResidentsPage } from "./pages/ResidentsPage"
-import { ResidentDetailPage } from "./pages/ResidentDetailPage"
+import ResidentDetailPage from "./pages/ResidentDetailPage"
+import { ResidentCallPage } from "./pages/ResidentCallPage"
 import { AlertsPage } from "./pages/AlertsPage"
 import { AlertDetailPage } from "./pages/AlertDetailPage"
 import { ReportTemplateDetailPage } from "./pages/ReportTemplateDetailPage"
 import { ReportsPage } from "./pages/ReportsPage"
+import { ProfilePage } from "./pages/ProfilePage"
+import { CaregiversPage } from "./pages/CaregiversPage"
 import { SettingsPage } from "./pages/SettingsPage"
 import { SettingsMfaPage } from "./pages/SettingsMfaPage"
 import { SettingsPhonePage } from "./pages/SettingsPhonePage"
 import { SettingsPrivacyPage } from "./pages/SettingsPrivacyPage"
+import { SettingsBillingPage } from "./pages/SettingsBillingPage"
 
 export default function App() {
   return (
@@ -58,11 +63,27 @@ export default function App() {
                 <Route path="residents" element={<ResidentsPage />} />
                 <Route path="residents/new" element={<AddResidentPage />} />
                 <Route path="residents/:residentId" element={<ResidentDetailPage />} />
+                <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
+                  <Route path="residents/:residentId/call" element={<ResidentCallPage />} />
+                </Route>
                 <Route path="reports/:templateId" element={<ReportTemplateDetailPage />} />
                 <Route path="reports" element={<ReportsPage />} />
+                <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
+                  <Route path="caregivers" element={<CaregiversPage />} />
+                </Route>
+                <Route path="profile" element={<ProfilePage />} />
+                <Route path="profile/mfa" element={<SettingsMfaPage />} />
+                <Route path="profile/phone" element={<SettingsPhonePage />} />
+                <Route path="profile/privacy" element={<SettingsPrivacyPage />} />
+                <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
+                  <Route path="profile/billing" element={<SettingsBillingPage />} />
+                </Route>
                 <Route path="settings/mfa" element={<SettingsMfaPage />} />
                 <Route path="settings/phone" element={<SettingsPhonePage />} />
                 <Route path="settings/privacy" element={<SettingsPrivacyPage />} />
+                <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
+                  <Route path="settings/billing" element={<SettingsBillingPage />} />
+                </Route>
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>

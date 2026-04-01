@@ -1,6 +1,5 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useMemo, useState } from "react"
-import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { mapClientToResident } from "../lib/liveData"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
@@ -18,31 +17,38 @@ const FILTERS = [
 ]
 
 export function ResidentsPage() {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   const authed = useAppSelector(isAuthenticated)
   const user = useAppSelector(getCurrentUser)
   const showAdd = canAddResidents(user?.role)
   const { data: pages, isLoading, isError, refetch, error } = useGetAllClientsQuery(
     authed ? { limit: 200, page: 1 } : skipToken,
+    { refetchOnMountOrArgChange: true, refetchOnFocus: true, refetchOnReconnect: true },
   )
 
   const [q, setQ] = useState("")
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all")
 
-  const residents = useMemo(() => (pages?.results ?? []).map(mapClientToResident), [pages?.results])
+  const residents = useMemo(
+    () =>
+      (pages?.results ?? []).map((c) => ({
+        resident: mapClientToResident(c),
+        avatar: c.avatar || "",
+      })),
+    [pages?.results],
+  )
 
   const rows = useMemo(() => {
-    let list: Resident[] = [...residents]
+    let list = [...residents]
     switch (filter) {
       case "active":
-        list = list.filter((r) => r.status === "active")
+        list = list.filter(({ resident: r }) => r.status === "active")
         break
       case "at_risk":
-        list = list.filter((r) => r.status === "at_risk")
+        list = list.filter(({ resident: r }) => r.status === "at_risk")
         break
       case "missing_consent":
-        list = list.filter((r) => !r.consentOnFile)
+        list = list.filter(({ resident: r }) => !r.consentOnFile)
         break
       default:
         break
@@ -50,18 +56,22 @@ export function ResidentsPage() {
     const t = q.trim().toLowerCase()
     if (t) {
       list = list.filter(
-        (r) =>
+        ({ resident: r }) =>
           r.firstName.toLowerCase().includes(t) ||
           r.lastName.toLowerCase().includes(t) ||
           `${r.firstName} ${r.lastName}`.toLowerCase().includes(t),
       )
     }
     list.sort((a, b) => {
-      const ln = a.lastName.localeCompare(b.lastName)
-      return ln !== 0 ? ln : a.firstName.localeCompare(b.firstName)
+      const ar = a.resident
+      const br = b.resident
+      const ln = ar.lastName.localeCompare(br.lastName)
+      return ln !== 0 ? ln : ar.firstName.localeCompare(br.firstName)
     })
     return list
   }, [residents, filter, q])
+
+  const initialsFor = (r: Resident) => `${r.firstName[0] ?? "?"}${r.lastName[0] ?? ""}`.toUpperCase()
 
   if (!authed) {
     return null
@@ -106,11 +116,6 @@ export function ResidentsPage() {
               {pages?.totalResults != null ? ` (${pages.totalResults} in directory)` : ""}
             </p>
           </div>
-          {showAdd ? (
-            <Link to="/residents/new" className="va-btn-primary" style={{ textDecoration: "none" }} data-testid="residents-add">
-              {t("residents.addResident")}
-            </Link>
-          ) : null}
         </div>
         <div className="va-search">
           <SearchIcon size={16} />
@@ -150,7 +155,7 @@ export function ResidentsPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {rows.map(({ resident: r, avatar }) => (
               <tr
                 key={r.id}
                 data-testid="resident-row"
@@ -158,7 +163,32 @@ export function ResidentsPage() {
                 onClick={() => navigate(`/residents/${r.id}`)}
               >
                 <td style={{ fontWeight: 600, color: "var(--va-navy)" }}>
-                  {r.firstName} {r.lastName}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                    <span
+                      style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: "50%",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        overflow: "hidden",
+                        background: "rgba(37, 99, 235, 0.12)",
+                        color: "#1d4ed8",
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {avatar ? (
+                        <img src={avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} referrerPolicy="no-referrer" />
+                      ) : (
+                        initialsFor(r)
+                      )}
+                    </span>
+                    <span>
+                      {r.firstName} {r.lastName}
+                    </span>
+                  </span>
                 </td>
                 <td>{r.room}</td>
                 <td>
@@ -174,7 +204,44 @@ export function ResidentsPage() {
         </table>
       </div>
 
+      {showAdd ? (
+        <Link
+          to="/residents/new"
+          aria-label="Add resident"
+          className="va-residents-fab"
+          data-testid="residents-add"
+        >
+          +
+        </Link>
+      ) : null}
+
       <style>{`
+        .va-residents-fab {
+          position: fixed;
+          right: 1.5rem;
+          bottom: 1.5rem;
+          width: 3rem;
+          height: 3rem;
+          border-radius: 999px;
+          background: var(--va-teal);
+          color: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+          font-size: 1.75rem;
+          line-height: 1;
+          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
+          z-index: 20;
+        }
+        .va-residents-fab:hover {
+          background: #0f9f90;
+        }
+        .va-residents-fab:focus-visible {
+          outline: 2px solid #fff;
+          outline-offset: 2px;
+          box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.45);
+        }
         @media (min-width: 640px) {
           .va-res-head {
             flex-direction: row !important;
