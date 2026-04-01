@@ -1,20 +1,13 @@
-import { FormEvent, Fragment, useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { skipToken } from "@reduxjs/toolkit/query"
+import { useNavigate } from "react-router-dom"
 import { canManageCaregivers } from "../lib/roleAccess"
 import { ChevronDownIcon, PencilIcon, TrashIcon } from "../icons"
-import { useCreateCaregiverMutation, useDeleteCaregiverMutation, useGetCaregiverClientsQuery, useGetCaregiversQuery, useUpdateCaregiverMutation } from "../services/api/caregiverApi"
+import { useDeleteCaregiverMutation, useGetCaregiverClientsQuery, useGetCaregiversQuery } from "../services/api/caregiverApi"
 import { mapClientToResident } from "../lib/liveData"
 import { useAssignCaregiverToClientMutation, useGetAllClientsQuery, useRemoveCaregiverFromClientMutation } from "../services/api/clientApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
-
-type EditState = {
-  id: string
-  name: string
-  email: string
-  phone: string
-  preferredLanguage: string
-}
 
 type DeleteState = {
   id: string
@@ -22,6 +15,7 @@ type DeleteState = {
 }
 
 export function CaregiversPage() {
+  const navigate = useNavigate()
   const user = useAppSelector(getCurrentUser)
   const role = user?.role
   const currentId = user?.id ? String(user.id) : ""
@@ -29,68 +23,12 @@ export function CaregiversPage() {
   const { data, isLoading, isError, error, refetch } = useGetCaregiversQuery(
     canManage ? { limit: 200, page: 1, sortBy: "name:asc" } : skipToken,
   )
-  const [createCaregiver, { isLoading: creating }] = useCreateCaregiverMutation()
-  const [updateCaregiver, { isLoading: saving }] = useUpdateCaregiverMutation()
   const [deleteCaregiver, { isLoading: deleting }] = useDeleteCaregiverMutation()
-
-  const [inviteName, setInviteName] = useState("")
-  const [inviteEmail, setInviteEmail] = useState("")
-  const [invitePhone, setInvitePhone] = useState("")
-  const [addMessage, setAddMessage] = useState("")
-  const [editMessage, setEditMessage] = useState("")
-  const [editing, setEditing] = useState<EditState | null>(null)
-  const [addOpen, setAddOpen] = useState(false)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [deleteModal, setDeleteModal] = useState<DeleteState | null>(null)
   const [deleteMessage, setDeleteMessage] = useState("")
 
   const caregivers = useMemo(() => data?.results ?? [], [data?.results])
-
-  const onInvite = async (e: FormEvent) => {
-    e.preventDefault()
-    setAddMessage("")
-    try {
-      await createCaregiver({
-        caregiver: {
-          name: inviteName.trim(),
-          email: inviteEmail.trim(),
-          phone: invitePhone.trim(),
-          role: "invited",
-        },
-      }).unwrap()
-      setInviteName("")
-      setInviteEmail("")
-      setInvitePhone("")
-      setAddOpen(false)
-      setAddMessage("Caregiver added.")
-      await refetch()
-    } catch (err: unknown) {
-      const msg = (err as { data?: { message?: string } })?.data?.message
-      setAddMessage(typeof msg === "string" ? msg : "Could not add caregiver.")
-    }
-  }
-
-  const onSaveEdit = async () => {
-    if (!editing) return
-    setEditMessage("")
-    try {
-      await updateCaregiver({
-        id: editing.id,
-        caregiver: {
-          name: editing.name.trim(),
-          email: editing.email.trim(),
-          phone: editing.phone.trim(),
-          preferredLanguage: editing.preferredLanguage.trim() || undefined,
-        },
-      }).unwrap()
-      setEditing(null)
-      setEditMessage("Caregiver updated.")
-      await refetch()
-    } catch (err: unknown) {
-      const msg = (err as { data?: { message?: string } })?.data?.message
-      setEditMessage(typeof msg === "string" ? msg : "Could not update caregiver.")
-    }
-  }
 
   const onDelete = async () => {
     if (!deleteModal || deleting) return
@@ -120,46 +58,8 @@ export function CaregiversPage() {
         </p>
       </div>
 
-      {addOpen ? (
-        <div className="va-card va-card-pad">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Add caregiver</h2>
-            <button type="button" className="va-btn-secondary" onClick={() => setAddOpen(false)}>
-              Close
-            </button>
-          </div>
-          <form onSubmit={(e) => void onInvite(e)} className="va-login-form">
-            <label className="va-login-label">
-              Name
-              <input className="va-login-input" value={inviteName} onChange={(e) => setInviteName(e.target.value)} required />
-            </label>
-            <label className="va-login-label">
-              Email
-              <input className="va-login-input" type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
-            </label>
-            <label className="va-login-label">
-              Phone
-              <input className="va-login-input" value={invitePhone} onChange={(e) => setInvitePhone(e.target.value)} required />
-            </label>
-            <button type="submit" className="va-btn-primary" disabled={creating}>
-              {creating ? "Adding..." : "Add caregiver"}
-            </button>
-            {addMessage ? (
-              <p style={{ margin: 0, fontSize: "0.8125rem", color: addMessage.includes("Could not") ? "var(--va-red-600)" : "var(--va-emerald-700)" }}>
-                {addMessage}
-              </p>
-            ) : null}
-          </form>
-        </div>
-      ) : null}
-
       <div className="va-card va-card-pad">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Organization caregivers</h2>
-        {editMessage ? (
-          <p style={{ marginTop: 0, marginBottom: "0.75rem", fontSize: "0.8125rem", color: editMessage.includes("Could not") ? "var(--va-red-600)" : "var(--va-emerald-700)" }}>
-            {editMessage}
-          </p>
-        ) : null}
         {isLoading ? (
           <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading caregivers...</p>
         ) : isError ? (
@@ -189,8 +89,14 @@ export function CaregiversPage() {
               <tbody>
                 {caregivers.map((c) => {
                   const id = c.id ? String(c.id) : ""
-                  const isEditing = editing?.id === id
                   const isExpanded = !!expanded[id]
+                  const initials = (c.name || "?")
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join("")
+                    .toUpperCase()
                   return (
                     <Fragment key={id}>
                       <tr>
@@ -205,67 +111,50 @@ export function CaregiversPage() {
                             <span style={{ display: "inline-flex", transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)" }}>
                               <ChevronDownIcon size={14} />
                             </span>
-                            <span>{isEditing ? (
-                              <input className="va-login-input" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
-                            ) : c.name}</span>
+                            <span
+                              style={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: "50%",
+                                overflow: "hidden",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "rgba(37, 99, 235, 0.12)",
+                                color: "#1d4ed8",
+                                fontSize: "0.68rem",
+                                fontWeight: 700,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {c.avatar ? <img src={c.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} referrerPolicy="no-referrer" /> : initials}
+                            </span>
+                            <span>{c.name}</span>
                           </button>
                         </td>
-                        <td>
-                          {isEditing ? (
-                            <input className="va-login-input" type="email" value={editing.email} onChange={(e) => setEditing({ ...editing, email: e.target.value })} />
-                          ) : (
-                            c.email
-                          )}
-                        </td>
-                        <td>
-                          {isEditing ? (
-                            <input className="va-login-input" value={editing.phone} onChange={(e) => setEditing({ ...editing, phone: e.target.value })} />
-                          ) : (
-                            c.phone
-                          )}
-                        </td>
+                        <td>{c.email}</td>
+                        <td>{c.phone}</td>
                         <td>{c.role}</td>
                         <td>
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                            {isEditing ? (
-                              <>
-                                <button type="button" className="va-btn-primary" onClick={() => void onSaveEdit()} disabled={saving}>
-                                  Save
-                                </button>
-                                <button type="button" className="va-btn-secondary" onClick={() => setEditing(null)}>
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  className="va-icon-btn"
-                                  aria-label="Edit caregiver"
-                                  onClick={() =>
-                                    setEditing({
-                                      id,
-                                      name: c.name || "",
-                                      email: c.email || "",
-                                      phone: c.phone || "",
-                                      preferredLanguage: c.preferredLanguage || "",
-                                    })
-                                  }
-                                >
-                                  <PencilIcon size={16} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="va-icon-btn"
-                                  aria-label={id === currentId ? "Current user cannot be removed" : "Remove caregiver"}
-                                  style={id === currentId ? { color: "var(--va-slate-300)" } : { color: "var(--va-red-600)" }}
-                                  disabled={deleting || id === currentId}
-                                  onClick={() => setDeleteModal({ id, name: c.name || "Caregiver" })}
-                                >
-                                  <TrashIcon size={16} />
-                                </button>
-                              </>
-                            )}
+                            <button
+                              type="button"
+                              className="va-icon-btn"
+                              aria-label="Edit caregiver"
+                              onClick={() => navigate(`/caregivers/${id}/edit`)}
+                            >
+                              <PencilIcon size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              className="va-icon-btn"
+                              aria-label={id === currentId ? "Current user cannot be removed" : "Remove caregiver"}
+                              style={id === currentId ? { color: "var(--va-slate-300)" } : { color: "var(--va-red-600)" }}
+                              disabled={deleting || id === currentId}
+                              onClick={() => setDeleteModal({ id, name: c.name || "Caregiver" })}
+                            >
+                              <TrashIcon size={16} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -284,7 +173,7 @@ export function CaregiversPage() {
         className="va-caregivers-fab"
         aria-label="Add caregiver"
         data-testid="caregivers-add"
-        onClick={() => setAddOpen(true)}
+        onClick={() => navigate("/caregivers/new")}
       >
         +
       </button>

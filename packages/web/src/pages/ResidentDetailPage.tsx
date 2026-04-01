@@ -14,6 +14,7 @@ import { useGetMedicalAnalysisResultsQuery, useGetMedicalAnalysisSummaryQuery } 
 import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdateScheduleMutation } from "../services/api/scheduleApi"
 import type { MedicalAnalysisResult, MedicalAnalysisSummaryResponse } from "../services/api/medicalAnalysisApi"
 import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
+import { AvatarPicker } from "../components/AvatarPicker"
 import { canAddResidents } from "../lib/roleAccess"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -532,6 +533,12 @@ export function ResidentDetailPage() {
         <div className="va-card va-card-pad">
           <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Edit resident</h2>
           <form onSubmit={(e) => void onSaveResident(e)} style={{ display: "grid", gap: "0.75rem" }}>
+            <AvatarPicker
+              label="Resident photo"
+              initialsSource={residentPreferredName || residentName || "?"}
+              existingAvatarUrl={apiClient?.avatar}
+              onPick={setResidentAvatarFile}
+            />
             <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
               Name
               <input className="va-login-input" type="text" value={residentName} onChange={(e) => setResidentName(e.target.value)} required />
@@ -594,15 +601,6 @@ export function ResidentDetailPage() {
                 onChange={(e) => setResidentNotes(e.target.value)}
                 rows={4}
                 style={{ resize: "vertical" }}
-              />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Resident photo
-              <input
-                className="va-login-input"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setResidentAvatarFile(e.target.files?.[0] ?? null)}
               />
             </label>
             {saveError ? (
@@ -735,9 +733,9 @@ export function ResidentDetailPage() {
                           padding: "0.25rem 0.58rem",
                           fontSize: "0.75rem",
                           borderRadius: 999,
-                          border: active ? "1px solid var(--va-teal-500)" : "1px solid var(--va-slate-200)",
-                          background: active ? "var(--va-teal-500)" : "#fff",
-                          color: active ? "#fff" : "var(--va-slate-600)",
+                          border: active ? "1px solid #14b8a6" : "1px solid #cbd5e1",
+                          background: active ? "#14b8a6" : "#ffffff",
+                          color: active ? "#ffffff" : "#334155",
                         }}
                         onClick={() => toggleWeeklyDay(d, editingScheduleId ? "edit" : "new")}
                       >

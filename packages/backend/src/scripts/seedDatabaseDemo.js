@@ -14,6 +14,7 @@ const {
   MedicalAnalysis,
   FraudAbuseAnalysis,
   OnboardingResponse,
+  PrivacyRequest,
 } = require('../models');
 const config = require('../config/config');
 
@@ -49,6 +50,7 @@ async function clearDatabase() {
   await OnboardingResponse.deleteMany({});
   await MedicalAnalysis.deleteMany({});
   await FraudAbuseAnalysis.deleteMany({});
+  await PrivacyRequest.deleteMany({});
   // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
   console.log('Database cleared');
 }

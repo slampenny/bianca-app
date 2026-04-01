@@ -29,6 +29,7 @@ import { ReportTemplateDetailPage } from "./pages/ReportTemplateDetailPage"
 import { ReportsPage } from "./pages/ReportsPage"
 import { ProfilePage } from "./pages/ProfilePage"
 import { CaregiversPage } from "./pages/CaregiversPage"
+import { CaregiverFormPage } from "./pages/CaregiverFormPage"
 import { SettingsPage } from "./pages/SettingsPage"
 import { SettingsMfaPage } from "./pages/SettingsMfaPage"
 import { SettingsPhonePage } from "./pages/SettingsPhonePage"
@@ -70,6 +71,8 @@ export default function App() {
                 <Route path="reports" element={<ReportsPage />} />
                 <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
                   <Route path="caregivers" element={<CaregiversPage />} />
+                  <Route path="caregivers/new" element={<CaregiverFormPage />} />
+                  <Route path="caregivers/:caregiverId/edit" element={<CaregiverFormPage />} />
                 </Route>
                 <Route path="profile" element={<ProfilePage />} />
                 <Route path="profile/mfa" element={<SettingsMfaPage />} />

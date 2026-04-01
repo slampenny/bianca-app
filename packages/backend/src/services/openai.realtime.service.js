@@ -2368,6 +2368,32 @@ class OpenAIRealtimeService {
         await this.createPlaceholderAssistantMessage(callId);
         conn._pendingAiPlaceholder = false;
       }
+
+      // If speech_stopped happened before ASR completed, trigger Bianca's response now.
+      // This prevents cases where Bianca appears to wait for a second user utterance.
+      if (!conn._aiIsSpeaking && !conn._responseCreated && this.canAIRespond(callId)) {
+        if (this.isInGracePeriod(callId)) {
+          const timeSinceGreeting = Date.now() - (conn._initialGreetingCompletedAt || 0);
+          logger.info(
+            `[OpenAI Realtime] Skipping post-ASR response for ${callId} - in grace period ` +
+            `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms).`
+          );
+        } else if (this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_transcript_completed_after_speech_stop')) {
+          setTimeout(async () => {
+            const currentConn = this.connections.get(callId);
+            if (!currentConn || currentConn._aiIsSpeaking || currentConn._responseCreated) return;
+            if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+            try {
+              await this.sendResponseCreate(callId);
+              currentConn._aiIsSpeaking = true;
+              logger.info(`[OpenAI Realtime] Triggered AI response after delayed transcript completion for ${callId}`);
+            } catch (err) {
+              logger.error(`[OpenAI Realtime] Failed post-ASR response trigger for ${callId}: ${err.message}`);
+              this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'post_asr_response_failed');
+            }
+          }, 120);
+        }
+      }
     }
 
     // EMERGENCY DETECTION: runs only after transcript is pushed to the frontend (notify) and DB update started/finished.

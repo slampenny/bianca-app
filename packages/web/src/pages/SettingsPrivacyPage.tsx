@@ -16,6 +16,8 @@ export function SettingsPrivacyPage() {
   const [requestDeletion, { isLoading: deleting }] = useRequestDataDeletionMutation()
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
+  const recentRequests = pages?.results ?? []
+  const hasRecentRequests = recentRequests.length > 0
 
   const submitAccess = async () => {
     setError("")
@@ -135,35 +137,35 @@ export function SettingsPrivacyPage() {
         </button>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Your recent requests</h2>
-        {isLoading ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading…</p>
-        ) : !pages?.results?.length ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>No requests yet.</p>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {pages.results.map((r) => {
-              const rid = String(r._id ?? r.id ?? "")
-              return (
-                <li
-                  key={rid}
-                  style={{
-                    padding: "0.75rem 0",
-                    borderBottom: "1px solid var(--va-slate-100)",
-                    fontSize: "0.875rem",
-                  }}
-                >
-                  <div style={{ fontWeight: 600 }}>{r.requestType || "request"}</div>
-                  <div style={{ color: "var(--va-slate-500)", fontSize: "0.75rem", marginTop: 4 }}>
-                    {r.status} · {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </div>
+      {(isLoading || hasRecentRequests) ? (
+        <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Your recent requests</h2>
+          {isLoading ? (
+            <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading…</p>
+          ) : (
+            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {recentRequests.map((r) => {
+                const rid = String(r._id ?? r.id ?? "")
+                return (
+                  <li
+                    key={rid}
+                    style={{
+                      padding: "0.75rem 0",
+                      borderBottom: "1px solid var(--va-slate-100)",
+                      fontSize: "0.875rem",
+                    }}
+                  >
+                    <div style={{ fontWeight: 600 }}>{r.requestType || "request"}</div>
+                    <div style={{ color: "var(--va-slate-500)", fontSize: "0.75rem", marginTop: 4 }}>
+                      {r.status} · {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      ) : null}
     </div>
   )
 }
