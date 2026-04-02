@@ -86,7 +86,16 @@ const corsOptions = {
     
     // Normalize origin (remove trailing slash, convert to lowercase for comparison)
     const normalizedOrigin = origin.toLowerCase().replace(/\/$/, '');
-    
+
+    // Allow any host under our owned apex domains (app, admin, api, www, future SPAs).
+    // Production was returning 500 on OPTIONS for admin when only a static allowlist was deployed;
+    // this regex keeps new frontends working without a backend redeploy for each hostname.
+    const biancaWellnessHostPattern = /^https?:\/\/(?:[a-z0-9-]+\.)*biancawellness\.com$/i;
+    const myPhoneFriendHostPattern = /^https?:\/\/(?:[a-z0-9-]+\.)*myphonefriend\.com$/i;
+    if (biancaWellnessHostPattern.test(normalizedOrigin) || myPhoneFriendHostPattern.test(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
     const allowedOrigins = [
       // New primary domain
       'https://app.biancawellness.com',
@@ -164,19 +173,19 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // Log CORS rejection for debugging (especially in staging)
-    if (config.env === 'staging' || config.env === 'development') {
+    // Log CORS rejection (do not pass Error to cors — that triggers error middleware and yields 500
+    // on preflight with no Access-Control-Allow-Origin, which browsers report as a CORS failure)
+    if (['development', 'staging', 'production'].includes(config.env)) {
       logger.warn('CORS: Origin not allowed', {
         origin,
         normalizedOrigin,
-        allowedOrigins: allowedOrigins.slice(0, 10), // Log first 10 for debugging
+        allowedOriginsSample: allowedOrigins.slice(0, 10),
         frontendUrl: config.frontendUrl,
         env: config.env
       });
     }
-    
-    // Block all other origins
-    callback(new Error('Not allowed by CORS'));
+
+    callback(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
