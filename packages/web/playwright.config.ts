@@ -1,8 +1,10 @@
 import { defineConfig } from "@playwright/test"
 import * as fs from "node:fs"
 import * as path from "node:path"
+import { fileURLToPath } from "node:url"
 
-const logsDir = path.join(__dirname, "test-logs")
+const configDir = path.dirname(fileURLToPath(import.meta.url))
+const logsDir = path.join(configDir, "test-logs")
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true })
 }
