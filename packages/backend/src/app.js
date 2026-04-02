@@ -101,6 +101,11 @@ const corsOptions = {
       'http://staging-api.biancawellness.com',
       'https://api.biancawellness.com',
       'http://api.biancawellness.com',
+      // Web admin console (Google SSO / exchange-code); keep in sync with ADMIN_FRONTEND_URL / deploy scripts
+      'https://admin.biancawellness.com',
+      'http://admin.biancawellness.com',
+      'https://staging-admin.biancawellness.com',
+      'http://staging-admin.biancawellness.com',
       // Legacy domain (for redirects)
       'https://app.myphonefriend.com',
       'http://app.myphonefriend.com',
