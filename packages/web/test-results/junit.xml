@@ -1,0 +1,8 @@
+<testsuites id="" name="" tests="1" failures="0" skipped="1" errors="0" time="0.045961000000000016">
+<testsuite name="openai-voice-connection.e2e.test.ts" timestamp="2026-04-02T19:57:35.363Z" hostname="chromium" tests="1" failures="0" skipped="1" time="0" errors="0">
+<testcase name="OpenAI Voice Connection › connects to OpenAI and returns voice session details" classname="openai-voice-connection.e2e.test.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>
