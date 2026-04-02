@@ -83,6 +83,16 @@ const caregiverSchema = mongoose.Schema(
       required: false,
       trim: true,
     },
+    externalId: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    active: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
     role: {
       type: String,
       enum: roles, // assuming roles is an array of valid roles
@@ -201,6 +211,10 @@ caregiverSchema.index({ role: 1 }); // For role-based queries
 caregiverSchema.index({ org: 1, role: 1 }); // Compound
 caregiverSchema.index({ clients: 1 });
 caregiverSchema.index({ phone: 1, isPhoneVerified: 1 }); // Compound index for phone verification queries
+caregiverSchema.index(
+  { org: 1, externalId: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { externalId: { $type: 'string' } } }
+);
 
 // Plugin to convert mongoose to JSON, and paginate results
 caregiverSchema.plugin(toJSON);

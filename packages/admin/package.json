@@ -1,0 +1,33 @@
+{
+  "name": "@bianca-app/admin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bianca super-admin console (observability and ops)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@bianca-app/shared": "*",
+    "@fontsource/ibm-plex-mono": "^5.2.5",
+    "@fontsource/ibm-plex-sans": "^5.2.5",
+    "@reduxjs/toolkit": "^2.2.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-redux": "^9.1.0",
+    "react-router-dom": "^6.28.0",
+    "recharts": "2.15.0",
+    "redux": "^5.0.1",
+    "redux-persist": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2.14",
+    "@types/react-dom": "~18.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.3"
+  },
+  "license": "UNLICENSED"
+}

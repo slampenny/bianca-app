@@ -40,6 +40,7 @@
  */
 
 const WebSocket = require('ws');
+const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
@@ -2119,11 +2120,16 @@ class OpenAIRealtimeService {
             const alertResult = await emergencyProcessor.createAlert(
               conn.clientId,
               emergencyResult.alertData,
-              content
+              content,
+              {
+                conversationId: conn.conversationId || null,
+                detectionSource: emergencyResult.detectionSource || 'phrase_match',
+                ...(message?._id ? { messageId: message._id } : {}),
+              }
             );
 
             if (alertResult.success) {
-              logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert._id}`);
+              logger.info(`[Emergency Detection] ✅ Alert created successfully: ${alertResult.alert?.id || alertResult.alert?._id}`);
             } else {
               logger.error(`[Emergency Detection] ❌ Failed to create alert: ${alertResult.error}`);
             }
@@ -2345,6 +2351,11 @@ class OpenAIRealtimeService {
     logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${transcript}"`);
     await this.persistUserTranscriptToPlaceholder(callId, transcript);
 
+    const evidenceUserMessageId =
+      conn.activeUserMessageId && mongoose.Types.ObjectId.isValid(conn.activeUserMessageId)
+        ? conn.activeUserMessageId
+        : null;
+
     // speech_stopped already ran and was waiting on ASR — finalize turn (placeholder already updated above).
     if (conn._waitingForUserTranscript && conn.activeUserMessageId && transcript.trim()) {
       logger.info(`[OpenAI Realtime] Transcript arrived after speech_stopped — finalizing user turn ${conn.activeUserMessageId}`);
@@ -2356,6 +2367,74 @@ class OpenAIRealtimeService {
         logger.info(`[OpenAI Realtime] User message finalized — creating deferred AI placeholder for ${callId}`);
         await this.createPlaceholderAssistantMessage(callId);
         conn._pendingAiPlaceholder = false;
+      }
+
+      // If speech_stopped happened before ASR completed, trigger Bianca's response now.
+      // This prevents cases where Bianca appears to wait for a second user utterance.
+      if (!conn._aiIsSpeaking && !conn._responseCreated && this.canAIRespond(callId)) {
+        if (this.isInGracePeriod(callId)) {
+          const timeSinceGreeting = Date.now() - (conn._initialGreetingCompletedAt || 0);
+          logger.info(
+            `[OpenAI Realtime] Skipping post-ASR response for ${callId} - in grace period ` +
+            `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms).`
+          );
+        } else if (this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_transcript_completed_after_speech_stop')) {
+          setTimeout(async () => {
+            const currentConn = this.connections.get(callId);
+            if (!currentConn || currentConn._aiIsSpeaking || currentConn._responseCreated) return;
+            if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+            try {
+              await this.sendResponseCreate(callId);
+              currentConn._aiIsSpeaking = true;
+              logger.info(`[OpenAI Realtime] Triggered AI response after delayed transcript completion for ${callId}`);
+            } catch (err) {
+              logger.error(`[OpenAI Realtime] Failed post-ASR response trigger for ${callId}: ${err.message}`);
+              this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'post_asr_response_failed');
+            }
+          }, 120);
+        }
+      }
+    }
+
+    // Fallback trigger: if ASR completed but speech_stopped path did not trigger a response,
+    // kick off the next Bianca turn directly from transcript completion.
+    // This fixes "must speak twice" hangs when state/placeholder timing is out of sync.
+    const preferredLanguage = conn.preferredLanguage || 'en';
+    const transcriptIsFillerOnly = this.isOnlyFillerWords(transcript, preferredLanguage);
+    if (
+      !transcriptIsFillerOnly &&
+      !conn._aiIsSpeaking &&
+      !conn._responseCreated &&
+      !conn._responseStartTime &&
+      !this.isInGracePeriod(callId)
+    ) {
+      const state = this.getConversationState(callId);
+      const canMoveToAiResponding =
+        state === CONVERSATION_STATES.GREETING_COMPLETE ||
+        state === CONVERSATION_STATES.CONVERSATION_ACTIVE ||
+        state === CONVERSATION_STATES.USER_SPEAKING;
+      const moved =
+        state === CONVERSATION_STATES.AI_RESPONDING
+          ? true
+          : canMoveToAiResponding
+            ? this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'asr_completed_fallback')
+            : false;
+
+      if (moved) {
+        setTimeout(async () => {
+          const currentConn = this.connections.get(callId);
+          if (!currentConn) return;
+          if (currentConn._aiIsSpeaking || currentConn._responseCreated || currentConn._responseStartTime) return;
+          if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+          try {
+            await this.sendResponseCreate(callId);
+            currentConn._aiIsSpeaking = true;
+            logger.info(`[OpenAI Realtime] Triggered AI response from ASR fallback for ${callId}`);
+          } catch (err) {
+            logger.error(`[OpenAI Realtime] Failed ASR fallback response trigger for ${callId}: ${err.message}`);
+            this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'asr_fallback_response_failed');
+          }
+        }, 80);
       }
     }
 
@@ -2382,7 +2461,12 @@ class OpenAIRealtimeService {
           const alertResult = await emergencyProcessor.createAlert(
             conn.clientId,
             emergencyResult.alertData,
-            transcript
+            transcript,
+            {
+              conversationId: conn.conversationId || null,
+              detectionSource: emergencyResult.detectionSource || 'phrase_match',
+              ...(evidenceUserMessageId ? { messageId: evidenceUserMessageId } : {}),
+            }
           );
 
           logger.info(`[Emergency Detection] createAlert result - success: ${alertResult.success}, error: ${alertResult.error || 'none'}`);
@@ -2391,7 +2475,7 @@ class OpenAIRealtimeService {
           }
 
           if (alertResult.success) {
-            logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert._id}`);
+            logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert?.id || alertResult.alert?._id}`);
 
             try {
               const emergencyInstruction = `\n\nCRITICAL: An emergency alert has been AUTOMATICALLY sent to the patient's caregiver via text message. In your next response, you MUST inform them: "I've already sent an alert to your caregiver. They'll be notified right away. Please call emergency services right away if you need immediate medical help." Do NOT offer to call emergency services yourself - you cannot make calls. Use "emergency services" (not "911") as it works in all countries. ONLY say this because the system has confirmed an alert was sent.`;
@@ -2712,7 +2796,6 @@ class OpenAIRealtimeService {
     }
 
     const onboardingService = require('./onboarding.service');
-    const mongoose = require('mongoose');
 
     try {
       if (name === 'capture_onboarding_response' && args.question_id) {

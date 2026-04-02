@@ -133,6 +133,22 @@ const orgSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // SCIM 2.0 provisioning (Bearer token + /v1/scim/orgs/:orgId/v2/...)
+    scimEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    scimBearerTokenHash: {
+      type: String,
+      required: false,
+      select: false,
+    },
+    /** Last few characters of the current token (for admin UI only; token is never stored in plain text). */
+    scimTokenHint: {
+      type: String,
+      required: false,
+      trim: true,
+    },
   },
   {
     timestamps: true,

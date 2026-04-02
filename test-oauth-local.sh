@@ -23,6 +23,6 @@ echo "If you see 'Google OAuth not configured' - OAuth secrets not loaded proper
 echo ""
 echo "To test full flow:"
 echo "1. Start backend: cd packages/backend && yarn dev"
-echo "2. Start frontend: cd packages/frontend && yarn start"
+echo "2. Start frontend: cd packages/mobile && yarn start"
 echo "3. Go to http://localhost:8082 and try 'Sign in with Google'"
 echo ""

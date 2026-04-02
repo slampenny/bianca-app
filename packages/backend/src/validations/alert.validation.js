@@ -1,6 +1,21 @@
 const Joi = require('joi');
 const { objectId } = require('./custom.validation');
 
+const evidenceSchema = Joi.object().keys({
+  snippet: Joi.string().allow('', null),
+  conversationId: Joi.string().custom(objectId).allow(null),
+  messageIds: Joi.array().items(Joi.string().custom(objectId)),
+  detector: Joi.string().allow('', null),
+  confidence: Joi.number().min(0).max(1).allow(null),
+  language: Joi.string().allow('', null),
+});
+
+const recommendedActionSchema = Joi.object().keys({
+  id: Joi.string().required(),
+  labelKey: Joi.string().required(),
+  actionType: Joi.string().required(),
+});
+
 const createAlert = {
   body: Joi.object().keys({
     message: Joi.string().required(),
@@ -13,6 +28,8 @@ const createAlert = {
     visibility: Joi.string().valid('orgAdmin', 'allCaregivers', 'assignedCaregivers').required(),
     relevanceUntil: Joi.date().optional(),
     readBy: Joi.array().items(Joi.string().custom(objectId)),
+    evidence: evidenceSchema.optional(),
+    recommendedActions: Joi.array().items(recommendedActionSchema).optional(),
   }),
 };
 
@@ -37,6 +54,9 @@ const updateAlert = {
       message: Joi.string().optional(),
       importance: Joi.string().valid('low', 'medium', 'high', 'urgent').optional(),
       relevanceUntil: Joi.date().optional(),
+      evidence: evidenceSchema.optional(),
+      recommendedActions: Joi.array().items(recommendedActionSchema).optional(),
+      resolutionNote: Joi.string().trim().min(1).max(2000).optional(),
     })
     .min(1),
 };

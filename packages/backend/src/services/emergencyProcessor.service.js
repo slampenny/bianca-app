@@ -248,6 +248,8 @@ class EmergencyProcessor {
         }
       }
 
+      const detectionSource = embeddingPipelinePositive ? 'embedding_pipeline' : 'phrase_match';
+
       // Step 7: Create response
       const response = {
         shouldAlert,
@@ -255,6 +257,7 @@ class EmergencyProcessor {
         severity: alertData?.severity ?? null,
         category: emergencyResult?.category ?? null,
         reason: this.getReason(emergencyResult, falsePositiveResult, deduplicationResult),
+        detectionSource,
         processing: {
           emergencyDetected: emergencyResult.isEmergency,
           falsePositive: falsePositiveResult.isFalsePositive,
@@ -293,13 +296,43 @@ class EmergencyProcessor {
   }
 
   /**
+   * Suggested staff next steps (US-7); labelKey is for app i18n.
+   * @param {string} severity
+   * @param {string} [category]
+   */
+  buildRecommendedActions(severity, category) {
+    const actions = [
+      { id: 'review_conversation', labelKey: 'alertActions.reviewConversation', actionType: 'review_conversation' },
+      { id: 'notify_team', labelKey: 'alertActions.notifyCareTeam', actionType: 'notify_care_team' },
+      { id: 'document', labelKey: 'alertActions.documentInRecord', actionType: 'document' },
+    ];
+    if (severity === 'CRITICAL' || severity === 'HIGH') {
+      actions.unshift({
+        id: 'emergency_services',
+        labelKey: 'alertActions.callEmergencyServices',
+        actionType: 'call_emergency',
+      });
+    }
+    const cat = (category || '').toLowerCase();
+    if (cat.includes('financial') || cat.includes('fraud') || cat.includes('abuse')) {
+      actions.push({
+        id: 'review_risk_report',
+        labelKey: 'alertActions.openRiskReport',
+        actionType: 'open_fraud_report',
+      });
+    }
+    return actions;
+  }
+
+  /**
    * Create an alert in the system
    * @param {string} clientId - Client ID
    * @param {Object} alertData - Alert data from processUtterance
    * @param {string} originalText - Original client utterance
+   * @param {Object} [meta] - Optional: conversationId, detectionSource (US-3)
    * @returns {Promise<Object>} - Alert creation result
    */
-  async createAlert(clientId, alertData, originalText) {
+  async createAlert(clientId, alertData, originalText, meta = {}) {
     try {
       // Validate client ID to avoid CastError and noisy logs in tests
       if (!clientId || !mongoose.Types.ObjectId.isValid(clientId)) {
@@ -314,16 +347,46 @@ class EmergencyProcessor {
       // Create alert message (stored in English, will be translated when fetched)
       const alertMessage = this.createAlertMessage(client, alertData, originalText);
 
-      // Create alert in database
+      const convId =
+        meta.conversationId && mongoose.Types.ObjectId.isValid(meta.conversationId)
+          ? new mongoose.Types.ObjectId(meta.conversationId)
+          : null;
+
+      const snippet =
+        originalText.length > 400 ? `${originalText.substring(0, 400)}…` : originalText;
+
+      const messageIds = [];
+      if (meta.messageId && mongoose.Types.ObjectId.isValid(meta.messageId)) {
+        messageIds.push(new mongoose.Types.ObjectId(meta.messageId));
+      }
+      if (Array.isArray(meta.messageIds)) {
+        for (const id of meta.messageIds) {
+          if (id && mongoose.Types.ObjectId.isValid(id)) {
+            const oid = new mongoose.Types.ObjectId(id);
+            if (!messageIds.some((x) => x.equals(oid))) messageIds.push(oid);
+          }
+        }
+      }
+
       const alertRecord = {
         message: alertMessage,
         importance: this.mapSeverityToImportance(alertData.severity),
-        alertType: 'client',
+        alertType: convId ? 'conversation' : 'client',
         relatedClient: clientId,
+        ...(convId ? { relatedConversation: convId } : {}),
         createdBy: clientId,
         createdModel: 'Client',
         visibility: 'assignedCaregivers',
-        relevanceUntil: new Date(Date.now() + (alertData.responseTimeSeconds * 1000))
+        relevanceUntil: new Date(Date.now() + (alertData.responseTimeSeconds * 1000)),
+        evidence: {
+          snippet,
+          ...(convId ? { conversationId: convId } : {}),
+          ...(messageIds.length ? { messageIds } : {}),
+          detector: meta.detectionSource || 'phrase_match',
+          confidence: typeof alertData.confidence === 'number' ? alertData.confidence : undefined,
+          language: client.preferredLanguage || 'en',
+        },
+        recommendedActions: this.buildRecommendedActions(alertData.severity, alertData.category),
       };
 
       const alert = await alertService.createAlert(alertRecord);
@@ -486,6 +549,7 @@ class EmergencyProcessor {
       alertData: null,
       reason: message,
       error: true,
+      detectionSource: null,
       processing: {
         emergencyDetected: false,
         falsePositive: false,

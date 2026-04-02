@@ -1,0 +1,94 @@
+export interface AuthTokens {
+  access: { expires: string | number; token: string }
+  refresh: { expires: string | number; token: string }
+}
+
+export type CaregiverRole = "admin" | "staff" | "orgAdmin" | "superAdmin" | "unverified" | "invited"
+
+export interface Caregiver {
+  id?: string
+  name: string
+  email: string
+  role: CaregiverRole
+  org?: string
+}
+
+export interface Org {
+  id?: string
+  name: string
+}
+
+export interface AdminCaregiverSearchRow {
+  id?: string
+  name: string
+  email: string
+  role: string
+  orgName?: string | null
+}
+
+export interface AdminCaregiverSearchResponse {
+  results: AdminCaregiverSearchRow[]
+  page: number
+  limit: number
+  totalPages: number
+  totalResults: number
+}
+
+export interface AdminOrgSearchRow {
+  id?: string
+  name: string
+  email: string
+}
+
+export interface AdminOrgSearchResponse {
+  results: AdminOrgSearchRow[]
+  page: number
+  limit: number
+  totalPages: number
+  totalResults: number
+}
+
+export interface ScimAdminStatus {
+  enabled: boolean
+  tokenHint: string | null
+  scimBaseUrl: string
+}
+
+export interface ScimTokenIssueResponse {
+  token: string
+  scimBaseUrl: string
+  tokenHint: string
+}
+
+export interface ImpersonateResponse {
+  impersonation: boolean
+  org: Org | null
+  caregiver: Caregiver
+  clients: unknown[]
+  alerts: unknown[]
+  tokens: AuthTokens
+}
+
+export interface ObservabilityPayload {
+  health: {
+    status: string
+    timestamp: string
+    environment: string
+    services: Record<string, unknown>
+  }
+  process: {
+    uptimeSeconds: number
+    nodeVersion: string
+    pid: number
+    memory: {
+      rss?: number
+      heapTotal?: number
+      heapUsed?: number
+      external?: number
+    }
+  }
+  api: {
+    name: string
+    version: string
+  }
+}

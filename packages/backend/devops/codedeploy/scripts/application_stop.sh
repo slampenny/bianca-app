@@ -47,7 +47,7 @@ if [ -f "docker-compose.yml" ] && docker compose version >/dev/null 2>&1; then
 else
   echo "   docker-compose.yml not found or docker compose not available, stopping individual containers..."
   # Fallback: stop individual containers
-  CONTAINERS="${CONTAINER_PREFIX}_app ${CONTAINER_PREFIX}_frontend ${CONTAINER_PREFIX}_nginx ${CONTAINER_PREFIX}_mongodb ${CONTAINER_PREFIX}_asterisk ${CONTAINER_PREFIX}_posthog ${CONTAINER_PREFIX}_posthog_db ${CONTAINER_PREFIX}_posthog_redis"
+  CONTAINERS="${CONTAINER_PREFIX}_app ${CONTAINER_PREFIX}_frontend ${CONTAINER_PREFIX}_admin ${CONTAINER_PREFIX}_nginx ${CONTAINER_PREFIX}_mongodb ${CONTAINER_PREFIX}_asterisk ${CONTAINER_PREFIX}_posthog ${CONTAINER_PREFIX}_posthog_db ${CONTAINER_PREFIX}_posthog_redis"
   
   for container in $CONTAINERS; do
     # Check if container exists before trying to stop it

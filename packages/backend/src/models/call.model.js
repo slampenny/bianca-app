@@ -15,7 +15,7 @@ const callSchema = mongoose.Schema(
     },
     callType: {
       type: String,
-      enum: ['inbound', 'outbound', 'wellness-check', 'follow-up'],
+      enum: ['inbound', 'outbound', 'wellness-check', 'follow-up', 'onboarding'],
       default: 'outbound',
     },
     status: {
@@ -114,7 +114,7 @@ const callSchema = mongoose.Schema(
       enum: ['normal_completion', 'user_hangup', 'assistant_error', 'network_error', 'timeout', 'unknown', null],
       default: null,
     },
-    agentId: {
+    caregiverId: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Caregiver',
       required: false,
@@ -128,6 +128,26 @@ const callSchema = mongoose.Schema(
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Conversation',
       default: null,
+    },
+    // Resident onboarding (4-day PRD): set on outbound onboarding calls; completion metadata from complete_onboarding_session tool
+    onboardingDay: {
+      type: Number,
+      min: 1,
+      max: 4,
+    },
+    onboardingCompletedAt: {
+      type: Date,
+      default: null,
+    },
+    onboardingEndedEarlyReason: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    onboardingSessionSummaryNotes: {
+      type: String,
+      default: null,
+      trim: true,
     },
   },
   {
@@ -143,6 +163,7 @@ callSchema.index({ clientId: 1, lineItemId: 1 });
 callSchema.index({ clientId: 1, lineItemId: 1, billingSessionId: 1 });
 callSchema.index({ billingSessionId: 1 }); // For fetching claimed calls during billing
 callSchema.index({ clientId: 1, startTime: -1 });
+callSchema.index({ clientId: 1, onboardingDay: 1 });
 callSchema.index({ status: 1, startTime: -1 }); // For status-based queries
 callSchema.index({ originalCallId: 1 }); // For retry queries
 

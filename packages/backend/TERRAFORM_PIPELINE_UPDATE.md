@@ -76,7 +76,7 @@ The pipelines now reference root-level buildspec files:
 These buildspec files include:
 - Change detection script (`scripts/detect-changes.sh`)
 - Conditional builds based on what changed
-- Monorepo-aware paths (`packages/backend/`, `packages/frontend/`)
+- Monorepo-aware paths (`packages/backend/`, `packages/mobile/`)
 
 ## Next Steps
 

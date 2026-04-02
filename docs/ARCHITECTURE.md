@@ -13,7 +13,7 @@ flowchart TB
   end
 
   subgraph bianca["Bianca App"]
-    Frontend["Frontend (React Native / Expo)"]
+    Mobile["Mobile app (React Native / Expo)"]
     Backend["Backend API (Node.js / Express)"]
     subgraph our_infra["Our infrastructure (AWS)"]
       Asterisk["Asterisk (VoIP / ARI)\nself-managed"]
@@ -28,8 +28,8 @@ flowchart TB
     SSO["SSO / OAuth"]
   end
 
-  Caregiver --> Frontend
-  Frontend -->|REST / JWT| Backend
+  Caregiver --> Mobile
+  Mobile -->|REST / JWT| Backend
   Backend --> Asterisk
   Backend --> Twilio
   Backend --> Stripe
@@ -46,7 +46,7 @@ flowchart TB
 flowchart LR
   subgraph repo["bianca-app (Yarn workspaces)"]
     PkgBackend["packages/backend"]
-    PkgFrontend["packages/frontend"]
+    PkgMobile["packages/mobile"]
   end
 
   subgraph deploy["Deployment"]
@@ -64,7 +64,7 @@ flowchart LR
 
 ---
 
-## Frontend architecture
+## Mobile app architecture
 
 ```mermaid
 flowchart TB
@@ -190,7 +190,8 @@ flowchart TB
 
 | Layer        | Technologies |
 |-------------|--------------|
-| Frontend    | React Native, Expo 50, Redux Toolkit, RTK Query, TypeScript |
+| Mobile app  | React Native, Expo 50, Redux Toolkit, RTK Query, TypeScript |
+| Web (desktop) | Vite, React 18, shared design tokens (`@bianca-app/shared`) |
 | Backend     | Node.js, Express, Passport JWT, Mongoose, Agenda |
 | Data        | MongoDB, Redis |
 | Voice       | Asterisk (ARI, self-managed on AWS), Twilio, OpenAI Realtime API, RTP |

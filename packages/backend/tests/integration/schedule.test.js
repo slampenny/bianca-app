@@ -69,7 +69,7 @@ describe('Schedule routes', () => {
   describe('GET /v1/schedules/:scheduleId', () => {
     test('should return 200 and a schedule if data is ok', async () => {
       const [org] = await insertOrgs([admin]);
-      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
       const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       
       // Create schedule via API to ensure proper timezone conversion
@@ -108,7 +108,7 @@ describe('Schedule routes', () => {
   describe('PATCH /v1/schedules/:scheduleId', () => {
     test('should update a schedule and return 200', async () => {
       const [org] = await insertOrgs([admin]);
-      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
       const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       const schedule = await insertScheduleAndAddToClient(client, scheduleOne);
 
@@ -140,7 +140,7 @@ describe('Schedule routes', () => {
   describe('DELETE /v1/schedules/:scheduleId', () => {
     test('should delete a schedule and return 204', async () => {
       const [org] = await insertOrgs([admin]);
-      const { accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
       const [client] = await insertClients([{ ...clientOne, org: org.id }]);
       const schedule = await insertScheduleAndAddToClient(client, scheduleOne);
 

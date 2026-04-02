@@ -69,9 +69,13 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body).toHaveProperty('callSid', 'mock-call-sid-12345');
       expect(response.body.clientId.toString()).toBe(client.id);
       expect(response.body.clientName ?? response.body.patientName).toBe(client.name);
-      expect(response.body.agentId.toString()).toBe(caregiver.id);
+      expect(response.body.caregiverId.toString()).toBe(caregiver.id);
       expect(response.body.status).toBe('in-progress');
       expect(response.body.callStatus).toBe('ringing');
+      expect(response.body.isOnboardingCall).toBe(true);
+      expect(response.body.onboardingDay).toBe(1);
+      expect(response.body.onboardingJourneyComplete).toBe(false);
+      expect(response.body.nextOutboundWillBeOnboarding).toBe(true);
 
       // Verify conversation was created in database
       const conversation = await Conversation.findById(response.body.conversationId);
@@ -84,9 +88,11 @@ describe('Call Workflow Integration Tests', () => {
       const call = await Call.findById(response.body.callId);
       expect(call).toBeTruthy();
       expect(call.conversationId.toString()).toBe(response.body.conversationId);
-      expect(call.agentId.toString()).toBe(caregiver.id);
+      expect(call.caregiverId.toString()).toBe(caregiver.id);
       expect(call.callStatus).toBe('ringing');
       expect(call.callNotes).toBe(callData.callNotes);
+      expect(call.callType).toBe('onboarding');
+      expect(call.onboardingDay).toBe(1);
     });
 
     it('should return 400 if client does not have phone number', async () => {
@@ -146,7 +152,7 @@ describe('Call Workflow Integration Tests', () => {
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
         clientId: client.id,
-        agentId: caregiver.id,
+        caregiverId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
         callType: 'outbound',
@@ -175,7 +181,10 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body.data.conversationId.toString()).toBe(conversation.id);
       expect(response.body.data.status).toBe('in-progress'); // Call status, not conversation status
       expect(response.body.data.client).toBeTruthy();
-      expect(response.body.data.agent).toBeTruthy();
+      expect(response.body.data.caregiver).toBeTruthy();
+      expect(response.body.data.onboarding).toBeDefined();
+      expect(response.body.data.onboarding.journeyComplete).toBe(false);
+      expect(response.body.data.onboarding.sessionsCompleted).toBe(0);
     });
 
     it('should return 404 if conversation not found', async () => {
@@ -203,7 +212,7 @@ describe('Call Workflow Integration Tests', () => {
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
         clientId: client.id,
-        agentId: caregiver.id,
+        caregiverId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
         callType: 'outbound',
@@ -293,7 +302,7 @@ describe('Call Workflow Integration Tests', () => {
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
         clientId: client.id,
-        agentId: caregiver.id,
+        caregiverId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
         callType: 'outbound',
@@ -356,7 +365,7 @@ describe('Call Workflow Integration Tests', () => {
       const call1 = await Call.create({
         callSid: 'CA1111111111111111',
         clientId: client.id,
-        agentId: caregiver.id,
+        caregiverId: caregiver.id,
         status: 'in-progress',
         callStatus: 'ringing',
         callType: 'outbound',
@@ -367,7 +376,7 @@ describe('Call Workflow Integration Tests', () => {
       const call2 = await Call.create({
         callSid: 'CA2222222222222222',
         clientId: client.id,
-        agentId: caregiver.id,
+        caregiverId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
         callType: 'outbound',
@@ -391,7 +400,7 @@ describe('Call Workflow Integration Tests', () => {
       await call2.save();
     });
 
-    it('should return active calls for the agent', async () => {
+    it('should return active calls for the caregiver', async () => {
       const response = await request(app)
         .get('/v1/calls/active')
         .set('Authorization', `Bearer ${caregiverToken.access.token}`)
@@ -423,7 +432,7 @@ describe('Call Workflow Integration Tests', () => {
       call = await Call.create({
         callSid: 'CA1234567890abcdef',
         clientId: client.id,
-        agentId: caregiver.id,
+        caregiverId: caregiver.id,
         status: 'in-progress',
         callStatus: 'connected',
         callType: 'outbound',
@@ -453,7 +462,7 @@ describe('Call Workflow Integration Tests', () => {
       expect(response.body.data.conversationId.toString()).toBe(conversation.id);
       expect(response.body.data.status).toBe('in-progress');
       expect(response.body.data.client).toBeTruthy();
-      expect(response.body.data.agent).toBeTruthy();
+      expect(response.body.data.caregiver).toBeTruthy();
     });
   });
 });

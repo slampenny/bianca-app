@@ -1515,6 +1515,16 @@ resource "aws_ecr_repository" "frontend_repo" {
   }
 }
 
+resource "aws_ecr_repository" "admin_repo" {
+  name = "bianca-app-admin"
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+  tags = {
+    Name = "bianca-app-admin"
+  }
+}
+
 ################################################################################
 # CloudWatch Log Groups
 ################################################################################
@@ -1755,7 +1765,8 @@ resource "aws_iam_policy" "codebuild_ecr_policy" {
         Resource = [
           aws_ecr_repository.app_repo.arn,
           aws_ecr_repository.asterisk_repo.arn,
-          aws_ecr_repository.frontend_repo.arn
+          aws_ecr_repository.frontend_repo.arn,
+          aws_ecr_repository.admin_repo.arn
         ]
       }
     ]
@@ -2154,8 +2165,10 @@ resource "aws_acm_certificate" "primary_domain_cert" {
 
   subject_alternative_names = [
     "app.${var.primary_domain}",
+    "admin.${var.primary_domain}",
     "staging.${var.primary_domain}",
     "staging-api.${var.primary_domain}",
+    "staging-admin.${var.primary_domain}",
     "demo.${var.primary_domain}",
     "sip.${var.primary_domain}",
     "staging-sip.${var.primary_domain}",
@@ -2691,6 +2704,10 @@ output "deployment_architecture" {
 
 output "frontend_ecr_repo_url" {
   value = aws_ecr_repository.frontend_repo.repository_url
+}
+
+output "admin_ecr_repo_url" {
+  value = aws_ecr_repository.admin_repo.repository_url
 }
 
 output "codepipeline_role_arn" {

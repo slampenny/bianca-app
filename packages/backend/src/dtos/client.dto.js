@@ -10,9 +10,13 @@ const toIsoOrNull = (d) => {
 
 const ClientDTO = (client) => {
   if (!client) return null;
+  const source = typeof client.toObject === 'function' ? client.toObject() : client;
   const {
     _id,
     name,
+    preferredName,
+    age,
+    notes,
     avatar,
     email,
     phone,
@@ -29,18 +33,26 @@ const ClientDTO = (client) => {
     sentimentAnalyzedConversations,
     latestOverallHealthScore,
     latestOverallRiskScore,
-  } = client;
+    room,
+    moveInDate,
+    emergencyContact,
+  } = source;
   // Use direct property access for populated array (destructuring can miss it on Mongoose docs)
-  const schedulesRaw = client.schedules;
+  const schedulesRaw = source.schedules;
   const scheduleDTOs = Array.isArray(schedulesRaw) ? schedulesRaw.map(ScheduleDTO) : [];
   const id = _id;
-  const orgId = org ? (typeof org === 'object' ? org._id : org) : null;
-  const caregiverIds = caregivers && Array.isArray(caregivers)
-    ? caregivers.map((cg) => (typeof cg === 'object' ? cg._id : cg))
-    : [];
+  let orgId = null;
+  if (org) {
+    orgId = typeof org === 'object' ? org._id : org;
+  }
+  const caregiverIds =
+    caregivers && Array.isArray(caregivers) ? caregivers.map((cg) => (typeof cg === 'object' ? cg._id : cg)) : [];
   return {
     id,
     name,
+    preferredName: preferredName || null,
+    age: age == null ? null : Number(age),
+    notes: notes || null,
     avatar,
     email,
     phone,
@@ -54,13 +66,23 @@ const ClientDTO = (client) => {
     schedules: scheduleDTOs,
     lastCallAttemptAt: toIsoOrNull(lastCallAttemptAt),
     lastAnsweredCallAt: toIsoOrNull(lastAnsweredCallAt),
-    sentimentTrendDirection: sentimentTrendDirection ?? null,
-    sentimentAnalyzedConversations:
-      sentimentAnalyzedConversations == null ? null : Number(sentimentAnalyzedConversations),
-    latestOverallHealthScore:
-      latestOverallHealthScore == null ? null : Math.round(Number(latestOverallHealthScore)),
-    latestOverallRiskScore:
-      latestOverallRiskScore == null ? null : Math.round(Number(latestOverallRiskScore)),
+    sentimentTrendDirection: sentimentTrendDirection == null ? null : sentimentTrendDirection,
+    sentimentAnalyzedConversations: sentimentAnalyzedConversations == null ? null : Number(sentimentAnalyzedConversations),
+    latestOverallHealthScore: latestOverallHealthScore == null ? null : Math.round(Number(latestOverallHealthScore)),
+    latestOverallRiskScore: latestOverallRiskScore == null ? null : Math.round(Number(latestOverallRiskScore)),
+    room: room == null || room === '' ? null : String(room).trim(),
+    moveInDate: toIsoOrNull(moveInDate),
+    emergencyContact:
+      emergencyContact &&
+      typeof emergencyContact === 'object' &&
+      (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone || emergencyContact.email)
+        ? {
+            name: emergencyContact.name || '',
+            relationship: emergencyContact.relationship || '',
+            phone: emergencyContact.phone || '',
+            email: emergencyContact.email ? String(emergencyContact.email).trim().toLowerCase() : '',
+          }
+        : null,
   };
 };
 

@@ -352,9 +352,9 @@ describe('Payment routes', () => {
         .get(`/v1/payments/clients/${nonExistentClientId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
-        .expect(httpStatus.OK); // Returns empty array, not 404
+        .expect(httpStatus.NOT_FOUND);
 
-      expect(res.body).toHaveLength(0);
+      expect(res.body.message).toBe('Client not found');
     });
 
     test('should return 401 when no authorization token provided', async () => {
@@ -473,7 +473,7 @@ describe('Payment routes', () => {
       expect(res.body[0].status).toBe('pending');
     });
 
-    test('should return 404 when org does not exist', async () => {
+    test('should return 403 when org is outside requester organization', async () => {
       const [org] = await insertOrgs([orgOne]);
       const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, admin);
       const nonExistentOrgId = new mongoose.Types.ObjectId();
@@ -482,9 +482,9 @@ describe('Payment routes', () => {
         .get(`/v1/payments/orgs/${nonExistentOrgId}/invoices`)
         .set('Authorization', `Bearer ${accessToken}`)
         .send()
-        .expect(httpStatus.OK); // Returns empty array, not 404
+        .expect(httpStatus.FORBIDDEN);
 
-      expect(res.body).toHaveLength(0);
+      expect(res.body.message).toContain('access');
     });
 
     test('should return 401 when no authorization token provided', async () => {

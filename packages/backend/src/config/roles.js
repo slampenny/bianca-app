@@ -17,6 +17,9 @@ const allRoles = {
     'readOwn:conversation', // Add this for staff to read conversations of their patients
     'readOwn:medicalAnalysis', // Add this for staff to read medical analysis of their patients
     'createOwn:medicalAnalysis', // Add this for staff to trigger medical analysis for their patients
+    'readOwn:familyDigest',
+    'createOwn:familyDigest',
+    'readOwn:facilityReport',
   ],
   orgAdmin: [
     // Inherited from staff
@@ -35,6 +38,7 @@ const allRoles = {
     'updateOwn:org',
     'deleteOwn:org',
     'readAny:caregiver',
+    'createAny:caregiver',
     'updateAny:caregiver',
     'deleteAny:caregiver',
     'readAny:client',
@@ -57,6 +61,11 @@ const allRoles = {
     'deleteAny:invoice',
     'readAny:medicalAnalysis', // Add this for orgAdmin to read medical analysis of any patient
     'createAny:medicalAnalysis', // Add this for orgAdmin to trigger medical analysis
+    'readAny:familyDigest',
+    'createAny:familyDigest',
+    'readAny:facilityReport',
+    'readAny:privacy',
+    'updateAny:privacy',
   ],
   superAdmin: [], // superAdmin can do everything without explicit permissions
 };

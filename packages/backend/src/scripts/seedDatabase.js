@@ -13,6 +13,8 @@ const {
   Call,
   MedicalAnalysis,
   FraudAbuseAnalysis,
+  OnboardingResponse,
+  PrivacyRequest,
 } = require('../models');
 const config = require('../config/config');
 
@@ -28,6 +30,7 @@ const invoicesSeeder = require('./seeders/invoices.seeder');
 const sentimentAnalysisSeeder = require('./seeders/sentimentAnalysis.seeder');
 const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
 const clientReportSnapshotSeeder = require('./seeders/clientReportSnapshot.seeder');
+const onboardingSeeder = require('./seeders/onboarding.seeder');
 
 /**
  * Clear all database collections
@@ -44,8 +47,10 @@ async function clearDatabase() {
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
   await Call.deleteMany({});
+  await OnboardingResponse.deleteMany({});
   await MedicalAnalysis.deleteMany({});
   await FraudAbuseAnalysis.deleteMany({});
+  await PrivacyRequest.deleteMany({});
   // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
   console.log('Database cleared');
 }
@@ -89,8 +94,20 @@ async function seedDatabase() {
     // Create a third client for fraud/abuse testing
     const client3 = new Client({
       name: 'Margaret Thompson',
+      preferredName: 'Margaret',
+      age: 76,
+      room: '203C',
       email: 'vulnerable@example.org',
       phone: '1234567892',
+      preferredLanguage: 'en',
+      notes: 'Needs extra reassurance during calls; monitor for potential vulnerability cues.',
+      moveInDate: new Date('2024-03-20T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Elaine Thompson',
+        relationship: 'Niece',
+        phone: '1234567803',
+        email: 'elaine.thompson@example.org',
+      },
       caregivers: [caregiverOneRecord.id],
       org: caregiverOneRecord.org,
       schedules: [],
@@ -100,6 +117,8 @@ async function seedDatabase() {
     caregiverOneRecord.clients.push(client3._id);
     await caregiverOneRecord.save();
     clients = [...clients, client3];
+
+    await onboardingSeeder.seedPrimaryTestClientsOnboarding(client1, client2, client3, caregiverOneRecord._id);
 
     // Seed conversations
     const conversations = await conversationsSeeder.seedConversations(client1);

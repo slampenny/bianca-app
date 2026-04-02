@@ -15,8 +15,13 @@ module.exports.paymentMethodService = require('./paymentMethod.service');
 module.exports.scheduleService = require('./schedule.service');
 module.exports.testService = require('./test.service');
 module.exports.tokenService = require('./token.service');
-module.exports.twilioCallService = require('./twilioCall.service');
-module.exports.twilioSmsService = require('./twilioSms.service');
+const voiceTelephonyService = require('./telephony/voiceTelephony.service');
+module.exports.voiceTelephonyService = voiceTelephonyService;
+/** @deprecated use voiceTelephonyService — same object, Twilio is no longer assumed by name */
+module.exports.twilioCallService = voiceTelephonyService;
+const { smsService, twilioSmsService } = require('./twilioSms.service');
+module.exports.smsService = smsService;
+module.exports.twilioSmsService = twilioSmsService;
 module.exports.callService = require('./call.service');
 
 // AI Services
@@ -61,6 +66,9 @@ module.exports.channelTracker = require('./channel.tracker');
 module.exports.etherealEmailRetriever = require('./etherealEmailRetriever.service');
 module.exports.analysisService = require('./analysis.service');
 module.exports.reportService = require('./report.service');
+module.exports.familyWeeklyDigestService = require('./familyWeeklyDigest.service');
+module.exports.facilityReportsService = require('./facilityReports.service');
+module.exports.activityService = require('./activity.service');
 module.exports.cacheService = require('./cache.service');
 
 // HIPAA Compliance Services

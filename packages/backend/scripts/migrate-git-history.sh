@@ -1,6 +1,6 @@
 #!/bin/bash
 # Git History Migration Script
-# Migrates history from packages/backend and packages/frontend into root monorepo
+# Migrates history from packages/backend and packages/mobile into root monorepo
 # Preserves main and staging branches only
 
 set -e
@@ -40,13 +40,13 @@ elif [ -d "packages/backend/.git" ]; then
 fi
 
 # Get frontend repo URL
-if [ -f "packages/frontend/.git" ]; then
+if [ -f "packages/mobile/.git" ]; then
   # It's a submodule
-  FRONTEND_REPO=$(git config -f .gitmodules --get submodule.packages/frontend.url 2>/dev/null || \
-    grep "url = " packages/frontend/.git 2>/dev/null | sed 's/.*url = //' || echo "")
-elif [ -d "packages/frontend/.git" ]; then
+  FRONTEND_REPO=$(git config -f .gitmodules --get submodule.packages/mobile.url 2>/dev/null || \
+    grep "url = " packages/mobile/.git 2>/dev/null | sed 's/.*url = //' || echo "")
+elif [ -d "packages/mobile/.git" ]; then
   # It's a regular git repo
-  cd "$ROOT_DIR/packages/frontend"
+  cd "$ROOT_DIR/packages/mobile"
   FRONTEND_REPO=$(git remote get-url origin 2>/dev/null || echo "")
   cd "$ROOT_DIR"
 fi
@@ -70,15 +70,15 @@ echo ""
 echo -e "${BLUE}Step 0.5: Cleaning up submodule references...${NC}"
 
 # Remove submodule references if they exist
-if [ -f ".gitmodules" ] || [ -f "packages/backend/.git" ] || [ -f "packages/frontend/.git" ]; then
+if [ -f ".gitmodules" ] || [ -f "packages/backend/.git" ] || [ -f "packages/mobile/.git" ]; then
   echo "  → Removing submodule references..."
   git rm --cached packages/backend 2>/dev/null || true
-  git rm --cached packages/frontend 2>/dev/null || true
+  git rm --cached packages/mobile 2>/dev/null || true
   rm -f .gitmodules
   
   # Remove .git files (submodule pointers)
   rm -f packages/backend/.git
-  rm -f packages/frontend/.git
+  rm -f packages/mobile/.git
 fi
 
 # Remove .git directories if they exist
@@ -86,8 +86,8 @@ if [ -d "packages/backend/.git" ]; then
   rm -rf packages/backend/.git
 fi
 
-if [ -d "packages/frontend/.git" ]; then
-  rm -rf packages/frontend/.git
+if [ -d "packages/mobile/.git" ]; then
+  rm -rf packages/mobile/.git
 fi
 
 # Commit the cleanup if there are changes
@@ -132,8 +132,8 @@ else
 fi
 
 # Only check frontend if it has its own .git (not a submodule)
-if [ -d "packages/frontend/.git" ] && [ ! -f "packages/frontend/.git" ]; then
-  cd "$ROOT_DIR/packages/frontend"
+if [ -d "packages/mobile/.git" ] && [ ! -f "packages/mobile/.git" ]; then
+  cd "$ROOT_DIR/packages/mobile"
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
     echo -e "${YELLOW}⚠️  Frontend has uncommitted changes${NC}"
     echo "   Please commit or stash them before proceeding."
@@ -276,17 +276,17 @@ echo -e "${BLUE}Step 9: Importing frontend history (preserving all existing file
 if git show-ref --verify --quiet refs/heads/frontend-main; then
   echo "  → Importing frontend main branch history..."
   git merge -s ours --no-commit --allow-unrelated-histories frontend-main 2>/dev/null || true
-  git read-tree --prefix=packages/frontend -u frontend-main 2>/dev/null || true
+  git read-tree --prefix=packages/mobile -u frontend-main 2>/dev/null || true
   
   # Keep existing files (ours strategy)
-  git checkout --ours packages/frontend/ 2>/dev/null || true
-  git add packages/frontend/ 2>/dev/null || true
+  git checkout --ours packages/mobile/ 2>/dev/null || true
+  git add packages/mobile/ 2>/dev/null || true
   
   git commit -m "chore: import frontend main branch history into monorepo
 
 This commit imports the complete history from bianca-app-frontend
-into packages/frontend, preserving all commits, authors, and dates.
-Existing files in packages/frontend are preserved.
+into packages/mobile, preserving all commits, authors, and dates.
+Existing files in packages/mobile are preserved.
 
 Original repository: $FRONTEND_REPO
 Migration date: $(date +%Y-%m-%d)" || echo -e "${YELLOW}  ⚠️  No changes to commit${NC}"
@@ -296,10 +296,10 @@ fi
 if git show-ref --verify --quiet refs/heads/frontend-staging; then
   echo "  → Importing frontend staging branch history..."
   git merge -s ours --no-commit --allow-unrelated-histories frontend-staging 2>/dev/null || true
-  git read-tree --prefix=packages/frontend -u frontend-staging 2>/dev/null || true
+  git read-tree --prefix=packages/mobile -u frontend-staging 2>/dev/null || true
   
-  git checkout --ours packages/frontend/ 2>/dev/null || true
-  git add packages/frontend/ 2>/dev/null || true
+  git checkout --ours packages/mobile/ 2>/dev/null || true
+  git add packages/mobile/ 2>/dev/null || true
   
   git commit -m "chore: import frontend staging branch history into monorepo
 
@@ -334,11 +334,11 @@ echo ""
 
 # Step 11: Remove individual .git directories
 echo -e "${BLUE}Step 11: Removing individual package .git directories...${NC}"
-read -p "Remove .git directories from packages/backend and packages/frontend? (y/n) " -n 1 -r
+read -p "Remove .git directories from packages/backend and packages/mobile? (y/n) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   rm -rf "$ROOT_DIR/packages/backend/.git"
-  rm -rf "$ROOT_DIR/packages/frontend/.git"
+  rm -rf "$ROOT_DIR/packages/mobile/.git"
   echo -e "${GREEN}✅ Individual .git directories removed${NC}"
   echo -e "${YELLOW}⚠️  Packages are now part of the monorepo git repository${NC}"
 else
@@ -369,7 +369,7 @@ echo "     git log --oneline --graph --all | head -30"
 echo ""
 echo "  2. Check history is preserved:"
 echo "     git log packages/backend --oneline | head -10"
-echo "     git log packages/frontend --oneline | head -10"
+echo "     git log packages/mobile --oneline | head -10"
 echo ""
 echo "  3. If everything looks good:"
 echo "     git checkout main"

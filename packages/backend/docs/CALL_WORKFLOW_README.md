@@ -20,24 +20,19 @@ The call workflow allows agents to manually initiate calls to patients and monit
 
 ## Backend Changes
 
-### 1. Conversation Model Updates
-Added new fields to `src/models/conversation.model.js`:
+### 1. Call / conversation workflow fields
+Runtime fields on conversations often come from the linked **Call** (`src/models/call.model.js`), including:
 ```javascript
-callStatus: 'initiating' | 'ringing' | 'answered' | 'connected' | 'ended' | 'failed' | 'busy' | 'no_answer'
-callStartTime: Date
-callEndTime: Date
-callDuration: Number
-callOutcome: 'answered' | 'no_answer' | 'busy' | 'failed' | 'voicemail'
-agentId: ObjectId (required)
-callNotes: String
+caregiverId: ObjectId (optional; caregiver who placed or owns the call)
 ```
+Conversation DTOs expose `caregiverId` (and related call metadata) when populated from the call.
 
 ### 2. New API Endpoints
 - `POST /v1/calls/initiate` - Start a call to a patient
 - `GET /v1/calls/:conversationId/status` - Get current call status
 - `POST /v1/calls/:conversationId/status` - Update call status
 - `POST /v1/calls/:conversationId/end` - End a call
-- `GET /v1/calls/active` - Get active calls for current agent
+- `GET /v1/calls/active` - Get active calls for current caregiver
 - `GET /v1/calls/:conversationId/conversation` - Get conversation with call details
 
 ### 3. Controller Implementation

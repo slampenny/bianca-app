@@ -54,9 +54,9 @@ const router = express.Router();
  *                       type: string
  *                     clientPhone:
  *                       type: string
- *                     agentId:
+ *                     caregiverId:
  *                       type: string
- *                     agentName:
+ *                     caregiverName:
  *                       type: string
  *                     callStatus:
  *                       type: string

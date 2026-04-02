@@ -87,6 +87,11 @@ const envVarsSchema = Joi.object({
     otherwise: Joi.string().optional() // Optional in dev/test environments (can use placeholder values)
   }),
   TWILIO_VOICEURL: Joi.string(), // Keep if used elsewhere
+  /** Outbound/inbound voice: twilio (default) | telnyx (stub until implemented) */
+  VOICE_TELEPHONY_PROVIDER: Joi.string().valid('twilio', 'telnyx').optional(),
+  /** Outbound SMS: twilio (default) | sns (Amazon SNS Publish to phone) */
+  SMS_PROVIDER: Joi.string().valid('twilio', 'sns').optional(),
+  SMS_SNS_REGION: Joi.string().optional(),
   PUBLIC_TUNNEL_URL: Joi.string(), // Used for twilio.apiUrl in dev/testing
   API_BASE_URL: Joi.string(), // Alternative base URL for APIs/webhooks
   AWS_SECRET_ID: Joi.string(), // Added for consistency
@@ -134,6 +139,9 @@ const envVarsSchema = Joi.object({
   REDIS_URL: Joi.string().optional(), // Redis connection URL (e.g., redis://endpoint:6379)
   REDIS_ENDPOINT: Joi.string().optional(), // Redis endpoint (alternative to REDIS_URL)
   REDIS_PORT: Joi.number().optional().default(6379),
+
+  /** If set, GET /metrics requires Authorization: Bearer <token> in production and staging */
+  METRICS_SCRAPE_TOKEN: Joi.string().optional().allow(''),
   
 }).unknown();
 
@@ -244,6 +252,11 @@ const baselineConfig = {
   },
   // Merge domain-specific configurations
   ...buildAllConfigs(envVars),
+
+  metricsScrapeToken:
+    typeof envVars.METRICS_SCRAPE_TOKEN === 'string' && envVars.METRICS_SCRAPE_TOKEN.trim() !== ''
+      ? envVars.METRICS_SCRAPE_TOKEN.trim()
+      : null,
 };
 
 // CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation

@@ -3,6 +3,27 @@ const mongooseDelete = require('mongoose-delete');
 const validator = require('validator');
 const { toJSON, paginate } = require('./plugins');
 
+const emergencyContactSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true },
+    relationship: { type: String, trim: true },
+    phone: { type: String, trim: true },
+    /** Optional; required to email weekly family call digests to an authorized contact. */
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+      validate(value) {
+        if (value && String(value).trim() !== '' && !validator.isEmail(value)) {
+          throw new Error('Invalid emergency contact email');
+        }
+      },
+    },
+  },
+  { _id: false }
+);
+
 // Client Schema
 const clientSchema = mongoose.Schema(
   {
@@ -72,6 +93,16 @@ const clientSchema = mongoose.Schema(
       required: false,
       trim: true,
     },
+    room: {
+      type: String,
+      required: false,
+      trim: true,
+    },
+    moveInDate: {
+      type: Date,
+      required: false,
+    },
+    emergencyContact: emergencyContactSchema,
     org: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Org',

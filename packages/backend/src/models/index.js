@@ -11,6 +11,7 @@ module.exports.EmergencyPhrase = require('./emergencyPhrase.model');
 module.exports.Invoice = Invoice;
 module.exports.LineItem = LineItem;
 module.exports.Call = require('./call.model');
+module.exports.OnboardingResponse = require('./onboardingResponse.model').OnboardingResponse;
 
 module.exports.Message = Message;
 module.exports.Conversation = Conversation;
@@ -19,6 +20,7 @@ module.exports.MedicalBaseline = require('./medicalBaseline.model');
 module.exports.FraudAbuseAnalysis = require('./fraudAbuseAnalysis.model');
 module.exports.PaymentMethod = require('./paymentMethod.model');
 module.exports.Report = require('./report.model');
+module.exports.FamilyWeeklyDigest = require('./familyWeeklyDigest.model');
 module.exports.Schedule = require('./schedule.model');
 module.exports.ClientMemory = require('./clientMemory.model').ClientMemory;
 

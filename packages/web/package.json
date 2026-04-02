@@ -1,0 +1,46 @@
+{
+  "name": "@bianca-app/web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bianca desktop web app (pure React) — uses @bianca-app/shared design tokens",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cucumber": "mkdir -p test/e2e/cucumber/reports test/e2e/cucumber/screenshots && NODE_ENV=test npx @cucumber/cucumber --config test/e2e/cucumber/cucumber.config.cjs test/e2e/cucumber/features",
+    "test:e2e": "NODE_ENV=test npx playwright test"
+  },
+  "dependencies": {
+    "@bianca-app/shared": "*",
+    "@fontsource/space-grotesk": "^5.2.5",
+    "@reduxjs/toolkit": "^2.2.1",
+    "i18next": "^26.0.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-i18next": "^17.0.1",
+    "react-redux": "^9.1.0",
+    "react-router-dom": "^6.28.0",
+    "recharts": "^2.15.0",
+    "redux-persist": "^6.0.0"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "^12.5.0",
+    "@cucumber/pretty-formatter": "^2.4.1",
+    "@playwright/test": "^1.52.0",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "~18.2.14",
+    "@types/react-dom": "~18.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.3",
+    "vitest": "^3.0.5"
+  },
+  "license": "UNLICENSED"
+}

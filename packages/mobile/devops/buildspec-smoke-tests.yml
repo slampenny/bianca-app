@@ -1,0 +1,98 @@
+version: 0.2
+
+# Smoke tests for @bianca-app/web (Vite build + static serve) before deploy.
+# Same stage shape as the previous mobile/Expo smoke job; no Playwright required.
+env:
+  variables:
+    NODE_ENV: test
+    FRONTEND_PORT: 8082
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting web frontend smoke tests..."
+      - echo "Installing Node.js 20..."
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm install 20
+        nvm use 20
+        echo "✅ Node.js 20 installed"
+      - echo "Locating monorepo root and packages/web..."
+      - |
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
+        if [ ! -f "$CODEBUILD_SRC_DIR/package.json" ] || [ ! -f "$FRONTEND_DIR/package.json" ]; then
+          echo "❌ ERROR: Monorepo root or packages/web not found"
+          exit 1
+        fi
+        echo "✅ Web package: $FRONTEND_DIR"
+        export FRONTEND_DIR="$FRONTEND_DIR"
+      - echo "Installing dependencies (yarn workspaces)..."
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        cd "$CODEBUILD_SRC_DIR" || exit 1
+        yarn install --frozen-lockfile || (echo "⚠️  Lockfile out of sync, updating..." && yarn install)
+        echo "✅ Dependencies installed"
+
+  build:
+    commands:
+      - echo "Building @bianca-app/web for smoke tests..."
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
+        cd "$CODEBUILD_SRC_DIR" || exit 1
+        if [ "$BUILD_ENV" = "staging" ] || [ -z "$BUILD_ENV" ]; then
+          echo "Build: staging API URL baked for sanity (localhost still used when served from 127.0.0.1 in app code)"
+          VITE_API_URL=https://staging-api.biancawellness.com/v1 yarn workspace @bianca-app/web build
+        else
+          VITE_API_URL=https://api.biancawellness.com/v1 yarn workspace @bianca-app/web build
+        fi
+        if [ ! -d "$FRONTEND_DIR/dist" ]; then
+          echo "❌ ERROR: dist/ missing after build"
+          exit 1
+        fi
+        echo "✅ Vite build output present"
+      - echo "Serving dist and verifying HTML..."
+      - |
+        export NVM_DIR="$HOME/.nvm"
+        [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+        nvm use 20
+        FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
+        cd "$FRONTEND_DIR" || exit 1
+        npx --yes serve dist -l $FRONTEND_PORT > /tmp/frontend-server.log 2>&1 &
+        echo $! > /tmp/frontend-server.pid
+        SERVER_PID=$(cat /tmp/frontend-server.pid)
+        echo "Static server PID: $SERVER_PID"
+        i=1
+        while [ $i -le 30 ]; do
+          if curl -f -s "http://localhost:$FRONTEND_PORT" > /tmp/smoke-page.html 2>/dev/null; then
+            break
+          fi
+          sleep 1
+          i=$((i + 1))
+        done
+        if [ $i -gt 30 ]; then
+          echo "❌ Server did not become ready"
+          cat /tmp/frontend-server.log || true
+          kill "$SERVER_PID" 2>/dev/null || true
+          exit 1
+        fi
+        if ! grep -qE 'id="root"|script.*src=.*\.js' /tmp/smoke-page.html; then
+          echo "❌ Unexpected index.html (no root mount or script)"
+          head -c 800 /tmp/smoke-page.html
+          kill "$SERVER_PID" 2>/dev/null || true
+          exit 1
+        fi
+        echo "✅ Smoke check passed (HTML looks like Vite app shell)"
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+
+  post_build:
+    commands:
+      - echo "✅ Web frontend smoke tests completed"
+      - echo "Frontend image build can proceed"

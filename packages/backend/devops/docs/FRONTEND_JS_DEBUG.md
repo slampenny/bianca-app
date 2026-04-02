@@ -74,7 +74,7 @@ So the usual fix is: **ensure the file referenced by `index.html` exists in the 
 
 ## 5. Fixes already in the pipeline
 
-- **Frontend Dockerfile** (`packages/frontend/devops/Dockerfile`): After copying `dist/`, a `RUN` step checks that the script `src` from `index.html` exists on disk. If it’s missing, the **image build fails** (no broken image is pushed).
+- **Frontend Dockerfile** (`packages/mobile/devops/Dockerfile`): After copying `dist/`, a `RUN` step checks that the script `src` from `index.html` exists on disk. If it’s missing, the **image build fails** (no broken image is pushed).
 - **Post-deploy validation** (`buildspec-post-deploy-validation.yml` and `validate_service.sh`): After deploy, we fetch the frontend page, resolve the first `.js` script URL, and **fail the pipeline** if that URL returns non-200 or HTML (so we don’t swap traffic when the app would show "Unexpected token '<'").
 
 ---
@@ -82,7 +82,7 @@ So the usual fix is: **ensure the file referenced by `index.html` exists in the 
 ## 6. After you fix it on the instance
 
 - **If the script showed “FILE MISSING” or “HTTP 404” for the JS URL:** The referenced file wasn’t in the container. Ensure the **same** `index.html` and `_expo/static/js/web/*.js` are produced and copied (no stale cache; Dockerfile copies full `dist/`). The new Dockerfile check will fail the build if the file is missing.
-- **If you had to fix nginx config on the instance:** Update `packages/frontend/devops/nginx.conf` to match (and any host nginx in CodeDeploy if relevant).
-- **If you had to fix path/base (e.g. base href):** Update `packages/frontend` app/Expo web config so the build emits the correct script URLs.
+- **If you had to fix nginx config on the instance:** Update `packages/mobile/devops/nginx.conf` to match (and any host nginx in CodeDeploy if relevant).
+- **If you had to fix path/base (e.g. base href):** Update `packages/mobile` app/Expo web config so the build emits the correct script URLs.
 
 Then re-run the pipeline so the fix is baked into the next deploy.

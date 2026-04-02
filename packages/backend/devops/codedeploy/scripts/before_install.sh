@@ -290,6 +290,22 @@ case "$ENVIRONMENT" in
     ;;
 esac
 
+# Super-admin static origin (API CORS). Staging/prod: separate admin container on the same EC2 as frontend; demo has no admin hostname.
+case "$ENVIRONMENT" in
+  production)
+    ADMIN_FRONTEND_URL="https://admin.biancawellness.com"
+    SERVER_NAME_ADMIN="admin.biancawellness.com"
+    ;;
+  staging)
+    ADMIN_FRONTEND_URL="https://staging-admin.biancawellness.com"
+    SERVER_NAME_ADMIN="staging-admin.biancawellness.com"
+    ;;
+  *)
+    ADMIN_FRONTEND_URL=""
+    SERVER_NAME_ADMIN=""
+    ;;
+esac
+
 # Ensure ENVIRONMENT is set in /etc/environment for future deployments
 # This helps existing instances that were created before userdata was updated
 if [ -n "$ENVIRONMENT" ]; then
@@ -384,6 +400,35 @@ echo "   ✅ Secrets fetched successfully"
 # Create docker-compose.yml
 echo "   Creating docker-compose.yml..."
 
+if [ "$ENVIRONMENT" != "demo" ]; then
+  ADMIN_BLOCK=$(cat <<ADMINEOF
+  admin:
+    image: $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/bianca-app-admin:${IMAGE_TAG}
+    container_name: ${CONTAINER_PREFIX}_admin
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    logging:
+      driver: "awslogs"
+      options:
+        awslogs-group: "${CLOUDWATCH_LOG_PREFIX}/admin"
+        awslogs-region: "$AWS_REGION"
+        awslogs-create-group: "true"
+    depends_on:
+      - app
+    networks:
+      - bianca-network
+
+ADMINEOF
+)
+  NGINX_DEPENDS="      - app
+      - frontend
+      - admin"
+else
+  ADMIN_BLOCK=""
+  NGINX_DEPENDS="      - app
+      - frontend"
+fi
 
 cat > docker-compose.yml <<EOF
 version: '3.8'
@@ -456,6 +501,7 @@ services:
       - API_BASE_URL=$API_BASE_URL
       - WEBSOCKET_URL=$WEBSOCKET_URL
       - FRONTEND_URL=$FRONTEND_URL
+      - ADMIN_FRONTEND_URL=$ADMIN_FRONTEND_URL
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_HOST=asterisk
       - DEPLOYMENT_TYPE=docker-compose
@@ -499,6 +545,7 @@ services:
     networks:
       - bianca-network
 
+${ADMIN_BLOCK}
   nginx:
     image: nginx:alpine
     container_name: ${CONTAINER_PREFIX}_nginx
@@ -517,8 +564,7 @@ services:
       - /opt/maintenance.html:/opt/maintenance.html:ro
       $DEMO_502_VOLUME
     depends_on:
-      - app
-      - frontend
+${NGINX_DEPENDS}
     networks:
       - bianca-network
 
@@ -615,6 +661,51 @@ server {
     
     error_page 503 /maintenance.html;
 }
+EOF
+
+if [ -n "$SERVER_NAME_ADMIN" ]; then
+cat >> nginx.conf <<EOF
+
+# Super-admin app
+server {
+    listen 80;
+    server_name $SERVER_NAME_ADMIN;
+$NGINX_502_BLOCK
+    location = /maintenance.html {
+        root /opt;
+        add_header Content-Type text/html;
+    }
+    location ~* \.(js|css|woff2?|ttf|eot|ico|png|jpg|jpeg|gif|webp|svg)$ {
+        proxy_pass http://admin:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
+        proxy_intercept_errors on;
+        error_page 502 503 = @admin_asset_error;
+    }
+    location @admin_asset_error {
+        add_header Content-Type application/octet-stream;
+        return 502 "";
+    }
+    location / {
+        if (-f /opt/maintenance-mode.flag) {
+            return 503 /maintenance.html;
+        }
+        proxy_pass http://admin:80;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;
+    }
+    error_page 503 /maintenance.html;
+}
+EOF
+fi
+
+cat >> nginx.conf <<EOF
 
 # API server
 server {

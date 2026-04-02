@@ -262,9 +262,13 @@ describe('OpenAI Realtime Service - State Machine', () => {
       service.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_completed');
       expect(service.canAIRespond(callId)).toBe(true);
 
-      // AI should not be able to respond in USER_SPEAKING state
+      // After user starts speaking, AI may send response.create on speech_stopped (USER_SPEAKING)
       service.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, 'user_started_speaking');
-      expect(service.canAIRespond(callId)).toBe(false);
+      expect(service.canAIRespond(callId)).toBe(true);
+
+      // While a response is in flight (AI_RESPONDING), further response.create must still be allowed
+      service.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_finished_speaking');
+      expect(service.canAIRespond(callId)).toBe(true);
     });
 
     it('should correctly identify when user can speak', () => {
@@ -347,12 +351,9 @@ describe('OpenAI Realtime Service - State Machine', () => {
       // User finishes speaking during grace period
       service.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, 'user_started_speaking');
       
-      // Should not be able to transition to AI_RESPONDING during grace period
       expect(service.isInGracePeriod(callId)).toBe(true);
-      expect(service.canAIRespond(callId)).toBe(false); // USER_SPEAKING state doesn't allow AI response
-      
-      // The grace period check should prevent the actual response
-      // This is tested in the speech_stopped handler logic
+      // canAIRespond is true in USER_SPEAKING; speech_stopped handler blocks via isInGracePeriod, not canAIRespond
+      expect(service.canAIRespond(callId)).toBe(true);
     });
 
     it('should allow AI response after grace period expires', () => {

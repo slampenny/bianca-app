@@ -49,17 +49,34 @@ const normalizePhoneToE164 = (phone) => {
  * @returns {Promise<Caregiver>}
  */
 const createCaregiver = async (orgId, caregiverBody) => {
-  if (await Caregiver.isEmailTaken(caregiverBody.email)) {
+  const body = { ...caregiverBody };
+  body.email = String(body.email || '').trim().toLowerCase();
+  if (await Caregiver.isEmailTaken(body.email)) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
 
   // Normalize phone number to E.164 format if provided
-  if (caregiverBody.phone) {
-    const normalizedPhone = normalizePhoneToE164(caregiverBody.phone);
+  if (body.phone) {
+    const normalizedPhone = normalizePhoneToE164(body.phone);
     if (!normalizedPhone) {
       throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid phone number format. Please use 10 digits or E.164 format (e.g., +1234567890)');
     }
-    caregiverBody.phone = normalizedPhone;
+    body.phone = normalizedPhone;
+  }
+
+  if (body.externalId != null && String(body.externalId).trim()) {
+    body.externalId = String(body.externalId).trim();
+    const existingExternal = await Caregiver.findOne({ org: orgId, externalId: body.externalId });
+    if (existingExternal) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'externalId already taken for this organization');
+    }
+  } else {
+    delete body.externalId;
+  }
+
+  // For provisioning-style creates, allow passwordless accounts by defaulting to invited.
+  if (!body.password && !body.ssoProvider && !body.role) {
+    body.role = 'invited';
   }
 
   // Add org to caregiver
@@ -70,7 +87,7 @@ const createCaregiver = async (orgId, caregiverBody) => {
 
   // CRITICAL: Set org at creation time, not after
   const caregiver = await Caregiver.create({
-    ...caregiverBody,
+    ...body,
     org: org._id, // Set org at creation time
   });
 
@@ -182,6 +199,33 @@ const getLoginCaregiverData = async (email) => {
     org: caregiver.org,
     caregiver,
     clients: caregiver.clients,
+  };
+};
+
+/**
+ * Load caregiver + org + clients (same shape as login) by id — for super-admin impersonation.
+ * @param {string|mongoose.Types.ObjectId} id
+ * @returns {Promise<{ org: *, caregiver: *, clients: * } | null>}
+ */
+const getCaregiverSessionContextById = async (id) => {
+  const caregiver = await Caregiver.findById(id)
+    .populate('org')
+    .populate({
+      path: 'clients',
+      populate: {
+        path: 'schedules',
+        model: 'Schedule',
+      },
+    });
+
+  if (!caregiver) {
+    return null;
+  }
+
+  return {
+    org: caregiver.org,
+    caregiver,
+    clients: caregiver.clients || [],
   };
 };
 
@@ -378,6 +422,7 @@ module.exports = {
   getCaregiverById,
   getCaregiverByEmail,
   getLoginCaregiverData,
+  getCaregiverSessionContextById,
   updateCaregiverById,
   deleteCaregiverById,
   getClientById,

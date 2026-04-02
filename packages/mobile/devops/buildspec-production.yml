@@ -1,0 +1,75 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: us-east-2
+    AWS_ACCOUNT_ID: 730335291008
+    REPOSITORY_NAME_FRONTEND: bianca-app-frontend
+    REPOSITORY_NAME_ADMIN: bianca-app-admin
+    FRONTEND_CONTAINER_NAME: bianca-frontend
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - REPOSITORY_URI_FRONTEND=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_FRONTEND
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)-$(date +%Y%m%d%H%M%S)
+      - echo "Configuring Git to preserve binary files..."
+      - git config --global core.autocrlf false
+      - git config --global core.eol lf
+  build:
+    commands:
+      - echo Build started on $(date)
+      - pwd
+      - echo Source directory is $CODEBUILD_SRC_DIR
+      - |
+        if [ ! -f "package.json" ] || [ ! -d "packages/web" ]; then
+          echo "ERROR: Run from monorepo root (package.json + packages/web required)"
+          ls -la
+          exit 1
+        fi
+        echo "Building @bianca-app/web from monorepo root: $(pwd)"
+      - echo Building frontend Docker image (production)...
+      - |
+        if docker build --build-arg BUILD_ENV=production \
+                     --build-arg VITE_API_URL=https://api.biancawellness.com/v1 \
+                     --build-arg VITE_ADMIN_APP_ORIGIN=https://admin.biancawellness.com \
+                     -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG \
+                     -t $REPOSITORY_URI_FRONTEND:production \
+                     -f packages/web/devops/Dockerfile .; then
+          echo "Frontend build complete"
+        else
+          echo "Frontend build FAILED!"
+          exit 1
+        fi
+      - REPOSITORY_URI_ADMIN=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_ADMIN
+      - |
+        if docker build --build-arg BUILD_ENV=production \
+                     --build-arg VITE_API_URL=https://api.biancawellness.com/v1 \
+                     -t $REPOSITORY_URI_ADMIN:$IMAGE_TAG \
+                     -t $REPOSITORY_URI_ADMIN:production \
+                     -f packages/admin/devops/Dockerfile .; then
+          echo "Super-admin build complete"
+        else
+          echo "Super-admin build FAILED!"
+          exit 1
+        fi
+      - docker tag $REPOSITORY_URI_FRONTEND:$IMAGE_TAG $REPOSITORY_URI_FRONTEND:latest
+      - docker tag $REPOSITORY_URI_ADMIN:$IMAGE_TAG $REPOSITORY_URI_ADMIN:latest
+  post_build:
+    commands:
+      - echo Build completed on $(date)
+      - echo Pushing frontend image...
+      - docker push $REPOSITORY_URI_FRONTEND:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_FRONTEND:production
+      - docker push $REPOSITORY_URI_FRONTEND:latest
+      - REPOSITORY_URI_ADMIN=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$REPOSITORY_NAME_ADMIN
+      - echo Pushing super-admin image...
+      - docker push $REPOSITORY_URI_ADMIN:$IMAGE_TAG
+      - docker push $REPOSITORY_URI_ADMIN:production
+      - docker push $REPOSITORY_URI_ADMIN:latest
+      - echo Creating imagedefinitions_frontend.json
+      - echo "[{\"name\":\"$FRONTEND_CONTAINER_NAME\",\"imageUri\":\"$REPOSITORY_URI_FRONTEND:$IMAGE_TAG\"}]" > imagedefinitions_frontend.json
+artifacts:
+  files:
+    - imagedefinitions_frontend.json

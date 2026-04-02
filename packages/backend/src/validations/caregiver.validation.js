@@ -3,12 +3,16 @@ const { password, objectId } = require('./custom.validation');
 
 const createCaregiver = {
   body: Joi.object().keys({
-    orgId: Joi.required().custom(objectId),
+    orgId: Joi.custom(objectId).optional(),
     email: Joi.string().required().email(),
     avatar: Joi.string().optional(),
     name: Joi.string().required(),
-    phone: Joi.string().required(),
-    password: Joi.string().required().custom(password),
+    phone: Joi.string().optional(),
+    password: Joi.string().custom(password).optional(),
+    role: Joi.string().valid('invited', 'staff', 'orgAdmin', 'superAdmin').optional(),
+    active: Joi.boolean().optional(),
+    externalId: Joi.string().trim().allow('', null).optional(),
+    preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar').optional(),
     clients: Joi.array().items(Joi.string().custom(objectId)),
   }),
 };
@@ -46,6 +50,8 @@ const updateCaregiver = {
       password: Joi.string().required().custom(password).optional(),
       themePreference: Joi.string().valid('healthcare', 'colorblind').optional(),
       preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar').optional(),
+      externalId: Joi.string().trim().allow('', null).optional(),
+      active: Joi.boolean().optional(),
       clients: Joi.array().items(Joi.string().custom(objectId)),
     })
     .min(1)

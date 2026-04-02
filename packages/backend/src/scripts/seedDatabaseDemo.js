@@ -13,6 +13,8 @@ const {
   Call,
   MedicalAnalysis,
   FraudAbuseAnalysis,
+  OnboardingResponse,
+  PrivacyRequest,
 } = require('../models');
 const config = require('../config/config');
 
@@ -28,6 +30,7 @@ const invoicesSeeder = require('./seeders/invoices.seeder');
 const sentimentAnalysisSeeder = require('./seeders/sentimentAnalysis.seeder');
 const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
 const clientReportSnapshotSeeder = require('./seeders/clientReportSnapshot.seeder');
+const onboardingSeeder = require('./seeders/onboarding.seeder');
 
 /**
  * Clear all database collections
@@ -44,8 +47,10 @@ async function clearDatabase() {
   await PaymentMethod.deleteMany({});
   await Invoice.deleteMany({});
   await Call.deleteMany({});
+  await OnboardingResponse.deleteMany({});
   await MedicalAnalysis.deleteMany({});
   await FraudAbuseAnalysis.deleteMany({});
+  await PrivacyRequest.deleteMany({});
   // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
   console.log('Database cleared');
 }
@@ -63,9 +68,17 @@ async function createDemoClients(caregiver, org) {
       email: 'sarah.johnson@demo.com',
       phone: '1234567893',
       age: 72,
+      room: '301A',
       preferredName: 'Sarah',
       preferredLanguage: 'en',
       notes: 'Active client with regular wellness checks. Enjoys talking about her grandchildren.',
+      moveInDate: new Date('2023-09-12T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Karen Johnson',
+        relationship: 'Daughter',
+        phone: '1234567811',
+        email: 'karen.johnson@demo.com',
+      },
       isActive: true,
       isEmailVerified: true,
     },
@@ -74,9 +87,17 @@ async function createDemoClients(caregiver, org) {
       email: 'robert.martinez@demo.com',
       phone: '1234567894',
       age: 68,
+      room: '302B',
       preferredName: 'Bob',
       preferredLanguage: 'es',
       notes: 'Spanish-speaking client. Prefers morning calls.',
+      moveInDate: new Date('2022-11-08T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Elena Martinez',
+        relationship: 'Spouse',
+        phone: '1234567812',
+        email: 'elena.martinez@demo.com',
+      },
       isActive: true,
       isEmailVerified: true,
     },
@@ -85,9 +106,17 @@ async function createDemoClients(caregiver, org) {
       email: 'emily.chen@demo.com',
       phone: '1234567895',
       age: 75,
+      room: '303C',
       preferredName: 'Emily',
       preferredLanguage: 'zh',
       notes: 'Chinese-speaking client. Needs medication reminders.',
+      moveInDate: new Date('2021-06-01T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Victor Chen',
+        relationship: 'Son',
+        phone: '1234567813',
+        email: 'victor.chen@demo.com',
+      },
       isActive: true,
       isEmailVerified: true,
     },
@@ -96,9 +125,17 @@ async function createDemoClients(caregiver, org) {
       email: 'james.wilson@demo.com',
       phone: '1234567896',
       age: 80,
+      room: '304D',
       preferredName: 'Jim',
       preferredLanguage: 'en',
       notes: 'Veteran. Shows signs of declining health. Monitor closely.',
+      moveInDate: new Date('2020-02-17T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Diane Wilson',
+        relationship: 'Daughter',
+        phone: '1234567814',
+        email: 'diane.wilson@demo.com',
+      },
       isActive: true,
       isEmailVerified: true,
     },
@@ -107,9 +144,17 @@ async function createDemoClients(caregiver, org) {
       email: 'maria.garcia@demo.com',
       phone: '1234567897',
       age: 65,
+      room: '305A',
       preferredName: 'Maria',
       preferredLanguage: 'es',
       notes: 'Recently discharged from hospital. Needs frequent check-ins.',
+      moveInDate: new Date('2024-01-03T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Luis Garcia',
+        relationship: 'Son',
+        phone: '1234567815',
+        email: 'luis.garcia@demo.com',
+      },
       isActive: true,
       isEmailVerified: true,
     },
@@ -118,9 +163,17 @@ async function createDemoClients(caregiver, org) {
       email: 'david.lee@demo.com',
       phone: '1234567898',
       age: 70,
+      room: '306B',
       preferredName: 'David',
       preferredLanguage: 'en',
       notes: 'Lives alone. Has mobility issues. Regular wellness checks important.',
+      moveInDate: new Date('2023-04-22T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Angela Lee',
+        relationship: 'Sister',
+        phone: '1234567816',
+        email: 'angela.lee@demo.com',
+      },
       isActive: true,
       isEmailVerified: true,
     },
@@ -484,6 +537,18 @@ async function seedDatabaseDemo() {
       name: 'Margaret Thompson',
       email: 'vulnerable@example.org',
       phone: '1234567892',
+      preferredName: 'Margaret',
+      age: 76,
+      room: '203C',
+      preferredLanguage: 'en',
+      notes: 'Needs extra reassurance during calls; monitor for potential vulnerability cues.',
+      moveInDate: new Date('2024-03-20T00:00:00.000Z'),
+      emergencyContact: {
+        name: 'Elaine Thompson',
+        relationship: 'Niece',
+        phone: '1234567803',
+        email: 'elaine.thompson@example.org',
+      },
       caregivers: [caregiverOneRecord.id],
       org: caregiverOneRecord.org,
       schedules: [],
@@ -495,7 +560,9 @@ async function seedDatabaseDemo() {
 
     // Create additional demo clients
     const demoClients = await createDemoClients(caregiverOneRecord, org);
-    const allClients = [...baseClients, client3, ...demoClients];
+    const clientsForDemoConversations = [...baseClients, client3, ...demoClients];
+    await onboardingSeeder.seedPrimaryTestClientsOnboarding(client1, client2, client3, caregiverOneRecord._id);
+    const allClients = [...clientsForDemoConversations];
 
     // Seed base conversations
     const baseConversations = await conversationsSeeder.seedConversations(client1);
@@ -509,8 +576,8 @@ async function seedDatabaseDemo() {
     // Add fraud/abuse pattern conversations for client3
     await conversationsSeeder.addFraudAbuseConversations(client3._id);
 
-    // Create additional demo conversations
-    const demoConversations = await createDemoConversations(allClients);
+    // Demo wellness threads (primary clients also have seeded onboarding captures for UI testing)
+    const demoConversations = await createDemoConversations(clientsForDemoConversations);
     const allConversations = [...baseConversations, ...demoConversations];
 
     // Seed base schedules
@@ -572,7 +639,7 @@ async function seedDatabaseDemo() {
 
     console.log('Demo database seeded successfully!');
     console.log(`Created:`);
-    console.log(`- ${allClients.length} clients`);
+    console.log(`- ${allClients.length} clients (Agnes/Barnaby/Margaret: onboarding day-1 WIP, day-2 WIP, complete)`);
     console.log(`- ${allConversations.length} conversations`);
     console.log(`- ${paymentMethods.length} payment methods`);
     console.log(`- Multiple schedules, alerts, and invoices`);

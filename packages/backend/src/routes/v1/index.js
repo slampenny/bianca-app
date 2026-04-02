@@ -15,6 +15,11 @@ const paymentRoute = require('./payment.route');
 const paymentMethodRoute = require('./paymentMethod.route');
 const privacyRoute = require('./privacy.route');
 const reportRoute = require('./report.route');
+const familyWeeklyDigestRoute = require('./familyWeeklyDigest.route');
+const facilityReportsRoute = require('./facilityReports.route');
+const activityRoute = require('./activity.route');
+const adminRoute = require('./admin.route');
+const scimRoute = require('./scim.route');
 const scheduleRoute = require('./schedule.route');
 const sentimentRoute = require('./sentiment.route');
 const ssoRoute = require('./sso.route');
@@ -95,6 +100,26 @@ const defaultRoutes = [
   {
     path: '/reports',
     route: reportRoute,
+  },
+  {
+    path: '/family-weekly-digests',
+    route: familyWeeklyDigestRoute,
+  },
+  {
+    path: '/facility-reports',
+    route: facilityReportsRoute,
+  },
+  {
+    path: '/activity',
+    route: activityRoute,
+  },
+  {
+    path: '/admin',
+    route: adminRoute,
+  },
+  {
+    path: '/scim',
+    route: scimRoute,
   },
   {
     path: '/schedules',

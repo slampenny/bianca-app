@@ -20,66 +20,16 @@ const routes = require('./routes/v1');
 const { errorConverter, errorHandler } = require('./middlewares/error');
 const ApiError = require('./utils/ApiError');
 const logger = require('./config/logger');
+const { metricsMiddleware, createMetricsHandler } = require('./metrics/prometheus');
 
 const app = express();
 
 // Enhanced health check that includes service status
 app.get('/health', (req, res) => {
   try {
-    const mongoose = require('mongoose');
-    
-    // Check email service status
-    let emailStatus = { ready: false, status: 'Service not loaded' };
-    try {
-      const emailService = require('./services/email.service');
-      emailStatus = {
-        ready: emailService.isReady(),
-        status: emailService.getStatus()
-      };
-    } catch (error) {
-      emailStatus = { ready: false, status: 'Service not available' };
-    }
-
-    // Check ARI client status
-    let ariStatus = { ready: false, status: 'Service not loaded' };
-    try {
-      const { getAriClientInstance } = require('./services/ari.client');
-      const ariClient = getAriClientInstance();
-      ariStatus = {
-        ready: ariClient && ariClient.isConnected,
-        status: ariClient && ariClient.isConnected ? 'Connected' : 'Not connected'
-      };
-    } catch (error) {
-      ariStatus = { ready: false, status: 'Service not available' };
-    }
-
-    // OpenAI: boolean only — helps ops confirm secret/env loaded (invalid key still fails at runtime)
-    const openaiKey = config.openai?.apiKey;
-    const openaiStatus = {
-      apiKeyConfigured: typeof openaiKey === 'string' && openaiKey.length > 0
-    };
-
-    const healthData = {
-      status: 'OK',
-      timestamp: new Date().toISOString(),
-      environment: config.env,
-      services: {
-        mongodb: {
-          ready: mongoose.connection.readyState === 1,
-          status: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'
-        },
-        email: emailStatus,
-        asterisk: ariStatus,
-        openai: openaiStatus
-      }
-    };
-
-    // Always return 200 - the app is healthy if it can respond to HTTP requests
-    // Individual service status is informational but doesn't affect overall health
-    res.status(200).json(healthData);
-    
+    const { getPublicHealthSnapshot } = require('./services/observability.service');
+    res.status(200).json(getPublicHealthSnapshot());
   } catch (error) {
-    // Fallback if something goes wrong
     const k = config.openai?.apiKey;
     res.status(200).json({
       status: 'OK',
@@ -88,12 +38,15 @@ app.get('/health', (req, res) => {
       error: 'Could not retrieve service status',
       services: {
         openai: {
-          apiKeyConfigured: typeof k === 'string' && k.length > 0
-        }
-      }
+          apiKeyConfigured: typeof k === 'string' && k.length > 0,
+        },
+      },
     });
   }
 });
+
+// Prometheus scrape target (see METRICS_SCRAPE_TOKEN in production/staging)
+app.get('/metrics', createMetricsHandler(config));
 
 // Trust proxy headers
 app.set('trust proxy', true);
@@ -157,6 +110,11 @@ const corsOptions = {
       'http://staging-api.biancawellness.com',
       'https://api.biancawellness.com',
       'http://api.biancawellness.com',
+      // Web admin console (Google SSO / exchange-code); keep in sync with ADMIN_FRONTEND_URL / deploy scripts
+      'https://admin.biancawellness.com',
+      'http://admin.biancawellness.com',
+      'https://staging-admin.biancawellness.com',
+      'http://staging-admin.biancawellness.com',
       // Legacy domain (for redirects)
       'https://app.myphonefriend.com',
       'http://app.myphonefriend.com',
@@ -177,6 +135,7 @@ const corsOptions = {
       'http://localhost:8081',
       'http://localhost:8082',
       config.frontendUrl,        // Frontend URL from config (single source of truth)
+      process.env.ADMIN_FRONTEND_URL, // Super-admin console (e.g. https://admin.biancawellness.com)
       'http://127.0.0.1:3000',   // Alternative localhost format
       'http://127.0.0.1:3001',
       'null'                     // Some browsers send 'null' as origin for file:// URLs
@@ -242,6 +201,8 @@ app.use(passport.initialize());
 passport.use('jwt', jwtStrategy);
 
 app.use(express.json({ limit: '50mb' }));
+
+app.use(metricsMiddleware);
 
 // Rate limiting for auth endpoints
 // Disabled in test and development, enabled in production and staging

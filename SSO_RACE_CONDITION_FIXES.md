@@ -54,7 +54,7 @@ After SSO login, the profile screen frequently showed empty/missing user data ev
 ### 2. Frontend Issues
 
 #### A. Redux Matcher Not Validating Data
-**Location:** `packages/frontend/app/store/authSlice.ts:98-104`
+**Location:** `packages/mobile/app/store/authSlice.ts:98-104`
 
 **Issue:** The RTK Query matcher updated state even if caregiver data was incomplete.
 
@@ -65,7 +65,7 @@ After SSO login, the profile screen frequently showed empty/missing user data ev
 - Changed from `payload.user` to `payload.caregiver` for consistency
 
 #### B. Caregiver Slice Matcher Not Validating Data
-**Location:** `packages/frontend/app/store/caregiverSlice.ts:129-133`
+**Location:** `packages/mobile/app/store/caregiverSlice.ts:129-133`
 
 **Issue:** Similar to authSlice, the matcher didn't validate caregiver data completeness.
 
@@ -76,7 +76,7 @@ After SSO login, the profile screen frequently showed empty/missing user data ev
 - Changed from `payload.user` to `payload.caregiver` for consistency
 
 #### C. ProfileScreen Fallback Lacks Error Handling
-**Location:** `packages/frontend/app/screens/ProfileScreen.tsx:57-76`
+**Location:** `packages/mobile/app/screens/ProfileScreen.tsx:57-76`
 
 **Issue:** 
 - JWT decode errors were silently swallowed
@@ -90,7 +90,7 @@ After SSO login, the profile screen frequently showed empty/missing user data ev
 - Better debug visibility into fallback mechanisms
 
 #### D. SSO Cache Fallback Not Validating Data
-**Location:** `packages/frontend/app/screens/ProfileScreen.tsx:78-91`
+**Location:** `packages/mobile/app/screens/ProfileScreen.tsx:78-91`
 
 **Issue:**
 - No validation that cached caregiver data was complete
@@ -104,7 +104,7 @@ After SSO login, the profile screen frequently showed empty/missing user data ev
 - Changed from `data.user` to `data.caregiver`
 
 #### E. LoginForm SSO Handler Lacks Validation
-**Location:** `packages/frontend/app/components/LoginForm.tsx:270-314`
+**Location:** `packages/mobile/app/components/LoginForm.tsx:270-314`
 
 **Issue:**
 - No validation that user data was complete before setting state
@@ -118,7 +118,7 @@ After SSO login, the profile screen frequently showed empty/missing user data ev
 - Better visibility into SSO flow execution
 
 #### F. SSO Service Type Interface Mismatch
-**Location:** `packages/frontend/app/services/api/ssoApi.ts:17`
+**Location:** `packages/mobile/app/services/api/ssoApi.ts:17`
 
 **Issue:** TypeScript interface defined `user: Caregiver` but backend actually returns `caregiver: Caregiver`.
 
@@ -183,12 +183,12 @@ Key log messages to monitor:
 - `packages/backend/src/controllers/sso.controller.js` - Fixed data population timing, added validation, changed `user` to `caregiver`
 
 ### Frontend:
-- `packages/frontend/app/services/api/ssoApi.ts` - Updated TypeScript interface: `user` → `caregiver`
-- `packages/frontend/app/store/authSlice.ts` - Added validation, changed `payload.user` → `payload.caregiver`
-- `packages/frontend/app/store/caregiverSlice.ts` - Added validation, changed `payload.user` → `payload.caregiver`
-- `packages/frontend/app/screens/ProfileScreen.tsx` - Improved error handling, changed `data.user` → `data.caregiver`
-- `packages/frontend/app/components/LoginForm.tsx` - Added validation and detailed logging
-- `packages/frontend/app/services/ssoService.ts` - Changed `data.user` → `data.caregiver`
+- `packages/mobile/app/services/api/ssoApi.ts` - Updated TypeScript interface: `user` → `caregiver`
+- `packages/mobile/app/store/authSlice.ts` - Added validation, changed `payload.user` → `payload.caregiver`
+- `packages/mobile/app/store/caregiverSlice.ts` - Added validation, changed `payload.user` → `payload.caregiver`
+- `packages/mobile/app/screens/ProfileScreen.tsx` - Improved error handling, changed `data.user` → `data.caregiver`
+- `packages/mobile/app/components/LoginForm.tsx` - Added validation and detailed logging
+- `packages/mobile/app/services/ssoService.ts` - Changed `data.user` → `data.caregiver`
 
 ## Summary
 

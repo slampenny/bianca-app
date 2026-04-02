@@ -4,9 +4,35 @@ const pick = require('../utils/pick');
 const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
+const onboardingService = require('../services/onboarding.service');
 const { caregiverService, conversationService, clientService, scheduleService } = require('../services');
-const { ConversationDTO, ClientDTO } = require('../dtos');
+const { ConversationDTO, ClientDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
+const { toIdString, assertCaregiverOrgAccess, assertCaregiverClientAccess } = require('../utils/accessControl');
+
+/**
+ * Staff may access a client's nested data if the client is on their roster, lists them as caregiver,
+ * or they have at least one Call with them as caregiverId (stored on Call, not Conversation).
+ */
+const assertStaffHasClientAccess = async (caregiver, clientId, client, denyMessage) => {
+  const caregiverDoc = await caregiverService.getCaregiverById(caregiver._id || caregiver.id);
+  if (!caregiverDoc) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Caregiver not found');
+  }
+  const idStr = clientId.toString();
+  const onRoster = (caregiverDoc.clients || []).some((p) => (p._id ? p._id.toString() : p.toString()) === idStr);
+  const assignedOnClient =
+    Array.isArray(client.caregivers) &&
+    client.caregivers.some((c) => (c._id ? c._id.toString() : c.toString()) === caregiver.id.toString());
+  if (onRoster || assignedOnClient) {
+    return;
+  }
+  const { Call } = require('../models');
+  const callCount = await Call.countDocuments({ clientId, caregiverId: caregiver.id });
+  if (callCount === 0) {
+    throw new ApiError(httpStatus.FORBIDDEN, denyMessage);
+  }
+};
 
 const createClient = catchAsync(async (req, res) => {
   const { schedules, ...clientData } = req.body;
@@ -14,8 +40,11 @@ const createClient = catchAsync(async (req, res) => {
   if (file) {
     clientData.avatar = file.path;
   }
-  if (!req.caregiver?.org) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Your caregiver account does not have an organization assigned. Please contact support.');
+  if (!req.caregiver || !req.caregiver.org) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Your caregiver account does not have an organization assigned. Please contact support.'
+    );
   }
   if (!clientData.org) {
     let orgId = req.caregiver.org;
@@ -34,7 +63,6 @@ const createClient = catchAsync(async (req, res) => {
       await scheduleService.createSchedule(client.id, schedule);
     }
   }
-  client = await caregiverService.addClient(req.caregiver._id || req.caregiver.id, client.id);
   try {
     await clientService.sendConsentEmailIfRequired(client);
   } catch (err) {
@@ -44,22 +72,44 @@ const createClient = catchAsync(async (req, res) => {
 });
 
 const getClients = catchAsync(async (req, res) => {
+  const { caregiver } = req;
   const filter = pick(req.query, ['name', 'role']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  if (caregiver.role !== 'superAdmin') {
+    assertCaregiverOrgAccess(caregiver, caregiver.org, 'You do not have access to this organization');
+    filter.org = toIdString(caregiver.org);
+  }
+  if (caregiver.role === 'staff') {
+    const caregiverDoc = await caregiverService.getCaregiverById(caregiver._id || caregiver.id);
+    const rosterIds = ((caregiverDoc && caregiverDoc.clients) || []).map((c) => toIdString(c)).filter(Boolean);
+    filter.$or = [{ caregivers: toIdString(caregiver._id || caregiver.id) }, { _id: { $in: rosterIds } }];
+  }
   const result = await clientService.queryClients(filter, options);
-  res.send(result);
+  const clientDTOs = await clientsToDTOsWithLastCall(result.results);
+  res.status(httpStatus.OK).json({ ...result, results: clientDTOs });
 });
 
 const getClient = catchAsync(async (req, res) => {
+  const { caregiver } = req;
   const client = await clientService.getClientById(req.params.clientId);
   if (!client) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  res.send(ClientDTO(client));
+  const caregiverDoc =
+    caregiver.role === 'staff' ? await caregiverService.getCaregiverById(caregiver._id || caregiver.id) : null;
+  assertCaregiverClientAccess(caregiver, caregiverDoc, client, 'You do not have access to this client');
+  const [dto] = await clientsToDTOsWithLastCall([client]);
+  res.status(httpStatus.OK).json(dto);
 });
 
 const updateClient = catchAsync(async (req, res) => {
   const { schedules, ...clientData } = req.body;
+  const { caregiver } = req;
+  const existing = await clientService.getClientById(req.params.clientId);
+  if (!existing) throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  const caregiverDoc =
+    caregiver.role === 'staff' ? await caregiverService.getCaregiverById(caregiver._id || caregiver.id) : null;
+  assertCaregiverClientAccess(caregiver, caregiverDoc, existing, 'You do not have access to this client');
   const client = await clientService.updateClientById(req.params.clientId, clientData);
   if (schedules) {
     for (const schedule of schedules) {
@@ -67,12 +117,20 @@ const updateClient = catchAsync(async (req, res) => {
     }
   }
   if (clientData.email || clientData.consented === undefined) {
-    clientService.sendConsentEmailIfRequired(client).catch((err) => logger.error('Failed to send consent email after client update:', err));
+    clientService
+      .sendConsentEmailIfRequired(client)
+      .catch((err) => logger.error('Failed to send consent email after client update:', err));
   }
   res.send(ClientDTO(client));
 });
 
 const uploadClientAvatar = catchAsync(async (req, res) => {
+  const { caregiver } = req;
+  const existing = await clientService.getClientById(req.params.clientId);
+  if (!existing) throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  const caregiverDoc =
+    caregiver.role === 'staff' ? await caregiverService.getCaregiverById(caregiver._id || caregiver.id) : null;
+  assertCaregiverClientAccess(caregiver, caregiverDoc, existing, 'You do not have access to this client');
   const { file } = req;
   if (!file) throw new Error('No file uploaded');
   const filename = path.basename(file.path);
@@ -82,18 +140,32 @@ const uploadClientAvatar = catchAsync(async (req, res) => {
 });
 
 const deleteClient = catchAsync(async (req, res) => {
+  const { caregiver } = req;
+  const existing = await clientService.getClientById(req.params.clientId);
+  if (!existing) throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  const caregiverDoc =
+    caregiver.role === 'staff' ? await caregiverService.getCaregiverById(caregiver._id || caregiver.id) : null;
+  assertCaregiverClientAccess(caregiver, caregiverDoc, existing, 'You do not have access to this client');
   await clientService.deleteClientById(req.params.clientId);
   res.status(httpStatus.NO_CONTENT).send();
 });
 
 const assignCaregiver = catchAsync(async (req, res) => {
   const { clientId, caregiverId } = req.params;
+  const { caregiver } = req;
+  const client = await clientService.getClientById(clientId);
+  if (!client) throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  assertCaregiverOrgAccess(caregiver, client.org, 'You do not have access to this client');
   const updatedClient = await clientService.assignCaregiver(caregiverId, clientId);
   res.status(httpStatus.OK).send(ClientDTO(updatedClient));
 });
 
 const removeCaregiver = catchAsync(async (req, res) => {
   const { clientId, caregiverId } = req.params;
+  const { caregiver } = req;
+  const client = await clientService.getClientById(clientId);
+  if (!client) throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  assertCaregiverOrgAccess(caregiver, client.org, 'You do not have access to this client');
   const updatedClient = await clientService.removeCaregiver(caregiverId, clientId);
   res.status(httpStatus.OK).send(ClientDTO(updatedClient));
 });
@@ -101,33 +173,81 @@ const removeCaregiver = catchAsync(async (req, res) => {
 const getClientsByCaregiver = catchAsync(async (req, res) => {
   const { caregiverId } = req.params;
   const clients = await caregiverService.getClients(caregiverId);
+  if (req.caregiver.role !== 'superAdmin') {
+    for (const client of clients) {
+      assertCaregiverOrgAccess(req.caregiver, client.org, 'You do not have access to these clients');
+    }
+  }
   res.status(httpStatus.OK).send(clients);
+});
+
+const formatOnboardingResponseRow = (r) => ({
+  id: r._id ? r._id.toString() : undefined,
+  clientId: r.clientId ? r.clientId.toString() : undefined,
+  dayNumber: r.dayNumber,
+  questionId: r.questionId,
+  responseType: r.responseType,
+  responseValue: r.responseValue,
+  verbatimTranscript: r.verbatimTranscript,
+  callId: r.callId ? r.callId.toString() : undefined,
+  conversationId: r.conversationId ? r.conversationId.toString() : undefined,
+  capturedAt: r.capturedAt,
+  safety_flag: !!r.safety_flag,
+  memory_flag: !!r.memory_flag,
+  mood_flag: !!r.mood_flag,
+  distress_flag: !!r.distress_flag,
+  confusion_flag: !!r.confusion_flag,
+  notes: r.notes,
+});
+
+const getClientOnboarding = catchAsync(async (req, res) => {
+  const { clientId } = req.params;
+  const dayRaw = req.query.day;
+  const dayNumber =
+    dayRaw !== undefined && dayRaw !== '' && !Number.isNaN(Number(dayRaw)) ? parseInt(String(dayRaw), 10) : undefined;
+
+  const { caregiver } = req;
+  const client = await clientService.getClientById(clientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  }
+  if (caregiver.role === 'staff') {
+    await assertStaffHasClientAccess(caregiver, clientId, client, "You do not have access to this client's onboarding data");
+  } else if (caregiver.role === 'orgAdmin') {
+    const clientOrgId = toOrgIdString(client.org);
+    const caregiverOrgId = toOrgIdString(caregiver.org);
+    if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
+      throw new ApiError(httpStatus.FORBIDDEN, "You do not have access to this client's onboarding data");
+    }
+  }
+
+  const payload = await onboardingService.getDashboardForClient(clientId, {
+    dayNumber: dayNumber >= 1 && dayNumber <= 4 ? dayNumber : undefined,
+  });
+
+  res.status(httpStatus.OK).send({
+    journey: payload.journey,
+    responses: payload.responses.map(formatOnboardingResponseRow),
+    flags: payload.flags,
+    questionCount: payload.questionCount,
+  });
 });
 
 const getConversationsByClient = catchAsync(async (req, res) => {
   const { clientId } = req.params;
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
-  const caregiver = req.caregiver;
+  const { caregiver } = req;
   const client = await clientService.getClientById(clientId);
   if (!client) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid client ID');
   }
   if (caregiver.role === 'staff') {
-    const caregiverDoc = await caregiverService.getCaregiverById(caregiver.id);
-    const hasClientAccess = caregiverDoc.clients.some((p) => (p._id ? p._id.toString() : p.toString()) === clientId.toString())
-      || (client.caregivers && client.caregivers.some((c) => (c._id ? c._id.toString() : c.toString()) === caregiver.id.toString()));
-    if (!hasClientAccess) {
-      const { Conversation } = require('../models');
-      const conversationCount = await Conversation.countDocuments({ clientId, agentId: caregiver.id });
-      if (conversationCount === 0) {
-        throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client\'s conversations');
-      }
-    }
+    await assertStaffHasClientAccess(caregiver, clientId, client, "You do not have access to this client's conversations");
   } else if (caregiver.role === 'orgAdmin') {
     const clientOrgId = toOrgIdString(client.org);
     const caregiverOrgId = toOrgIdString(caregiver.org);
     if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
-      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client\'s conversations');
+      throw new ApiError(httpStatus.FORBIDDEN, "You do not have access to this client's conversations");
     }
   }
   if (!options.sortBy) options.sortBy = 'startTime:desc';
@@ -154,18 +274,18 @@ const getCaregivers = catchAsync(async (req, res) => {
 });
 
 const getUnassignedClients = catchAsync(async (req, res) => {
-  const clients = await clientService.getUnassignedClients();
+  const clients = await clientService.getUnassignedClients(req.caregiver);
   res.status(httpStatus.OK).send(clients.map((c) => ClientDTO(c)));
 });
 
 const assignUnassignedClients = catchAsync(async (req, res) => {
   const { caregiverId, clientIds } = req.body;
-  const clients = await clientService.assignUnassignedClients(caregiverId, clientIds);
+  const clients = await clientService.assignUnassignedClients(caregiverId, clientIds, req.caregiver);
   res.status(httpStatus.OK).send(clients.map((c) => ClientDTO(c)));
 });
 
 const verifyConsent = catchAsync(async (req, res) => {
-  const wantsJson = req.headers.accept?.includes('application/json') || req.query.format === 'json';
+  const wantsJson = (req.headers.accept && req.headers.accept.includes('application/json')) || req.query.format === 'json';
   const token = req.query.token || req.body.token;
   if (!token) {
     if (wantsJson) return res.status(httpStatus.BAD_REQUEST).json({ success: false, error: 'Consent token is required' });
@@ -186,7 +306,9 @@ const verifyConsent = catchAsync(async (req, res) => {
     return res.status(httpStatus.OK).send(html);
   } catch (error) {
     if (wantsJson) {
-      return res.status(error.statusCode || httpStatus.UNAUTHORIZED).json({ success: false, error: error.message || 'Invalid or expired consent token' });
+      return res
+        .status(error.statusCode || httpStatus.UNAUTHORIZED)
+        .json({ success: false, error: error.message || 'Invalid or expired consent token' });
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     return res.status(error.statusCode || httpStatus.UNAUTHORIZED).send(error.message || 'Invalid or expired consent token');
@@ -197,6 +319,7 @@ module.exports = {
   createClient,
   getClients,
   getClient,
+  getClientOnboarding,
   getConversationsByClient,
   updateClient,
   verifyConsent,

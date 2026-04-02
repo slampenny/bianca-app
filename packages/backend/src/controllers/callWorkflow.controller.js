@@ -1,7 +1,8 @@
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
-const { conversationService, twilioCallService, clientService, caregiverService } = require('../services');
+const { conversationService, voiceTelephonyService, clientService, caregiverService } = require('../services');
+const onboardingService = require('../services/onboarding.service');
 const { ConversationDTO } = require('../dtos');
 const { Call, Conversation } = require('../models');
 const logger = require('../config/logger');
@@ -13,7 +14,7 @@ const logger = require('../config/logger');
 const initiateCall = catchAsync(async (req, res) => {
   const clientId = req.body.clientId;
   const { callNotes } = req.body;
-  const agentId = req.caregiver.id;
+  const caregiverId = req.caregiver.id;
   let call = null;
 
   const client = await clientService.getClientById(clientId);
@@ -24,14 +25,19 @@ const initiateCall = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Client does not have a phone number');
   }
 
-  // Validate agent exists
-  const agent = await caregiverService.getCaregiverById(agentId);
-  if (!agent) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'Agent not found');
+  const initiatingCaregiver = await caregiverService.getCaregiverById(caregiverId);
+  if (!initiatingCaregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
   try {
-    const callSid = await twilioCallService.initiateCall(client.id);
+    const onboardingDash = await onboardingService.getDashboardForClient(client._id);
+    const nextOnboardingDay =
+      !onboardingDash.journey.journeyComplete && onboardingDash.journey.currentDay != null
+        ? onboardingDash.journey.currentDay
+        : null;
+
+    const callSid = await voiceTelephonyService.initiateCall(client.id);
     let call = await Call.findOne({ callSid });
     if (!call) {
       call = await Call.create({
@@ -39,18 +45,25 @@ const initiateCall = catchAsync(async (req, res) => {
         clientId: client.id,
         startTime: new Date(),
         callStartTime: new Date(),
-        callType: 'outbound',
+        callType: nextOnboardingDay != null ? 'onboarding' : 'outbound',
+        ...(nextOnboardingDay != null ? { onboardingDay: nextOnboardingDay } : {}),
         status: 'initiated',
         callStatus: 'initiating',
       });
+    } else if (nextOnboardingDay != null && (call.onboardingDay == null || call.onboardingDay < 1)) {
+      call.onboardingDay = nextOnboardingDay;
+      call.callType = 'onboarding';
+      await call.save();
     }
     
     // Add call workflow-specific fields
-    call.agentId = agentId;
+    call.caregiverId = caregiverId;
     call.callNotes = callNotes;
     call.status = 'in-progress';
     call.callStatus = 'ringing';
-    call.callType = 'outbound';
+    if (call.callType !== 'onboarding') {
+      call.callType = 'outbound';
+    }
     await call.save();
     
     // Create Conversation immediately when call is initiated
@@ -71,20 +84,28 @@ const initiateCall = catchAsync(async (req, res) => {
 
     logger.info(`[CallWorkflow] Call initiated for client ${client.name}, SID: ${callSid}, Conversation: ${conversation._id}`);
 
+    const isOnboardingCall = !!(call.onboardingDay >= 1 && call.onboardingDay <= 4);
+
     res.status(httpStatus.CREATED).send({
       callId: call._id.toString(),
       callSid,
       conversationId: conversation._id.toString(),
       clientId: client._id,
-      clientId: client._id,
       patientName: client.name,
       clientName: client.name,
       patientPhone: client.phone,
       clientPhone: client.phone,
-      agentId: agent._id,
-      agentName: agent.name,
+      caregiverId: initiatingCaregiver._id,
+      caregiverName: initiatingCaregiver.name,
       status: call.status,
       callStatus: call.callStatus,
+      callType: call.callType,
+      onboardingDay: call.onboardingDay ?? null,
+      onboardingJourneyComplete: onboardingDash.journey.journeyComplete,
+      onboardingSessionsCompleted: onboardingDash.journey.sessionsCompletedCount,
+      onboardingCurrentStageDay: onboardingDash.journey.currentDay,
+      nextOutboundWillBeOnboarding: !onboardingDash.journey.journeyComplete,
+      isOnboardingCall,
     });
 
   } catch (error) {
@@ -119,11 +140,10 @@ const getCallStatus = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
   }
   
-  // Populate client and agent details
+  // Populate client and caregiver details
   await conversation.populate('clientId', 'name phone');
-  // Note: agentId is on Call, not Conversation
   await call.populate('clientId', 'name phone');
-  await call.populate('agentId', 'name');
+  await call.populate('caregiverId', 'name');
   
   // CRITICAL: conversation.messages IS THE QUEUE - use it as-is, don't touch it
   // Messages are added via $push which maintains FIFO order
@@ -209,6 +229,10 @@ const getCallStatus = catchAsync(async (req, res) => {
     }
   }
   
+  const clientMongoId = call.clientId?._id || call.clientId;
+  const onboardingDash = await onboardingService.getDashboardForClient(clientMongoId);
+  const isOnboardingCall = !!(call.onboardingDay >= 1 && call.onboardingDay <= 4);
+
   const status = {
     conversationId: conversation._id,
     callId: call._id,
@@ -219,11 +243,20 @@ const getCallStatus = catchAsync(async (req, res) => {
     endTime: call.endTime,
     duration: call.duration,
     client: conversation.clientId || call.clientId,
-    agent: call.agentId,
+    caregiver: call.caregiverId,
     // Include all messages (patient and assistant) for live call display
     messages: messages,
     // Include AI speaking status
-    aiSpeaking: aiSpeakingStatus
+    aiSpeaking: aiSpeakingStatus,
+    callType: call.callType,
+    onboarding: {
+      isOnboardingCall,
+      onboardingDay: call.onboardingDay ?? null,
+      journeyComplete: onboardingDash.journey.journeyComplete,
+      sessionsCompleted: onboardingDash.journey.sessionsCompletedCount,
+      currentStageDay: onboardingDash.journey.currentDay,
+      nextOutboundWillBeOnboarding: !onboardingDash.journey.journeyComplete,
+    },
   };
   
   res.status(httpStatus.OK).send({ data: status });
@@ -293,7 +326,7 @@ const updateCallStatus = catchAsync(async (req, res) => {
   conversation.callStartTime = call.callStartTime;
   conversation.callEndTime = call.callEndTime;
   conversation.callDuration = call.callDuration;
-  conversation.agentId = call.agentId;
+  conversation.caregiverId = call.caregiverId;
   conversation.callSid = call.callSid;
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
@@ -357,7 +390,7 @@ const endCall = catchAsync(async (req, res) => {
       if (call.asteriskChannelId) {
         try {
           const { channelTracker } = require('../services');
-          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by agent');
+          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by caregiver');
           logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${call.asteriskChannelId}`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel: ${err.message}`);
@@ -371,7 +404,7 @@ const endCall = catchAsync(async (req, res) => {
       if (call.callSid) {
         try {
           logger.info(`[CallWorkflow] Attempting to hang up Twilio call ${call.callSid}`);
-          await twilioCallService.hangupCall(call.callSid);
+          await voiceTelephonyService.hangupCall(call.callSid);
           logger.info(`[CallWorkflow] Successfully hung up Twilio call ${call.callSid}`);
         } catch (err) {
           logger.error(`[CallWorkflow] FAILED to hang up Twilio call ${call.callSid}: ${err.message}`);
@@ -404,7 +437,7 @@ const endCall = catchAsync(async (req, res) => {
       if (call.asteriskChannelId) {
         try {
           const { channelTracker } = require('../services');
-          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by agent');
+          await channelTracker.cleanupCall(call.asteriskChannelId, 'Call ended by caregiver');
           logger.info(`[CallWorkflow] Cleaned up Asterisk channel ${call.asteriskChannelId} (fallback)`);
         } catch (err) {
           logger.warn(`[CallWorkflow] Error cleaning up Asterisk channel (fallback): ${err.message}`);
@@ -413,7 +446,7 @@ const endCall = catchAsync(async (req, res) => {
       
       if (call.callSid) {
         try {
-          await twilioCallService.hangupCall(call.callSid);
+          await voiceTelephonyService.hangupCall(call.callSid);
           logger.info(`[CallWorkflow] Hung up Twilio call ${call.callSid} (fallback)`);
         } catch (err) {
           logger.error(`[CallWorkflow] Error hanging up Twilio call (fallback): ${err.message}`);
@@ -455,25 +488,24 @@ const endCall = catchAsync(async (req, res) => {
   conversation.callStartTime = call.callStartTime;
   conversation.callEndTime = call.callEndTime;
   conversation.callDuration = call.callDuration;
-  conversation.agentId = call.agentId;
+  conversation.caregiverId = call.caregiverId;
   conversation.callSid = call.callSid;
   res.status(httpStatus.OK).send(ConversationDTO(conversation));
 });
 
 /**
- * Get active calls for the current agent
+ * Get active calls for the current caregiver
  * @route GET /v1/calls/active
  */
 const getActiveCalls = catchAsync(async (req, res) => {
-  const agentId = req.caregiver.id;
-  
-  // Get active calls for this agent (Call model tracks call status)
+  const caregiverId = req.caregiver.id;
+
   const activeCalls = await Call.find({
-    agentId,
+    caregiverId,
     status: { $in: ['initiated', 'in-progress'] }
   })
   .populate('clientId', 'name phone')
-  .populate('agentId', 'name')
+  .populate('caregiverId', 'name')
   .populate('conversationId')
   .limit(50)
   .lean();
@@ -513,11 +545,11 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Call not found for conversation');
   }
   
-  // Populate client and agent details
+  // Populate client and caregiver details
   await conversation.populate('clientId', 'name phone');
   await call.populate('clientId', 'name phone');
-  await call.populate('agentId', 'name');
-  
+  await call.populate('caregiverId', 'name');
+
   const callDetails = {
     conversationId: conversation._id,
     callId: call._id,
@@ -527,7 +559,7 @@ const getConversationWithCallDetails = catchAsync(async (req, res) => {
     endTime: call.endTime,
     duration: call.duration,
     client: conversation.clientId || call.clientId,
-    agent: call.agentId
+    caregiver: call.caregiverId
   };
   
   res.status(httpStatus.OK).send({ data: callDetails });

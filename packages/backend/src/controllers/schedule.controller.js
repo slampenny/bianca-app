@@ -1,9 +1,10 @@
 const httpStatus = require('http-status');
 const catchAsync = require('../utils/catchAsync');
 const { scheduleService } = require('../services');
+const { clientService, caregiverService } = require('../services');
 const ApiError = require('../utils/ApiError');
-const logger = require('../config/logger');
 const ScheduleDTO = require('../dtos/schedule.dto');
+const { assertCaregiverClientAccess } = require('../utils/accessControl');
 
 // Create a new schedule or update an existing one
 const createSchedule = catchAsync(async (req, res) => {
@@ -11,6 +12,14 @@ const createSchedule = catchAsync(async (req, res) => {
   if (!req.body.frequency || !req.body.intervals) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid request body');
   }
+
+  const client = await clientService.getClientById(req.params.clientId);
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  }
+  const caregiverDoc =
+    req.caregiver.role === 'staff' ? await caregiverService.getCaregiverById(req.caregiver._id || req.caregiver.id) : null;
+  assertCaregiverClientAccess(req.caregiver, caregiverDoc, client, 'You do not have access to this client');
 
   // Create or update the schedule
   const schedule = await scheduleService.createSchedule(req.params.clientId, {
@@ -30,6 +39,11 @@ const updateSchedule = catchAsync(async (req, res) => {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid request body');
   }
 
+  const existing = await scheduleService.getScheduleById(req.params.scheduleId);
+  const caregiverDoc =
+    req.caregiver.role === 'staff' ? await caregiverService.getCaregiverById(req.caregiver._id || req.caregiver.id) : null;
+  assertCaregiverClientAccess(req.caregiver, caregiverDoc, existing.client, 'You do not have access to this schedule');
+
   // Update the schedule
   const schedule = await scheduleService.updateSchedule(req.params.scheduleId, req.body);
 
@@ -39,6 +53,10 @@ const updateSchedule = catchAsync(async (req, res) => {
 
 // Patch an existing schedule
 const patchSchedule = catchAsync(async (req, res) => {
+  const existing = await scheduleService.getScheduleById(req.params.scheduleId);
+  const caregiverDoc =
+    req.caregiver.role === 'staff' ? await caregiverService.getCaregiverById(req.caregiver._id || req.caregiver.id) : null;
+  assertCaregiverClientAccess(req.caregiver, caregiverDoc, existing.client, 'You do not have access to this schedule');
   // Patch the schedule
   const schedule = await scheduleService.patchSchedule(req.params.scheduleId, req.body);
 
@@ -48,6 +66,10 @@ const patchSchedule = catchAsync(async (req, res) => {
 
 // Delete a schedule
 const deleteSchedule = catchAsync(async (req, res) => {
+  const existing = await scheduleService.getScheduleById(req.params.scheduleId);
+  const caregiverDoc =
+    req.caregiver.role === 'staff' ? await caregiverService.getCaregiverById(req.caregiver._id || req.caregiver.id) : null;
+  assertCaregiverClientAccess(req.caregiver, caregiverDoc, existing.client, 'You do not have access to this schedule');
   // Delete the schedule
   await scheduleService.deleteSchedule(req.params.scheduleId);
 
@@ -64,6 +86,9 @@ const getSchedule = catchAsync(async (req, res) => {
   if (!schedule) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Schedule not found');
   }
+  const caregiverDoc =
+    req.caregiver.role === 'staff' ? await caregiverService.getCaregiverById(req.caregiver._id || req.caregiver.id) : null;
+  assertCaregiverClientAccess(req.caregiver, caregiverDoc, schedule.client, 'You do not have access to this schedule');
 
   // Send the schedule
   res.send(ScheduleDTO(schedule));

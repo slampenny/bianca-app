@@ -42,7 +42,7 @@ FROM base AS dependencies
 COPY --chown=node:node package.json yarn.lock ./
 USER node
 RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --frozen-lockfile
+    yarn install --frozen-lockfile --ignore-scripts
 
 # Build stage - copy source and build if needed
 FROM dependencies AS build
