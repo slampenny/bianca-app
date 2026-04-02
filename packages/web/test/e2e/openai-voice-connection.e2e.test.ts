@@ -4,7 +4,8 @@ import { TEST_USERS } from "./fixtures/testData"
 
 /**
  * Verifies OpenAI Realtime connectivity via POST /v1/test/openai-connection (authenticated).
- * UI login ensures the web app + API base URL work; token is read from redux-persist (web shape).
+ * UI login ensures the web app + API base URL work; bearer token comes from the login response body.
+ * (Tokens are intentionally not persisted to localStorage — see authPersistConfig blacklist.)
  */
 test.describe("OpenAI Voice Connection", () => {
   test("connects to OpenAI and returns voice session details", async ({ page }) => {
@@ -13,35 +14,24 @@ test.describe("OpenAI Voice Connection", () => {
     await page.getByTestId("password-input").fill(TEST_USERS.WITH_CLIENTS.password)
 
     const loginWait = page.waitForResponse(
-      (r) => r.url().includes("/v1/auth/login") && r.status() === 200,
+      (r) => r.url().includes("/v1/auth/login") && r.request().method() === "POST",
       { timeout: 20_000 },
     )
     await page.getByTestId("login-button").click()
-    await loginWait
+    const loginRes = await loginWait
+    expect(loginRes.status()).toBe(200)
+
+    const loginBody = (await loginRes.json()) as {
+      requireMFA?: boolean
+      tokens?: { access?: { token?: string } }
+    }
+    if (loginBody.requireMFA) {
+      throw new Error("OpenAI voice e2e: test user requires MFA; use a non-MFA fixture in CI")
+    }
+    const authToken = loginBody.tokens?.access?.token
+    expect(authToken).toBeTruthy()
 
     await page.getByTestId("home-header").waitFor({ state: "visible", timeout: 15_000 })
-
-    const authToken = await page.evaluate(() => {
-      try {
-        const raw = localStorage.getItem("persist:auth")
-        if (!raw) return null
-        const outer = JSON.parse(raw) as Record<string, unknown>
-        let tok = outer.tokens
-        if (typeof tok === "string") {
-          try {
-            tok = JSON.parse(tok) as { access?: { token?: string } }
-          } catch {
-            return null
-          }
-        }
-        const tokens = tok as { access?: { token?: string } } | null
-        return tokens?.access?.token ?? null
-      } catch {
-        return null
-      }
-    })
-
-    expect(authToken).toBeTruthy()
 
     const response = await page.request.post(`${API_URL}/test/openai-connection`, {
       headers: {
