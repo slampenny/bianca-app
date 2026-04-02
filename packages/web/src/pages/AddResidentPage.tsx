@@ -126,7 +126,7 @@ export function AddResidentPage() {
   }
 
   return (
-    <div data-testid="add-resident-page" style={{ maxWidth: 560, margin: "0 auto" }}>
+    <div data-testid="add-resident-page" className="va-page-wrap">
       <p style={{ marginBottom: "0.75rem" }}>
         <Link to="/residents" className="va-link" style={{ fontSize: "0.875rem" }}>
           ← {t("residentDetail.back")}

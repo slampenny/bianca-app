@@ -50,4 +50,11 @@ router.get(
 
 router.post('/impersonate', auth(), validate(adminValidation.impersonate), adminController.impersonate);
 
+router.patch(
+  '/caregivers/:caregiverId/role',
+  auth(),
+  validate(adminValidation.setCaregiverRole),
+  adminController.setCaregiverRole,
+);
+
 module.exports = router;

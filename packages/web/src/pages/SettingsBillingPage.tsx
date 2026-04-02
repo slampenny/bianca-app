@@ -9,6 +9,7 @@ import {
 } from "../services/api/paymentMethodApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
+import "../app.css"
 
 function methodLabel(type?: string, brand?: string) {
   if (type === "card") return brand ? `Card (${brand})` : "Card"
@@ -34,14 +35,14 @@ export function SettingsBillingPage() {
 
   if (!canManage) {
     return (
-      <div data-testid="settings-billing-page" style={{ maxWidth: 560, margin: "0 auto" }}>
+      <div data-testid="settings-billing-page" className="va-page-wrap">
         <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
           ← Back to settings
         </Link>
         <h1 className="va-page-title" style={{ marginTop: "1rem" }}>
           Billing
         </h1>
-        <div className="va-card va-card-pad">
+        <div className="va-page-section">
           <p style={{ margin: 0, color: "var(--va-slate-600)" }}>You do not have permission to manage billing.</p>
         </div>
       </div>
@@ -92,7 +93,7 @@ export function SettingsBillingPage() {
   }
 
   return (
-    <div data-testid="settings-billing-page" style={{ maxWidth: 640, margin: "0 auto" }}>
+    <div data-testid="settings-billing-page" className="va-page-wrap">
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
         ← Back to settings
       </Link>
@@ -103,7 +104,7 @@ export function SettingsBillingPage() {
         Manage organization payment methods and default billing source.
       </p>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
+      <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Payment methods</h2>
         {isLoading ? <p style={{ color: "var(--va-slate-500)", margin: 0 }}>Loading…</p> : null}
         {isError ? (
@@ -163,7 +164,7 @@ export function SettingsBillingPage() {
         ) : null}
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
+      <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Add payment method</h2>
         <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginTop: 0 }}>
           Enter a Stripe payment method ID (for staging/testing workflows).

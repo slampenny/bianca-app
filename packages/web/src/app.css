@@ -178,7 +178,7 @@
   align-items: center;
   justify-content: space-between;
   height: 3.5rem;
-  padding: 0 1.5rem;
+  padding: 0 0.5rem;
   background: #fff;
   border-bottom: 1px solid var(--va-slate-200);
   flex-shrink: 0;
@@ -255,7 +255,34 @@
 .va-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  /* Horizontal inset for readable line length; content is flat on background (no card panel) */
+  padding: 1.5rem 1.25rem;
+}
+
+/* Use full width of the main column (no narrow centered column) */
+.va-page-wrap {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* No raised card — headings + controls sit on the scroll area background (like dashboard) */
+.va-page-section {
+  margin-bottom: 2rem;
+}
+.va-page-section:last-child {
+  margin-bottom: 0;
+}
+
+.va-settings-version {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--va-slate-200);
+  font-size: 0.75rem;
+  color: var(--va-slate-400);
+  text-align: center;
+  font-family: ui-monospace, monospace;
 }
 
 .va-page-title {
@@ -1041,6 +1068,9 @@ html.va-dark .va-page-title {
 html.va-dark .va-card {
   background: #1e293b;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+html.va-dark .va-settings-version {
+  border-top-color: #334155;
 }
 html.va-dark .va-login-input,
 html.va-dark select.va-login-input {

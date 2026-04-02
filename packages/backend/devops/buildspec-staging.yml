@@ -101,12 +101,28 @@ phases:
         if docker build --no-cache \
                      --build-arg BUILD_ENV=staging \
                      --build-arg VITE_API_URL=https://staging-api.biancawellness.com/v1 \
+                     --build-arg VITE_ADMIN_APP_ORIGIN=https://staging-admin.biancawellness.com \
                      -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:staging \
                      -f packages/web/devops/Dockerfile .; then
           echo "✅ Frontend build complete"
         else
           echo "❌ Frontend build FAILED!"
+          exit 1
+        fi
+      - |
+        # Build super-admin image (separate container on same EC2 as facility web)
+        echo "Building super-admin image..."
+        cd "$CODEBUILD_SRC_DIR"
+        if docker build --no-cache \
+                     --build-arg BUILD_ENV=staging \
+                     --build-arg VITE_API_URL=https://staging-api.biancawellness.com/v1 \
+                     -t $ECR_REGISTRY/bianca-app-admin:latest \
+                     -t $ECR_REGISTRY/bianca-app-admin:staging \
+                     -f packages/admin/devops/Dockerfile .; then
+          echo "Super-admin build complete"
+        else
+          echo "Super-admin build FAILED!"
           exit 1
         fi
       - |
@@ -120,6 +136,9 @@ phases:
         echo "📦 Pushing frontend images..."
         docker push $ECR_REGISTRY/bianca-app-frontend:latest
         docker push $ECR_REGISTRY/bianca-app-frontend:staging
+        echo "📦 Pushing super-admin images..."
+        docker push $ECR_REGISTRY/bianca-app-admin:latest
+        docker push $ECR_REGISTRY/bianca-app-admin:staging
         echo "✅ All images pushed successfully"
 
   post_build:

@@ -106,7 +106,7 @@ export function SettingsMfaPage() {
   }
 
   return (
-    <div data-testid="settings-mfa-page" style={{ maxWidth: 520, margin: "0 auto" }}>
+    <div data-testid="settings-mfa-page" className="va-page-wrap">
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
         ← Back to settings
       </Link>
@@ -120,7 +120,7 @@ export function SettingsMfaPage() {
       {statusLoading ? (
         <p style={{ color: "var(--va-slate-500)" }}>Loading…</p>
       ) : (
-        <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
+        <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
           {info ? (
             <div className="va-login-success" style={{ marginBottom: "1rem" }} role="status">
               {info}

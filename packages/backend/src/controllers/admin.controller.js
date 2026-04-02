@@ -6,7 +6,7 @@ const { getAdminObservabilitySnapshot } = require('../services/observability.ser
 const { caregiverService, tokenService, alertService, orgService } = require('../services');
 const scimService = require('../services/scim.service');
 const { AlertDTO, CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall } = require('../dtos');
-const { AuditLog } = require('../models');
+const { AuditLog, Caregiver } = require('../models');
 const logger = require('../config/logger');
 
 function assertSuperAdmin(req) {
@@ -210,6 +210,78 @@ const impersonate = catchAsync(async (req, res) => {
   });
 });
 
+/**
+ * Promote a caregiver to superAdmin or demote a superAdmin to orgAdmin. Super admin only.
+ */
+const setCaregiverRole = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+
+  const { caregiverId } = req.params;
+  const { role: nextRole } = req.body;
+  const actingSuperAdminId = String(req.caregiver._id || req.caregiver.id);
+
+  const existing = await Caregiver.findById(caregiverId);
+  if (!existing) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+
+  if (nextRole === 'superAdmin') {
+    if (existing.role === 'invited') {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot promote invited users to super administrator');
+    }
+    if (existing.role === 'superAdmin') {
+      const dto = CaregiverDTO(existing);
+      return res.send({ ...dto, id: dto.id != null ? String(dto.id) : undefined });
+    }
+  }
+
+  if (nextRole === 'orgAdmin') {
+    if (existing.role !== 'superAdmin') {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Only super administrators can be demoted to org admin');
+    }
+    const superAdminCount = await Caregiver.countDocuments({ role: 'superAdmin' });
+    if (superAdminCount <= 1) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Cannot demote the last super administrator');
+    }
+  }
+
+  const updated = await caregiverService.updateCaregiverById(caregiverId, { role: nextRole });
+
+  const metadata = new Map();
+  metadata.set('targetCaregiverId', String(caregiverId));
+  metadata.set('previousRole', String(existing.role || ''));
+  metadata.set('newRole', String(nextRole));
+  metadata.set('actingSuperAdminId', actingSuperAdminId);
+
+  await AuditLog.create({
+    timestamp: new Date(),
+    userId: actingSuperAdminId,
+    userRole: 'superAdmin',
+    action: 'SUPERADMIN_ROLE_CHANGE',
+    resource: 'caregiver',
+    resourceId: String(caregiverId),
+    outcome: 'SUCCESS',
+    ipAddress: req.ip || req.connection.remoteAddress,
+    userAgent: req.get('user-agent'),
+    metadata,
+    complianceFlags: {
+      phiAccessed: false,
+      highRiskAction: true,
+      requiresReview: true,
+    },
+  });
+
+  logger.warn('[Admin] Super-admin role change', {
+    actingSuperAdminId,
+    targetCaregiverId: String(caregiverId),
+    previousRole: existing.role,
+    newRole: nextRole,
+  });
+
+  const dto = CaregiverDTO(updated);
+  res.send({ ...dto, id: dto.id != null ? String(dto.id) : undefined });
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -218,4 +290,5 @@ module.exports = {
   issueOrgScimToken,
   disableOrgScim,
   impersonate,
+  setCaregiverRole,
 };

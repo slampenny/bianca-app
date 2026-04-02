@@ -357,12 +357,9 @@ resource "aws_eip_association" "production" {
   allocation_id = aws_eip.production.id
 }
 
-# Attach EBS volume to production instance
-resource "aws_volume_attachment" "production_mongodb" {
-  device_name = "/dev/sdf"
-  volume_id   = aws_ebs_volume.production_mongodb.id
-  instance_id = aws_instance.production.id
-}
+# MongoDB data volume attachment is NOT managed here: blue/green swap detaches/reattaches
+# this volume between instances. See buildspec-swap-and-terminate.yml and volume tag
+# bianca-production-mongodb-data.
 
 # Production Load Balancer for HTTPS
 resource "aws_lb" "production" {
@@ -619,6 +616,14 @@ resource "aws_route53_record" "production_api_primary" {
 resource "aws_route53_record" "production_app_primary" {
   zone_id = data.aws_route53_zone.primary.zone_id
   name    = "app.${var.primary_domain}"
+  type    = "CNAME"
+  ttl     = 300
+  records = [aws_lb.production.dns_name]
+}
+
+resource "aws_route53_record" "production_admin_primary" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "admin.${var.primary_domain}"
   type    = "CNAME"
   ttl     = 300
   records = [aws_lb.production.dns_name]

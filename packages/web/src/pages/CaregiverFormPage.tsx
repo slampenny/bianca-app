@@ -12,6 +12,7 @@ import {
 } from "../services/api/caregiverApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
+import "../app.css"
 
 export function CaregiverFormPage() {
   const navigate = useNavigate()
@@ -89,7 +90,7 @@ export function CaregiverFormPage() {
   if (!canManage) return null
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 560 }}>
+    <div className="va-page-wrap" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div>
         <h1 className="va-page-title">{title}</h1>
         <p style={{ marginTop: 4, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>

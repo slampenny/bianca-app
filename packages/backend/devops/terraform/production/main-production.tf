@@ -1381,6 +1381,16 @@ resource "aws_ecr_repository" "frontend_repo" {
   }
 }
 
+resource "aws_ecr_repository" "admin_repo" {
+  name = "bianca-app-admin"
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+  tags = {
+    Name = "bianca-app-admin"
+  }
+}
+
 ################################################################################
 # CloudWatch Log Groups
 ################################################################################
@@ -1613,7 +1623,8 @@ resource "aws_iam_policy" "codebuild_ecr_policy" {
         Resource = [
           aws_ecr_repository.app_repo.arn,
           aws_ecr_repository.asterisk_repo.arn,
-          aws_ecr_repository.frontend_repo.arn
+          aws_ecr_repository.frontend_repo.arn,
+          aws_ecr_repository.admin_repo.arn
         ]
       }
     ]

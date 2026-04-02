@@ -64,7 +64,7 @@ export function SettingsPhonePage() {
   }
 
   return (
-    <div data-testid="settings-phone-page" style={{ maxWidth: 480, margin: "0 auto" }}>
+    <div data-testid="settings-phone-page" className="va-page-wrap">
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
         ← Back to settings
       </Link>
@@ -75,7 +75,7 @@ export function SettingsPhonePage() {
         We’ll text a code to the phone number on your account. If you just changed it, go back and click <strong>Save profile</strong> first.
       </p>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
+      <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
         {message ? (
           <div className="va-login-success" style={{ marginBottom: "1rem" }} role="status">
             {message}

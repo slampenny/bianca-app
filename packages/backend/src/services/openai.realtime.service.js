@@ -2396,6 +2396,48 @@ class OpenAIRealtimeService {
       }
     }
 
+    // Fallback trigger: if ASR completed but speech_stopped path did not trigger a response,
+    // kick off the next Bianca turn directly from transcript completion.
+    // This fixes "must speak twice" hangs when state/placeholder timing is out of sync.
+    const preferredLanguage = conn.preferredLanguage || 'en';
+    const transcriptIsFillerOnly = this.isOnlyFillerWords(transcript, preferredLanguage);
+    if (
+      !transcriptIsFillerOnly &&
+      !conn._aiIsSpeaking &&
+      !conn._responseCreated &&
+      !conn._responseStartTime &&
+      !this.isInGracePeriod(callId)
+    ) {
+      const state = this.getConversationState(callId);
+      const canMoveToAiResponding =
+        state === CONVERSATION_STATES.GREETING_COMPLETE ||
+        state === CONVERSATION_STATES.CONVERSATION_ACTIVE ||
+        state === CONVERSATION_STATES.USER_SPEAKING;
+      const moved =
+        state === CONVERSATION_STATES.AI_RESPONDING
+          ? true
+          : canMoveToAiResponding
+            ? this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'asr_completed_fallback')
+            : false;
+
+      if (moved) {
+        setTimeout(async () => {
+          const currentConn = this.connections.get(callId);
+          if (!currentConn) return;
+          if (currentConn._aiIsSpeaking || currentConn._responseCreated || currentConn._responseStartTime) return;
+          if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+          try {
+            await this.sendResponseCreate(callId);
+            currentConn._aiIsSpeaking = true;
+            logger.info(`[OpenAI Realtime] Triggered AI response from ASR fallback for ${callId}`);
+          } catch (err) {
+            logger.error(`[OpenAI Realtime] Failed ASR fallback response trigger for ${callId}: ${err.message}`);
+            this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'asr_fallback_response_failed');
+          }
+        }, 80);
+      }
+    }
+
     // EMERGENCY DETECTION: runs only after transcript is pushed to the frontend (notify) and DB update started/finished.
     logger.debug(`[Emergency Detection] Checking transcript - clientId: ${conn.clientId}, transcript length: ${transcript.length || 0}`);
 

@@ -75,6 +75,7 @@ const auditLogSchema = mongoose.Schema(
         'BREACH_DETECTED',
         'BREACH_NOTIFICATION_SENT',
         'IMPERSONATION',
+        'SUPERADMIN_ROLE_CHANGE',
       ],
       index: true,
     },

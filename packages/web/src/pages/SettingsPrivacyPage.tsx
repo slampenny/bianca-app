@@ -61,7 +61,7 @@ export function SettingsPrivacyPage() {
   }
 
   return (
-    <div data-testid="settings-privacy-page" style={{ maxWidth: 560, margin: "0 auto" }}>
+    <div data-testid="settings-privacy-page" className="va-page-wrap">
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
         ← Back to settings
       </Link>
@@ -76,7 +76,7 @@ export function SettingsPrivacyPage() {
         contact options.
       </p>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-access">
+      <div className="va-page-section" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-access">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Request my data</h2>
         <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginBottom: "1rem", lineHeight: 1.45 }}>
           Submits an access request. Delivery is typically by email as a JSON export, per our processes.
@@ -103,7 +103,7 @@ export function SettingsPrivacyPage() {
         </button>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-correction">
+      <div className="va-page-section" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-correction">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Request a correction</h2>
         <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginBottom: "1rem", lineHeight: 1.45 }}>
           Submits a correction request for personal information in your account.
@@ -120,7 +120,7 @@ export function SettingsPrivacyPage() {
         </button>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-deletion">
+      <div className="va-page-section" style={{ marginTop: "1.25rem" }} data-testid="privacy-request-card-deletion">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Request data deletion</h2>
         <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginBottom: "1rem", lineHeight: 1.45 }}>
           Request deletion of your account data according to applicable retention policies.
@@ -138,7 +138,7 @@ export function SettingsPrivacyPage() {
       </div>
 
       {(isLoading || hasRecentRequests) ? (
-        <div className="va-card va-card-pad" style={{ marginTop: "1.25rem" }}>
+        <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
           <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Your recent requests</h2>
           {isLoading ? (
             <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading…</p>

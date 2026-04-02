@@ -352,12 +352,9 @@ resource "aws_ebs_volume" "staging_mongodb" {
   }
 }
 
-# Attach EBS volume to staging instance
-resource "aws_volume_attachment" "staging_mongodb" {
-  device_name = "/dev/sdf" # Use /dev/sdf for data volume
-  volume_id   = aws_ebs_volume.staging_mongodb.id
-  instance_id = aws_instance.staging.id
-}
+# MongoDB data volume attachment is NOT managed here: blue/green swap (buildspec-swap-and-terminate)
+# detaches/reattaches this volume between instances. Managing aws_volume_attachment caused
+# VolumeInUse on apply. Volume is identified by tag Name=bianca-staging-mongodb-data (see swap env).
 
 # Staging ALB
 resource "aws_lb" "staging" {
@@ -540,6 +537,19 @@ resource "aws_route53_record" "staging_sip_primary" {
 resource "aws_route53_record" "staging_frontend_primary" {
   zone_id = data.aws_route53_zone.primary.zone_id
   name    = "staging.${var.primary_domain}"
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.staging.dns_name
+    zone_id                = aws_lb.staging.zone_id
+    evaluate_target_health = false
+  }
+}
+
+# Super-admin console (same ALB + nginx vhost as staging web)
+resource "aws_route53_record" "staging_admin_primary" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = "staging-admin.${var.primary_domain}"
   type    = "A"
 
   alias {

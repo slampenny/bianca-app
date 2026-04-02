@@ -163,7 +163,7 @@ export function SettingsPage() {
   const displayAvatar = avatarPreview || profile?.avatar
 
   return (
-    <div data-testid="settings-page" style={{ maxWidth: 560, margin: "0 auto" }}>
+    <div data-testid="settings-page" className="va-page-wrap">
       <h1 className="va-page-title">Settings</h1>
       <p style={{ color: "var(--va-slate-500)", marginTop: 8, marginBottom: "1.5rem", fontSize: "0.875rem", lineHeight: 1.45 }}>
         Profile, security, and appearance — aligned with the mobile app.
@@ -194,7 +194,7 @@ export function SettingsPage() {
         </div>
       )}
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Profile</h2>
         {loadingProfile && !fresh ? (
           <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading profile…</p>
@@ -314,7 +314,7 @@ export function SettingsPage() {
         )}
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Language</h2>
         <p className="va-login-helper" style={{ marginBottom: "0.75rem" }}>
           Preferred language is saved to your account (for emails and future in-app translations).
@@ -332,7 +332,7 @@ export function SettingsPage() {
         </select>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Appearance</h2>
         <label className="va-login-label">
           Theme
@@ -357,7 +357,7 @@ export function SettingsPage() {
         </label>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Security</h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
           MFA:{" "}
@@ -373,7 +373,7 @@ export function SettingsPage() {
         </Link>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Privacy</h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
           Access requests and your privacy history.
@@ -384,7 +384,7 @@ export function SettingsPage() {
       </div>
 
       {canSeeBilling ? (
-        <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+        <div className="va-page-section">
           <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Billing</h2>
           <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
             Manage organization payment methods and default charge source.
@@ -395,7 +395,7 @@ export function SettingsPage() {
         </div>
       ) : null}
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Legal</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem 1.25rem", fontSize: "0.875rem" }}>
           <a href={TERMS_OF_SERVICE_URL} target="_blank" rel="noreferrer" className="va-link">
@@ -407,7 +407,7 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="va-card va-card-pad">
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Session</h2>
         <button
           type="button"
@@ -419,19 +419,7 @@ export function SettingsPage() {
         >
           {signingOut ? "Signing out…" : "Sign out"}
         </button>
-        <p
-          style={{
-            marginTop: "1.25rem",
-            paddingTop: "1rem",
-            borderTop: "1px solid var(--va-slate-100)",
-            fontSize: "0.75rem",
-            color: "var(--va-slate-400)",
-            textAlign: "center",
-            fontFamily: "ui-monospace, monospace",
-          }}
-        >
-          Web app v{APP_VERSION}
-        </p>
+        <p className="va-settings-version">Web app v{APP_VERSION}</p>
       </div>
     </div>
   )

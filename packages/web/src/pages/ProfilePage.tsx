@@ -147,7 +147,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: "0 auto" }}>
+    <div className="va-page-wrap">
       <h1 className="va-page-title">{t("profile.title")}</h1>
       <p style={{ color: "var(--va-slate-500)", marginTop: 8, marginBottom: "1.5rem", fontSize: "0.875rem", lineHeight: 1.45 }}>
         {t("profile.subtitle")}
@@ -184,7 +184,7 @@ export function ProfilePage() {
         </div>
       )}
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>{t("profile.sectionYourDetails")}</h2>
         {loadingProfile && !fresh ? (
           <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("profile.loadingProfile")}</p>
@@ -281,7 +281,7 @@ export function ProfilePage() {
         )}
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.appearanceTitle")}</h2>
         <p className="va-login-helper" style={{ marginBottom: "0.75rem" }}>
           {t("profile.appearanceHelper")}
@@ -309,7 +309,7 @@ export function ProfilePage() {
         </label>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.securityTitle")}</h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
           {t("profile.mfaLabel")}{" "}
@@ -324,7 +324,7 @@ export function ProfilePage() {
         </Link>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.privacyTitle")}</h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
           {t("profile.privacyBody")}
@@ -334,7 +334,7 @@ export function ProfilePage() {
         </Link>
       </div>
 
-      <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.legalTitle")}</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem 1.25rem", fontSize: "0.875rem" }}>
           <a href={TERMS_OF_SERVICE_URL} target="_blank" rel="noreferrer" className="va-link">
@@ -347,7 +347,7 @@ export function ProfilePage() {
       </div>
 
       {!loadingProfile || fresh ? (
-        <div className="va-card va-card-pad" style={{ marginBottom: "1.25rem" }}>
+        <div className="va-page-section">
           <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.saveChangesTitle")}</h2>
           <p className="va-login-helper" style={{ marginBottom: "1rem" }}>
             {t("profile.saveChangesHelper")}
@@ -374,24 +374,12 @@ export function ProfilePage() {
         </div>
       ) : null}
 
-      <div className="va-card va-card-pad">
+      <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>{t("profile.sessionTitle")}</h2>
         <button type="button" className="va-btn-secondary" style={{ width: "100%" }} disabled={signingOut} onClick={() => void signOut()}>
           {signingOut ? t("profile.signingOut") : t("profile.signOut")}
         </button>
-        <p
-          style={{
-            marginTop: "1.25rem",
-            paddingTop: "1rem",
-            borderTop: "1px solid var(--va-slate-100)",
-            fontSize: "0.75rem",
-            color: "var(--va-slate-400)",
-            textAlign: "center",
-            fontFamily: "ui-monospace, monospace",
-          }}
-        >
-          {t("profile.webVersion", { version: APP_VERSION })}
-        </p>
+        <p className="va-settings-version">{t("profile.webVersion", { version: APP_VERSION })}</p>
       </div>
     </div>
   )

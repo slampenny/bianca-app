@@ -87,4 +87,44 @@ describe('Admin impersonation', () => {
 
     expect(res.statusCode).toEqual(httpStatus.FORBIDDEN);
   });
+
+  it('allows super admin to promote staff to superAdmin and demote back to orgAdmin', async () => {
+    const accessToken = tokenService.generateToken(superAdminId);
+    const promote = await request(app)
+      .patch(`/v1/admin/caregivers/${staffId}/role`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ role: 'superAdmin' });
+    expect(promote.statusCode).toEqual(httpStatus.OK);
+    expect(promote.body.role).toEqual('superAdmin');
+
+    const demote = await request(app)
+      .patch(`/v1/admin/caregivers/${staffId}/role`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ role: 'orgAdmin' });
+    expect(demote.statusCode).toEqual(httpStatus.OK);
+    expect(demote.body.role).toEqual('orgAdmin');
+
+    const audit = await AuditLog.findOne({ action: 'SUPERADMIN_ROLE_CHANGE', resourceId: String(staffId) });
+    expect(audit).not.toBeNull();
+  });
+
+  it('forbids demoting the last super administrator', async () => {
+    const accessToken = tokenService.generateToken(superAdminId);
+    const res = await request(app)
+      .patch(`/v1/admin/caregivers/${superAdminId}/role`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ role: 'orgAdmin' });
+
+    expect(res.statusCode).toEqual(httpStatus.BAD_REQUEST);
+  });
+
+  it('forbids org admin from changing super-admin role', async () => {
+    const accessToken = tokenService.generateToken(orgAdminId);
+    const res = await request(app)
+      .patch(`/v1/admin/caregivers/${staffId}/role`)
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ role: 'superAdmin' });
+
+    expect(res.statusCode).toEqual(httpStatus.FORBIDDEN);
+  });
 });

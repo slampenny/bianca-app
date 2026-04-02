@@ -1,6 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import type {
   AdminCaregiverSearchResponse,
+  AdminCaregiverSearchRow,
   AdminOrgSearchResponse,
   ImpersonateResponse,
   ObservabilityPayload,
@@ -63,6 +64,16 @@ export const adminApi = createApi({
         body,
       }),
     }),
+    updateCaregiverRole: builder.mutation<
+      AdminCaregiverSearchRow,
+      { caregiverId: string; role: "superAdmin" | "orgAdmin" }
+    >({
+      query: ({ caregiverId, role }) => ({
+        url: `/admin/caregivers/${caregiverId}/role`,
+        method: "PATCH",
+        body: { role },
+      }),
+    }),
   }),
 })
 
@@ -75,4 +86,5 @@ export const {
   useIssueOrgScimTokenMutation,
   useDisableOrgScimMutation,
   useImpersonateCaregiverMutation,
+  useUpdateCaregiverRoleMutation,
 } = adminApi

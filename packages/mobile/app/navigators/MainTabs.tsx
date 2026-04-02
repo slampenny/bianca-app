@@ -207,7 +207,21 @@ export default function MainTabNavigator() {
           let iconName
 
           if (route.name === "Home") {
-            iconName = focused ? "home" : "home-outline"
+            return (
+              <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+                <Ionicons
+                  name={focused ? "heart" : "heart-outline"}
+                  size={size}
+                  color={color}
+                />
+                <Ionicons
+                  name="call"
+                  size={Math.max(9, Math.floor(size * 0.42))}
+                  color="#14b8a6"
+                  style={{ position: "absolute" }}
+                />
+              </View>
+            )
           } else if (route.name === "Org") {
             iconName = focused ? "people" : "people-outline"
           } else if (route.name === "Reports") {

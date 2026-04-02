@@ -31,9 +31,20 @@ const orgIdParam = {
   }),
 };
 
+/** Promote to super admin or demote super admin to org admin (super admin only). */
+const setCaregiverRole = {
+  params: Joi.object().keys({
+    caregiverId: Joi.string().custom(objectId).required(),
+  }),
+  body: Joi.object().keys({
+    role: Joi.string().valid('superAdmin', 'orgAdmin').required(),
+  }),
+};
+
 module.exports = {
   searchCaregivers,
   impersonate,
   searchOrgs,
   orgIdParam,
+  setCaregiverRole,
 };
