@@ -265,7 +265,11 @@ phases:
           fi
           if [ "$GREEN_STEP0_OK" != "true" ]; then
             echo "  ❌ CRITICAL: Step 0 (volume on green) did not succeed. Aborting to prevent data loss."
-            echo "     Fix the green instance (SSM/SSH: mount volume, restart mongodb) or re-run pipeline after fixing."
+            if [ -n "${GREEN_CMD_ID:-}" ]; then
+              aws ssm get-command-invocation --command-id "$GREEN_CMD_ID" --instance-id "$GREEN_INSTANCE_ID" --query '{Status:Status,Details:StatusDetails}' --output text 2>/dev/null | sed 's/^/     Last SSM: /' || true
+            fi
+            echo "     If status was Pending/Delayed: EC2 role needs AmazonSSMManagedInstanceCore (terraform: production_ssm_managed_core on bianca-production-role)."
+            echo "     Or fix mount/docker on green via SSH, then re-run SwapAndTerminate."
             exit 1
           fi
         fi

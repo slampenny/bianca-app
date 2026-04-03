@@ -216,6 +216,13 @@ resource "aws_iam_instance_profile" "production_profile" {
   }
 }
 
+# Run Command / Session Manager agent data plane uses ssmmessages + ec2messages APIs.
+# Inline ssm:* does not grant those; without this, invocations stay Pending/Delayed forever.
+resource "aws_iam_role_policy_attachment" "production_ssm_managed_core" {
+  role       = aws_iam_role.production_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # Production EBS Volume for MongoDB data persistence
 resource "aws_ebs_volume" "production_mongodb" {
   availability_zone = aws_subnet.production_public.availability_zone
