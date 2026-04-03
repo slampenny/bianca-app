@@ -75,6 +75,7 @@
     "docker:test": "docker compose -f docker/docker-compose.yml -f docker/docker-compose.test.yml up",
     "prepare": "husky install",
     "seed": "cross-env NODE_ENV=development node src/scripts/seedDatabase.js",
+    "bootstrap-superadmin": "node src/scripts/bootstrapSuperAdminFromSecret.js",
     "demo": "cross-env NODE_ENV=development node src/scripts/seedDatabaseDemo.js",
     "demo:up": "bash scripts/demo-up-aws.sh",
     "demo:down": "bash scripts/demo-down-aws.sh",
