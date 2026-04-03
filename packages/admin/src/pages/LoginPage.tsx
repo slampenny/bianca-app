@@ -1,6 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
+import { SSOLoginButtons } from "../components/SSOLoginButtons"
 import { useLoginMutation } from "../services/api/authApi"
+import type { AuthTokens, Caregiver } from "../services/api/api.types"
+import { consumeSsoRedirectError } from "../services/webSsoService"
 import { setAuthEmail, setAuthTokens, setCurrentUser, getValidationError, getAuthEmail } from "../store/authSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import { mapValidationErrorToMessage, parseLoginError } from "../lib/loginError"
@@ -30,6 +33,11 @@ export function LoginPage() {
       setErrorMessage("Session expired. Please sign in again.")
     }
   }, [searchParams])
+
+  useEffect(() => {
+    const msg = consumeSsoRedirectError()
+    if (msg) setErrorMessage(msg)
+  }, [])
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -100,6 +108,31 @@ export function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        <SSOLoginButtons
+          disabled={loading}
+          onSsoError={(err) => {
+            const message = err.description || err.error
+            setErrorMessage(
+              err.error.includes("not configured")
+                ? `Single sign-on is not available: ${message}`
+                : `Sign-in failed: ${message}`,
+            )
+          }}
+          onSsoSuccess={(user) => {
+            if (!user.tokens || !user.backendUser) return
+            dispatch(setAuthTokens(user.tokens as AuthTokens))
+            dispatch(setAuthEmail(user.email))
+            dispatch(setCurrentUser(user.backendUser as Caregiver))
+            const next = searchParams.get("next")
+            const fromPath =
+              next ||
+              (state.from && typeof state.from.pathname === "string"
+                ? `${state.from.pathname}${state.from.search || ""}`
+                : "/")
+            navigate(fromPath || "/", { replace: true })
+          }}
+        />
       </div>
     </div>
   )

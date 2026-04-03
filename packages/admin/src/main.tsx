@@ -15,6 +15,7 @@ import { Provider } from "react-redux"
 import { PersistGate } from "redux-persist/integration/react"
 import { createRoot } from "react-dom/client"
 import { BrowserRouter } from "react-router-dom"
+import { SSOCallbackGate } from "./auth/SSOCallbackGate"
 import App from "./App"
 import { persistor, store } from "./store/store"
 import "./index.css"
@@ -33,7 +34,9 @@ createRoot(document.getElementById("root")!).render(
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <BrowserRouter>
-          <App />
+          <SSOCallbackGate>
+            <App />
+          </SSOCallbackGate>
         </BrowserRouter>
       </PersistGate>
     </Provider>
