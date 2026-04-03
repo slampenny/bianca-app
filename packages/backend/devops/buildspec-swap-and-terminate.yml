@@ -24,19 +24,33 @@ phases:
         # Deploy directory (staging: /opt/bianca-staging, production: /opt/bianca-production)
         DEPLOY_DIR="/opt/${BLUE_TAG}"
         echo "Deploy directory: $DEPLOY_DIR"
-        # Find green instance if not in file
-        if [ -z "$GREEN_INSTANCE_ID" ]; then
-          echo "Finding green instance..."
+        # Artifact instance-info can reference a terminated green after a failed swap; ignore stale IDs.
+        if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+          G_ST=$(aws ec2 describe-instances --instance-ids "$GREEN_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo "")
+          if [ "$G_ST" != "running" ]; then
+            echo "⚠️  GREEN_INSTANCE_ID from artifact ($GREEN_INSTANCE_ID) is not running (state=$G_ST); discovering from tags..."
+            GREEN_INSTANCE_ID=""
+          fi
+        fi
+        # Newest running instance wins if duplicates exist (Reservations[0] order is undefined).
+        if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
+          echo "Finding green instance (newest running by LaunchTime)..."
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
-            --query 'Reservations[0].Instances[0].InstanceId' \
-            --output text 2>/dev/null || echo "")
+            --output json | python3 -c 'import json,sys;d=json.load(sys.stdin);ids=[(i.get("LaunchTime") or "",i.get("InstanceId")) for r in d.get("Reservations") or [] for i in r.get("Instances") or []];ids.sort();print(ids[-1][1] if ids else "")')
         fi
         
         if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
-          echo "❌ ERROR: Green instance not found!"
-          echo "   Cannot proceed with swap - green instance must exist"
+          echo "❌ ERROR: No running EC2 instance with Name tag: $GREEN_TAG"
+          echo "   SwapAndTerminate must run after CreateGreenInstance finishes and the instance is running."
+          echo "   Retrying only this stage before green exists (or from an old pipeline run) will fail."
+          echo "   Run the full production pipeline, or wait for CreateGreenInstance + Deploy, then retry swap."
+          aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" \
+            --query 'Reservations[].Instances[].{InstanceId:InstanceId,State:State.Name,LaunchTime:LaunchTime}' \
+            --output table 2>/dev/null || true
           exit 1
         fi
         
