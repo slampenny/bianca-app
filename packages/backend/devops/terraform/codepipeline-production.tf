@@ -354,13 +354,16 @@ resource "aws_iam_role_policy" "codebuild_production_policy" {
         ]
         Resource = "*"
       },
-      # Volume migration in SwapAndTerminate (detach from blue, attach to green)
+      # Volume migration + move SIP Elastic IP to green in SwapAndTerminate (associate-address before terminate blue)
       {
         Effect = "Allow"
         Action = [
           "ec2:DetachVolume",
           "ec2:AttachVolume",
-          "ec2:DescribeVolumes"
+          "ec2:DescribeVolumes",
+          "ec2:AssociateAddress",
+          "ec2:DisassociateAddress",
+          "ec2:DescribeAddresses"
         ]
         Resource = "*"
       },
