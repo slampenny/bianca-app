@@ -214,35 +214,54 @@ phases:
               sleep 5
             done
           else
-            echo "  No MongoDB volume attached to blue; looking for detached volume (tag Name=$MONGODB_DATA_VOLUME_TAG, state=available)..."
-            AVAIL_IDS=$(aws ec2 describe-volumes \
-              --filters "Name=tag:Name,Values=$MONGODB_DATA_VOLUME_TAG" "Name=status,Values=available" \
-              --query 'Volumes[*].VolumeId' \
+            # Volume may already be on green after a failed swap (attach succeeded; later step failed).
+            V_ON_GREEN=""
+            V_ON_GREEN=$(aws ec2 describe-volumes \
+              --filters "Name=attachment.instance-id,Values=$GREEN_INSTANCE_ID" "Name=attachment.device,Values=/dev/sdf" \
+              --query 'Volumes[0].VolumeId' \
               --output text 2>/dev/null || echo "")
-            AVAIL_COUNT=0
-            ORPHAN_ID=""
-            for vid in $AVAIL_IDS; do
-              [ "$vid" = "None" ] && continue
-              ORPHAN_ID="$vid"
-              AVAIL_COUNT=$((AVAIL_COUNT + 1))
-            done
-            if [ "$AVAIL_COUNT" -eq 1 ]; then
-              echo "  Attaching detached volume $ORPHAN_ID directly to green (recover from Terraform/live drift)..."
-              aws ec2 attach-volume --volume-id "$ORPHAN_ID" --instance-id "$GREEN_INSTANCE_ID" --device /dev/sdf
-              VOLUME_ID="$ORPHAN_ID"
-              echo "  Waiting for volume to attach to green..."
-              for i in 1 2 3 4 5 6 7 8 9 10; do
-                ATTACH_STATE=$(aws ec2 describe-volumes --volume-ids "$VOLUME_ID" --query 'Volumes[0].Attachments[0].State' --output text 2>/dev/null || echo "attaching")
-                [ "$ATTACH_STATE" = "attached" ] && break
-                sleep 5
-              done
-            elif [ "$AVAIL_COUNT" -eq 0 ]; then
-              echo "  ❌ CRITICAL: No MongoDB data volume on blue and none available with tag $MONGODB_DATA_VOLUME_TAG."
-              echo "     Refusing to swap — green would run with an empty database."
-              exit 1
+            [ "$V_ON_GREEN" = "None" ] && V_ON_GREEN=""
+            if [ -z "$V_ON_GREEN" ]; then
+              V_ON_GREEN=$(aws ec2 describe-volumes \
+                --filters "Name=attachment.instance-id,Values=$GREEN_INSTANCE_ID" "Name=tag:Name,Values=$MONGODB_DATA_VOLUME_TAG" \
+                --query 'Volumes[0].VolumeId' \
+                --output text 2>/dev/null || echo "")
+              [ "$V_ON_GREEN" = "None" ] && V_ON_GREEN=""
+            fi
+            if [ -n "$V_ON_GREEN" ]; then
+              VOLUME_ID="$V_ON_GREEN"
+              echo "  MongoDB volume already on green ($VOLUME_ID) — skip detach/attach; mount/restart only."
             else
-              echo "  ❌ CRITICAL: Multiple ($AVAIL_COUNT) available volumes with tag $MONGODB_DATA_VOLUME_TAG; resolve in AWS before swap."
-              exit 1
+              echo "  No MongoDB volume attached to blue; looking for detached volume (tag Name=$MONGODB_DATA_VOLUME_TAG, state=available)..."
+              AVAIL_IDS=$(aws ec2 describe-volumes \
+                --filters "Name=tag:Name,Values=$MONGODB_DATA_VOLUME_TAG" "Name=status,Values=available" \
+                --query 'Volumes[*].VolumeId' \
+                --output text 2>/dev/null || echo "")
+              AVAIL_COUNT=0
+              ORPHAN_ID=""
+              for vid in $AVAIL_IDS; do
+                [ "$vid" = "None" ] && continue
+                ORPHAN_ID="$vid"
+                AVAIL_COUNT=$((AVAIL_COUNT + 1))
+              done
+              if [ "$AVAIL_COUNT" -eq 1 ]; then
+                echo "  Attaching detached volume $ORPHAN_ID directly to green (recover from Terraform/live drift)..."
+                aws ec2 attach-volume --volume-id "$ORPHAN_ID" --instance-id "$GREEN_INSTANCE_ID" --device /dev/sdf
+                VOLUME_ID="$ORPHAN_ID"
+                echo "  Waiting for volume to attach to green..."
+                for i in 1 2 3 4 5 6 7 8 9 10; do
+                  ATTACH_STATE=$(aws ec2 describe-volumes --volume-ids "$VOLUME_ID" --query 'Volumes[0].Attachments[0].State' --output text 2>/dev/null || echo "attaching")
+                  [ "$ATTACH_STATE" = "attached" ] && break
+                  sleep 5
+                done
+              elif [ "$AVAIL_COUNT" -eq 0 ]; then
+                echo "  ❌ CRITICAL: No MongoDB data volume on blue, not on green, and none available with tag $MONGODB_DATA_VOLUME_TAG."
+                echo "     Refusing to swap — green would run with an empty database."
+                exit 1
+              else
+                echo "  ❌ CRITICAL: Multiple ($AVAIL_COUNT) available volumes with tag $MONGODB_DATA_VOLUME_TAG; resolve in AWS before swap."
+                exit 1
+              fi
             fi
           fi
           echo "  Mounting volume on green and restarting MongoDB..."
