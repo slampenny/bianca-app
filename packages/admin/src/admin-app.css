@@ -424,3 +424,76 @@ a.admin-btn {
 .admin-card--grafana {
   border-left: 3px solid rgba(56, 189, 248, 0.45);
 }
+
+/* SSO (same OAuth clients as facility web; redirect_uri = admin origin, e.g. https://admin.example.com) */
+.admin-sso-block {
+  margin-top: 1.25rem;
+  width: 100%;
+}
+
+.admin-sso-divider {
+  text-align: center;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  margin: 0 0 0.75rem;
+}
+
+.admin-sso-row {
+  display: flex;
+  gap: 0.625rem;
+  width: 100%;
+}
+
+.admin-sso-google,
+.admin-sso-microsoft {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 2.75rem;
+}
+
+.admin-sso-google {
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.admin-sso-google:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.admin-sso-microsoft {
+  background: #0078d4;
+  border: 1px solid #0078d4;
+  color: #fff;
+}
+
+.admin-sso-microsoft:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.admin-sso-google:disabled,
+.admin-sso-microsoft:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.admin-sso-google-icon {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #4285f4;
+}
+
+.admin-sso-ms-icon {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #fff;
+}
