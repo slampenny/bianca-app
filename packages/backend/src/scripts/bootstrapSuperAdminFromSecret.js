@@ -12,6 +12,8 @@
  * Optional env:
  *   BOOTSTRAP_ORG_ID — attach new users to this org (default: first org by _id)
  *   BOOTSTRAP_SUPERADMIN_NAME — display name when creating a new caregiver (default: Bianca Super Admin)
+ *   BOOTSTRAP_CREATE_ORG_IF_MISSING — if "0", do not auto-create an org when the DB has none (default: create)
+ *   BOOTSTRAP_ORG_NAME / BOOTSTRAP_ORG_EMAIL — when auto-creating the first org
  */
 /* eslint-disable no-console */
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
@@ -49,14 +51,29 @@ async function main() {
 
   await mongoose.connect(mongoUrl);
 
-  const orgQuery = process.env.BOOTSTRAP_ORG_ID ? { _id: process.env.BOOTSTRAP_ORG_ID } : {};
-  const org = await Org.findOne(orgQuery).sort({ _id: 1 });
-  if (!org) {
-    throw new Error(
-      process.env.BOOTSTRAP_ORG_ID
-        ? `No org with BOOTSTRAP_ORG_ID=${process.env.BOOTSTRAP_ORG_ID}`
-        : 'No organization in database. Create an org first or set BOOTSTRAP_ORG_ID'
-    );
+  let org;
+  if (process.env.BOOTSTRAP_ORG_ID) {
+    org = await Org.findById(process.env.BOOTSTRAP_ORG_ID);
+    if (!org) {
+      throw new Error(`No org with BOOTSTRAP_ORG_ID=${process.env.BOOTSTRAP_ORG_ID}`);
+    }
+  } else {
+    org = await Org.findOne({}).sort({ _id: 1 });
+    if (!org && process.env.BOOTSTRAP_CREATE_ORG_IF_MISSING !== '0') {
+      org = await Org.create({
+        name: process.env.BOOTSTRAP_ORG_NAME || 'Bianca Technologies',
+        email: String(process.env.BOOTSTRAP_ORG_EMAIL || 'internal-root@biancatechnologies.com').toLowerCase(),
+        country: 'US',
+        caregivers: [],
+        clients: [],
+      });
+      console.log('Created bootstrap organization (database had no orgs):', org.name);
+    }
+    if (!org) {
+      throw new Error(
+        'No organization in database. Re-run with default auto-create, or insert an org / set BOOTSTRAP_ORG_ID.'
+      );
+    }
   }
 
   let caregiver = await Caregiver.findOne({ email });
