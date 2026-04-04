@@ -136,6 +136,10 @@ src/
 
 ## 🔧 Troubleshooting
 
+### Docker layout
+
+Compose files and the API `Dockerfile` live under [`docker/`](./docker/README.md). Use the `yarn docker:*` scripts from this package directory — do not rely on removed root-level `docker-compose*.yml` copies.
+
 ### Docker: "network ... not found" when running `yarn dev`
 
 If you see `failed to set up container networking: network ... not found`, Docker’s Compose network was removed or is stale. Reset it and try again:

@@ -53,6 +53,10 @@ export const authSlice = createSlice({
     builder.addMatcher(authApi.endpoints.refreshTokens.matchFulfilled, (state, { payload }) => {
       state.tokens = payload.tokens
     })
+    builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
+      state.currentUser = payload.caregiver
+      state.tokens = payload.tokens
+    })
   },
 })
 

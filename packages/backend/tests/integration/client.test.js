@@ -656,4 +656,52 @@ describe('Client routes', () => {
       expect(res.body.journey.hasAnyOnboardingActivity).toBe(true);
     });
   });
+
+  describe('GET /v1/clients/onboarding-rollups', () => {
+    test('should return per-client rollups for org clients', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
+
+      const res = await request(app)
+        .get('/v1/clients/onboarding-rollups')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      expect(res.body.rollups).toBeDefined();
+      const key = client.id.toString();
+      expect(res.body.rollups[key]).toMatchObject({
+        sessionsCompletedCount: 0,
+        journeyComplete: false,
+        currentDay: 1,
+        hasAnyOnboardingActivity: false,
+        questionCount: 0,
+      });
+    });
+
+    test('should reflect completed onboarding sessions in rollups', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [client] = await insertClientsAndAddToCaregiver(caregiver, [clientOne]);
+
+      await Call.create({
+        callSid: `onb-roll-${Date.now()}`,
+        clientId: client._id,
+        status: 'completed',
+        duration: 120,
+        onboardingDay: 1,
+        onboardingCompletedAt: new Date(),
+        onboardingEndedEarlyReason: 'completed',
+      });
+
+      const res = await request(app)
+        .get('/v1/clients/onboarding-rollups')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      const key = client.id.toString();
+      expect(res.body.rollups[key].sessionsCompletedCount).toBe(1);
+      expect(res.body.rollups[key].currentDay).toBe(2);
+    });
+  });
 });

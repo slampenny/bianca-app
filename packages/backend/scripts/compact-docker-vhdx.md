@@ -1,127 +1,140 @@
-# Compacting Docker Desktop VHDX File
+# Reclaiming Docker disk space on Windows (WSL2)
 
-## The Problem
+After `docker image prune` and friends, **Linux frees blocks inside the virtual disk**, but **Windows often still sees a huge `.vhdx` file** until you compact it. The file you compact depends on **how you run Docker**:
 
-Docker Desktop on WSL2 uses a VHDX (virtual hard disk) file that grows as you use Docker but **doesn't automatically shrink** when you delete images/containers. This is why:
+| Setup | What holds Docker data | What to compact |
+|--------|-------------------------|-----------------|
+| **Docker Desktop** | Dedicated WSL2 disk | `…\Docker\wsl\disk\docker_data.vhdx` |
+| **Docker Engine inside WSL2** (e.g. Ubuntu + `docker.io` / Docker CE) — *typical on Windows Pro **without** Desktop* | Your distro’s root filesystem | That distro’s **`ext4.vhdx`** (not `docker_data.vhdx`) |
+| **Docker on a remote Linux box** | That server’s disk | Use host tools (`fstrim`, LVM, etc.) — not this doc |
 
-- `docker system df` shows: ~21GB (actual data)
-- File tree shows: 163GB (VHDX file size)
+If you are **not** using Docker Desktop, **`docker_data.vhdx` usually does not exist**. Compacting **`ext4.vhdx`** for the WSL distro where you run `docker` is the right move.
 
-## Important: Two-Step Process
+---
 
-**Compacting is NOT the same as cleaning!** You need to do BOTH:
+## Step 1: Clean Docker, then wait for prunes to finish
 
-1. **First:** Clean up Docker data (remove unused images, containers, etc.)
+1. Prune images/cache (e.g. `yarn docker:low-disk` from `packages/backend`).
+2. If a big prune might still be running:
    ```bash
-   cd bianca-app-backend/scripts
-   ./cleanup-docker.sh --aggressive
+   cd packages/backend && yarn docker:wait-prune
    ```
-   This removes actual Docker data, reducing what's stored inside the VHDX.
+3. Only after that, shut down Docker / WSL for compaction (below).
 
-2. **Then:** Compact the VHDX file (removes unused space from the file itself)
-   - This step is what actually frees up the disk space on Windows
-   - Without compacting, the VHDX file stays large even after cleaning
+---
 
-**Why not just delete the VHDX?** The VHDX file contains ALL your Docker data (images, containers, volumes). Deleting it would wipe out everything. Compacting just removes unused space without deleting data.
+## Path A: Docker Desktop
 
-The VHDX file is located at:
+Docker Desktop uses its own VHDX:
+
 ```
-C:\Users\<username>\AppData\Local\Docker\wsl\disk\docker_data.vhdx
+%LOCALAPPDATA%\Docker\wsl\disk\docker_data.vhdx
 ```
 
-## Solution: Compact the VHDX File
-
-### Method 1: Using PowerShell (Recommended)
-
-1. **Stop Docker Desktop completely**
-   - Right-click Docker Desktop icon in system tray
-   - Select "Quit Docker Desktop"
-   - Wait for it to fully shut down
-
-2. **Open PowerShell as Administrator** (right-click → Run as Administrator)
-
-3. **Run the compact command:**
+1. **Quit Docker Desktop** fully (system tray → Quit).
+2. **PowerShell as Administrator:**
    ```powershell
-   Optimize-VHD -Path "$env:LOCALAPPDATA\Docker\wsl\disk\docker_data.vhdx" -Mode Full
-   ```
-
-   This will:
-   - Analyze the VHDX file
-   - Remove unused space
-   - Compact it to the actual size needed
-
-4. **Restart Docker Desktop**
-
-### Method 2: Using diskpart (Alternative)
-
-1. **Stop Docker Desktop completely**
-
-2. **Open Command Prompt as Administrator**
-
-3. **Run diskpart:**
-   ```cmd
-   diskpart
-   ```
-
-4. **In diskpart, run:**
-   ```diskpart
-   select vdisk file="C:\Users\<username>\AppData\Local\Docker\wsl\disk\docker_data.vhdx"
-   compact vdisk
-   exit
-   ```
-
-5. **Restart Docker Desktop**
-
-### Method 3: Using WSL Command (From WSL2)
-
-1. **Stop Docker Desktop**
-
-2. **From WSL2, run:**
-   ```bash
    wsl --shutdown
-   ```
-
-3. **From Windows PowerShell (as Admin):**
-   ```powershell
    Optimize-VHD -Path "$env:LOCALAPPDATA\Docker\wsl\disk\docker_data.vhdx" -Mode Full
    ```
+3. Start Docker Desktop again.
 
-4. **Restart Docker Desktop**
+*(Requires Hyper-V PowerShell — on Windows Pro, enable the Hyper-V feature or “Hyper-V Module for Windows PowerShell” if `Optimize-VHD` is missing.)*
 
-## Expected Results
+---
 
-After compacting, the VHDX file should shrink from ~163GB to approximately:
-- **~20-30GB** (actual data + some overhead)
+## Path B: Docker in WSL2 only (no Docker Desktop) — **Windows Pro**
 
-This will free up **~130-140GB** of disk space!
+Here `/var/lib/docker` lives **inside** your Ubuntu (or other) distro disk.
+
+### 1) Find your distro’s VHDX
+
+In **PowerShell** (normal user is fine):
+
+```powershell
+wsl -l -v
+```
+
+Note the **NAME** of the distro where you run Docker (e.g. `Ubuntu`).
+
+Common locations:
+
+- **Store install** (e.g. Ubuntu from Microsoft Store):  
+  `C:\Users\<you>\AppData\Local\Packages\<Publisher>.<DistroName>_...\LocalState\ext4.vhdx`  
+  (folder name varies; search `ext4.vhdx` under `%LOCALAPPDATA%\Packages` if needed.)
+- **Custom / imported** distro: often under  
+  `%LOCALAPPDATA%\WSL\` or `%USERPROFILE%\AppData\Local\WSL\` — check `wsl --status` / docs for your install.
+
+You can also open `\\wsl$\<DistroName>\` in Explorer to confirm the distro, then locate its `ext4.vhdx` on Windows as above.
+
+### 2) Stop Docker and WSL
+
+**Inside that WSL distro** (where Docker runs):
+
+```bash
+sudo service docker stop
+# or: sudo systemctl stop docker   (if systemd is available)
+```
+
+Then **from Windows PowerShell or CMD**:
+
+```powershell
+wsl --shutdown
+```
+
+### 3) Compact the distro VHDX
+
+**PowerShell as Administrator** (adjust the path you found):
+
+```powershell
+Optimize-VHD -Path "C:\Users\<you>\AppData\Local\Packages\...\LocalState\ext4.vhdx" -Mode Full
+```
+
+### 4) Start WSL again
+
+Open your distro; start Docker:
+
+```bash
+sudo service docker start
+```
+
+---
+
+## diskpart alternative (either VHDX)
+
+```cmd
+diskpart
+select vdisk file="C:\full\path\to\file.vhdx"
+compact vdisk
+exit
+```
+
+Use the correct path: `docker_data.vhdx` **or** your distro `ext4.vhdx`.
+
+---
+
+## If `Optimize-VHD` is not found
+
+- Turn on **Hyper-V** (optional Windows feature) or at least the **Hyper-V Module for Windows PowerShell** on Pro.
+- Or use **diskpart** `compact vdisk` as above.
+
+---
 
 ## Prevention
 
-To prevent this from happening again:
-
-1. **Run cleanup regularly:**
-   ```bash
-   cd bianca-app-backend/scripts
-   ./cleanup-docker.sh --aggressive
-   ```
-
-2. **Compact the VHDX periodically** (every few months or when disk space is low)
-
-3. **Configure Docker Desktop log rotation** to prevent log files from growing too large
+- Run `yarn docker:low-disk` (or `cleanup-docker.sh`) periodically.
+- After pruning, compact the right VHDX when Windows still shows low free space.
 
 ## Troubleshooting
 
-### "Cannot compact: file is in use"
-- Make sure Docker Desktop is completely stopped
-- Check Task Manager for any Docker processes still running
-- Try: `wsl --shutdown` before compacting
+### “File is in use”
+- Run `wsl --shutdown` before compacting.
+- Ensure no `wsl.exe` / distro windows are using that disk.
 
-### "Access denied"
-- Make sure you're running PowerShell/CMD as Administrator
-- Close any file explorers that might have the Docker directory open
+### Compact barely helps
+- Prune more inside Linux: `docker system df`, then `docker image prune -a -f`, `docker builder prune -af`.
+- Confirm you compacted the **distro** `ext4.vhdx`, not only a missing `docker_data.vhdx`.
 
-### Compact doesn't reduce size much
-- Run `docker system prune -a --volumes` first to remove more data
-- Then compact the VHDX
-- The compact operation only removes unused space, not actual data
-
+### Still stuck
+- Check size of the correct `ext4.vhdx` in Explorer before/after.
+- Consider moving WSL to another drive (`wsl --export` / `--import`) if C: is too small.

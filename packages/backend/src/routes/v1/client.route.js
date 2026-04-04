@@ -26,6 +26,15 @@ router
   );
 
 router
+  .route('/onboarding-rollups')
+  .get(
+    auth('readOwn:client', 'readAny:client'),
+    minimumNecessaryMiddleware('clientOnboarding'),
+    validate(clientValidation.getClientsOnboardingRollups),
+    clientController.getClientsOnboardingRollups
+  );
+
+router
   .route('/unassigned')
   .get(
     auth('readOwn:client', 'readAny:client'),

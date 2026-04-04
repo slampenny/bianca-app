@@ -110,7 +110,7 @@ const corsOptions = {
       'http://staging-api.biancawellness.com',
       'https://api.biancawellness.com',
       'http://api.biancawellness.com',
-      // Web admin console (Google SSO / exchange-code); keep in sync with ADMIN_FRONTEND_URL / deploy scripts
+      // Web admin console (Google SSO / exchange-code); hostnames mirror config.adminFrontendUrl defaults
       'https://admin.biancawellness.com',
       'http://admin.biancawellness.com',
       'https://staging-admin.biancawellness.com',
@@ -134,8 +134,8 @@ const corsOptions = {
       'http://localhost:8080',
       'http://localhost:8081',
       'http://localhost:8082',
-      config.frontendUrl,        // Frontend URL from config (single source of truth)
-      process.env.ADMIN_FRONTEND_URL, // Super-admin console (e.g. https://admin.biancawellness.com)
+      config.frontendUrl, // Facility web — from config (PRIMARY_DOMAIN + NODE_ENV, optional FRONTEND_URL)
+      config.adminFrontendUrl, // Super-admin SPA — same pattern (optional ADMIN_FRONTEND_URL override)
       'http://127.0.0.1:3000',   // Alternative localhost format
       'http://127.0.0.1:3001',
       'null'                     // Some browsers send 'null' as origin for file:// URLs

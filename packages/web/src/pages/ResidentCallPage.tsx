@@ -1,6 +1,6 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useState } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { Link, useNavigate, useParams } from "react-router-dom"
 import { ChevronLeftIcon } from "../icons"
 import { useGetClientQuery } from "../services/api/clientApi"
 import { useEndCallMutation, useGetCallStatusQuery, useInitiateCallMutation } from "../services/api/callWorkflowApi"
@@ -179,6 +179,12 @@ export function ResidentCallPage() {
                 </p>
               </div>
             ) : null}
+
+            <p style={{ margin: 0, fontSize: "0.72rem" }}>
+              <Link to={`/residents/${residentId ?? ""}#voice-onboarding`} style={{ color: "#2563eb" }}>
+                Full journey & captured answers
+              </Link>
+            </p>
 
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--va-slate-600)" }}>

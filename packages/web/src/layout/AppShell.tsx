@@ -26,6 +26,7 @@ const NAV = [
   { to: "/residents", label: "Residents", icon: UsersIcon, badge: false },
   { to: "/caregivers", label: "Caregivers", icon: UsersIcon, badge: false, orgAdminOnly: true },
   { to: "/reports", label: "Reports", icon: FileTextIcon, badge: false },
+  { to: "/daily-digest", label: "Daily digest", icon: FileTextIcon, badge: false },
   { to: "/settings", label: "Settings", icon: SettingsIcon, badge: false },
 ] as const
 
@@ -61,7 +62,10 @@ export function AppShell() {
   const demoNew = alerts.filter((a) => a.status === "new").length
   const newAlertCount = liveUnread + demoNew
   const navItems = useMemo(
-    () => NAV.filter((n) => !n.orgAdminOnly || canManageCaregivers(currentUser?.role)),
+    () =>
+      NAV.filter(
+        (n) => !('orgAdminOnly' in n && n.orgAdminOnly) || canManageCaregivers(currentUser?.role),
+      ),
     [currentUser?.role],
   )
   const first = activityFeed[0]

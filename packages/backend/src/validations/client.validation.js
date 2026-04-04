@@ -169,6 +169,10 @@ const getClientOnboarding = {
   }),
 };
 
+const getClientsOnboardingRollups = {
+  query: Joi.object().keys({}),
+};
+
 const getCaregivers = {
   params: Joi.object().keys({
     clientId: Joi.string().custom(objectId),
@@ -192,6 +196,7 @@ module.exports = {
   createClient,
   getConversationsByClient,
   getClientOnboarding,
+  getClientsOnboardingRollups,
   getClients,
   getClient,
   updateClient,

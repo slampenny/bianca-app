@@ -11,6 +11,10 @@
 		"subject": "Welcome to Bianca Wellness - Invitation to Join",
 		"text": "Dear caregiver,\n\nYou have been invited to join Bianca Wellness, a secure platform for healthcare communication.\n\nTo accept your invitation and set up your account, please click the link below:\n\n%s\n\nThis invitation will expire in 7 days for security purposes.\n\nIf you did not expect this invitation, please ignore this email.\n\nBest regards,\nThe Bianca Wellness Team\n\n---\nBianca Wellness - Secure Healthcare Communication\nThis email was sent from a verified domain: biancawellness.com"
 	},
+	"superAdminInviteEmail": {
+		"subject": "Bianca — Super administrator invitation",
+		"text": "Dear colleague,\n\nYou have been invited to become a Bianca super administrator. Use the link below to create your password and access the admin console:\n\n%s\n\nThis invitation expires in 7 days. If you did not expect this email, ignore it.\n\n— Bianca"
+	},
 	"emailVerifiedPage": {
 		"title": "Email Verified!",
 		"titleAlreadyVerified": "Already Verified",
@@ -54,5 +58,19 @@
 		"contactInfo": "If you have any questions or concerns, please contact your organization or email us at privacy@biancawellness.com.",
 		"versionLabel": "Consent Email Version:",
 		"closing": "Best regards,\nThe Bianca Wellness Team"
+	},
+	"caregiverDailyDigest": {
+		"title": "Daily care digest",
+		"subtitle": "Wellness check-ins for your assigned residents",
+		"subtitleWithOrg": "Wellness check-ins — %s",
+		"labelConversationSummary": "Conversation summary",
+		"labelSentiment": "Sentiment",
+		"labelCallsToday": "Calls today",
+		"noActivity": "No calls scheduled for this day.",
+		"noAnswerToday": "Call attempted; no conversation summary (not answered or too short).",
+		"completedMinutes": "Check-in completed (about %s min).",
+		"completedNoTranscript": "Check-in completed; no written summary yet.",
+		"languageMismatchExplanation": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). Sentiment summary only.",
+		"emailSoon": "Email delivery for this digest is not enabled yet; you can review it here anytime."
 	}
 }

@@ -96,6 +96,7 @@ const auditLogSchema = mongoose.Schema(
         'invoice',
         'report',
         'familyDigest',
+        'caregiverDailyDigest',
         'facilityReport',
         'activityFeed',
         'consentAudit',

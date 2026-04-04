@@ -84,7 +84,7 @@ const FIELD_ACCESS_RULES = {
       // EXCLUDED: Full client context, medical details
     ],
 
-    clientOnboarding: ['journey', 'responses', 'flags', 'questionCount'],
+    clientOnboarding: ['journey', 'responses', 'flags', 'questionCount', 'rollups'],
   },
 
   // OrgAdmin: Broader access for administrative purposes
@@ -151,7 +151,7 @@ const FIELD_ACCESS_RULES = {
 
     alert: '*', // Full access to all alert fields
 
-    clientOnboarding: ['journey', 'responses', 'flags', 'questionCount'],
+    clientOnboarding: ['journey', 'responses', 'flags', 'questionCount', 'rollups'],
   },
 
   // SuperAdmin: Full access (system administration)

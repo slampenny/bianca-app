@@ -31,6 +31,15 @@ const orgIdParam = {
   }),
 };
 
+/** Invite email for a future superAdmin (super admin only). */
+const sendSuperAdminInvite = {
+  body: Joi.object().keys({
+    name: Joi.string().required().trim().min(1).max(200),
+    email: Joi.string().required().email(),
+    phone: Joi.string().required().trim().min(1).max(40),
+  }),
+};
+
 /** Promote to super admin or demote super admin to org admin (super admin only). */
 const setCaregiverRole = {
   params: Joi.object().keys({
@@ -46,5 +55,6 @@ module.exports = {
   impersonate,
   searchOrgs,
   orgIdParam,
+  sendSuperAdminInvite,
   setCaregiverRole,
 };

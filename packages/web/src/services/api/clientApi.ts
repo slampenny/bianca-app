@@ -1,11 +1,11 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import type { Client, ClientPages } from "./api.types"
+import type { Client, ClientOnboardingDashboard, ClientPages, ClientOnboardingRollup } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const clientApi = createApi({
   reducerPath: "clientApi",
   baseQuery: baseQueryWithReauth(),
-  tagTypes: ["Client"],
+  tagTypes: ["Client", "OnboardingRollup"],
   endpoints: (builder) => ({
     getAllClients: builder.query<
       ClientPages,
@@ -21,6 +21,17 @@ export const clientApi = createApi({
     getClient: builder.query<Client, { id: string }>({
       query: ({ id }) => `/clients/${id}`,
       providesTags: (_r, _e, { id }) => [{ type: "Client", id }],
+    }),
+    getClientOnboarding: builder.query<ClientOnboardingDashboard, { clientId: string; day?: number }>({
+      query: ({ clientId, day }) => ({
+        url: `/clients/${clientId}/onboarding`,
+        params: day != null && day >= 1 && day <= 4 ? { day } : undefined,
+      }),
+      providesTags: (_r, _e, { clientId }) => [{ type: "Client", id: clientId }, "OnboardingRollup"],
+    }),
+    getClientsOnboardingRollups: builder.query<{ rollups: Record<string, ClientOnboardingRollup> }, void>({
+      query: () => "/clients/onboarding-rollups",
+      providesTags: ["OnboardingRollup"],
     }),
     /** Public — used from /client-consent (email link). GET does not require auth. */
     verifyConsent: builder.mutation<
@@ -133,6 +144,8 @@ export const clientApi = createApi({
 export const {
   useGetAllClientsQuery,
   useGetClientQuery,
+  useGetClientOnboardingQuery,
+  useGetClientsOnboardingRollupsQuery,
   useVerifyConsentMutation,
   useCreateClientMutation,
   usePatchClientMutation,

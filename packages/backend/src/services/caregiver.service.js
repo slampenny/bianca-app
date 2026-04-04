@@ -263,9 +263,10 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
   // If this is an invited user completing registration (setting password), promote them to staff
   // Also promote if they already have a password and are adding a phone (completing profile)
   if (caregiver.role === 'invited' && (updateBody.password || (updateBody.phone && caregiver.password))) {
-    // Invited user completing registration - promote to staff
-    // Phone and verification status are separate concerns
-    updateBody.role = 'staff';
+    // Invited user completing registration — super-admin invite passes role superAdmin explicitly
+    if (updateBody.role !== 'superAdmin') {
+      updateBody.role = 'staff';
+    }
   }
   
   // If orgAdmin or staff is updating their phone, also update the organization's phone if it's not set

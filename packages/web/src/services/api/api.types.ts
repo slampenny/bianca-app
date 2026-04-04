@@ -115,6 +115,68 @@ export interface ClientPages {
   totalResults: number
 }
 
+/** GET /clients/:id/onboarding — voice onboarding journey for a client */
+export interface ClientOnboardingJourneyDay {
+  dayNumber: number
+  totalQuestions: number
+  capturedCount: number
+  sessionCompleted: boolean
+  sessionCompletedAt?: string | null
+  sessionEndedReason?: string | null
+}
+
+export interface ClientOnboardingJourney {
+  days: ClientOnboardingJourneyDay[]
+  currentDay: number | null
+  journeyComplete: boolean
+  sessionsCompletedCount: number
+  hasAnyOnboardingActivity: boolean
+}
+
+export interface ClientOnboardingFlags {
+  safety: boolean
+  memory: boolean
+  mood: boolean
+  distress: boolean
+  confusion: boolean
+}
+
+export interface ClientOnboardingResponseRow {
+  id?: string
+  clientId?: string
+  dayNumber: number
+  questionId: string
+  responseType?: string
+  responseValue?: unknown
+  verbatimTranscript?: string | null
+  callId?: string
+  conversationId?: string
+  capturedAt?: string
+  safety_flag?: boolean
+  memory_flag?: boolean
+  mood_flag?: boolean
+  distress_flag?: boolean
+  confusion_flag?: boolean
+  notes?: string | null
+}
+
+export interface ClientOnboardingDashboard {
+  journey: ClientOnboardingJourney
+  responses: ClientOnboardingResponseRow[]
+  flags: ClientOnboardingFlags
+  questionCount: number
+}
+
+/** GET /clients/onboarding-rollups — per-client summary for lists / dashboard */
+export interface ClientOnboardingRollup {
+  sessionsCompletedCount: number
+  journeyComplete: boolean
+  currentDay: number | null
+  hasAnyOnboardingActivity: boolean
+  flags: ClientOnboardingFlags
+  questionCount: number
+}
+
 export interface CaregiverPages {
   limit: number
   page: number

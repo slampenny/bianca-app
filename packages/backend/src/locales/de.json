@@ -54,6 +54,19 @@
 		"contactInfo": "Wenn Sie Fragen oder Bedenken haben, wenden Sie sich bitte an Ihre Organisation oder senden Sie uns eine E-Mail an privacy@biancawellness.com.",
 		"versionLabel": "Version der Zustimmungs-E-Mail:",
 		"closing": "Mit freundlichen Grüßen,\nDas Bianca Wellness Team"
+},
+	"caregiverDailyDigest": {
+		"title": "Daily care digest",
+		"subtitle": "Wellness check-ins for your assigned residents",
+		"subtitleWithOrg": "Wellness check-ins — %s",
+		"labelConversationSummary": "Conversation summary",
+		"labelSentiment": "Sentiment",
+		"labelCallsToday": "Calls today",
+		"noActivity": "No calls scheduled for this day.",
+		"noAnswerToday": "Call attempted; no conversation summary (not answered or too short).",
+		"completedMinutes": "Check-in completed (about %s min).",
+		"completedNoTranscript": "Check-in completed; no written summary yet.",
+		"languageMismatchExplanation": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). Sentiment summary only.",
+		"emailSoon": "Email delivery for this digest is not enabled yet; you can review it here anytime."
 	}
 }
-

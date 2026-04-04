@@ -22,7 +22,8 @@ jest.mock('../../../src/config/agenda', () => {
   return { agenda: mockAgenda };
 });
 const config = require('../../../src/config/config');
-const { emailService, orgService } = require('../../../src/services');
+const { emailService, orgService, tokenService } = require('../../../src/services');
+const { tokenTypes } = require('../../../src/config/tokens');
 const { orgOne, insertOrgs } = require('../../fixtures/org.fixture');
 const { caregiverOne, password } = require('../../fixtures/caregiver.fixture');
 const { Caregiver, Org, Token } = require('../../../src/models');
@@ -70,10 +71,10 @@ afterAll(async () => {
 
 describe('inviteService', () => {
   describe('generateInviteToken', () => {
-    afterEach(() => {
-      Org.deleteMany();
-      Caregiver.deleteMany();
-      Token.deleteMany();
+    afterEach(async () => {
+      await Org.deleteMany();
+      await Caregiver.deleteMany();
+      await Token.deleteMany();
     });
 
     it('should generate an invite token and store it in the database', async () => {
@@ -103,6 +104,26 @@ describe('inviteService', () => {
       // Just verify the invite token was generated and caregiver was created
       expect(inviteToken).toBeDefined();
       expect(caregiver).not.toBeNull();
+    });
+
+    it('sendSuperAdminInvite creates invited caregiver and super-admin invite token', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const email = 'super-invite-test@example.com';
+      const { inviteToken, caregiver } = await orgService.sendSuperAdminInvite(
+        'Super Invite',
+        email,
+        caregiverOne.phone,
+        null
+      );
+      expect(inviteToken).toBeDefined();
+      expect(caregiver.role).toEqual('invited');
+      expect(caregiver.email).toEqual(email);
+      expect(caregiver.org.toString()).toEqual(org.id);
+
+      const { inviteKind } = await tokenService.verifyStaffOrSuperAdminInviteToken(inviteToken);
+      expect(inviteKind).toEqual('superAdmin');
+      const row = await Token.findOne({ token: inviteToken });
+      expect(row.type).toEqual(tokenTypes.SUPERADMIN_INVITE);
     });
   });
 

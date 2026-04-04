@@ -95,23 +95,19 @@ const register = catchAsync(async (req, res, next) => {
 
 const getInviteInfo = catchAsync(async (req, res) => {
   const { token } = req.query;
-  const { tokenTypes } = require('../config/tokens');
-  
+
   if (!token) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Token is required');
   }
-  
+
   try {
-    const inviteTokenDoc = await tokenService.verifyToken(token, tokenTypes.INVITE);
-    
-    // Get the existing invited caregiver (created when invite was sent)
+    const { tokenDoc: inviteTokenDoc } = await tokenService.verifyStaffOrSuperAdminInviteToken(token);
+
     const invitedCaregiver = await caregiverService.getCaregiverById(inviteTokenDoc.caregiver);
     if (!invitedCaregiver) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Invited caregiver not found');
     }
-    
-    // Return only the info needed to prefill the form (name, email, phone)
-    // Don't return sensitive info like password
+
     res.status(httpStatus.OK).send({
       name: invitedCaregiver.name,
       email: invitedCaregiver.email,
@@ -128,28 +124,28 @@ const getInviteInfo = catchAsync(async (req, res) => {
 const registerWithInvite = catchAsync(async (req, res) => {
   const { token, password, name, email, phone } = req.body;
   const { tokenTypes } = require('../config/tokens');
-  const inviteTokenDoc = await tokenService.verifyToken(token, tokenTypes.INVITE);
-  
-  // Get the existing invited caregiver (created when invite was sent)
-  const invitedCaregiver = await caregiverService.getCaregiverById(inviteTokenDoc.caregiver);
+  const { tokenDoc, inviteKind } = await tokenService.verifyStaffOrSuperAdminInviteToken(token);
+
+  const invitedCaregiver = await caregiverService.getCaregiverById(tokenDoc.caregiver);
   if (!invitedCaregiver) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Invited caregiver not found');
   }
-  
-  // Verify the email matches the invite
+
   if (invitedCaregiver.email !== email) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email does not match the invite');
   }
-  
-  // Update the existing caregiver with password and other info (this will also promote from 'invited' to 'staff')
-  const caregiver = await caregiverService.updateCaregiverById(invitedCaregiver.id, {
-    password,
-    name,
-    phone,
+
+  const updatePayload = { password, name, phone };
+  if (inviteKind === 'superAdmin') {
+    updatePayload.role = 'superAdmin';
+  }
+
+  const caregiver = await caregiverService.updateCaregiverById(invitedCaregiver.id, updatePayload);
+
+  await Token.deleteMany({
+    caregiver: caregiver.id,
+    type: { $in: [tokenTypes.INVITE, tokenTypes.SUPERADMIN_INVITE] },
   });
-  
-  // Delete the invite token since it's been used
-  await Token.deleteMany({ caregiver: caregiver.id, type: tokenTypes.INVITE });
   
   // Record PIPEDA consent for data collection (required for Canadian users)
   try {

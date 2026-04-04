@@ -27,6 +27,7 @@ import { medicalAnalysisApi } from "../services/api/medicalAnalysisApi"
 import { callWorkflowApi } from "../services/api/callWorkflowApi"
 import { scheduleApi } from "../services/api/scheduleApi"
 import { paymentMethodApi } from "../services/api/paymentMethodApi"
+import { dailyDigestApi } from "../services/api/dailyDigestApi"
 
 const authPersistConfig = {
   key: "auth",
@@ -56,6 +57,7 @@ const rootReducer = combineReducers({
   [callWorkflowApi.reducerPath]: callWorkflowApi.reducer,
   [scheduleApi.reducerPath]: scheduleApi.reducer,
   [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
+  [dailyDigestApi.reducerPath]: dailyDigestApi.reducer,
 })
 
 export const store = configureStore({
@@ -80,6 +82,7 @@ export const store = configureStore({
       callWorkflowApi.middleware,
       scheduleApi.middleware,
       paymentMethodApi.middleware,
+      dailyDigestApi.middleware,
     ),
 })
 

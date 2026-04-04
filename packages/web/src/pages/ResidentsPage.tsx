@@ -1,23 +1,85 @@
 import { skipToken } from "@reduxjs/toolkit/query"
-import { useMemo, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { mapClientToResident } from "../lib/liveData"
-import { useGetAllClientsQuery } from "../services/api/clientApi"
+import type { ClientOnboardingRollup } from "../services/api/api.types"
+import { useGetAllClientsQuery, useGetClientsOnboardingRollupsQuery } from "../services/api/clientApi"
 import { useAppSelector } from "../store/store"
 import { getCurrentUser, isAuthenticated } from "../store/authSlice"
 import type { Resident } from "../types"
 import { SearchIcon } from "../icons"
 import { canAddResidents } from "../lib/roleAccess"
 
+const ONBOARDING_PARAM_TO_FILTER: Record<string, string> = {
+  in_progress: "onboarding_in_progress",
+  complete: "onboarding_complete",
+  not_started: "onboarding_not_started",
+}
+
+const FILTER_TO_ONBOARDING_PARAM: Record<string, string> = {
+  onboarding_in_progress: "in_progress",
+  onboarding_complete: "complete",
+  onboarding_not_started: "not_started",
+}
+
 const FILTERS = [
-  { key: "all" as const, label: "All" },
-  { key: "active" as const, label: "Active" },
-  { key: "at_risk" as const, label: "At Risk" },
-  { key: "missing_consent" as const, label: "Missing Consent" },
+  { key: "all", label: "All" },
+  { key: "active", label: "Active" },
+  { key: "at_risk", label: "At Risk" },
+  { key: "missing_consent", label: "Missing Consent" },
+  { key: "onboarding_in_progress", label: "Onboarding · Active" },
+  { key: "onboarding_complete", label: "Onboarding · Complete" },
+  { key: "onboarding_not_started", label: "Onboarding · Not started" },
 ]
+
+function defaultOnboardingRollup(): ClientOnboardingRollup {
+  return {
+    sessionsCompletedCount: 0,
+    journeyComplete: false,
+    currentDay: 1,
+    hasAnyOnboardingActivity: false,
+    flags: { safety: false, memory: false, mood: false, distress: false, confusion: false },
+    questionCount: 0,
+  }
+}
+
+function OnboardingStatusCell({ rollup, loading }: { rollup: ClientOnboardingRollup; loading: boolean }) {
+  if (loading) {
+    return <span style={{ color: "var(--va-slate-400)", fontSize: "0.8125rem" }}>…</span>
+  }
+  if (rollup.journeyComplete) {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          padding: "0.125rem 0.5rem",
+          borderRadius: 999,
+          fontSize: "0.75rem",
+          fontWeight: 500,
+          background: "var(--va-emerald-100)",
+          color: "var(--va-emerald-700)",
+        }}
+      >
+        Complete
+      </span>
+    )
+  }
+  if (!rollup.hasAnyOnboardingActivity) {
+    return (
+      <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>Not started</span>
+    )
+  }
+  return (
+    <span style={{ fontSize: "0.8125rem", color: "var(--va-amber-800)" }}>
+      {rollup.sessionsCompletedCount}/4
+      {rollup.currentDay != null ? ` · Next: Day ${rollup.currentDay}` : ""}
+    </span>
+  )
+}
 
 export function ResidentsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const authed = useAppSelector(isAuthenticated)
   const user = useAppSelector(getCurrentUser)
   const showAdd = canAddResidents(user?.role)
@@ -25,9 +87,24 @@ export function ResidentsPage() {
     authed ? { limit: 200, page: 1 } : skipToken,
     { refetchOnMountOrArgChange: true, refetchOnFocus: true, refetchOnReconnect: true },
   )
+  const { data: rollupsPayload, isLoading: rollupsLoading } = useGetClientsOnboardingRollupsQuery(undefined, {
+    skip: !authed,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+  })
+  const rollups = rollupsPayload?.rollups ?? {}
 
   const [q, setQ] = useState("")
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]["key"]>("all")
+  const [filter, setFilter] = useState<string>(() => {
+    const p = searchParams.get("onboarding")
+    return p && ONBOARDING_PARAM_TO_FILTER[p] ? ONBOARDING_PARAM_TO_FILTER[p] : "all"
+  })
+  const [onboardingSortFirst, setOnboardingSortFirst] = useState(false)
+
+  useEffect(() => {
+    const p = searchParams.get("onboarding")
+    if (p && ONBOARDING_PARAM_TO_FILTER[p]) setFilter(ONBOARDING_PARAM_TO_FILTER[p])
+  }, [searchParams])
 
   const residents = useMemo(
     () =>
@@ -50,6 +127,21 @@ export function ResidentsPage() {
       case "missing_consent":
         list = list.filter(({ resident: r }) => !r.consentOnFile)
         break
+      case "onboarding_in_progress":
+        list = list.filter(({ resident: r }) => {
+          const u = rollups[r.id] ?? defaultOnboardingRollup()
+          return !u.journeyComplete && u.hasAnyOnboardingActivity
+        })
+        break
+      case "onboarding_complete":
+        list = list.filter(({ resident: r }) => (rollups[r.id] ?? defaultOnboardingRollup()).journeyComplete)
+        break
+      case "onboarding_not_started":
+        list = list.filter(({ resident: r }) => {
+          const u = rollups[r.id] ?? defaultOnboardingRollup()
+          return !u.journeyComplete && !u.hasAnyOnboardingActivity
+        })
+        break
       default:
         break
     }
@@ -65,11 +157,21 @@ export function ResidentsPage() {
     list.sort((a, b) => {
       const ar = a.resident
       const br = b.resident
+      if (onboardingSortFirst) {
+        const ua = rollups[ar.id] ?? defaultOnboardingRollup()
+        const ub = rollups[br.id] ?? defaultOnboardingRollup()
+        const ca = ua.journeyComplete ? 1 : 0
+        const cb = ub.journeyComplete ? 1 : 0
+        if (ca !== cb) return ca - cb
+        if (ua.sessionsCompletedCount !== ub.sessionsCompletedCount) {
+          return ua.sessionsCompletedCount - ub.sessionsCompletedCount
+        }
+      }
       const ln = ar.lastName.localeCompare(br.lastName)
       return ln !== 0 ? ln : ar.firstName.localeCompare(br.firstName)
     })
     return list
-  }, [residents, filter, q])
+  }, [residents, filter, q, rollups, onboardingSortFirst])
 
   const initialsFor = (r: Resident) => `${r.firstName[0] ?? "?"}${r.lastName[0] ?? ""}`.toUpperCase()
 
@@ -136,11 +238,29 @@ export function ResidentsPage() {
             key={f.key}
             type="button"
             className={`va-chip ${filter === f.key ? "va-chip--on" : ""}`}
-            onClick={() => setFilter(f.key)}
+            onClick={() => {
+              setFilter(f.key)
+              if (FILTER_TO_ONBOARDING_PARAM[f.key]) {
+                setSearchParams({ onboarding: FILTER_TO_ONBOARDING_PARAM[f.key] })
+              } else {
+                setSearchParams({})
+              }
+            }}
           >
             {f.label}
           </button>
         ))}
+      </div>
+
+      <div className="va-chip-row" style={{ marginTop: "-0.25rem" }}>
+        <button
+          type="button"
+          className={`va-chip ${onboardingSortFirst ? "va-chip--on" : ""}`}
+          onClick={() => setOnboardingSortFirst((v) => !v)}
+          data-testid="residents-sort-onboarding"
+        >
+          Sort: onboarding first
+        </button>
       </div>
 
       <div className="va-card va-table-wrap">
@@ -150,6 +270,7 @@ export function ResidentsPage() {
               <th>Name</th>
               <th>Room</th>
               <th>Status</th>
+              <th>Onboarding</th>
               <th>Last Call</th>
               <th>Risk</th>
             </tr>
@@ -193,6 +314,9 @@ export function ResidentsPage() {
                 <td>{r.room}</td>
                 <td>
                   <StatusPill status={r.status} />
+                </td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <OnboardingStatusCell rollup={rollups[r.id] ?? defaultOnboardingRollup()} loading={rollupsLoading} />
                 </td>
                 <td style={{ color: "var(--va-slate-600)" }}>
                   {r.lastCallDate} {r.lastCallTime}

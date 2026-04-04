@@ -64,6 +64,11 @@ const envVarsSchema = Joi.object({
   API_BASE_URL: Joi.string().uri().description('Base API URL (e.g., https://api.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
   BASE_URL: Joi.string().uri().description('Base URL (alternative to API_BASE_URL)'),
   FRONTEND_URL: Joi.string().uri().description('Frontend URL for email links (e.g., https://app.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
+  ADMIN_FRONTEND_URL: Joi.string()
+    .uri()
+    .description(
+      'Optional override for super-admin console origin (like FRONTEND_URL for facility web). If unset, config.adminFrontendUrl is built from PRIMARY_DOMAIN + NODE_ENV in this file.'
+    ),
   WEBSOCKET_URL: Joi.string().uri().description('WebSocket URL (e.g., wss://api.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
   
   // Generic SMTP (can be used for Ethereal if manually configured, or other SMTP services)
@@ -183,7 +188,15 @@ const baselineConfig = {
   authEnabled: true,
   baseUrl: envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain))),
   apiUrl: (envVars.API_BASE_URL || (envVars.NODE_ENV === 'development' ? `http://localhost:${envVars.PORT}` : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging-api', primaryDomain) : getUrlFromDomain('api', primaryDomain)))) + '/v1',
+  // Facility web + super-admin SPA: defaults live here (no .env required). FRONTEND_URL / ADMIN_FRONTEND_URL override when set.
   frontendUrl: envVars.FRONTEND_URL || (envVars.NODE_ENV === 'development' || envVars.NODE_ENV === 'test' ? 'http://localhost:8082' : (envVars.NODE_ENV === 'staging' ? getUrlFromDomain('staging', primaryDomain) : getUrlFromDomain('app', primaryDomain))),
+  adminFrontendUrl:
+    envVars.ADMIN_FRONTEND_URL ||
+    (envVars.NODE_ENV === 'development' || envVars.NODE_ENV === 'test'
+      ? 'http://localhost:5174'
+      : envVars.NODE_ENV === 'staging'
+        ? getUrlFromDomain('staging-admin', primaryDomain)
+        : getUrlFromDomain('admin', primaryDomain)),
   billing: { 
     ratePerMinute: 0.1,
     minimumBillableDuration: 30,
@@ -312,6 +325,7 @@ if (envVars.NODE_ENV === 'staging') {
   baselineConfig.apiUrl = `${apiBaseUrl}/v1`;
   // On staging, frontend is at staging.biancawellness.com, API is at staging-api.biancawellness.com
   baselineConfig.frontendUrl = envVars.FRONTEND_URL || getUrlFromDomain('staging', primaryDomain);
+  baselineConfig.adminFrontendUrl = envVars.ADMIN_FRONTEND_URL || getUrlFromDomain('staging-admin', primaryDomain);
   baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb:27017/bianca-service';
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = apiBaseUrl;

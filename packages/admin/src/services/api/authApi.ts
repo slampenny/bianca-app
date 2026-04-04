@@ -31,7 +31,29 @@ export const authApi = createApi({
         body: { refreshToken },
       }),
     }),
+    getInviteInfo: builder.query<{ name: string; email: string; phone: string }, { token: string }>({
+      query: ({ token }) => ({
+        url: "/auth/invite-info",
+        params: { token },
+      }),
+    }),
+    registerWithInvite: builder.mutation<
+      { caregiver: Caregiver; tokens: AuthTokens },
+      { token: string; password: string; name: string; email: string; phone: string }
+    >({
+      query: (body) => ({
+        url: "/auth/registerWithInvite",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 })
 
-export const { useLoginMutation, useLogoutMutation, useRefreshTokensMutation } = authApi
+export const {
+  useLoginMutation,
+  useLogoutMutation,
+  useRefreshTokensMutation,
+  useGetInviteInfoQuery,
+  useRegisterWithInviteMutation,
+} = authApi

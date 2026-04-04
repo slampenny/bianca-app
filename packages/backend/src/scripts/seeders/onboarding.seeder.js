@@ -87,13 +87,6 @@ async function seedDay1InProgress(clientId, caregiverId) {
   await createOnboardingCall(clientId, 1, { caregiverId, completed: false, daysAgo: 1 });
 }
 
-/** Day 1 done + partial day 2 → currentDay 2 */
-async function seedDay2InProgress(clientId, caregiverId) {
-  await insertCaptures(clientId, 1, DAY1_TOPICS);
-  await createOnboardingCall(clientId, 1, { caregiverId, completed: true, daysAgo: 5 });
-  await insertCaptures(clientId, 2, DAY2_TOPICS.slice(0, 2));
-}
-
 /** All four days completed with full captures */
 async function seedJourneyComplete(clientId, caregiverId) {
   await insertCaptures(clientId, 1, DAY1_TOPICS);
@@ -109,9 +102,32 @@ async function seedJourneyComplete(clientId, caregiverId) {
 }
 
 /**
- * Agnes Alphabet: day 1 in progress (answers + incomplete session).
- * Barnaby Button: day 1 complete, day 2 in progress.
- * Margaret Thompson: full journey complete with answers (incl. mood flag on day 3).
+ * Journey complete in dashboard APIs (four completed onboarding calls), no captured answers.
+ * Use for bulk seeding so most residents look "done" like real long-term clients.
+ */
+async function seedJourneyCompleteCallsOnly(clientId, caregiverId) {
+  const base = 40;
+  for (let day = 1; day <= 4; day += 1) {
+    await createOnboardingCall(clientId, day, { caregiverId, completed: true, daysAgo: base - (day - 1) * 5 });
+  }
+}
+
+/**
+ * @param {import('mongoose').Document[]} clients
+ * @param {import('mongoose').Types.ObjectId} caregiverId
+ */
+async function seedBulkOnboardingComplete(clients, caregiverId) {
+  if (!clients?.length) return;
+  console.log(`Seeding completed onboarding (calls only) for ${clients.length} additional client(s)...`);
+  for (const c of clients) {
+    await seedJourneyCompleteCallsOnly(c._id, caregiverId);
+  }
+}
+
+/**
+ * Agnes Alphabet: day 1 in progress (answers + incomplete session) — sole in-flight example for UI.
+ * Barnaby Button: journey complete (calls only), like a typical long-term resident.
+ * Margaret Thompson: full journey with captures (incl. mood flag on day 3) for testing historic answers.
  *
  * @param {import('mongoose').Document} client1
  * @param {import('mongoose').Document} client2
@@ -119,13 +135,15 @@ async function seedJourneyComplete(clientId, caregiverId) {
  * @param {import('mongoose').Types.ObjectId} caregiverId
  */
 async function seedPrimaryTestClientsOnboarding(client1, client2, client3, caregiverId) {
-  console.log('Seeding onboarding on primary test clients (day-1 WIP, day-2 WIP, complete)...');
+  console.log('Seeding onboarding on primary test clients (one in progress, two complete)...');
   await seedDay1InProgress(client1._id, caregiverId);
-  await seedDay2InProgress(client2._id, caregiverId);
+  await seedJourneyCompleteCallsOnly(client2._id, caregiverId);
   await seedJourneyComplete(client3._id, caregiverId);
-  console.log('Onboarding seed: Agnes (day 1 WIP), Barnaby (day 2 WIP), Margaret (complete)');
+  console.log('Onboarding seed: Agnes (day 1 WIP), Barnaby (complete, calls only), Margaret (complete + answers)');
 }
 
 module.exports = {
   seedPrimaryTestClientsOnboarding,
+  seedJourneyCompleteCallsOnly,
+  seedBulkOnboardingComplete,
 };

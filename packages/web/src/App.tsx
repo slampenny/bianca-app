@@ -27,6 +27,7 @@ import { AlertsPage } from "./pages/AlertsPage"
 import { AlertDetailPage } from "./pages/AlertDetailPage"
 import { ReportTemplateDetailPage } from "./pages/ReportTemplateDetailPage"
 import { ReportsPage } from "./pages/ReportsPage"
+import { DailyDigestPage } from "./pages/DailyDigestPage"
 import { ProfilePage } from "./pages/ProfilePage"
 import { CaregiversPage } from "./pages/CaregiversPage"
 import { CaregiverFormPage } from "./pages/CaregiverFormPage"
@@ -69,6 +70,7 @@ export default function App() {
                 </Route>
                 <Route path="reports/:templateId" element={<ReportTemplateDetailPage />} />
                 <Route path="reports" element={<ReportsPage />} />
+                <Route path="daily-digest" element={<DailyDigestPage />} />
                 <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
                   <Route path="caregivers" element={<CaregiversPage />} />
                   <Route path="caregivers/new" element={<CaregiverFormPage />} />

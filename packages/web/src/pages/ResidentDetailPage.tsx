@@ -15,6 +15,7 @@ import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdat
 import type { MedicalAnalysisResult, MedicalAnalysisSummaryResponse } from "../services/api/medicalAnalysisApi"
 import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
 import { AvatarPicker } from "../components/AvatarPicker"
+import { ClientOnboardingSection } from "../components/ClientOnboardingSection"
 import { canAddResidents } from "../lib/roleAccess"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -633,6 +634,8 @@ export function ResidentDetailPage() {
           </button>
         </div>
       ) : null}
+
+      {apiClient ? <ClientOnboardingSection clientId={apiRecordId(apiClient)} residentPathId={residentId || ""} /> : null}
 
       {canManageResidents ? (
         <div className="va-card va-card-pad" data-testid="resident-schedules-card">

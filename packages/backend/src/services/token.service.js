@@ -288,6 +288,35 @@ const generateInviteToken = async (caregiver) => {
   return token;
 };
 
+const generateSuperAdminInviteToken = async (caregiver) => {
+  const caregiverId = extractCaregiverId(caregiver);
+  const expires = moment().add(config.jwt.inviteExpirationMinutes, 'minutes');
+  const token = generateToken(caregiverId, expires, tokenTypes.SUPERADMIN_INVITE);
+  await saveToken(token, caregiverId, expires, tokenTypes.SUPERADMIN_INVITE);
+  return token;
+};
+
+/**
+ * Accept either facility invite or super-admin invite JWT (same expiry rules).
+ * @param {string} token
+ * @returns {Promise<{ tokenDoc: *, inviteKind: 'staff' | 'superAdmin' }>}
+ */
+const verifyStaffOrSuperAdminInviteToken = async (token) => {
+  let lastError;
+  for (const type of [tokenTypes.INVITE, tokenTypes.SUPERADMIN_INVITE]) {
+    try {
+      const tokenDoc = await verifyToken(token, type);
+      return {
+        tokenDoc,
+        inviteKind: type === tokenTypes.SUPERADMIN_INVITE ? 'superAdmin' : 'staff',
+      };
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+};
+
 /**
  * Generate reset password token
  * @param {string} email
@@ -351,6 +380,8 @@ module.exports = {
   saveToken,
   generateAuthTokens,
   generateInviteToken,
+  generateSuperAdminInviteToken,
+  verifyStaffOrSuperAdminInviteToken,
   generateResetPasswordToken,
   generateVerifyEmailToken,
   generateClientConsentToken,

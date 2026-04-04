@@ -562,6 +562,7 @@ async function seedDatabaseDemo() {
     const demoClients = await createDemoClients(caregiverOneRecord, org);
     const clientsForDemoConversations = [...baseClients, client3, ...demoClients];
     await onboardingSeeder.seedPrimaryTestClientsOnboarding(client1, client2, client3, caregiverOneRecord._id);
+    await onboardingSeeder.seedBulkOnboardingComplete(demoClients, caregiverOneRecord._id);
     const allClients = [...clientsForDemoConversations];
 
     // Seed base conversations
@@ -639,7 +640,9 @@ async function seedDatabaseDemo() {
 
     console.log('Demo database seeded successfully!');
     console.log(`Created:`);
-    console.log(`- ${allClients.length} clients (Agnes/Barnaby/Margaret: onboarding day-1 WIP, day-2 WIP, complete)`);
+    console.log(
+      `- ${allClients.length} clients (onboarding: Agnes day-1 WIP; Barnaby/Margaret + ${demoClients.length} demo clients complete)`
+    );
     console.log(`- ${allConversations.length} conversations`);
     console.log(`- ${paymentMethods.length} payment methods`);
     console.log(`- Multiple schedules, alerts, and invoices`);

@@ -230,4 +230,3 @@ devops/
 # Scripts and configs not needed in container
 scripts/
 *.sh
-!docker-entrypoint.sh

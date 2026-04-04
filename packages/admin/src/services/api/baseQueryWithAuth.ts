@@ -11,7 +11,9 @@ function isAuthPath(url: string): boolean {
   return (
     url.includes("/auth/login") ||
     url.includes("/auth/refresh-tokens") ||
-    url.includes("/auth/logout")
+    url.includes("/auth/logout") ||
+    url.includes("/auth/invite-info") ||
+    url.includes("/auth/registerWithInvite")
   )
 }
 

@@ -1,11 +1,12 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { isAlertUnreadForCaregiver, mapClientToResident } from "../lib/liveData"
 import { formatActivityRowTime } from "../lib/timeFormat"
 import { useGetCallsByHourTodayQuery, useGetRecentActivityQuery } from "../services/api/activityApi"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
-import { useGetAllClientsQuery } from "../services/api/clientApi"
+import { useGetAllClientsQuery, useGetClientsOnboardingRollupsQuery } from "../services/api/clientApi"
 import { useDemo } from "../state/DemoContext"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -53,6 +54,11 @@ export function DashboardPage() {
   )
 
   const { data: clientPages } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
+  const {
+    data: onboardingRollupsRes,
+    isLoading: onbRollLoading,
+    isError: onbRollError,
+  } = useGetClientsOnboardingRollupsQuery(undefined, { skip: !authed, refetchOnFocus: true })
   const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
 
   const clients = clientPages?.results ?? []
@@ -127,6 +133,19 @@ export function DashboardPage() {
     if (m <= 0) return 7
     return Math.max(7, Math.ceil(m / 7) * 7)
   }, [hourlyChartData])
+
+  const onboardingCounts = useMemo(() => {
+    const vals = Object.values(onboardingRollupsRes?.rollups ?? {})
+    let complete = 0
+    let active = 0
+    let notStarted = 0
+    for (const u of vals) {
+      if (u.journeyComplete) complete += 1
+      else if (u.hasAnyOnboardingActivity) active += 1
+      else notStarted += 1
+    }
+    return { complete, active, notStarted, total: vals.length }
+  }, [onboardingRollupsRes])
 
   return (
     <div data-testid="home-header" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
@@ -205,6 +224,57 @@ export function DashboardPage() {
         <MetricCard icon={<PhoneIcon size={20} />} value={callsCompleted} label="Calls Completed (24h)" accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
         <MetricCard icon={<ChartGlyph />} value={`${successRate}%`} label="Answer rate (24h)" accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
       </div>
+
+      {authed ? (
+        <div className="va-card va-card-pad" data-testid="dashboard-onboarding-card">
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
+            <div>
+              <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)", margin: 0 }}>Voice onboarding</h2>
+              <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginTop: 4, maxWidth: 520 }}>
+                Four-day call journey per client. Use Residents to filter or drill into a profile for answers.
+              </p>
+            </div>
+          </div>
+          {onbRollError ? (
+            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-red-600)" }}>Could not load onboarding summary.</p>
+          ) : onbRollLoading ? (
+            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>Loading onboarding summary…</p>
+          ) : (
+            <>
+              <div
+                style={{
+                  marginTop: "1rem",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                  gap: "0.75rem",
+                }}
+              >
+                <OnboardingStat value={onboardingCounts.active} label="In progress" accent="var(--va-amber-50)" border="var(--va-amber-200)" />
+                <OnboardingStat value={onboardingCounts.notStarted} label="Not started" accent="var(--va-slate-50)" border="var(--va-slate-200)" />
+                <OnboardingStat value={onboardingCounts.complete} label="Complete" accent="var(--va-emerald-50)" border="var(--va-emerald-200)" />
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem", marginTop: "1rem" }}>
+                <Link to="/residents?onboarding=in_progress" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+                  View in progress
+                </Link>
+                <Link to="/residents?onboarding=not_started" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+                  View not started
+                </Link>
+                <Link to="/residents?onboarding=complete" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+                  View complete
+                </Link>
+                <Link to="/residents" className="va-btn-ghost" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+                  All residents
+                </Link>
+              </div>
+              <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: "0.65rem", marginBottom: 0 }}>
+                Based on {onboardingCounts.total} client{onboardingCounts.total === 1 ? "" : "s"} you can access ·{" "}
+                <code style={{ fontSize: "0.65em" }}>GET /clients/onboarding-rollups</code>
+              </p>
+            </>
+          )}
+        </div>
+      ) : null}
 
       <div
         style={{
@@ -372,6 +442,24 @@ export function DashboardPage() {
           .va-dash-grid { grid-template-columns: 3fr 2fr !important; }
         }
       `}</style>
+    </div>
+  )
+}
+
+function OnboardingStat({ value, label, accent, border }: { value: number; label: string; accent: string; border: string }) {
+  return (
+    <div
+      style={{
+        borderRadius: "0.65rem",
+        border: `1px solid ${border}`,
+        background: accent,
+        padding: "0.65rem 0.75rem",
+      }}
+    >
+      <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, color: "var(--va-navy)", lineHeight: 1.2 }}>{value}</p>
+      <p style={{ margin: "0.2rem 0 0", fontSize: "0.7rem", fontWeight: 600, color: "var(--va-slate-600)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        {label}
+      </p>
     </div>
   )
 }

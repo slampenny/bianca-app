@@ -19,6 +19,8 @@ const allRoles = {
     'createOwn:medicalAnalysis', // Add this for staff to trigger medical analysis for their patients
     'readOwn:familyDigest',
     'createOwn:familyDigest',
+    'readOwn:caregiverDailyDigest',
+    'createOwn:caregiverDailyDigest',
     'readOwn:facilityReport',
   ],
   orgAdmin: [
@@ -63,6 +65,9 @@ const allRoles = {
     'createAny:medicalAnalysis', // Add this for orgAdmin to trigger medical analysis
     'readAny:familyDigest',
     'createAny:familyDigest',
+    'readOwn:caregiverDailyDigest',
+    'createOwn:caregiverDailyDigest',
+    'readAny:caregiverDailyDigest',
     'readAny:facilityReport',
     'readAny:privacy',
     'updateAny:privacy',

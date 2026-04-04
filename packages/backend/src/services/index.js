@@ -67,6 +67,7 @@ module.exports.etherealEmailRetriever = require('./etherealEmailRetriever.servic
 module.exports.analysisService = require('./analysis.service');
 module.exports.reportService = require('./report.service');
 module.exports.familyWeeklyDigestService = require('./familyWeeklyDigest.service');
+module.exports.caregiverDailyDigestService = require('./caregiverDailyDigest.service');
 module.exports.facilityReportsService = require('./facilityReports.service');
 module.exports.activityService = require('./activity.service');
 module.exports.cacheService = require('./cache.service');

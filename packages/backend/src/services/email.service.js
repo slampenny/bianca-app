@@ -510,6 +510,48 @@ const sendInviteEmail = async (to, inviteLink, locale = 'en', caregiverName = nu
 };
 
 /**
+ * Super-admin console invite (same transport as facility invite; different copy and link target).
+ */
+const sendSuperAdminInviteEmail = async (to, inviteLink, locale = 'en', caregiverName = null) => {
+  const previousLocale = i18n.getLocale();
+  i18n.setLocale(locale);
+
+  const subject = i18n.__
+    ? i18n.__('superAdminInviteEmail.subject')
+    : 'Bianca — Super administrator invitation';
+
+  const greeting = caregiverName ? `Dear ${caregiverName},` : 'Dear colleague,';
+
+  let text;
+  if (i18n.__) {
+    const template = i18n.__('superAdminInviteEmail.text');
+    text = template.replace('%s', inviteLink).replace(/Dear colleague,?/i, greeting);
+  } else {
+    text = `${greeting}\n\nYou have been invited to become a Bianca super administrator. Use the link below to create your password and access the admin console:\n\n${inviteLink}\n\nThis invitation expires in 7 days. If you did not expect this email, ignore it.\n\n— Bianca`;
+  }
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #2c3e50; margin-top: 0;">Super administrator invitation</h2>
+        <p style="color: #555; line-height: 1.6;">${greeting}</p>
+        <p style="color: #555; line-height: 1.6;">You have been invited to access the Bianca super-admin console. Complete setup with the button below.</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${inviteLink}" style="background-color: #1a365d; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Accept invitation</a>
+        </div>
+        <p style="color: #777; font-size: 14px;">This invitation expires in 7 days.</p>
+        <p style="color: #777; font-size: 14px;">If you did not expect this message, you can ignore it.</p>
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">— Bianca</p>
+      </div>
+    </div>
+  `;
+
+  await sendEmail(to, subject, text, html);
+  i18n.setLocale(previousLocale);
+  logger.info(`Super-admin invite email queued for ${to} (locale: ${locale})`);
+};
+
+/**
  * Send reset password email
  * @param {string} to
  * @param {string} token
@@ -949,6 +991,7 @@ module.exports = {
   initializeEmailTransport, // Call this at application startup
   sendEmail,
   sendInviteEmail,
+  sendSuperAdminInviteEmail,
   sendResetPasswordEmail,
   sendVerificationEmail,
   sendPrivacyDataEmail,
