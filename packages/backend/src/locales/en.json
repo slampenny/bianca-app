@@ -71,6 +71,10 @@
 		"completedMinutes": "Check-in completed (about %s min).",
 		"completedNoTranscript": "Check-in completed; no written summary yet.",
 		"languageMismatchExplanation": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). Sentiment summary only.",
-		"emailSoon": "Email delivery for this digest is not enabled yet; you can review it here anytime."
+		"languageMismatchExplanationNoSentiment": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). No sentiment analysis is available for these calls.",
+		"emailScreenHint": "Use “Email digest” to send a copy to your verified account email, or check “Email me when I build” when you generate the digest.",
+		"emailSubject": "Daily care digest — %s",
+		"emailPlainIntro": "This message summarizes wellness check-ins for your assigned residents. Open the HTML version for the full layout.",
+		"emailConfidentialFooter": "Confidential — for the intended caregiver only. Do not forward."
 	}
 }

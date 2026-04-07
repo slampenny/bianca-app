@@ -4,6 +4,7 @@ const { objectId } = require('./custom.validation');
 const createDigest = {
   body: Joi.object().keys({
     digestDate: Joi.string().optional().allow('', null),
+    sendEmail: Joi.boolean().optional(),
   }),
 };
 

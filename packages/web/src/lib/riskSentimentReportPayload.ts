@@ -1,4 +1,3 @@
-import type { ReportPayload } from "../data/reportsMock"
 import type { Client } from "../services/api/api.types"
 import { mapClientToResident } from "./liveData"
 
@@ -22,48 +21,47 @@ function sentimentLabel(dir: Client["sentimentTrendDirection"]): string {
   return "—"
 }
 
-/** Same risk/sentiment signals as the Residents list and mobile home (merged client payload). */
-export function buildRiskSentimentReportPayload(
-  clients: Client[],
-  opts: { facilityLine: string; generatedAtLabel: string },
-): ReportPayload {
+export function riskSentimentReportSubtitle(clientCount: number, scopeFullOrganization: boolean): string {
+  if (scopeFullOrganization) {
+    return `All residents (${clientCount})`
+  }
+  return `Your residents (${clientCount})`
+}
+
+/** One table row (without per-resident trend series — use the live report for sparklines). */
+export function buildRiskSentimentTableRowStrings(client: Client): [string, string, string, string, string] {
+  const r = mapClientToResident(client)
+  const name = (client.preferredName || client.name || "—").trim()
+  const room = (client.room && String(client.room).trim()) || "—"
+  const risk = riskLevelLabel(r.riskLevel)
+  const sentiment = sentimentLabel(client.sentimentTrendDirection)
+  let notes = "—"
+  if (
+    (client.sentimentAnalyzedConversations ?? 0) === 0 &&
+    client.latestOverallRiskScore == null &&
+    !client.sentimentTrendDirection
+  ) {
+    notes = "No analysis yet"
+  } else if (r.riskType === "sentiment") {
+    notes = "Sentiment-driven risk signal"
+  }
+  return [name, room, risk, sentiment, notes]
+}
+
+export function buildRiskSentimentCsvExport(clients: Client[]): { headers: string[]; rows: string[][] } {
+  const headers = [
+    "Resident",
+    "Room",
+    "Risk level",
+    "Sentiment",
+    "Sentiment trend (30d)",
+    "Notes",
+  ]
   const rows = [...clients]
     .map((c) => {
-      const r = mapClientToResident(c)
-      const name = (c.preferredName || c.name || "—").trim()
-      const room = (c.room && String(c.room).trim()) || "—"
-      const risk = riskLevelLabel(r.riskLevel)
-      const sentiment = sentimentLabel(c.sentimentTrendDirection)
-      let notes = "—"
-      if (
-        (c.sentimentAnalyzedConversations ?? 0) === 0 &&
-        c.latestOverallRiskScore == null &&
-        !c.sentimentTrendDirection
-      ) {
-        notes = "No analysis yet"
-      } else if (r.riskType === "sentiment") {
-        notes = "Sentiment-driven risk signal"
-      }
-      return [name, room, risk, sentiment, notes]
+      const [name, room, risk, sentiment, notes] = buildRiskSentimentTableRowStrings(c)
+      return [name, room, risk, sentiment, "", notes]
     })
     .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))
-
-  return {
-    id: "risk_sentiment",
-    title: "Risk & sentiment trend",
-    subtitle: `All residents (${clients.length})`,
-    facilityLine: opts.facilityLine,
-    generatedAtLabel: opts.generatedAtLabel,
-    narrative: [
-      "Figures below match the Residents list and the mobile app home screen: latest fraud/abuse risk score and recent conversation sentiment summary.",
-      'Residents with no completed analyses yet show "None" / "—" until data exists.',
-    ],
-    tables: [
-      {
-        caption: "Roster · current signals",
-        headers: ["Resident", "Room", "Risk level", "Sentiment", "Notes"],
-        rows,
-      },
-    ],
-  }
+  return { headers, rows }
 }

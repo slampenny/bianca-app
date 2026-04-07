@@ -1,7 +1,12 @@
 const { AccessControl } = require('accesscontrol');
 
 const allRoles = {
-  invited: ['readOwn:caregiver', 'updateOwn:caregiver'],
+  invited: [
+    'readOwn:caregiver',
+    'updateOwn:caregiver',
+    'readOwn:caregiverDailyDigest',
+    'createOwn:caregiverDailyDigest',
+  ],
   staff: [
     'readOwn:caregiver',
     'updateOwn:caregiver',
@@ -68,6 +73,7 @@ const allRoles = {
     'readOwn:caregiverDailyDigest',
     'createOwn:caregiverDailyDigest',
     'readAny:caregiverDailyDigest',
+    'createAny:caregiverDailyDigest',
     'readAny:facilityReport',
     'readAny:privacy',
     'updateAny:privacy',

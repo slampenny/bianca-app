@@ -60,6 +60,23 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.va-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.va-logo-mark {
+  display: block;
+  height: 1.75rem;
+  width: 1.75rem;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.va-logo-mark--collapsed {
+  height: 1.5rem;
+  width: 1.5rem;
+}
 .va-logo {
   font-size: 1.125rem;
   font-weight: 600;
@@ -1105,4 +1122,35 @@ html.va-dark .va-report-doc-table td {
 html.va-dark .va-report-doc-table th {
   background: #334155;
   color: #e2e8f0;
+}
+
+@media print {
+  .va-no-print {
+    display: none !important;
+  }
+  .va-app > aside,
+  .va-header,
+  .va-toast {
+    display: none !important;
+  }
+  .va-main-col {
+    display: block !important;
+    width: 100% !important;
+  }
+  .va-scroll {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .va-app {
+    background: #fff !important;
+    min-height: 0 !important;
+  }
+  .va-card {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  .va-report-risk-sentiment-print {
+    max-width: none !important;
+  }
 }

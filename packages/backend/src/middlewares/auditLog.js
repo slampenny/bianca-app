@@ -90,6 +90,12 @@ const PHI_ROUTES = {
   'POST /v1/caregiver-daily-digests': { action: 'CREATE', resource: 'caregiverDailyDigest', phiAccessed: true },
   'GET /v1/caregiver-daily-digests': { action: 'READ', resource: 'caregiverDailyDigest', phiAccessed: true },
   'GET /v1/caregiver-daily-digests/:digestId': { action: 'READ', resource: 'caregiverDailyDigest', phiAccessed: true },
+  'POST /v1/caregiver-daily-digests/:digestId/send': {
+    action: 'EXPORT',
+    resource: 'caregiverDailyDigest',
+    phiAccessed: true,
+    highRisk: true,
+  },
 
   'GET /facility-reports/call-completion-log': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
   'GET /facility-reports/alert-audit-trail': { action: 'READ', resource: 'facilityReport', phiAccessed: true },

@@ -1,15 +1,21 @@
 const path = require('path');
 const httpStatus = require('http-status');
 const i18n = require('i18n');
+const validator = require('validator');
 const { Client, Call, Conversation, Caregiver, CaregiverDailyDigest, Org } = require('../models');
+const { toOrgIdString } = require('../dtos/caregiver.dto');
+const { toIdString } = require('../utils/accessControl');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const emailService = require('./email.service');
 
 i18n.configure({
   locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
   directory: path.join(__dirname, '../locales'),
   defaultLocale: 'en',
   updateFiles: false,
+  objectNotation: true,
+  logWarnFn() {},
 });
 
 const truncate = (s, max) => {
@@ -111,7 +117,7 @@ const ensureCaregiverCanAccessTarget = async (requester, targetCaregiverId) => {
     if (!target) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
     }
-    if (target.org.toString() !== requester.org.toString()) {
+    if (toOrgIdString(target.org) !== toOrgIdString(requester.org)) {
       throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this caregiver');
     }
     return target;
@@ -124,8 +130,9 @@ const ensureStaffCanAccessClient = async (requester, client) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
   if (requester.role === 'superAdmin') return;
-  const clientOrg = client.org?._id ? client.org._id.toString() : client.org.toString();
-  if (requester.org.toString() !== clientOrg) {
+  const clientOrg = toOrgIdString(client.org);
+  const requesterOrg = toOrgIdString(requester.org);
+  if (!requesterOrg || !clientOrg || requesterOrg !== clientOrg) {
     throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client');
   }
   if (requester.role === 'orgAdmin') return;
@@ -143,6 +150,32 @@ const ensureStaffCanAccessClient = async (requester, client) => {
 };
 
 /**
+ * Residents in the digest must stay inside the caregiver's org.
+ * - orgAdmin / superAdmin: all clients in the org (facility-wide digest for email + UI).
+ * - staff, invited, and other roles: only clients on this caregiver's roster or with this caregiver on client.caregivers
+ *   (each caregiver's email digest is limited to their patients).
+ */
+const findClientsForDailyDigest = async (caregiverDoc) => {
+  const orgId = toOrgIdString(caregiverDoc.org);
+  if (!orgId) {
+    return [];
+  }
+  const selectFields = 'name preferredName preferredLanguage org caregivers';
+
+  if (caregiverDoc.role === 'orgAdmin' || caregiverDoc.role === 'superAdmin') {
+    return Client.find({ org: orgId }).select(selectFields).sort({ name: 1 }).lean();
+  }
+
+  const rosterIds = (caregiverDoc.clients || []).map((c) => toIdString(c._id || c)).filter(Boolean);
+  const caregiverIdStr = toIdString(caregiverDoc._id);
+  const filter = {
+    org: orgId,
+    $or: [{ caregivers: caregiverIdStr }, { _id: { $in: rosterIds } }],
+  };
+  return Client.find(filter).select(selectFields).sort({ name: 1 }).lean();
+};
+
+/**
  * Build localized digest payload for one caregiver and UTC calendar day.
  */
 const buildPayloadForCaregiverDay = async (caregiverDoc, digestDateStart) => {
@@ -152,10 +185,7 @@ const buildPayloadForCaregiverDay = async (caregiverDoc, digestDateStart) => {
   const org = await Org.findById(caregiverDoc.org);
   const orgName = org?.name || '';
 
-  const clientIds = (caregiverDoc.clients || []).map((c) => (c._id ? c._id : c));
-  const clients = await Client.find({ _id: { $in: clientIds } })
-    .select('name preferredName preferredLanguage org caregivers')
-    .lean();
+  const clients = await findClientsForDailyDigest(caregiverDoc);
 
   const dateLabel = dayStart.toLocaleDateString(locale === 'en' ? 'en-US' : locale, {
     weekday: 'long',
@@ -220,15 +250,21 @@ const buildPayloadForCaregiverDay = async (caregiverDoc, digestDateStart) => {
     const clientLangName = languageDisplayName(locale, clientLang);
     const caregiverLangName = languageDisplayName(locale, locale);
 
+    const hasSentiment = sentiment && typeof sentiment === 'object' && Object.keys(sentiment).length > 0;
+    let languageMismatchExplanation = null;
+    if (languageMismatch && calls.length > 0) {
+      languageMismatchExplanation = hasSentiment
+        ? tx(locale, 'caregiverDailyDigest.languageMismatchExplanation', clientLangName, caregiverLangName)
+        : tx(locale, 'caregiverDailyDigest.languageMismatchExplanationNoSentiment', clientLangName, caregiverLangName);
+    }
+
     entries.push({
       clientId: cl._id.toString(),
       clientName: displayName,
       clientPreferredLanguage: clientLang,
       caregiverPreferredLanguage: locale,
       languageMismatch,
-      languageMismatchExplanation: languageMismatch
-        ? tx(locale, 'caregiverDailyDigest.languageMismatchExplanation', clientLangName, caregiverLangName)
-        : null,
+      languageMismatchExplanation,
       conversationSummaryShort,
       sentiment,
       callsPlaced: calls.length,
@@ -248,7 +284,7 @@ const buildPayloadForCaregiverDay = async (caregiverDoc, digestDateStart) => {
       sentiment: tx(locale, 'caregiverDailyDigest.labelSentiment'),
       callsToday: tx(locale, 'caregiverDailyDigest.labelCallsToday'),
       noActivity: tx(locale, 'caregiverDailyDigest.noActivity'),
-      emailSoon: tx(locale, 'caregiverDailyDigest.emailSoon'),
+      emailScreenHint: tx(locale, 'caregiverDailyDigest.emailScreenHint'),
     },
     entries,
     generatedAt: new Date().toISOString(),
@@ -257,14 +293,116 @@ const buildPayloadForCaregiverDay = async (caregiverDoc, digestDateStart) => {
   return { payload, locale };
 };
 
-const createOrUpdateDigest = async (requester, digestDateInput) => {
+const escapeHtml = (s) =>
+  String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+const formatSentimentPlain = (sentiment) => {
+  if (!sentiment || typeof sentiment !== 'object') return '';
+  const parts = [];
+  if (typeof sentiment.overallSentiment === 'string') parts.push(sentiment.overallSentiment);
+  if (typeof sentiment.summary === 'string' && sentiment.summary) parts.push(sentiment.summary);
+  else if (typeof sentiment.patientMood === 'string' && sentiment.patientMood) parts.push(sentiment.patientMood);
+  if (Array.isArray(sentiment.keyEmotions) && sentiment.keyEmotions.length) {
+    parts.push(sentiment.keyEmotions.join(', '));
+  }
+  return parts.join(' — ');
+};
+
+const payloadToEmailHtml = (payload) => {
+  const { labels } = payload;
+  const rows = (payload.entries || [])
+    .map((e) => {
+      const mismatch = e.languageMismatch && e.languageMismatchExplanation ? `<p style="margin:0 0 8px;font-size:0.85rem;color:#b45309">${escapeHtml(e.languageMismatchExplanation)}</p>` : '';
+      const summary = e.conversationSummaryShort
+        ? `<p style="margin:0 0 4px"><strong>${escapeHtml(labels.conversationSummary)}</strong></p><p style="margin:0 0 8px">${escapeHtml(e.conversationSummaryShort)}</p>`
+        : e.callsPlaced === 0
+          ? `<p style="margin:0 0 8px;color:#64748b">${escapeHtml(labels.noActivity)}</p>`
+          : '';
+      const sent = formatSentimentPlain(e.sentiment);
+      const sentBlock = sent
+        ? `<p style="margin:0 0 4px"><strong>${escapeHtml(labels.sentiment)}</strong></p><p style="margin:0">${escapeHtml(sent)}</p>`
+        : '';
+      return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px">
+<h3 style="margin:0 0 8px;font-size:1rem">${escapeHtml(e.clientName)}</h3>
+<p style="margin:0 0 8px;font-size:0.8rem;color:#64748b">${escapeHtml(labels.callsToday)}: ${e.callsPlaced} · ${e.answeredCalls} answered</p>
+${mismatch}${summary}${sentBlock}
+</div>`;
+    })
+    .join('');
+  const footer = escapeHtml(
+    i18n.__({ phrase: 'caregiverDailyDigest.emailConfidentialFooter', locale: payload.localeHint || 'en' })
+  );
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/></head><body style="font-family:system-ui,sans-serif;max-width:640px;line-height:1.5;color:#0f172a">
+<p style="font-weight:700">bianca<span style="color:#14b8a6">.</span></p>
+<h1 style="font-size:1.25rem">${escapeHtml(payload.title)}</h1>
+<p style="color:#64748b;font-size:0.9rem">${escapeHtml(payload.subtitle)} · ${escapeHtml(payload.dateLabel)}</p>
+${rows}
+<p style="margin-top:24px;font-size:0.75rem;color:#94a3b8">${footer}</p>
+</body></html>`;
+};
+
+const payloadToPlainText = (payload) => {
+  const lines = [
+    payload.title,
+    `${payload.subtitle} · ${payload.dateLabel}`,
+    '',
+    i18n.__({ phrase: 'caregiverDailyDigest.emailPlainIntro', locale: payload.localeHint || 'en' }),
+    '',
+  ];
+  (payload.entries || []).forEach((e) => {
+    lines.push(`— ${e.clientName} —`);
+    lines.push(`${payload.labels.callsToday}: ${e.callsPlaced}, answered: ${e.answeredCalls}`);
+    if (e.languageMismatchExplanation) lines.push(e.languageMismatchExplanation);
+    if (e.conversationSummaryShort) lines.push(`${payload.labels.conversationSummary}: ${e.conversationSummaryShort}`);
+    const s = formatSentimentPlain(e.sentiment);
+    if (s) lines.push(`${payload.labels.sentiment}: ${s}`);
+    lines.push('');
+  });
+  lines.push(i18n.__({ phrase: 'caregiverDailyDigest.emailConfidentialFooter', locale: payload.localeHint || 'en' }));
+  return lines.join('\n');
+};
+
+/**
+ * Send digest email to the caregiver on file. Updates status to sent.
+ */
+const deliverDigestEmail = async (digest) => {
+  if (digest.status === 'sent') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Digest was already sent');
+  }
+  const caregiver = await Caregiver.findById(digest.caregiver).select('email name preferredLanguage');
+  if (!caregiver) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
+  }
+  const email = caregiver.email;
+  if (!email || !validator.isEmail(email)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'A verified email is required on your profile to send this digest');
+  }
+  const loc = normalizeLang(digest.locale || caregiver.preferredLanguage);
+  const payload = { ...digest.payload, localeHint: loc };
+  const html = payloadToEmailHtml(payload);
+  const text = payloadToPlainText(payload);
+  const subject = tx(loc, 'caregiverDailyDigest.emailSubject', payload.dateLabel || '');
+  await emailService.sendEmail(email, subject, text, html);
+  digest.status = 'sent';
+  digest.sentAt = new Date();
+  await digest.save();
+  logger.info(`[CaregiverDailyDigest] Sent digest ${digest.id} to ${email}`);
+  return digest;
+};
+
+const createOrUpdateDigest = async (requester, digestDateInput, options = {}) => {
+  const sendEmail = Boolean(options.sendEmail);
   const targetId = requester.id || requester._id;
   const caregiverDoc = await ensureCaregiverCanAccessTarget(requester, targetId);
   if (!caregiverDoc) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
   }
 
-  if (requester.role === 'staff') {
+  if (requester.role === 'staff' || requester.role === 'invited') {
     for (const c of caregiverDoc.clients || []) {
       const cl = await Client.findById(c._id || c);
       await ensureStaffCanAccessClient(requester, cl);
@@ -282,7 +420,12 @@ const createOrUpdateDigest = async (requester, digestDateInput) => {
     existing.status = 'draft';
     await existing.save();
     logger.info(`[CaregiverDailyDigest] Refreshed digest ${existing.id} for caregiver ${caregiverDoc._id}`);
-    return existing;
+    let out = existing;
+    if (sendEmail) {
+      const reloaded = await CaregiverDailyDigest.findById(existing._id);
+      out = await deliverDigestEmail(reloaded);
+    }
+    return out;
   }
 
   const doc = await CaregiverDailyDigest.create({
@@ -294,6 +437,10 @@ const createOrUpdateDigest = async (requester, digestDateInput) => {
     payload,
   });
   logger.info(`[CaregiverDailyDigest] Created digest ${doc.id} for caregiver ${caregiverDoc._id}`);
+  if (sendEmail) {
+    const reloaded = await CaregiverDailyDigest.findById(doc._id);
+    return deliverDigestEmail(reloaded);
+  }
   return doc;
 };
 
@@ -328,7 +475,7 @@ const getDigestById = async (requester, digestId) => {
   if (requester.role === 'superAdmin') {
     return digest;
   }
-  if (digest.org.toString() !== requester.org.toString()) {
+  if (toOrgIdString(digest.org) !== toOrgIdString(requester.org)) {
     throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this digest');
   }
   if (String(digest.caregiver) === String(requester.id || requester._id)) {
@@ -340,6 +487,11 @@ const getDigestById = async (requester, digestId) => {
   throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this digest');
 };
 
+const sendDigest = async (requester, digestId) => {
+  const digest = await getDigestById(requester, digestId);
+  return deliverDigestEmail(digest);
+};
+
 module.exports = {
   startOfUtcDayContaining,
   endOfUtcDay,
@@ -347,4 +499,5 @@ module.exports = {
   createOrUpdateDigest,
   queryDigests,
   getDigestById,
+  sendDigest,
 };

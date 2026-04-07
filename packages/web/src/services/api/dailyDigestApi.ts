@@ -27,7 +27,7 @@ export type CaregiverDailyDigestPayload = {
     sentiment: string
     callsToday: string
     noActivity: string
-    emailSoon: string
+    emailScreenHint: string
   }
   entries: CaregiverDailyDigestEntry[]
   generatedAt: string
@@ -39,8 +39,9 @@ export type CaregiverDailyDigest = {
   caregiver: string
   digestDate: string
   locale: string
-  status: string
+  status: "draft" | "sent" | string
   payload: CaregiverDailyDigestPayload
+  sentAt?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -73,11 +74,21 @@ export const dailyDigestApi = createApi({
       query: ({ digestId }) => `/caregiver-daily-digests/${digestId}`,
       providesTags: (_r, _e, { digestId }) => [{ type: "CaregiverDailyDigest", id: digestId }],
     }),
-    generateCaregiverDailyDigest: builder.mutation<CaregiverDailyDigest, { digestDate?: string }>({
+    generateCaregiverDailyDigest: builder.mutation<
+      CaregiverDailyDigest,
+      { digestDate?: string; sendEmail?: boolean }
+    >({
       query: (body) => ({
         url: "/caregiver-daily-digests",
         method: "POST",
         body,
+      }),
+      invalidatesTags: ["CaregiverDailyDigest"],
+    }),
+    sendCaregiverDailyDigest: builder.mutation<CaregiverDailyDigest, { digestId: string }>({
+      query: ({ digestId }) => ({
+        url: `/caregiver-daily-digests/${digestId}/send`,
+        method: "POST",
       }),
       invalidatesTags: ["CaregiverDailyDigest"],
     }),
@@ -88,4 +99,5 @@ export const {
   useListCaregiverDailyDigestsQuery,
   useGetCaregiverDailyDigestQuery,
   useGenerateCaregiverDailyDigestMutation,
+  useSendCaregiverDailyDigestMutation,
 } = dailyDigestApi

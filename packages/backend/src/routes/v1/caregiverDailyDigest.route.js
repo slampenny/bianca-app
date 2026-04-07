@@ -20,6 +20,14 @@ router
   );
 
 router
+  .route('/:digestId/send')
+  .post(
+    auth('createOwn:caregiverDailyDigest', 'createAny:caregiverDailyDigest'),
+    validate(caregiverDailyDigestValidation.digestIdParam),
+    caregiverDailyDigestController.sendDigest
+  );
+
+router
   .route('/:digestId')
   .get(
     auth('readOwn:caregiverDailyDigest', 'readAny:caregiverDailyDigest'),

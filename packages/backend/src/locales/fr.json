@@ -67,6 +67,10 @@
 		"completedMinutes": "Check-in completed (about %s min).",
 		"completedNoTranscript": "Check-in completed; no written summary yet.",
 		"languageMismatchExplanation": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). Sentiment summary only.",
-		"emailSoon": "Email delivery for this digest is not enabled yet; you can review it here anytime."
+		"languageMismatchExplanationNoSentiment": "Le texte de la conversation est omis car la langue préférée du résident (%s) diffère de la vôtre (%s). Aucune analyse de sentiment n’est disponible pour ces appels.",
+		"emailScreenHint": "Use 201cEmail digest201d to send a copy to your verified account email, or check 201cEmail me when I build201d when you generate the digest.",
+		"emailSubject": "Daily care digest 2014 %s",
+		"emailPlainIntro": "This message summarizes wellness check-ins for your assigned residents. Open the HTML version for the full layout.",
+		"emailConfidentialFooter": "Confidential 2014 for the intended caregiver only. Do not forward."
 	}
 }

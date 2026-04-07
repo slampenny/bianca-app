@@ -7,6 +7,8 @@ const callCompletionLogQuery = {
     dateTo: Joi.string().optional().allow(''),
     clientId: Joi.string().custom(objectId).optional(),
     orgId: Joi.string().custom(objectId).optional(),
+    page: Joi.number().integer().min(1).optional(),
+    limit: Joi.number().integer().min(1).max(200).optional(),
   }),
 };
 

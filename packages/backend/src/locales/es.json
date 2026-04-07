@@ -67,6 +67,10 @@
 		"completedMinutes": "Llamada de bienestar completada (unos %s min).",
 		"completedNoTranscript": "Llamada completada; aún no hay resumen escrito.",
 		"languageMismatchExplanation": "Se omite el texto de la conversación porque el idioma preferido del residente (%s) no coincide con el suyo (%s). Solo resumen de sentimiento.",
-		"emailSoon": "El envío por correo de este resumen aún no está activado; puede consultarlo aquí cuando quiera."
+		"languageMismatchExplanationNoSentiment": "Se omite el texto de la conversación porque el idioma preferido del residente (%s) no coincide con el suyo (%s). No hay análisis de sentimiento disponible para estos contactos.",
+		"emailScreenHint": "Use “Enviar resumen por correo” para enviar una copia a su correo verificado, o marque “Enviarme correo al generar” al crear el resumen.",
+		"emailSubject": "Resumen diario de atención — %s",
+		"emailPlainIntro": "Este mensaje resume las llamadas de bienestar de sus residentes asignados. Abra la versión HTML para el formato completo.",
+		"emailConfidentialFooter": "Confidencial — solo para el cuidador destinado. No reenviar."
 	}
 }

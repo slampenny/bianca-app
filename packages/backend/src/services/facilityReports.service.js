@@ -76,18 +76,21 @@ const getAccessibleClientIds = async (caregiver, orgObjectId) => {
   if (caregiver.role === 'orgAdmin' || caregiver.role === 'superAdmin') {
     return Client.find({ org: orgObjectId }).distinct('_id');
   }
-  const caregiverDoc = await Caregiver.findById(caregiver.id || caregiver._id).select('clients');
+  const selfId = caregiver.id || caregiver._id;
+  const caregiverObjectId = new mongoose.Types.ObjectId(selfId);
+  const caregiverDoc = await Caregiver.findById(caregiverObjectId).select('clients');
   const ids = new Set();
   for (const p of caregiverDoc?.clients || []) {
     ids.add(p._id ? p._id.toString() : p.toString());
   }
-  const fromCalls = await Call.distinct('clientId', { caregiverId: caregiver.id });
-  for (const cid of fromCalls) {
+  const assignedInOrg = await Client.find({
+    org: orgObjectId,
+    caregivers: caregiverObjectId,
+  }).distinct('_id');
+  for (const cid of assignedInOrg) {
     if (cid) ids.add(cid.toString());
   }
-  const list = [...ids].map((id) => new mongoose.Types.ObjectId(id));
-  const inOrg = await Client.find({ _id: { $in: list }, org: orgObjectId }).distinct('_id');
-  return inOrg;
+  return [...ids].map((id) => new mongoose.Types.ObjectId(id));
 };
 
 const formatOutcome = (call) => {
@@ -105,12 +108,33 @@ const formatDuration = (call) => {
   return `${m}m ${s}s`;
 };
 
+const CALL_LOG_DEFAULT_LIMIT = 50;
+const CALL_LOG_MAX_LIMIT = 200;
+
+const answeredCallsFilter = {
+  $or: [
+    { callOutcome: 'answered' },
+    {
+      status: 'completed',
+      $or: [{ duration: { $gt: 0 } }, { callDuration: { $gt: 0 } }],
+    },
+  ],
+};
+
 /**
  * Call completion log for an org (and optional single client), date range on startTime.
+ * Newest calls first. Paginated (default limit 50, max 200).
  */
-const getCallCompletionLog = async (caregiver, { dateFrom, dateTo, clientId, orgId: queryOrgId }) => {
+const getCallCompletionLog = async (caregiver, { dateFrom, dateTo, clientId, orgId: queryOrgId, page: pageIn, limit: limitIn }) => {
   const orgObjectId = resolveOrgId(caregiver, queryOrgId);
   const { from, to } = parseDateRange(dateFrom, dateTo);
+
+  const page = Math.max(1, parseInt(pageIn, 10) || 1);
+  let limit = parseInt(limitIn, 10);
+  if (!Number.isFinite(limit) || limit < 1) {
+    limit = CALL_LOG_DEFAULT_LIMIT;
+  }
+  limit = Math.min(limit, CALL_LOG_MAX_LIMIT);
 
   let clientFilter;
   if (clientId) {
@@ -132,23 +156,28 @@ const getCallCompletionLog = async (caregiver, { dateFrom, dateTo, clientId, org
         dateTo: to.toISOString(),
         summary: { totalCalls: 0, answeredCount: 0, orgId: orgObjectId.toString() },
         rows: [],
+        pagination: { page: 1, limit, totalPages: 0, totalResults: 0 },
       };
     }
     clientFilter = { clientId: { $in: ids } };
   }
 
-  const calls = await Call.find({
+  const baseFilter = {
     ...clientFilter,
     startTime: { $gte: from, $lte: to },
-  })
-    .sort({ startTime: 1 })
-    .populate('clientId', 'name preferredName')
-    .lean();
+  };
 
-  let answeredCount = 0;
-  const rows = calls.map((c) => {
-    const answered = c.callOutcome === 'answered' || (Number(c.duration) > 0 && c.status === 'completed');
-    if (answered) answeredCount += 1;
+  const [answeredCount, paginated] = await Promise.all([
+    Call.countDocuments({ ...baseFilter, ...answeredCallsFilter }),
+    Call.paginate(baseFilter, {
+      sortBy: 'startTime:desc',
+      page,
+      limit,
+      populate: 'clientId',
+    }),
+  ]);
+
+  const rows = paginated.results.map((c) => {
     const clientDoc = c.clientId;
     const residentLabel = clientDoc
       ? clientDoc.preferredName || clientDoc.name || '—'
@@ -171,11 +200,17 @@ const getCallCompletionLog = async (caregiver, { dateFrom, dateTo, clientId, org
     dateFrom: from.toISOString(),
     dateTo: to.toISOString(),
     summary: {
-      totalCalls: rows.length,
+      totalCalls: paginated.totalResults,
       answeredCount,
       orgId: orgObjectId.toString(),
     },
     rows,
+    pagination: {
+      page: paginated.page,
+      limit: paginated.limit,
+      totalPages: paginated.totalPages,
+      totalResults: paginated.totalResults,
+    },
   };
 };
 
