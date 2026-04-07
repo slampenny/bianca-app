@@ -59,6 +59,7 @@ const ReconnectionManager = require('./ai/realtime/reconnection.manager');
 const AudioProcessor = require('./ai/realtime/audio.processor');
 const ConnectionManager = require('./ai/realtime/connection.manager');
 const MessageHandler = require('./ai/realtime/message.handler');
+const { isFiller } = require('./ai/realtime/filler-words');
 
 // STRANGLER FIG: Keep old constants for backward compatibility
 // These will be removed once all code is migrated
@@ -481,6 +482,10 @@ class OpenAIRealtimeService {
 
       // Per-call only: assistant transcripts waiting for user row to leave [Speaking...] (concurrent calls each have their own array)
       _deferredAssistantQueue: [],
+      // Transcript-ordering / dual-talk: user speech_stopped while _aiIsSpeaking — defer response.create until response.done clears the guard
+      _pendingUserResponseAfterAiStops: false,
+      // True from websocket send of response.create until response.created ack (or cleanup). Unlike _responseCreated, which is set only on that event.
+      _responseCreateInFlight: false,
 
       // Track timing for each speaker
       lastUserSpeechTime: null,
@@ -613,6 +618,16 @@ class OpenAIRealtimeService {
       return;
     }
 
+    // _responseCreated is set when OpenAI emits response.created, not when we send — so it does not close the
+    // gap between send and ack (e.g. double speech_stopped + deferred flush within ~200ms). Guard with in-flight.
+    if (connection._responseCreateInFlight) {
+      logger.warn(
+        `[OpenAI Realtime] response.create already in flight for ${callId} — skipping duplicate sendResponseCreate`
+      );
+      return;
+    }
+    connection._responseCreateInFlight = true;
+
     try {
       const responseCreateEvent = {
         type: 'response.create',
@@ -642,6 +657,7 @@ class OpenAIRealtimeService {
         if (currentConn && currentConn._responseCreated && currentConn._responseStartTime === connection._responseStartTime) {
           logger.warn(`[OpenAI Realtime] Response timeout for ${callId} - resetting response flag after 10 seconds`);
           currentConn._responseCreated = false;
+          currentConn._responseCreateInFlight = false;
           currentConn._responseStartTime = null;
 
           // Force a new response generation after timeout
@@ -681,6 +697,7 @@ class OpenAIRealtimeService {
           if (responseAge > 30000) { // 30 seconds
             logger.warn(`[OpenAI Realtime] Aggressive timeout for ${callId} - response stuck for ${responseAge}ms, forcing reset`);
             currentConn._responseCreated = false;
+            currentConn._responseCreateInFlight = false;
             currentConn._responseStartTime = null;
             clearInterval(aggressiveTimeout);
 
@@ -725,66 +742,9 @@ class OpenAIRealtimeService {
         pendingCommit: connection.pendingCommit
       });
     } catch (err) {
+      connection._responseCreateInFlight = false;
       logger.error(`[OpenAI Realtime] CRITICAL: Error sending response.create for ${callId}: ${err.message}`);
     }
-  }
-
-  /**
-   * Get language-specific filler words
-   * @param {string} languageCode - Language code (en, es, fr, de, zh, ja, pt, it, ru, ar)
-   * @returns {Set<string>} - Set of filler words for that language
-   */
-  getFillerWordsForLanguage(languageCode) {
-    const fillerWordsByLanguage = {
-      'en': ['um', 'uh', 'ah', 'er', 'eh', 'hmm', 'hm', 'mm', 'mhm', 'uh-huh', 'oh', 'ahh', 'umm', 'uhh', 'err', 'ehh', 'hmmm', 'mmm', 'well', 'like', 'you know', 'i mean', 'so', 'actually', 'basically'],
-      'es': ['eh', 'este', 'pues', 'bueno', 'o sea', 'como', 'mm', 'hmm', 'ah', 'ay', 'uy', 'ehh', 'mmm', 'pues', 'entonces'],
-      'fr': ['euh', 'ben', 'alors', 'hein', 'mm', 'hmm', 'ah', 'oh', 'bah', 'quoi', 'tu vois', 'genre'],
-      'de': ['äh', 'ähm', 'hmm', 'mm', 'also', 'nun', 'ja', 'eh', 'oh', 'tja', 'weißt du', 'sozusagen'],
-      'zh': ['嗯', '呃', '那个', '就是', '然后', '这个', '啊', '哦', '呢', '吧'],
-      'ja': ['えー', 'あの', 'その', 'まあ', 'なんか', 'えっと', 'うーん', 'あー', 'んー', 'えーと'],
-      'pt': ['é', 'né', 'tipo', 'assim', 'então', 'hmm', 'mm', 'ah', 'oh', 'éé', 'néé', 'sabe'],
-      'it': ['eh', 'ehm', 'allora', 'cioè', 'tipo', 'mm', 'hmm', 'ah', 'oh', 'beh', 'sai', 'capisci'],
-      'ru': ['э', 'ээ', 'эм', 'ну', 'типа', 'как бы', 'мм', 'хм', 'а', 'о', 'вот', 'знаешь'],
-      'ar': ['إم', 'إيه', 'يعني', 'يعني', 'هه', 'أه', 'مم', 'حسناً', 'طيب', 'يعني']
-    };
-
-    // Default to English if language not found
-    const fillerWords = fillerWordsByLanguage[languageCode] || fillerWordsByLanguage['en'];
-    return new Set(fillerWords);
-  }
-
-  /**
-   * Check if transcript contains only filler words (um, ah, uh, etc.)
-   * Supports multiple languages based on patient's preferred language
-   * @param {string} transcript - The transcript to check
-   * @param {string} languageCode - Optional language code (en, es, fr, etc.). If not provided, uses English.
-   * @returns {boolean} - True if transcript is only filler words
-   */
-  isOnlyFillerWords(transcript, languageCode = 'en') {
-    if (!transcript || !transcript.trim()) {
-      return false; // Empty transcript is not filler words
-    }
-
-    // Normalize: lowercase, remove punctuation, split into words
-    const normalized = transcript.toLowerCase().trim();
-    const words = normalized.split(/\s+/).filter(word => word.length > 0);
-
-    // If no words, not filler
-    if (words.length === 0) {
-      return false;
-    }
-
-    // Get language-specific filler words
-    const fillerWords = this.getFillerWordsForLanguage(languageCode);
-
-    // Check if ALL words are filler words
-    const allFiller = words.every(word => {
-      // Remove punctuation from word
-      const cleanWord = word.replace(/[.,!?;:]/g, '');
-      return fillerWords.has(cleanWord);
-    });
-
-    return allFiller && words.length > 0;
   }
 
   /**
@@ -857,6 +817,7 @@ class OpenAIRealtimeService {
       this.isReconnecting.set(callId, true);
       currentConnState.webSocket = null;
       currentConnState.sessionReady = false;
+      currentConnState._responseCreateInFlight = false;
 
       const delay = this.calculateBackoffDelay(this.reconnectAttempts.get(callId) || 0);
       logger.info(`[OpenAI Realtime] Will attempt reconnect for ${callId} in ${delay}ms`);
@@ -1221,6 +1182,7 @@ class OpenAIRealtimeService {
 
           if (conn) {
             conn._userIsSpeaking = true;
+            conn._pendingUserResponseAfterAiStops = false;
             conn._lastUserSpeechStart = Date.now();
             conn._userTranscriptLiveBuffer = '';
             if (conn._userTranscriptFlushTimer) {
@@ -1255,8 +1217,16 @@ class OpenAIRealtimeService {
                 conn._responseCanceledAt = Date.now();
                 // Clear any pending assistant transcript since we're canceling
                 conn.pendingAssistantTranscript = '';
-                // Transition back to conversation active since AI was interrupted
-                this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
+                // GREETING_ACTIVE may only transition to GREETING_COMPLETE or ERROR — not CONVERSATION_ACTIVE.
+                // Invalid transitions were no-ops, leaving the call stuck in greeting_active so the first user
+                // turn never triggered a response (canAIRespond excludes greeting_active).
+                const st = this.getConversationState(callId);
+                if (st === CONVERSATION_STATES.GREETING_ACTIVE) {
+                  conn._waitingForInitialGreeting = false;
+                  this.transitionState(callId, CONVERSATION_STATES.GREETING_COMPLETE, 'initial_greeting_interrupted');
+                } else {
+                  this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
+                }
                 logger.info(`[OpenAI Realtime] Response canceled for ${callId} - will wait for user to finish before responding`);
               } catch (err) {
                 logger.error(`[OpenAI Realtime] Failed to cancel AI response: ${err.message}`);
@@ -1306,7 +1276,7 @@ class OpenAIRealtimeService {
                 }
                 
                 // Check if transcript is only filler words - if so, don't save or respond, just wait
-                if (this.isOnlyFillerWords(transcript, preferredLanguage)) {
+                if (isFiller(transcript, preferredLanguage)) {
                   logger.info(
                     `[OpenAI Realtime] User transcript contains only filler words (${preferredLanguage}): "${transcript}" — removing placeholder, no response`
                   );
@@ -1433,6 +1403,7 @@ class OpenAIRealtimeService {
             }
             
             if (!conn._aiIsSpeaking && this.canAIRespond(callId)) {
+              conn._pendingUserResponseAfterAiStops = false;
               // Check if we're in grace period after initial greeting
               if (this.isInGracePeriod(callId)) {
                 const timeSinceGreeting = Date.now() - conn._initialGreetingCompletedAt;
@@ -1464,7 +1435,7 @@ class OpenAIRealtimeService {
                   }
                 }
                 
-                if (this.isOnlyFillerWords(conn.pendingUserTranscript, preferredLanguage)) {
+                if (isFiller(conn.pendingUserTranscript, preferredLanguage)) {
                   logger.info(
                     `[OpenAI Realtime] Ignoring speech_stopped for ${callId} - transcript contains only filler words (${preferredLanguage}): "${conn.pendingUserTranscript}"`
                   );
@@ -1498,6 +1469,13 @@ class OpenAIRealtimeService {
                 logger.warn(`[OpenAI Realtime] Cannot transition to AI_RESPONDING state for ${callId}`);
               }
             } else if (conn._aiIsSpeaking) {
+              if (this.canAIRespond(callId) && !this.isInGracePeriod(callId)) {
+                conn._pendingUserResponseAfterAiStops = true;
+                logger.info(
+                  `[OpenAI Realtime] Queued deferred user response for ${callId} — speech_stopped while _aiIsSpeaking ` +
+                  `(will flush after response.done clears AI guard)`
+                );
+              }
               logger.info(`[OpenAI Realtime] User finished speaking but AI is already speaking for ${callId}`);
             } else {
               logger.info(`[OpenAI Realtime] User finished speaking but cannot respond in current state: ${this.getConversationState(callId)}`);
@@ -1555,6 +1533,7 @@ class OpenAIRealtimeService {
           const connResponse = this.connections.get(callId);
           if (connResponse) {
             connResponse._responseCreated = true;
+            connResponse._responseCreateInFlight = false;
             logger.info(`[OpenAI Realtime] OpenAI acknowledged response.create for ${callId}`);
           }
           break;
@@ -1878,6 +1857,70 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * If user speech_stopped fired while _aiIsSpeaking (ordering / streaming tail), we could not call
+   * sendResponseCreate. Flush that turn once response.done clears _aiIsSpeaking — no separate
+   * output_audio_buffer event in our pipeline.
+   */
+  async maybeFlushPendingUserResponseAfterAiDone(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn || !conn._pendingUserResponseAfterAiStops) return;
+
+    if (conn._userIsSpeaking) {
+      conn._pendingUserResponseAfterAiStops = false;
+      return;
+    }
+    if (!this.canAIRespond(callId)) {
+      conn._pendingUserResponseAfterAiStops = false;
+      return;
+    }
+    if (conn._responseCreated) {
+      conn._pendingUserResponseAfterAiStops = false;
+      return;
+    }
+
+    if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
+      const preferredLanguage = conn.preferredLanguage || 'en';
+      if (isFiller(conn.pendingUserTranscript.trim(), preferredLanguage)) {
+        conn._pendingUserResponseAfterAiStops = false;
+        return;
+      }
+    }
+
+    // State machine: AI_RESPONDING is only reachable from USER_SPEAKING (not from GREETING_COMPLETE directly).
+    // After greeting, we may be GREETING_COMPLETE with a deferred stop — step into USER_SPEAKING first.
+    let st = this.getConversationState(callId);
+    if (st === CONVERSATION_STATES.GREETING_COMPLETE) {
+      if (!this.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, 'deferred_user_response_prep')) {
+        logger.warn(
+          `[OpenAI Realtime] Deferred user response: could not transition GREETING_COMPLETE→USER_SPEAKING for ${callId}`
+        );
+        return;
+      }
+      st = this.getConversationState(callId);
+    }
+
+    if (!this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_turn_deferred_until_response_done')) {
+      logger.warn(`[OpenAI Realtime] Deferred user response: could not transition to AI_RESPONDING for ${callId}`);
+      return;
+    }
+
+    conn._pendingUserResponseAfterAiStops = false;
+
+    setTimeout(async () => {
+      const currentConn = this.connections.get(callId);
+      if (!currentConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+      try {
+        await this.sendResponseCreate(callId);
+        currentConn._aiIsSpeaking = true;
+        logger.info(`[OpenAI Realtime] Flushed deferred user response for ${callId} after AI response.done`);
+      } catch (err) {
+        logger.error(`[OpenAI Realtime] Deferred user response flush failed for ${callId}: ${err.message}`);
+        this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'deferred_response_failed');
+      }
+    }, 200);
+  }
+
+  /**
    * Handle response.done - Save complete assistant response
    * 
    * MESSAGE FLOW LOGIC:
@@ -1903,18 +1946,12 @@ class OpenAIRealtimeService {
     
     if (wasCanceled) {
       logger.info(`[OpenAI Realtime] Response done event received for ${callId} but response was canceled (status: ${responseStatus || 'tracked locally'}) - skipping processing`);
-      
-      // Clear the canceled flag and reset state
+
       conn._responseCanceled = false;
       conn._responseCanceledAt = null;
-      conn._aiIsSpeaking = false;
-      conn._responseCreated = false;
-      conn._responseStartTime = null;
-      
-      // Clear any pending assistant transcript since we canceled
+
+      // 1) No commitAssistantTranscriptOrDefer on cancel — drop in-flight assistant text and placeholder
       conn.pendingAssistantTranscript = '';
-      
-      // Remove placeholder if it exists
       if (conn.activeAssistantMessageId) {
         try {
           const { Message } = require('../models');
@@ -1925,60 +1962,67 @@ class OpenAIRealtimeService {
           logger.error(`[OpenAI Realtime] Failed to remove placeholder for canceled response: ${err.message}`);
         }
       }
-      
-      // Transition state back to conversation active
+
+      conn._aiIsSpeaking = false;
+      conn._responseCreated = false;
+      conn._responseCreateInFlight = false;
+      conn._responseStartTime = null;
+
       const currentState = this.getConversationState(callId);
       if (currentState === CONVERSATION_STATES.AI_RESPONDING) {
         this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
       }
-      
+
+      await this.maybeFlushPendingUserResponseAfterAiDone(callId);
       this.notify(callId, 'response_done', { canceled: true });
       return;
     }
 
     logger.info(`[OpenAI Realtime] Assistant response done for ${callId} (status: ${responseStatus || 'completed'})`);
 
-    // Save AI transcript now that AI has finished speaking (may defer until user row is not [Speaking...])
-    if (conn.pendingAssistantTranscript && conn.pendingAssistantTranscript.trim()) {
-      logger.info(`[OpenAI Realtime] Saving AI transcript now that AI finished speaking: "${conn.pendingAssistantTranscript}"`);
-      const toSave = conn.pendingAssistantTranscript;
-      conn.pendingAssistantTranscript = '';
-      await this.commitAssistantTranscriptOrDefer(callId, conn, toSave);
-    } else if (conn.activeAssistantMessageId) {
-      // No transcript but placeholder exists - remove the placeholder
-      try {
+    // 1) DB ordering: assistant transcript or placeholder cleanup (must not skip later steps if this throws)
+    try {
+      if (conn.pendingAssistantTranscript && conn.pendingAssistantTranscript.trim()) {
+        logger.info(`[OpenAI Realtime] Saving AI transcript now that AI finished speaking: "${conn.pendingAssistantTranscript}"`);
+        const toSave = conn.pendingAssistantTranscript;
+        conn.pendingAssistantTranscript = '';
+        await this.commitAssistantTranscriptOrDefer(callId, conn, toSave);
+      } else if (conn.activeAssistantMessageId) {
         const { Message } = require('../models');
         await Message.findByIdAndDelete(conn.activeAssistantMessageId);
         logger.info(`[OpenAI Realtime] Removed placeholder assistant message with no transcript for ${callId}`);
         conn.activeAssistantMessageId = null;
-      } catch (err) {
-        logger.error(`[OpenAI Realtime] Failed to remove placeholder assistant message: ${err.message}`);
       }
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Assistant transcript/placeholder step failed for ${callId}: ${err.message}`, err);
     }
 
-    // Reset response flag so new commits can trigger new responses
+    // 2) Clear AI-speaking guard before response lifecycle flags (ordering for deferred flush + commits)
     conn._aiIsSpeaking = false;
+    // 3) OpenAI response.create ack / stuck guards
     conn._responseCreated = false;
+    conn._responseCreateInFlight = false;
     conn._responseStartTime = null; // Clear timeout tracking
     // Clear canceled flag if it was set (shouldn't be, but defensive)
     conn._responseCanceled = false;
     conn._responseCanceledAt = null;
 
-    // STATE MACHINE: Transition based on current state
+    // 4) STATE MACHINE: greeting or regular AI turn completion
     const currentState = this.getConversationState(callId);
     if (currentState === CONVERSATION_STATES.GREETING_ACTIVE) {
-      // Initial greeting completed
       conn._initialGreetingCompletedAt = Date.now();
-      conn._waitingForInitialGreeting = false; // Clear the flag to allow user input
+      conn._waitingForInitialGreeting = false;
       this.transitionState(callId, CONVERSATION_STATES.GREETING_COMPLETE, 'initial_greeting_completed');
       logger.info(`[OpenAI Realtime] Initial greeting completed for ${callId} - entering grace period and allowing user input`);
     } else if (currentState === CONVERSATION_STATES.AI_RESPONDING) {
-      // Regular AI response completed
       this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_completed');
       logger.info(`[OpenAI Realtime] AI response completed for ${callId} - ready for user input`);
     }
 
     logger.info(`[OpenAI Realtime] Reset response flag for ${callId} - ready for new responses`);
+
+    // 5) Last: deferred user response (needs _aiIsSpeaking false + greeting transition if applicable)
+    await this.maybeFlushPendingUserResponseAfterAiDone(callId);
 
     this.notify(callId, 'response_done', {});
   }
@@ -2372,7 +2416,10 @@ class OpenAIRealtimeService {
       // If speech_stopped happened before ASR completed, trigger Bianca's response now.
       // This prevents cases where Bianca appears to wait for a second user utterance.
       if (!conn._aiIsSpeaking && !conn._responseCreated && this.canAIRespond(callId)) {
-        if (this.isInGracePeriod(callId)) {
+        const postAsrGrace = this.isInGracePeriod(callId);
+        const postAsrSubstantive =
+          typeof transcript === 'string' && !isFiller(transcript, conn.preferredLanguage || 'en');
+        if (postAsrGrace && !postAsrSubstantive) {
           const timeSinceGreeting = Date.now() - (conn._initialGreetingCompletedAt || 0);
           logger.info(
             `[OpenAI Realtime] Skipping post-ASR response for ${callId} - in grace period ` +
@@ -2400,13 +2447,18 @@ class OpenAIRealtimeService {
     // kick off the next Bianca turn directly from transcript completion.
     // This fixes "must speak twice" hangs when state/placeholder timing is out of sync.
     const preferredLanguage = conn.preferredLanguage || 'en';
-    const transcriptIsFillerOnly = this.isOnlyFillerWords(transcript, preferredLanguage);
+    const transcriptIsFillerOnly = isFiller(transcript, preferredLanguage);
+    const inGrace = this.isInGracePeriod(callId);
+    // speech_stopped can return early during post-greeting grace while ASR finishes later; allow a
+    // substantive (non-filler-only) transcript to recover without a second utterance.
+    const substantiveEnoughToBypassGrace =
+      typeof transcript === 'string' && !transcriptIsFillerOnly;
     if (
       !transcriptIsFillerOnly &&
       !conn._aiIsSpeaking &&
       !conn._responseCreated &&
       !conn._responseStartTime &&
-      !this.isInGracePeriod(callId)
+      (!inGrace || substantiveEnoughToBypassGrace)
     ) {
       const state = this.getConversationState(callId);
       const canMoveToAiResponding =
@@ -2620,7 +2672,10 @@ class OpenAIRealtimeService {
         `[OpenAI Realtime] API Error for ${callId}: "Conversation already has an active response". This often happens if a fallback response.create was sent while OpenAI was already generating. Current pendingCommit: ${conn?.pendingCommit}`
       );
       // No specific action needed here usually, just a diagnostic.
-      if (conn) conn.pendingCommit = false; // If this error was related to a commit that also triggered a response.create
+      if (conn) {
+        conn.pendingCommit = false; // If this error was related to a commit that also triggered a response.create
+        conn._responseCreateInFlight = false;
+      }
     } else if (
       errorCode === 'session_not_found' ||
       errorCode === 'session_expired_error' ||
@@ -3434,6 +3489,7 @@ class OpenAIRealtimeService {
     try {
       // Temporarily override the response flag to force a new response
       conn._responseCreated = false;
+      conn._responseCreateInFlight = false;
 
       // Send a user message first to establish context
       await this.sendJsonMessage(callId, {
@@ -3445,13 +3501,9 @@ class OpenAIRealtimeService {
         }
       });
 
-      // Then immediately request a response
-      await this.sendJsonMessage(callId, {
-        type: 'response.create',
-        response: {
-          modalities: ['text', 'audio']
-        }
-      });
+      // Use sendResponseCreate (not raw response.create) so canAIRespond, _responseCreateInFlight, and
+      // session checks run — raw send would bypass guards and could double with event-driven paths.
+      await this.sendResponseCreate(callId);
 
       logger.info(`[OpenAI Realtime] Forced response generation with silence for ${callId}`);
       return true;
@@ -3827,6 +3879,11 @@ class OpenAIRealtimeService {
         logger.info(`[OpenAI Realtime] Clearing ${pendingCount} pending audio chunks for ${callId}`);
       }
       this.pendingAudio.delete(callId);
+    }
+
+    const connPreDelete = this.connections.get(callId);
+    if (connPreDelete) {
+      connPreDelete._responseCreateInFlight = false;
     }
 
     const deleted = this.connections.delete(callId);
