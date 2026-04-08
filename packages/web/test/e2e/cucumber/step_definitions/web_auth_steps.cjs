@@ -62,18 +62,13 @@ When("I type web login password {string}", async function (password) {
 })
 
 When("I submit the web login form expecting success", async function () {
-  const loginDone = this.page.waitForResponse(
-    (r) => r.url().includes("/v1/auth/login") && r.status() === 200,
-    { timeout: 20000 },
-  )
   await this.page.getByTestId("login-button").click()
-  await loginDone
+  await this.page.getByTestId("home-header").waitFor({ state: "visible", timeout: 60000 })
 })
 
 When("I submit the web login form allowing failure", async function () {
-  const loginDone = this.page.waitForResponse((r) => r.url().includes("/v1/auth/login"), { timeout: 20000 })
   await this.page.getByTestId("login-button").click()
-  await loginDone
+  await this.page.locator(".va-login-error[role='alert']").first().waitFor({ state: "visible", timeout: 20000 })
 })
 
 Then("I should land on the web dashboard", async function () {

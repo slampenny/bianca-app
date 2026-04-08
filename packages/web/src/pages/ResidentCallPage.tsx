@@ -159,7 +159,13 @@ export function ResidentCallPage() {
               />
             </label>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <button type="button" className="va-btn-primary" disabled={isInitiatingCall || !apiClient?.id} onClick={() => void onCallNow()}>
+              <button
+                type="button"
+                className="va-btn-primary"
+                data-testid="resident-call-workspace-submit"
+                disabled={isInitiatingCall || !apiClient?.id}
+                onClick={() => void onCallNow()}
+              >
                 {isInitiatingCall ? "Calling..." : "Call now"}
               </button>
               <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
