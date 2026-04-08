@@ -1815,21 +1815,30 @@ class OpenAIRealtimeService {
                   hint: 'invalid_transition_often_ai_responding_stuck_without_response_done',
                 });
                 logger.warn(`[OpenAI Realtime] Cannot transition to AI_RESPONDING state for ${callId}`);
+                const hasUserTurnTransitionDenied =
+                  (conn.pendingUserTranscript || '').trim().length > 0 ||
+                  Boolean(conn.activeUserMessageId) ||
+                  conn._waitingForUserTranscript;
                 if (
                   stateBeforeAiResponding === CONVERSATION_STATES.AI_RESPONDING &&
-                  conn._aiAudioComplete &&
+                  hasUserTurnTransitionDenied &&
+                  !conn._userTurnResponseCreateSent &&
                   this.canAIRespond(callId) &&
                   !this.isInGracePeriod(callId)
                 ) {
                   conn._pendingUserResponseAfterAiStops = true;
+                  conn._userTurnResponseCreateSent = false;
                   logger.info(
-                    `[RealtimeRC] speech_stopped:transition_denied — audio complete, deferring to response.done ${callId}`
+                    conn._aiAudioComplete
+                      ? `[RealtimeRC] speech_stopped:transition_denied — audio complete, deferring to response.done ${callId}`
+                      : `[RealtimeRC] speech_stopped:transition_denied — still streaming, deferring to response.done ${callId}`
                   );
                 }
               }
             } else if (conn._aiIsSpeaking) {
               if (this.canAIRespond(callId) && !this.isInGracePeriod(callId)) {
                 conn._pendingUserResponseAfterAiStops = true;
+                conn._userTurnResponseCreateSent = false;
                 this._rcDiagSpeechStopped(callId, conn, 'defer_until_response_done', {
                   outcome: 'set_pendingUserResponseAfterAiStops_true',
                   _pendingUserResponseAfterAiStops: conn._pendingUserResponseAfterAiStops,
@@ -1839,13 +1848,17 @@ class OpenAIRealtimeService {
                   `(will flush after response.done clears AI guard)`
                 );
               } else {
-                // Primary defer path requires canAIRespond && !grace. If we landed here due to grace (or rare
-                // !canAIRespond while AI still "speaking"), still queue when audio is done and we have a transcript
-                // so maybeFlush can run after response.done (maybeFlush drops pending if state still disallows).
-                if (conn._aiAudioComplete && (conn.pendingUserTranscript || '').trim()) {
+                // Primary defer path requires canAIRespond && !grace. Barge-in during streaming (or grace / !canAIRespond)
+                // still needs recovery: user content exists but we cannot schedule now — flush after response.done.
+                const hasUserTurnForDefer =
+                  (conn.pendingUserTranscript || '').trim().length > 0 ||
+                  Boolean(conn.activeUserMessageId) ||
+                  conn._waitingForUserTranscript;
+                if (hasUserTurnForDefer && !conn._userTurnResponseCreateSent) {
                   conn._pendingUserResponseAfterAiStops = true;
+                  conn._userTurnResponseCreateSent = false;
                   logger.info(
-                    `[RealtimeRC] speech_stopped:while_ai_speaking_no_queue — audio complete, deferring to response.done ${callId}`
+                    `[RealtimeRC] speech_stopped:main_path_blocked — _aiIsSpeaking true, deferring to response.done ${callId}`
                   );
                 }
                 this._rcDiagSpeechStopped(callId, conn, 'speech_stopped_while_ai_speaking_no_queue', {
@@ -1858,7 +1871,19 @@ class OpenAIRealtimeService {
               }
               logger.info(`[OpenAI Realtime] User finished speaking but AI is already speaking for ${callId}`);
             } else {
-              // This branch is only reachable when !_aiIsSpeaking && !canAIRespond (see if / else-if above).
+              // Typically !_aiIsSpeaking && !canAIRespond. Defensive: if _aiIsSpeaking is true (ordering / guard skew),
+              // still defer a real user turn so maybeFlush can run after response.done.
+              const hasUserTurnMainBlocked =
+                (conn.pendingUserTranscript || '').trim().length > 0 ||
+                Boolean(conn.activeUserMessageId) ||
+                conn._waitingForUserTranscript;
+              if (conn._aiIsSpeaking && hasUserTurnMainBlocked && !conn._userTurnResponseCreateSent) {
+                conn._pendingUserResponseAfterAiStops = true;
+                conn._userTurnResponseCreateSent = false;
+                logger.info(
+                  `[RealtimeRC] speech_stopped:main_path_blocked — _aiIsSpeaking true, deferring to response.done ${callId}`
+                );
+              }
               this._rcDiagSpeechStopped(callId, conn, 'main_path_blocked', {
                 outcome: 'sendResponseCreate_not_scheduled',
                 reason: '!_aiIsSpeaking && canAIRespond was false, or _aiIsSpeaking path not taken',

@@ -9,7 +9,12 @@ const httpStatus = require('http-status');
 const app = require('../utils/integration-app');
 const { Org, Client, Token, Caregiver, OnboardingResponse, Call } = require('../../src/models');
 const { orgOne, insertOrgs } = require('../fixtures/org.fixture');
-const { clientOne, insertClientsAndAddToCaregiver, insertClientsWithOrg } = require('../fixtures/client.fixture');
+const {
+  clientOne,
+  clientTwo,
+  insertClientsAndAddToCaregiver,
+  insertClientsWithOrg,
+} = require('../fixtures/client.fixture');
 
 const {
   caregiverOne,
@@ -38,6 +43,62 @@ describe('Client routes', () => {
     await Caregiver.deleteMany();
     await Client.deleteMany();
     await Token.deleteMany();
+  });
+
+  describe('GET /v1/clients', () => {
+    test('orgAdmin sees all clients in the org even when none are on their roster', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
+      await insertClientsWithOrg(
+        [
+          { ...clientOne, email: 'orgwide-a@example.org', phone: '+12015550101', caregivers: [] },
+          { ...clientTwo, email: 'orgwide-b@example.org', phone: '+12015550102', caregivers: [] },
+        ],
+        org._id
+      );
+
+      const res = await request(app)
+        .get('/v1/clients')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .query({ limit: 50, page: 1 })
+        .expect(httpStatus.OK);
+
+      expect(res.body.totalResults).toBe(2);
+      expect(res.body.results).toHaveLength(2);
+    });
+
+    test('does not treat role query param as a Client field (avoids empty list)', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
+      await insertClientsWithOrg([{ ...clientOne, email: 'roleparam@example.org', phone: '+12015550103', caregivers: [] }], org._id);
+
+      const res = await request(app)
+        .get('/v1/clients')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .query({ limit: 50, page: 1, role: 'orgAdmin' })
+        .expect(httpStatus.OK);
+
+      expect(res.body.totalResults).toBe(1);
+    });
+
+    test('staff only sees clients on their roster or assigned as caregiver', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+      const [onRoster] = await insertClientsAndAddToCaregiver(caregiver, [{ ...clientOne, email: 'staff-roster@example.org' }]);
+      await insertClientsWithOrg(
+        [{ ...clientTwo, email: 'staff-other@example.org', phone: '+12015550104', caregivers: [] }],
+        org._id
+      );
+
+      const res = await request(app)
+        .get('/v1/clients')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .query({ limit: 50, page: 1 })
+        .expect(httpStatus.OK);
+
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.results[0].id).toBe(onRoster._id.toString());
+    });
   });
 
   describe('POST /v1/clients', () => {

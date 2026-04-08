@@ -10,7 +10,7 @@ describe('filler-words isFiller', () => {
   });
 
   it('rejects single filler token (es)', () => {
-    expect(isFiller('bueno', 'es')).toBe(true);
+    expect(isFiller('eh', 'es')).toBe(true);
   });
 
   it('rejects single filler token (zh)', () => {
@@ -22,7 +22,7 @@ describe('filler-words isFiller', () => {
   });
 
   it('rejects multi-filler phrase (en)', () => {
-    expect(isFiller('um okay yeah', 'en')).toBe(true);
+    expect(isFiller('um uh yeah', 'en')).toBe(true);
   });
 
   it('accepts real English content', () => {
@@ -31,6 +31,21 @@ describe('filler-words isFiller', () => {
 
   it('accepts mixed filler + content', () => {
     expect(isFiller("um I'm fine", 'en')).toBe(false);
+  });
+
+  it('does not treat former filler-like answers as filler (en)', () => {
+    expect(isFiller('yes', 'en')).toBe(false);
+    expect(isFiller('no', 'en')).toBe(false);
+    expect(isFiller('ok', 'en')).toBe(false);
+    expect(isFiller('okay', 'en')).toBe(false);
+    expect(isFiller('fine', 'en')).toBe(false);
+    expect(isFiller('hello', 'en')).toBe(false);
+  });
+
+  it('does not treat Spanish answer words as filler', () => {
+    expect(isFiller('sí', 'es')).toBe(false);
+    expect(isFiller('bueno', 'es')).toBe(false);
+    expect(isFiller('hola', 'es')).toBe(false);
   });
 
   it('rejects empty string', () => {

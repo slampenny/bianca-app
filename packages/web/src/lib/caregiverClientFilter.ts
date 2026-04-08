@@ -19,7 +19,7 @@ export function seesWholeFacilityInReports(role: CaregiverRole | undefined): boo
 
 /**
  * Keep clients on the caregiver's roster or explicitly assigned via `client.caregivers`.
- * Matches backend staff filtering for GET /clients. Super-admins and unknown roles see the full result set.
+ * Aligns with backend GET /clients when the account lacks readAny:client (e.g. staff). Org admins / super-admins see the full API result set.
  */
 export function filterClientsToCaregiverRoster(
   clients: Client[],

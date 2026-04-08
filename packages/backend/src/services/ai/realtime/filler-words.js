@@ -1,6 +1,9 @@
 /**
  * Localized filler-word lists for realtime user transcript filtering.
  * Map keys are BCP-47 tags used with session / client language configuration.
+ *
+ * Only non-answer vocalizations / thinking sounds — no yes/no, greetings,
+ * or content words that can answer a question.
  */
 
 /** Leading/trailing punctuation to strip (periods, commas, ellipses, ?, !). */
@@ -54,118 +57,29 @@ const enSet = new Set([
   'yeah',
   'yep',
   'yup',
-  'ok',
-  'okay',
-  'sure',
-  'right',
-  'alright',
-  'fine',
-  'good',
-  'bye',
-  'yes',
-  'no',
-  'hi',
-  'hello',
-  'hey',
 ]);
 
-const frSet = new Set([
-  'euh',
-  'hm',
-  'hmm',
-  'ouais',
-  'oui',
-  'non',
-  'ok',
-  "d'accord",
-  'bien',
-  'salut',
-  'bonjour',
-  'bonsoir',
-  'ah',
-  'oh',
-  'eh',
-  'hein',
-]);
+const frSet = new Set(['euh', 'hm', 'hmm', 'ah', 'oh', 'eh', 'hein']);
 
-const esSet = new Set([
-  'eh',
-  'um',
-  'este',
-  'este...',
-  'am',
-  'mm',
-  'sí',
-  'no',
-  'ok',
-  'okey',
-  'bueno',
-  'hola',
-  'adiós',
-  'claro',
-  'bien',
-]);
+const esSet = new Set(['eh', 'um', 'este', 'este...', 'mm']);
 
-const ptSet = new Set(['ã', 'hm', 'hmm', 'é', 'né', 'sim', 'não', 'ok', 'olá', 'oi', 'tchau', 'bom', 'certo']);
+const ptSet = new Set(['ã', 'hm', 'hmm', 'hum']);
 
-const deSet = new Set([
-  'äh',
-  'ähm',
-  'hm',
-  'hmm',
-  'ja',
-  'nein',
-  'ok',
-  'okay',
-  'tschüss',
-  'hallo',
-  'gut',
-  'alright',
-  'na',
-  'jo',
-]);
+const deSet = new Set(['äh', 'ähm', 'hm', 'hmm']);
 
-const itSet = new Set([
-  'eh',
-  'um',
-  'beh',
-  'mah',
-  'sì',
-  'no',
-  'ok',
-  'ciao',
-  'salve',
-  'buongiorno',
-  'bene',
-  'dai',
-  'vabbè',
-]);
+const itSet = new Set(['eh', 'um', 'beh', 'mah', 'vabbè']);
 
-const nlSet = new Set(['eh', 'uhm', 'hm', 'hmm', 'ja', 'nee', 'ok', 'okay', 'hallo', 'dag', 'goed', 'prima']);
+const nlSet = new Set(['eh', 'uhm', 'hm', 'hmm']);
 
-const plSet = new Set(['yyy', 'eee', 'hm', 'hmm', 'tak', 'nie', 'ok', 'okej', 'cześć', 'hej', 'dobrze', 'no']);
+const plSet = new Set(['yyy', 'eee', 'hm', 'hmm']);
 
-const ruSet = new Set(['э', 'эм', 'хм', 'да', 'нет', 'ок', 'окей', 'привет', 'пока', 'хорошо', 'ладно']);
+const ruSet = new Set(['э', 'эм', 'хм']);
 
-const zhSet = new Set(['嗯', '啊', '哦', '哈', '呃', '是', '对', '好', '行', '没有', '不', '喂', '你好', '再见']);
+const zhSet = new Set(['嗯', '啊', '哦', '哈', '呃']);
 
-const jaSet = new Set([
-  'えー',
-  'あー',
-  'うーん',
-  'はい',
-  'いいえ',
-  'うん',
-  'ええ',
-  'そう',
-  'あ',
-  'ね',
-  'な',
-  'もしもし',
-  'さようなら',
-]);
+const jaSet = new Set(['えー', 'あー', 'うーん', 'うん', 'ええ', 'あ', 'ね', 'な']);
 
-const koSet = new Set(['어', '음', '흠', '네', '아니요', '응', '그래', '어어', '여보세요', '안녕', '잘있어']);
+const koSet = new Set(['어', '음', '흠', '응', '어어']);
 
 /** @type {Map<string, Set<string>>} */
 const FILLER_WORDS_BY_LANGUAGE = new Map();

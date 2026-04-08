@@ -9,7 +9,12 @@ const { caregiverService, conversationService, clientService, scheduleService } 
 const { Client } = require('../models');
 const { ConversationDTO, ClientDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
-const { toIdString, assertCaregiverOrgAccess, assertCaregiverClientAccess } = require('../utils/accessControl');
+const {
+  toIdString,
+  assertCaregiverOrgAccess,
+  assertCaregiverClientAccess,
+  restrictsClientListingToCaregiverRoster,
+} = require('../utils/accessControl');
 
 /**
  * Staff may access a client's nested data if the client is on their roster, lists them as caregiver,
@@ -74,13 +79,14 @@ const createClient = catchAsync(async (req, res) => {
 
 const getClients = catchAsync(async (req, res) => {
   const { caregiver } = req;
-  const filter = pick(req.query, ['name', 'role']);
+  // Do not pass `role` from query into the Mongo filter — Client has no `role` field; doing so returns zero rows.
+  const filter = pick(req.query, ['name']);
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
   if (caregiver.role !== 'superAdmin') {
     assertCaregiverOrgAccess(caregiver, caregiver.org, 'You do not have access to this organization');
     filter.org = toIdString(caregiver.org);
   }
-  if (caregiver.role === 'staff') {
+  if (restrictsClientListingToCaregiverRoster(caregiver)) {
     const caregiverDoc = await caregiverService.getCaregiverById(caregiver._id || caregiver.id);
     const rosterIds = ((caregiverDoc && caregiverDoc.clients) || []).map((c) => toIdString(c)).filter(Boolean);
     filter.$or = [{ caregivers: toIdString(caregiver._id || caregiver.id) }, { _id: { $in: rosterIds } }];
@@ -97,7 +103,7 @@ const getClientsOnboardingRollups = catchAsync(async (req, res) => {
     assertCaregiverOrgAccess(caregiver, caregiver.org, 'You do not have access to this organization');
     filter.org = toIdString(caregiver.org);
   }
-  if (caregiver.role === 'staff') {
+  if (restrictsClientListingToCaregiverRoster(caregiver)) {
     const caregiverDoc = await caregiverService.getCaregiverById(caregiver._id || caregiver.id);
     const rosterIds = ((caregiverDoc && caregiverDoc.clients) || []).map((c) => toIdString(c)).filter(Boolean);
     filter.$or = [{ caregivers: toIdString(caregiver._id || caregiver.id) }, { _id: { $in: rosterIds } }];

@@ -1,5 +1,6 @@
 const httpStatus = require('http-status');
 const ApiError = require('./ApiError');
+const { ac } = require('../config/roles');
 
 const toIdString = (value) => {
   if (!value) return null;
@@ -19,6 +20,21 @@ const assertCaregiverOrgAccess = (caregiver, orgId, message = 'Access denied') =
   const targetOrgId = toIdString(orgId);
   if (!caregiverOrgId || !targetOrgId || caregiverOrgId !== targetOrgId) {
     throw new ApiError(httpStatus.FORBIDDEN, message);
+  }
+};
+
+/**
+ * GET /clients list: org-wide when the role may read any client in the org (e.g. orgAdmin);
+ * otherwise limit to roster / explicit assignments (e.g. staff).
+ */
+const restrictsClientListingToCaregiverRoster = (caregiver) => {
+  if (!caregiver || caregiver.role === 'superAdmin') {
+    return false;
+  }
+  try {
+    return !ac.can(caregiver.role).readAny('client').granted;
+  } catch {
+    return true;
   }
 };
 
@@ -42,4 +58,5 @@ module.exports = {
   toIdString,
   assertCaregiverOrgAccess,
   assertCaregiverClientAccess,
+  restrictsClientListingToCaregiverRoster,
 };
