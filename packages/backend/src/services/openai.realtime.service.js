@@ -145,7 +145,20 @@ class OpenAIRealtimeService {
       logger.error(`[State Machine] Cannot transition state for ${callId} - no connection`);
       return false;
     }
-    return StateMachine.transition(conn, newState, reason);
+    const fromState = StateMachine.getCurrentState(conn);
+    const ok = StateMachine.transition(conn, newState, reason);
+    if (ok && newState === CONVERSATION_STATES.AI_RESPONDING) {
+      logger.info(`[RealtimeRC] enter AI_RESPONDING ${callId}`, {
+        reason,
+        fromState,
+        _responseCreateInFlight: conn._responseCreateInFlight,
+        _responseCreated: conn._responseCreated,
+        _aiIsSpeaking: conn._aiIsSpeaking,
+        _pendingUserResponseAfterAiStops: conn._pendingUserResponseAfterAiStops,
+        _waitingForUserTranscript: conn._waitingForUserTranscript,
+      });
+    }
+    return ok;
   }
 
   /**
@@ -482,10 +495,18 @@ class OpenAIRealtimeService {
 
       // Per-call only: assistant transcripts waiting for user row to leave [Speaking...] (concurrent calls each have their own array)
       _deferredAssistantQueue: [],
+      // --- Realtime turn / response guards: all live on this object only (this.connections.get(callId)), never on the service singleton ---
       // Transcript-ordering / dual-talk: user speech_stopped while _aiIsSpeaking — defer response.create until response.done clears the guard
       _pendingUserResponseAfterAiStops: false,
+      // True after response.create was sent for the current user utterance (speech_started → speech_stopped cycle). Cleared on speech_started.
+      // Prevents handleInputAudioTranscriptionCompleted (_waitingForUserTranscript late path) from scheduling a second send when speech_stopped's 200ms timer already ran at T+200 while _waitingForUserTranscript was set at T+500.
+      _userTurnResponseCreateSent: false,
       // True from websocket send of response.create until response.created ack (or cleanup). Unlike _responseCreated, which is set only on that event.
       _responseCreateInFlight: false,
+      _responseCreated: false,
+      _aiIsSpeaking: false,
+      // Set in speech_stopped 500ms path when placeholder exists but ASR not ready yet; cleared when ASR completes or on cleanup paths.
+      _waitingForUserTranscript: false,
 
       // Track timing for each speaker
       lastUserSpeechTime: null,
@@ -1249,6 +1270,7 @@ class OpenAIRealtimeService {
           if (conn) {
             conn._userIsSpeaking = true;
             conn._pendingUserResponseAfterAiStops = false;
+            conn._userTurnResponseCreateSent = false;
             conn._lastUserSpeechStart = Date.now();
             conn._userTranscriptLiveBuffer = '';
             if (conn._userTranscriptFlushTimer) {
@@ -1507,15 +1529,21 @@ class OpenAIRealtimeService {
                     
                     setTimeout(async () => {
                       const finalConn = this.connections.get(callId);
-                      if (finalConn && this.getConversationState(callId) === CONVERSATION_STATES.AI_RESPONDING) {
-                        try {
-                          await this.sendResponseCreate(callId);
-                          finalConn._aiIsSpeaking = true;
-                          logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking (post-cancel) for ${callId}`);
-                        } catch (err) {
-                          logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
-                          this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
-                        }
+                      if (!finalConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+                      if (finalConn._userTurnResponseCreateSent) {
+                        logger.info(
+                          `[RealtimeRC] post-cancel 200ms timer skipped ${callId} — user-turn response.create already sent`
+                        );
+                        return;
+                      }
+                      try {
+                        await this.sendResponseCreate(callId);
+                        finalConn._userTurnResponseCreateSent = true;
+                        finalConn._aiIsSpeaking = true;
+                        logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking (post-cancel) for ${callId}`);
+                      } catch (err) {
+                        logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
+                        this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
                       }
                     }, 200);
                   }
@@ -1593,30 +1621,39 @@ class OpenAIRealtimeService {
                 });
                 logger.info(`[OpenAI Realtime] User finished speaking - will trigger AI response for ${callId}`);
 
-                // Small delay to ensure audio processing is complete
+                // Timer hierarchy (Scenario B — canonical): this 200ms debounce is the primary send for normal turns.
+                // OpenAI Realtime already has the user's audio in the server-side buffer; response.create does not wait
+                // on our conversation.item.input_audio_transcription.completed. ASR completion handlers are for UI/DB and
+                // for recovery paths when speech_stopped never reached AI_RESPONDING+schedule (fallback / _waiting path).
                 setTimeout(async () => {
                   const currentConn = this.connections.get(callId);
-                  if (currentConn && this.getConversationState(callId) === CONVERSATION_STATES.AI_RESPONDING) {
-                    try {
-                      this._rcDiagSpeechStopped(callId, currentConn, 'timer_200ms_before_sendResponseCreate', {
-                        outcome: 'calling_sendResponseCreate',
-                      });
-                      logger.info(`[OpenAI Realtime] DEBUG: About to trigger response for ${callId} - _responseCreated: ${currentConn._responseCreated}, _responseStartTime: ${currentConn._responseStartTime}`);
-                      await this.sendResponseCreate(callId);
-                      currentConn._aiIsSpeaking = true;
-                      logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
-                    } catch (err) {
-                      logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
-                      // Revert state on error
-                      this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
-                    }
-                  } else {
+                  if (!currentConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) {
                     const snapConn = this.connections.get(callId);
                     this._rcDiagSpeechStopped(callId, snapConn || conn, 'timer_200ms_skip', {
                       outcome: 'sendResponseCreate_not_called_state_mismatch',
                       stateNow: this.getConversationState(callId),
                     });
                     logger.info(`[OpenAI Realtime] Skipping auto-response trigger for ${callId} - state changed or connection lost`);
+                    return;
+                  }
+                  if (currentConn._userTurnResponseCreateSent) {
+                    logger.info(
+                      `[RealtimeRC] speech_stopped 200ms timer skipped ${callId} — user-turn response.create already sent (ASR recovery path won)`
+                    );
+                    return;
+                  }
+                  try {
+                    this._rcDiagSpeechStopped(callId, currentConn, 'timer_200ms_before_sendResponseCreate', {
+                      outcome: 'calling_sendResponseCreate',
+                    });
+                    logger.info(`[OpenAI Realtime] DEBUG: About to trigger response for ${callId} - _responseCreated: ${currentConn._responseCreated}, _responseStartTime: ${currentConn._responseStartTime}`);
+                    await this.sendResponseCreate(callId);
+                    currentConn._userTurnResponseCreateSent = true;
+                    currentConn._aiIsSpeaking = true;
+                    logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
+                  } catch (err) {
+                    logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
+                    this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
                   }
                 }, 200);
               } else {
@@ -2115,8 +2152,13 @@ class OpenAIRealtimeService {
     setTimeout(async () => {
       const currentConn = this.connections.get(callId);
       if (!currentConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+      if (currentConn._userTurnResponseCreateSent) {
+        logger.info(`[RealtimeRC] maybeFlush 200ms timer skipped ${callId} — user-turn response.create already sent`);
+        return;
+      }
       try {
         await this.sendResponseCreate(callId);
+        currentConn._userTurnResponseCreateSent = true;
         currentConn._aiIsSpeaking = true;
         logger.info(`[OpenAI Realtime] Flushed deferred user response for ${callId} after AI response.done`);
       } catch (err) {
@@ -2619,7 +2661,13 @@ class OpenAIRealtimeService {
         : null;
 
     // speech_stopped already ran and was waiting on ASR — finalize turn (placeholder already updated above).
+    // handledPostSpeechStoppedAsrPath is LOCAL to this handler invocation only: it gates the ASR *fallback* block
+    // below vs this _waitingForUserTranscript branch in the same event. It is NOT stored on conn — each
+    // transcription.completed is a fresh call, so nothing persists across turns and no speech_stopped/speech_started
+    // reset is required for this variable.
+    let handledPostSpeechStoppedAsrPath = false;
     if (conn._waitingForUserTranscript && conn.activeUserMessageId && transcript.trim()) {
+      handledPostSpeechStoppedAsrPath = true;
       logger.info(`[OpenAI Realtime] Transcript arrived after speech_stopped — finalizing user turn ${conn.activeUserMessageId}`);
       conn.activeUserMessageId = null;
       conn._waitingForUserTranscript = false;
@@ -2633,7 +2681,16 @@ class OpenAIRealtimeService {
 
       // If speech_stopped happened before ASR completed, trigger Bianca's response now.
       // This prevents cases where Bianca appears to wait for a second user utterance.
-      if (!conn._aiIsSpeaking && !conn._responseCreated && this.canAIRespond(callId)) {
+      const stateForWaitingPath = this.getConversationState(callId);
+      if (stateForWaitingPath === CONVERSATION_STATES.AI_RESPONDING) {
+        logger.info(
+          `[RealtimeRC] ASR _waitingForUserTranscript path skipped — already AI_RESPONDING, speech_stopped path owns this turn`
+        );
+      } else if (conn._userTurnResponseCreateSent) {
+        logger.info(
+          `[RealtimeRC] ASR _waitingForUserTranscript path skipped — user-turn response.create already sent (speech_stopped 200ms or other path)`
+        );
+      } else if (!conn._aiIsSpeaking && !conn._responseCreated && this.canAIRespond(callId)) {
         const postAsrGrace = this.isInGracePeriod(callId);
         const postAsrSubstantive =
           typeof transcript === 'string' && !isFiller(transcript, conn.preferredLanguage || 'en');
@@ -2648,8 +2705,15 @@ class OpenAIRealtimeService {
             const currentConn = this.connections.get(callId);
             if (!currentConn || currentConn._aiIsSpeaking || currentConn._responseCreated) return;
             if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+            if (currentConn._userTurnResponseCreateSent) {
+              logger.info(
+                `[RealtimeRC] ASR _waitingForUserTranscript 120ms timer skipped ${callId} — user-turn response.create already sent`
+              );
+              return;
+            }
             try {
               await this.sendResponseCreate(callId);
+              currentConn._userTurnResponseCreateSent = true;
               currentConn._aiIsSpeaking = true;
               logger.info(`[OpenAI Realtime] Triggered AI response after delayed transcript completion for ${callId}`);
             } catch (err) {
@@ -2664,6 +2728,12 @@ class OpenAIRealtimeService {
     // Fallback trigger: if ASR completed but speech_stopped path did not trigger a response,
     // kick off the next Bianca turn directly from transcript completion.
     // This fixes "must speak twice" hangs when state/placeholder timing is out of sync.
+    //
+    // CRITICAL: Do NOT run when already ai_responding — speech_stopped schedules sendResponseCreate on a
+    // 200ms timer and _aiIsSpeaking is still false until that fires; treating AI_RESPONDING as "moved=true"
+    // here scheduled a second response.create (80ms vs 200ms), causing phantom turns and stuck AI_RESPONDING
+    // when OpenAI rejects or coalesces the duplicate.
+    // Also skip entirely when the post-speech_stopped ASR path above already handled this completion event.
     const preferredLanguage = conn.preferredLanguage || 'en';
     const transcriptIsFillerOnly = isFiller(transcript, preferredLanguage);
     const inGrace = this.isInGracePeriod(callId);
@@ -2671,33 +2741,40 @@ class OpenAIRealtimeService {
     // substantive (non-filler-only) transcript to recover without a second utterance.
     const substantiveEnoughToBypassGrace =
       typeof transcript === 'string' && !transcriptIsFillerOnly;
+    const stateForFallback = this.getConversationState(callId);
     if (
+      !handledPostSpeechStoppedAsrPath &&
+      stateForFallback !== CONVERSATION_STATES.AI_RESPONDING &&
       !transcriptIsFillerOnly &&
       !conn._aiIsSpeaking &&
       !conn._responseCreated &&
       !conn._responseStartTime &&
       (!inGrace || substantiveEnoughToBypassGrace)
     ) {
-      const state = this.getConversationState(callId);
       const canMoveToAiResponding =
-        state === CONVERSATION_STATES.GREETING_COMPLETE ||
-        state === CONVERSATION_STATES.CONVERSATION_ACTIVE ||
-        state === CONVERSATION_STATES.USER_SPEAKING;
-      const moved =
-        state === CONVERSATION_STATES.AI_RESPONDING
-          ? true
-          : canMoveToAiResponding
-            ? this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'asr_completed_fallback')
-            : false;
+        stateForFallback === CONVERSATION_STATES.GREETING_COMPLETE ||
+        stateForFallback === CONVERSATION_STATES.CONVERSATION_ACTIVE ||
+        stateForFallback === CONVERSATION_STATES.USER_SPEAKING;
+      const moved = canMoveToAiResponding
+        ? this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'asr_completed_fallback')
+        : false;
 
       if (moved) {
+        logger.info(`[RealtimeRC] ASR fallback scheduling sendResponseCreate ${callId}`, {
+          stateBeforeTransition: stateForFallback,
+        });
         setTimeout(async () => {
           const currentConn = this.connections.get(callId);
           if (!currentConn) return;
           if (currentConn._aiIsSpeaking || currentConn._responseCreated || currentConn._responseStartTime) return;
           if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+          if (currentConn._userTurnResponseCreateSent) {
+            logger.info(`[RealtimeRC] ASR fallback 80ms timer skipped ${callId} — user-turn response.create already sent`);
+            return;
+          }
           try {
             await this.sendResponseCreate(callId);
+            currentConn._userTurnResponseCreateSent = true;
             currentConn._aiIsSpeaking = true;
             logger.info(`[OpenAI Realtime] Triggered AI response from ASR fallback for ${callId}`);
           } catch (err) {
