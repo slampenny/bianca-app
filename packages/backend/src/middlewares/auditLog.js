@@ -87,6 +87,16 @@ const PHI_ROUTES = {
     highRisk: true,
   },
 
+  'POST /v1/caregiver-daily-digests': { action: 'CREATE', resource: 'caregiverDailyDigest', phiAccessed: true },
+  'GET /v1/caregiver-daily-digests': { action: 'READ', resource: 'caregiverDailyDigest', phiAccessed: true },
+  'GET /v1/caregiver-daily-digests/:digestId': { action: 'READ', resource: 'caregiverDailyDigest', phiAccessed: true },
+  'POST /v1/caregiver-daily-digests/:digestId/send': {
+    action: 'EXPORT',
+    resource: 'caregiverDailyDigest',
+    phiAccessed: true,
+    highRisk: true,
+  },
+
   'GET /facility-reports/call-completion-log': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
   'GET /facility-reports/alert-audit-trail': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
   'GET /activity/recent': { action: 'READ', resource: 'activityFeed', phiAccessed: true },
@@ -158,6 +168,7 @@ function extractResourceId(req) {
   if (req.params.clientId) return req.params.clientId;
   if (req.params.clientId) return req.params.clientId;
   if (req.params.conversationId) return req.params.conversationId;
+  if (req.params.digestId) return req.params.digestId;
 
   // For POST requests creating new resources, use "new" or "pending"
   if (req.method === 'POST') {

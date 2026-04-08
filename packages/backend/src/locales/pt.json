@@ -54,6 +54,23 @@
 		"contactInfo": "Se você tiver alguma dúvida ou preocupação, entre em contato com sua organização ou envie um e-mail para privacy@biancawellness.com.",
 		"versionLabel": "Versão do e-mail de consentimento:",
 		"closing": "Atenciosamente,\nA equipe Bianca Wellness"
+},
+	"caregiverDailyDigest": {
+		"title": "Daily care digest",
+		"subtitle": "Wellness check-ins for your assigned residents",
+		"subtitleWithOrg": "Wellness check-ins — %s",
+		"labelConversationSummary": "Conversation summary",
+		"labelSentiment": "Sentiment",
+		"labelCallsToday": "Calls today",
+		"noActivity": "No calls scheduled for this day.",
+		"noAnswerToday": "Call attempted; no conversation summary (not answered or too short).",
+		"completedMinutes": "Check-in completed (about %s min).",
+		"completedNoTranscript": "Check-in completed; no written summary yet.",
+		"languageMismatchExplanation": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). Sentiment summary only.",
+		"languageMismatchExplanationNoSentiment": "O texto da conversação foi omitido porque a língua preferida do residente (%s) difere da sua (%s). Não há análise de sentimento disponível para essas chamadas.",
+		"emailScreenHint": "Use 201cEmail digest201d to send a copy to your verified account email, or check 201cEmail me when I build201d when you generate the digest.",
+		"emailSubject": "Daily care digest 2014 %s",
+		"emailPlainIntro": "This message summarizes wellness check-ins for your assigned residents. Open the HTML version for the full layout.",
+		"emailConfidentialFooter": "Confidential 2014 for the intended caregiver only. Do not forward."
 	}
 }
-

@@ -13,11 +13,16 @@ Feature: Web alerts and reports
     Then I should see the web alert detail or stay on alerts
     When I go back to alerts from alert detail
 
+  Scenario: Reports hub from sidebar
+    Given I am signed in on the web as the seeded test caregiver
+    When I open the web sidebar "reports" section
+    Then I should see the web reports library
+
   Scenario: Open a report template and return to the library
     Given I am signed in on the web as the seeded test caregiver
     When I open the web sidebar "reports" section
     Then I should see the web reports library
-    When I open the web report template "wellness_daily"
+    When I open the web report template "call_log"
     Then I should see the web report detail view
     When I go back to reports from report detail
     Then I should see the web reports library

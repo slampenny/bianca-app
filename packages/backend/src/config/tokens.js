@@ -4,6 +4,8 @@ const tokenTypes = {
   RESET_PASSWORD: 'resetPassword',
   VERIFY_EMAIL: 'verifyEmail',
   INVITE: 'invite',
+  /** Completes registration as superAdmin (Bianca console), not facility staff */
+  SUPERADMIN_INVITE: 'superAdminInvite',
   CLIENT_CONSENT: 'clientConsent',
 };
 

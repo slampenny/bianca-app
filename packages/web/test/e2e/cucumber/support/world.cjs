@@ -76,12 +76,17 @@ class PlaywrightWorld {
   async ensureBackendSeeded() {
     if (this._backendSeeded) return
     const base = this.apiURL || "http://localhost:3000"
+    let res
     try {
-      const res = await fetch(`${base}/v1/test/seed`, { method: "POST" })
-      if (res.ok) console.log("[E2E] Backend seed OK")
+      res = await fetch(`${base}/v1/test/seed`, { method: "POST" })
     } catch (e) {
-      console.warn("[E2E] Seed request failed:", e.message)
+      throw new Error(`[E2E] Backend seed request failed (${base}): ${e.message}`)
     }
+    const text = await res.text().catch(() => "")
+    if (!res.ok) {
+      throw new Error(`[E2E] Backend seed failed: HTTP ${res.status} — ${text.slice(0, 500)}`)
+    }
+    console.log("[E2E] Backend seed OK")
     this._backendSeeded = true
   }
 }

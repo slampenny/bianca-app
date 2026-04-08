@@ -1,5 +1,6 @@
 const httpStatus = require('http-status');
 const { Client, Call, Conversation, Caregiver, FamilyWeeklyDigest, Org } = require('../models');
+const { toOrgIdString } = require('../dtos/caregiver.dto');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
@@ -67,8 +68,9 @@ const ensureCaregiverCanAccessClient = async (caregiver, client) => {
   if (caregiver.role === 'superAdmin') {
     return;
   }
-  const clientOrg = client.org._id ? client.org._id.toString() : client.org.toString();
-  if (caregiver.org.toString() !== clientOrg) {
+  const clientOrg = toOrgIdString(client.org);
+  const caregiverOrg = toOrgIdString(caregiver.org);
+  if (!clientOrg || !caregiverOrg || clientOrg !== caregiverOrg) {
     throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this client');
   }
   if (caregiver.role === 'orgAdmin') {
@@ -316,7 +318,7 @@ const getDigestById = async (caregiver, digestId) => {
   if (!digest) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Digest not found');
   }
-  if (caregiver.role !== 'superAdmin' && digest.org.toString() !== caregiver.org.toString()) {
+  if (caregiver.role !== 'superAdmin' && toOrgIdString(digest.org) !== toOrgIdString(caregiver.org)) {
     throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this digest');
   }
   const client = await Client.findById(digest.client);

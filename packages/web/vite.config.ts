@@ -13,6 +13,17 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    strictPort: true,
+    // WSL / LAN: bind all interfaces; align HMR WebSocket with the page origin
+    host: true,
+    hmr: {
+      protocol: "ws",
+      port: 5173,
+      clientPort: 5173,
+    },
+    watch: {
+      usePolling: process.env.VITE_USE_POLLING === "1",
+    },
   },
   test: {
     environment: "jsdom",

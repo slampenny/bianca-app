@@ -22,6 +22,6 @@ module.exports = {
   MIN_SPEECH_DURATION_MS: 800, // Conservative: 800ms instead of 500ms
   // After initial voice greeting: ignore speech_stopped so bridge/echo doesn’t trigger a reply.
   // Keep short — long windows feel like Bianca ignores the first real answer.
-  GRACE_PERIOD_MS: 1000,
+  GRACE_PERIOD_MS: 350,
 };
 

@@ -4,6 +4,7 @@ import { SESSION_HANDOFF_MESSAGE_TYPE } from "../sessionHandoff"
 import {
   useImpersonateCaregiverMutation,
   useLazySearchCaregiversQuery,
+  useSendSuperAdminInviteMutation,
   useUpdateCaregiverRoleMutation,
 } from "../services/api/adminApi"
 import type { AdminCaregiverSearchRow } from "../services/api/api.types"
@@ -27,6 +28,13 @@ export function ImpersonatePage() {
   const [runSearch] = useLazySearchCaregiversQuery()
   const [impersonate, { isLoading: impersonating }] = useImpersonateCaregiverMutation()
   const [updateRole, { isLoading: roleUpdating }] = useUpdateCaregiverRoleMutation()
+  const [sendSuperInvite, { isLoading: inviteSending }] = useSendSuperAdminInviteMutation()
+
+  const [inviteName, setInviteName] = useState("")
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [invitePhone, setInvitePhone] = useState("")
+  const [inviteMessage, setInviteMessage] = useState("")
+  const [inviteError, setInviteError] = useState("")
 
   const handleSearch = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -116,6 +124,81 @@ export function ImpersonatePage() {
       </header>
 
       <main className="admin-main">
+        <div className="admin-card admin-card--wide" style={{ marginBottom: "1rem" }}>
+          <h2 className="admin-section-title">Invite super administrator</h2>
+          <p className="admin-muted" style={{ marginBottom: "1rem" }}>
+            Sends the same style of invitation email as facility staff invites, but the link opens this admin app; completing
+            signup creates a <code className="admin-code">superAdmin</code> user anchored to the first organization (or{" "}
+            <code className="admin-code">BIANCA_PLATFORM_ORG_ID</code> when set).
+          </p>
+          <form
+            className="admin-form"
+            style={{ flexDirection: "row", flexWrap: "wrap", gap: "0.75rem", alignItems: "flex-end" }}
+            onSubmit={(e) => {
+              e.preventDefault()
+              setInviteError("")
+              setInviteMessage("")
+              void (async () => {
+                try {
+                  await sendSuperInvite({
+                    name: inviteName.trim(),
+                    email: inviteEmail.trim(),
+                    phone: invitePhone.replace(/\s/g, ""),
+                  }).unwrap()
+                  setInviteMessage("Invitation sent (if email delivery is configured).")
+                  setInviteName("")
+                  setInviteEmail("")
+                  setInvitePhone("")
+                } catch {
+                  setInviteError("Could not send invite (email may already exist or conflict).")
+                }
+              })()
+            }}
+          >
+            <label className="admin-label" style={{ flex: "1 1 160px" }}>
+              Name
+              <input
+                className="admin-input"
+                value={inviteName}
+                onChange={(e) => setInviteName(e.target.value)}
+                autoComplete="name"
+              />
+            </label>
+            <label className="admin-label" style={{ flex: "1 1 200px" }}>
+              Email
+              <input
+                type="email"
+                className="admin-input"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </label>
+            <label className="admin-label" style={{ flex: "1 1 140px" }}>
+              Phone
+              <input
+                className="admin-input"
+                value={invitePhone}
+                onChange={(e) => setInvitePhone(e.target.value)}
+                autoComplete="tel"
+              />
+            </label>
+            <button type="submit" className="admin-btn admin-btn--primary" disabled={inviteSending}>
+              {inviteSending ? "Sending…" : "Send invite"}
+            </button>
+          </form>
+          {inviteError ? (
+            <p className="admin-error" role="alert" style={{ marginTop: "0.75rem" }}>
+              {inviteError}
+            </p>
+          ) : null}
+          {inviteMessage ? (
+            <p className="admin-muted" role="status" style={{ marginTop: "0.75rem" }}>
+              {inviteMessage}
+            </p>
+          ) : null}
+        </div>
+
         <div className="admin-card admin-card--wide" style={{ marginBottom: "1rem" }}>
           <form className="admin-form" style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-end" }} onSubmit={(e) => void handleSearch(e)}>
             <label className="admin-label" style={{ flex: "1 1 240px" }}>

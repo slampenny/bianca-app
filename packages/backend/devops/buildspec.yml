@@ -41,7 +41,7 @@ phases:
           -t $REPOSITORY_URI_APP:$IMAGE_TAG \
           -t $REPOSITORY_URI_APP:latest \
           -t $REPOSITORY_URI_APP:cache \
-          -f Dockerfile .
+          -f docker/Dockerfile .
       
       # Build the Asterisk image with cache
       - echo Building Asterisk image...

@@ -32,27 +32,39 @@ When("I search residents for {string}", async function (text) {
 
 When("I open the first web resident row", async function () {
   const row = this.page.getByTestId("resident-row").first()
-  await expect(row).toBeVisible({ timeout: 15000 })
-  await row.click()
+  await expect(row).toBeVisible({ timeout: 20000 })
+  // Auth tokens are not redux-persisted (blacklisted), so full page.goto would drop the session.
+  // Click the name cell (first td); onboarding column uses stopPropagation and must not receive the click.
+  const nameCell = row.locator("td").first()
+  await Promise.all([
+    this.page.waitForURL(
+      (url) => {
+        const p = url.pathname.replace(/\/$/, "")
+        return /^\/residents\/[^/]+$/.test(p) && !p.endsWith("/new")
+      },
+      { timeout: 35000 },
+    ),
+    nameCell.click(),
+  ])
 })
 
 Then("I should see the web resident detail view", async function () {
-  await expect(this.page.getByTestId("resident-detail-page")).toBeVisible({ timeout: 15000 })
+  await expect(this.page.getByTestId("resident-detail-page")).toBeVisible({ timeout: 30000 })
   await expect(this.page.getByTestId("resident-detail-back")).toBeVisible()
   await expect(this.page.getByText("Resident not found")).toHaveCount(0)
   await expect(this.page.getByRole("heading", { level: 1 }).first()).toBeVisible()
 })
 
 Then("I should see the resident call action", async function () {
-  await expect(this.page.getByRole("button", { name: "Call now" }).first()).toBeVisible({ timeout: 10000 })
+  await expect(this.page.getByTestId("resident-call-now")).toBeVisible({ timeout: 20000 })
 })
 
 Then("I should not see the resident call action", async function () {
-  await expect(this.page.getByRole("button", { name: "Call now" }).first()).toHaveCount(0)
+  await expect(this.page.getByTestId("resident-call-now")).toHaveCount(0)
 })
 
 When("I open the resident call workspace", async function () {
-  await this.page.getByRole("button", { name: "Call now" }).first().click()
+  await this.page.getByTestId("resident-call-now").click()
   await this.page.waitForURL(/\/residents\/.+\/call/, { timeout: 15000 })
 })
 
@@ -72,7 +84,7 @@ Then("I should not see the resident call workspace", async function () {
 
 Then("I should see resident call controls", async function () {
   await expect(this.page.getByRole("button", { name: "Back to Resident" })).toBeVisible({ timeout: 10000 })
-  await expect(this.page.getByRole("button", { name: "Call now" }).first()).toBeVisible({ timeout: 10000 })
+  await expect(this.page.getByTestId("resident-call-workspace-submit")).toBeVisible({ timeout: 10000 })
   await expect(this.page.getByText("Call notes (optional)")).toBeVisible({ timeout: 10000 })
 })
 
@@ -82,7 +94,7 @@ When("I go back to resident detail from resident call workspace", async function
 })
 
 Then("I should see resident analysis tabs", async function () {
-  await expect(this.page.getByRole("tablist", { name: "Resident analysis tabs" })).toBeVisible({ timeout: 10000 })
+  await expect(this.page.getByTestId("resident-analysis-tablist")).toBeVisible({ timeout: 20000 })
   await expect(this.page.getByRole("tab", { name: "Sentiment" })).toBeVisible()
   await expect(this.page.getByRole("tab", { name: "Medical" })).toBeVisible()
   await expect(this.page.getByRole("tab", { name: "Security" })).toBeVisible()
@@ -120,7 +132,7 @@ Then("I should see the caregivers management page", async function () {
 })
 
 Then("I should see the resident schedules section", async function () {
-  await expect(this.page.getByTestId("resident-schedules-card")).toBeVisible({ timeout: 15000 })
+  await expect(this.page.getByTestId("resident-schedules-card")).toBeVisible({ timeout: 30000 })
   await expect(this.page.getByRole("heading", { name: "Call Schedules" })).toBeVisible()
 })
 

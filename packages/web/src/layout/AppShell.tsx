@@ -20,14 +20,23 @@ import {
 import { formatHeaderLastActivity } from "../lib/timeFormat"
 import "../app.css"
 
-const NAV = [
+type NavItem = {
+  to: string
+  label: string
+  icon: typeof DashboardIcon
+  badge: boolean
+  orgAdminOnly?: boolean
+  testId?: string
+}
+
+const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: DashboardIcon, badge: false },
   { to: "/alerts", label: "Alerts", icon: BellIcon, badge: true },
   { to: "/residents", label: "Residents", icon: UsersIcon, badge: false },
   { to: "/caregivers", label: "Caregivers", icon: UsersIcon, badge: false, orgAdminOnly: true },
   { to: "/reports", label: "Reports", icon: FileTextIcon, badge: false },
   { to: "/settings", label: "Settings", icon: SettingsIcon, badge: false },
-] as const
+]
 
 function userInitials(name: string | undefined): string {
   if (!name?.trim()) return "—"
@@ -61,7 +70,8 @@ export function AppShell() {
   const demoNew = alerts.filter((a) => a.status === "new").length
   const newAlertCount = liveUnread + demoNew
   const navItems = useMemo(
-    () => NAV.filter((n) => !n.orgAdminOnly || canManageCaregivers(currentUser?.role)),
+    () =>
+      NAV.filter((n) => !n.orgAdminOnly || canManageCaregivers(currentUser?.role)),
     [currentUser?.role],
   )
   const first = activityFeed[0]
@@ -97,13 +107,26 @@ export function AppShell() {
       >
         <div className="va-aside-top">
           {!sidebarCollapsed ? (
-            <span className="va-logo">
-              bianca<span className="va-logo-teal">.</span>
-            </span>
+            <div className="va-logo-row">
+              <img
+                src="/bianca-mark.png"
+                alt=""
+                className="va-logo-mark"
+                decoding="async"
+                aria-hidden
+              />
+              <span className="va-logo">
+                bianca<span className="va-logo-teal">.</span>
+              </span>
+            </div>
           ) : (
-            <span className="va-logo va-logo-teal" style={{ margin: "0 auto" }}>
-              b.
-            </span>
+            <img
+              src="/bianca-mark.png"
+              alt="Bianca"
+              className="va-logo-mark va-logo-mark--collapsed"
+              decoding="async"
+              style={{ margin: "0 auto" }}
+            />
           )}
           <button
             type="button"
@@ -115,12 +138,12 @@ export function AppShell() {
           </button>
         </div>
         <nav className="va-nav">
-          {navItems.map(({ to, label, icon: Icon, badge }) => (
+          {navItems.map(({ to, label, icon: Icon, badge, testId }) => (
             <NavLink
               key={to}
               to={to}
               end={to === "/"}
-              data-testid={`nav-${label.toLowerCase()}`}
+              data-testid={testId ?? `nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
               className={({ isActive }) =>
                 `va-nav-link ${isActive ? "va-nav-link--active" : ""} ${sidebarCollapsed ? "justify-center" : ""}`
               }

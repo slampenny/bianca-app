@@ -1,5 +1,5 @@
 const httpStatus = require('http-status');
-const { Org, Caregiver, Client, Schedule } = require('../models');
+const { Org, Caregiver, Client, Schedule, Token } = require('../models');
 const config = require('../config/config');
 const emailService = require('./email.service');
 const tokenService = require('./token.service');
@@ -158,6 +158,28 @@ const removeCaregiver = async (orgId, caregiverId) => {
   return org;
 };
 
+/**
+ * Org used to anchor invited caregivers for platform super-admin invites (caregivers require an org).
+ * Override with BIANCA_PLATFORM_ORG_ID.
+ */
+const getPlatformAnchorOrg = async () => {
+  if (process.env.BIANCA_PLATFORM_ORG_ID) {
+    const org = await Org.findById(process.env.BIANCA_PLATFORM_ORG_ID);
+    if (!org) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Platform organization not found (BIANCA_PLATFORM_ORG_ID)');
+    }
+    return org;
+  }
+  const org = await Org.findOne({}).sort({ _id: 1 });
+  if (!org) {
+    throw new ApiError(
+      httpStatus.NOT_FOUND,
+      'No organization in database. Create an organization before sending super-admin invites.'
+    );
+  }
+  return org;
+};
+
 const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
   const org = await Org.findById(orgId);
   if (!org) {
@@ -215,6 +237,8 @@ const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
     throw new ApiError(httpStatus.CONFLICT, 'Caregiver already exists');
   }
 
+  await Token.deleteMany({ caregiver: caregiver._id, type: tokenTypes.SUPERADMIN_INVITE });
+
   // Generate invite token and send email (for both new and resend cases)
   const inviteToken = await tokenService.generateInviteToken(caregiver);
   const inviteLink = `${config.frontendUrl}/signup?token=${inviteToken}`;
@@ -247,6 +271,67 @@ const sendInvite = async (orgId, name, email, phone, inviterId = null) => {
     });
     // Don't throw - allow the invite to be created even if email fails
     // The caregiver can still use the invite link if they have it
+  }
+
+  return { caregiver, inviteToken };
+};
+
+/**
+ * Invite someone to complete signup as superAdmin on the admin console (mirrors sendInvite).
+ * @param {string} name
+ * @param {string} email
+ * @param {string} phone
+ * @param {string|null} [inviterId]
+ */
+const sendSuperAdminInvite = async (name, email, phone, inviterId = null) => {
+  const org = await getPlatformAnchorOrg();
+  const orgId = org._id;
+
+  let caregiver = await Caregiver.findOne({ email });
+
+  if (!caregiver) {
+    caregiver = new Caregiver({
+      org: orgId,
+      name,
+      email,
+      phone,
+      role: 'invited',
+      isEmailVerified: true,
+    });
+    await caregiver.save();
+    org.caregivers.push(caregiver);
+    await org.save();
+  } else if (caregiver.role === 'invited' && caregiver.org?.toString() === orgId.toString()) {
+    caregiver.name = name;
+    caregiver.phone = phone;
+    await caregiver.save();
+  } else {
+    throw new ApiError(httpStatus.CONFLICT, 'Caregiver already exists');
+  }
+
+  await Token.deleteMany({ caregiver: caregiver._id, type: tokenTypes.INVITE });
+
+  const inviteToken = await tokenService.generateSuperAdminInviteToken(caregiver);
+  const inviteLink = `${config.adminFrontendUrl}/signup?token=${inviteToken}`;
+
+  let locale = 'en';
+  if (inviterId) {
+    const inviter = await Caregiver.findById(inviterId).select('preferredLanguage');
+    if (inviter?.preferredLanguage) {
+      locale = inviter.preferredLanguage;
+    }
+  }
+
+  try {
+    await emailService.sendSuperAdminInviteEmail(email, inviteLink, locale, caregiver.name);
+    logger.info('Super-admin invite email sent', { email, caregiverId: caregiver.id, locale });
+  } catch (emailError) {
+    logger.error('Failed to send super-admin invite email', {
+      error: emailError.message,
+      email,
+      caregiverId: caregiver.id,
+      inviteLink,
+    });
   }
 
   return { caregiver, inviteToken };
@@ -336,6 +421,7 @@ module.exports = {
   removeCaregiver,
   setRole,
   sendInvite,
+  sendSuperAdminInvite,
   verifyInvite,
   updateCallRetrySettings,
 };

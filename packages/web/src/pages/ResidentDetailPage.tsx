@@ -15,6 +15,7 @@ import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdat
 import type { MedicalAnalysisResult, MedicalAnalysisSummaryResponse } from "../services/api/medicalAnalysisApi"
 import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
 import { AvatarPicker } from "../components/AvatarPicker"
+import { ClientOnboardingSection } from "../components/ClientOnboardingSection"
 import { canAddResidents } from "../lib/roleAccess"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -200,7 +201,7 @@ export function ResidentDetailPage() {
   )
 
   const atRisk = resident?.status === "at_risk"
-  const canCallNow = user?.role === "orgAdmin" || user?.role === "superAdmin"
+  const canCallNow = canAddResidents(user?.role)
 
   const sentimentChartData = useMemo(() => {
     const pts = sentimentTrend?.dataPoints ?? []
@@ -628,11 +629,18 @@ export function ResidentDetailPage() {
               Open the full call workspace for live status, onboarding progress, and transcript stream.
             </p>
           </div>
-          <button type="button" className="va-btn-primary" onClick={() => navigate(`/residents/${residentId || ""}/call`)}>
+          <button
+            type="button"
+            className="va-btn-primary"
+            data-testid="resident-call-now"
+            onClick={() => navigate(`/residents/${residentId || ""}/call`)}
+          >
             Call now
           </button>
         </div>
       ) : null}
+
+      {apiClient ? <ClientOnboardingSection clientId={apiRecordId(apiClient)} residentPathId={residentId || ""} /> : null}
 
       {canManageResidents ? (
         <div className="va-card va-card-pad" data-testid="resident-schedules-card">
@@ -969,7 +977,12 @@ export function ResidentDetailPage() {
       <div className="va-card va-card-pad">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Analysis</h2>
-          <div role="tablist" aria-label="Resident analysis tabs" style={{ display: "inline-flex", borderBottom: "1px solid var(--va-slate-200)", gap: 4 }}>
+          <div
+            data-testid="resident-analysis-tablist"
+            role="tablist"
+            aria-label="Resident analysis tabs"
+            style={{ display: "inline-flex", borderBottom: "1px solid var(--va-slate-200)", gap: 4 }}
+          >
             {(
               [
                 { id: "sentiment" as const, label: "Sentiment" },

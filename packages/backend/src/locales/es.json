@@ -54,5 +54,23 @@
 		"contactInfo": "Si tiene alguna pregunta o inquietud, por favor contacte a su organización o envíenos un correo a privacy@biancawellness.com.",
 		"versionLabel": "Versión del correo de consentimiento:",
 		"closing": "Saludos cordiales,\nEl equipo de Bianca Wellness"
+	},
+	"caregiverDailyDigest": {
+		"title": "Resumen diario de atención",
+		"subtitle": "Llamadas de bienestar para sus residentes asignados",
+		"subtitleWithOrg": "Llamadas de bienestar — %s",
+		"labelConversationSummary": "Resumen de la conversación",
+		"labelSentiment": "Sentimiento",
+		"labelCallsToday": "Llamadas hoy",
+		"noActivity": "No hubo llamadas este día.",
+		"noAnswerToday": "Se intentó llamar; sin resumen (no contestó o fue muy breve).",
+		"completedMinutes": "Llamada de bienestar completada (unos %s min).",
+		"completedNoTranscript": "Llamada completada; aún no hay resumen escrito.",
+		"languageMismatchExplanation": "Se omite el texto de la conversación porque el idioma preferido del residente (%s) no coincide con el suyo (%s). Solo resumen de sentimiento.",
+		"languageMismatchExplanationNoSentiment": "Se omite el texto de la conversación porque el idioma preferido del residente (%s) no coincide con el suyo (%s). No hay análisis de sentimiento disponible para estos contactos.",
+		"emailScreenHint": "Use “Enviar resumen por correo” para enviar una copia a su correo verificado, o marque “Enviarme correo al generar” al crear el resumen.",
+		"emailSubject": "Resumen diario de atención — %s",
+		"emailPlainIntro": "Este mensaje resume las llamadas de bienestar de sus residentes asignados. Abra la versión HTML para el formato completo.",
+		"emailConfidentialFooter": "Confidencial — solo para el cuidador destinado. No reenviar."
 	}
 }

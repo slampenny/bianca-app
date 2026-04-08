@@ -26,7 +26,7 @@ if ! docker images | grep -q "$IMAGE_NAME"; then
   echo "This may take several minutes on first run..."
   cd "$BACKEND_DIR"
   # Dockerfile expects to be built from packages/backend directory
-  docker build -f Dockerfile -t "$IMAGE_NAME" .
+  docker build -f docker/Dockerfile -t "$IMAGE_NAME" .
 fi
 
 # Stop and remove existing container if it exists

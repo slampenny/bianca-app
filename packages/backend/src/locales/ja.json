@@ -54,6 +54,23 @@
 		"contactInfo": "ご質問やご懸念がある場合は、組織に連絡するか、privacy@biancawellness.comまでメールをお送りください。",
 		"versionLabel": "同意メールのバージョン：",
 		"closing": "敬具\nBianca Wellnessチーム"
+},
+	"caregiverDailyDigest": {
+		"title": "Daily care digest",
+		"subtitle": "Wellness check-ins for your assigned residents",
+		"subtitleWithOrg": "Wellness check-ins — %s",
+		"labelConversationSummary": "Conversation summary",
+		"labelSentiment": "Sentiment",
+		"labelCallsToday": "Calls today",
+		"noActivity": "No calls scheduled for this day.",
+		"noAnswerToday": "Call attempted; no conversation summary (not answered or too short).",
+		"completedMinutes": "Check-in completed (about %s min).",
+		"completedNoTranscript": "Check-in completed; no written summary yet.",
+		"languageMismatchExplanation": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). Sentiment summary only.",
+		"languageMismatchExplanationNoSentiment": "Conversation text is omitted because the resident's preferred language (%s) differs from yours (%s). No sentiment analysis is available for these calls.",
+		"emailScreenHint": "Use 201cEmail digest201d to send a copy to your verified account email, or check 201cEmail me when I build201d when you generate the digest.",
+		"emailSubject": "Daily care digest 2014 %s",
+		"emailPlainIntro": "This message summarizes wellness check-ins for your assigned residents. Open the HTML version for the full layout.",
+		"emailConfidentialFooter": "Confidential 2014 for the intended caregiver only. Do not forward."
 	}
 }
-

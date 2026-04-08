@@ -74,6 +74,16 @@ export const adminApi = createApi({
         body: { role },
       }),
     }),
+    sendSuperAdminInvite: builder.mutation<
+      AdminCaregiverSearchRow,
+      { name: string; email: string; phone: string }
+    >({
+      query: (body) => ({
+        url: "/admin/superadmin-invites",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 })
 
@@ -87,4 +97,5 @@ export const {
   useDisableOrgScimMutation,
   useImpersonateCaregiverMutation,
   useUpdateCaregiverRoleMutation,
+  useSendSuperAdminInviteMutation,
 } = adminApi

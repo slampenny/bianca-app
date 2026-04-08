@@ -290,18 +290,15 @@ case "$ENVIRONMENT" in
     ;;
 esac
 
-# Super-admin static origin (API CORS). Staging/prod: separate admin container on the same EC2 as frontend; demo has no admin hostname.
+# Nginx server_name for super-admin static container (TLS). API derives admin origin from config.js (PRIMARY_DOMAIN + NODE_ENV), same as facility FRONTEND_URL.
 case "$ENVIRONMENT" in
   production)
-    ADMIN_FRONTEND_URL="https://admin.biancawellness.com"
     SERVER_NAME_ADMIN="admin.biancawellness.com"
     ;;
   staging)
-    ADMIN_FRONTEND_URL="https://staging-admin.biancawellness.com"
     SERVER_NAME_ADMIN="staging-admin.biancawellness.com"
     ;;
   *)
-    ADMIN_FRONTEND_URL=""
     SERVER_NAME_ADMIN=""
     ;;
 esac
@@ -501,7 +498,6 @@ services:
       - API_BASE_URL=$API_BASE_URL
       - WEBSOCKET_URL=$WEBSOCKET_URL
       - FRONTEND_URL=$FRONTEND_URL
-      - ADMIN_FRONTEND_URL=$ADMIN_FRONTEND_URL
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_HOST=asterisk
       - DEPLOYMENT_TYPE=docker-compose

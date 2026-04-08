@@ -25,8 +25,11 @@ import ResidentDetailPage from "./pages/ResidentDetailPage"
 import { ResidentCallPage } from "./pages/ResidentCallPage"
 import { AlertsPage } from "./pages/AlertsPage"
 import { AlertDetailPage } from "./pages/AlertDetailPage"
+import { FamilyWeeklyDigestClientPage } from "./pages/FamilyWeeklyDigestClientPage"
+import { FamilyWeeklyDigestHubPage } from "./pages/FamilyWeeklyDigestHubPage"
 import { ReportTemplateDetailPage } from "./pages/ReportTemplateDetailPage"
 import { ReportsPage } from "./pages/ReportsPage"
+import { DailyDigestPage } from "./pages/DailyDigestPage"
 import { ProfilePage } from "./pages/ProfilePage"
 import { CaregiversPage } from "./pages/CaregiversPage"
 import { CaregiverFormPage } from "./pages/CaregiverFormPage"
@@ -67,8 +70,12 @@ export default function App() {
                 <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
                   <Route path="residents/:residentId/call" element={<ResidentCallPage />} />
                 </Route>
+                <Route path="reports/family_weekly_digest/clients/:clientId" element={<FamilyWeeklyDigestClientPage />} />
+                <Route path="reports/family_weekly_digest" element={<FamilyWeeklyDigestHubPage />} />
+                <Route path="reports/daily-digest" element={<DailyDigestPage />} />
                 <Route path="reports/:templateId" element={<ReportTemplateDetailPage />} />
                 <Route path="reports" element={<ReportsPage />} />
+                <Route path="daily-digest" element={<Navigate to="/reports/daily-digest" replace />} />
                 <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
                   <Route path="caregivers" element={<CaregiversPage />} />
                   <Route path="caregivers/new" element={<CaregiverFormPage />} />

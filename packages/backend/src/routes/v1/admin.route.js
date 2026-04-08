@@ -50,6 +50,13 @@ router.get(
 
 router.post('/impersonate', auth(), validate(adminValidation.impersonate), adminController.impersonate);
 
+router.post(
+  '/superadmin-invites',
+  auth(),
+  validate(adminValidation.sendSuperAdminInvite),
+  adminController.sendSuperAdminInvite,
+);
+
 router.patch(
   '/caregivers/:caregiverId/role',
   auth(),

@@ -6,6 +6,7 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const onboardingService = require('../services/onboarding.service');
 const { caregiverService, conversationService, clientService, scheduleService } = require('../services');
+const { Client } = require('../models');
 const { ConversationDTO, ClientDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
 const { toIdString, assertCaregiverOrgAccess, assertCaregiverClientAccess } = require('../utils/accessControl');
@@ -87,6 +88,24 @@ const getClients = catchAsync(async (req, res) => {
   const result = await clientService.queryClients(filter, options);
   const clientDTOs = await clientsToDTOsWithLastCall(result.results);
   res.status(httpStatus.OK).json({ ...result, results: clientDTOs });
+});
+
+const getClientsOnboardingRollups = catchAsync(async (req, res) => {
+  const { caregiver } = req;
+  const filter = {};
+  if (caregiver.role !== 'superAdmin') {
+    assertCaregiverOrgAccess(caregiver, caregiver.org, 'You do not have access to this organization');
+    filter.org = toIdString(caregiver.org);
+  }
+  if (caregiver.role === 'staff') {
+    const caregiverDoc = await caregiverService.getCaregiverById(caregiver._id || caregiver.id);
+    const rosterIds = ((caregiverDoc && caregiverDoc.clients) || []).map((c) => toIdString(c)).filter(Boolean);
+    filter.$or = [{ caregivers: toIdString(caregiver._id || caregiver.id) }, { _id: { $in: rosterIds } }];
+  }
+  const docs = await Client.find(filter).select('_id').lean();
+  const ids = docs.map((d) => d._id);
+  const rollups = await onboardingService.getJourneyRollupsForClientIds(ids);
+  res.status(httpStatus.OK).json({ rollups });
 });
 
 const getClient = catchAsync(async (req, res) => {
@@ -318,6 +337,7 @@ const verifyConsent = catchAsync(async (req, res) => {
 module.exports = {
   createClient,
   getClients,
+  getClientsOnboardingRollups,
   getClient,
   getClientOnboarding,
   getConversationsByClient,

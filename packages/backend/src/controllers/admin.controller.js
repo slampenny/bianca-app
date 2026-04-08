@@ -140,6 +140,18 @@ const disableOrgScim = catchAsync(async (req, res) => {
 });
 
 /**
+ * Email an invitation to complete signup as superAdmin on the admin console.
+ */
+const sendSuperAdminInvite = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const { name, email, phone } = req.body;
+  const inviterId = req.caregiver?.id || req.caregiver?._id || null;
+  const { caregiver } = await orgService.sendSuperAdminInvite(name, email, phone, inviterId);
+  const dto = CaregiverDTO(caregiver);
+  res.status(httpStatus.OK).send({ ...dto, id: dto.id != null ? String(dto.id) : undefined });
+});
+
+/**
  * Issue tokens for another caregiver (same payload shape as POST /auth/login). Super admin only.
  */
 const impersonate = catchAsync(async (req, res) => {
@@ -289,6 +301,7 @@ module.exports = {
   getOrgScimStatus,
   issueOrgScimToken,
   disableOrgScim,
+  sendSuperAdminInvite,
   impersonate,
   setCaregiverRole,
 };

@@ -3,7 +3,7 @@ const catchAsync = require('../utils/catchAsync');
 const { facilityReportsService } = require('../services');
 
 const getCallCompletionLog = catchAsync(async (req, res) => {
-  const query = pick(req.query, ['dateFrom', 'dateTo', 'clientId', 'orgId']);
+  const query = pick(req.query, ['dateFrom', 'dateTo', 'clientId', 'orgId', 'page', 'limit']);
   const data = await facilityReportsService.getCallCompletionLog(req.caregiver, query);
   res.send(data);
 });

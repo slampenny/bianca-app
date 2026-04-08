@@ -347,12 +347,12 @@ export function ReportsPage() {
                     ))}
                   </div>
                   <Link
-                    to={`/reports/${t.id}`}
+                    to={t.id === "wellness_daily" ? "/reports/daily-digest" : `/reports/${t.id}`}
                     className="va-btn-primary"
                     data-testid={`report-open-${t.id}`}
                     style={{ alignSelf: "stretch", justifyContent: "center", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
                   >
-                    View report
+                    {t.id === "wellness_daily" ? "Open live digest" : "View report"}
                   </Link>
                 </div>
               </article>

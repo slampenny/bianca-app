@@ -9,7 +9,7 @@
 
 ### Docker Compose Setup
 
-Redis is now included in `docker-compose.yml` and runs as a container alongside your app:
+Redis is included in `docker/docker-compose.yml` (merged with `docker-compose.dev.yml` for local dev) and runs as a container alongside your app:
 
 - **Local Development**: Redis runs in Docker (zero additional cost)
 - **Staging**: Redis runs in Docker on the same EC2 instance (zero additional cost)

@@ -153,12 +153,12 @@ export function getReportPayload(id: ReportTemplateId): ReportPayload {
         subtitle: "Facility-wide · Last 48 hours",
         tables: [
           {
-            headers: ["Time", "Resident", "Outcome", "Duration"],
+            headers: ["Date", "Time", "Resident", "Outcome", "Duration"],
             rows: [
-              ["06:12", "E. Briggs", "Completed", "4 min"],
-              ["06:30", "J. Okoro", "No answer", "—"],
-              ["07:05", "M. Liu", "Completed", "6 min"],
-              ["07:22", "R. Santos", "Completed", "3 min"],
+              ["Apr 6, 2026", "06:12", "E. Briggs", "Completed", "4 min"],
+              ["Apr 6, 2026", "06:30", "J. Okoro", "No answer", "—"],
+              ["Apr 6, 2026", "07:05", "M. Liu", "Completed", "6 min"],
+              ["Apr 6, 2026", "07:22", "R. Santos", "Completed", "3 min"],
             ],
           },
         ],

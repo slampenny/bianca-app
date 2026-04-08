@@ -7,10 +7,12 @@ import { MFAPage } from "./pages/MFAPage"
 import { ImpersonatePage } from "./pages/ImpersonatePage"
 import { ObservabilityPage } from "./pages/ObservabilityPage"
 import { ScimProvisioningPage } from "./pages/ScimProvisioningPage"
+import { InviteSignupPage } from "./pages/InviteSignupPage"
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/signup" element={<InviteSignupPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/login/mfa" element={<MFAPage />} />
       <Route path="/forbidden" element={<ForbiddenPage />} />

@@ -16,6 +16,7 @@ const paymentMethodRoute = require('./paymentMethod.route');
 const privacyRoute = require('./privacy.route');
 const reportRoute = require('./report.route');
 const familyWeeklyDigestRoute = require('./familyWeeklyDigest.route');
+const caregiverDailyDigestRoute = require('./caregiverDailyDigest.route');
 const facilityReportsRoute = require('./facilityReports.route');
 const activityRoute = require('./activity.route');
 const adminRoute = require('./admin.route');
@@ -104,6 +105,10 @@ const defaultRoutes = [
   {
     path: '/family-weekly-digests',
     route: familyWeeklyDigestRoute,
+  },
+  {
+    path: '/caregiver-daily-digests',
+    route: caregiverDailyDigestRoute,
   },
   {
     path: '/facility-reports',

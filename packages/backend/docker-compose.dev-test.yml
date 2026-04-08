@@ -1,9 +1,0 @@
-version: '3'
-
-services:
-  bianca-app:
-    container_name: bianca-app-test
-    environment:
-      - NODE_ENV=test
-      - USE_SES_IN_DEV=false  # Force Ethereal for tests
-    command: yarn dev:test
