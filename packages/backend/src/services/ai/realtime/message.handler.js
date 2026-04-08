@@ -108,7 +108,14 @@ class MessageHandler {
           type: 'server_vad',
           threshold: turnDetectionThreshold,
           prefix_padding_ms: turnDetectionPrefixPadding,
-          silence_duration_ms: turnDetectionSilenceDuration
+          silence_duration_ms: turnDetectionSilenceDuration,
+          // create_response: false — we manage response scheduling via
+          // sendResponseCreate to avoid double response.create collisions
+          // with our state machine. OpenAI still handles VAD detection
+          // and server-side buffer commit.
+          // OPENAI_REALTIME_SESSION_CONFIG is not merged into this payload; if it ever is,
+          // do not allow env to set turn_detection.create_response: true (reintroduces the race).
+          create_response: false,
         }
       },
       output: {
