@@ -1678,8 +1678,11 @@ class OpenAIRealtimeService {
               
               return; // Exit early - we'll handle response after debounce
             }
-            
-            if (!conn._aiIsSpeaking && this.canAIRespond(callId)) {
+
+            const isActiveResponse =
+              conn._aiIsSpeaking || conn._responseCreated || conn._responseCreateInFlight;
+
+            if (!isActiveResponse && this.canAIRespond(callId)) {
               const hadPendingFlag = conn._pendingUserResponseAfterAiStops;
               conn._pendingUserResponseAfterAiStops = false;
               this._rcDiagSpeechStopped(callId, conn, 'main_path_enter', {
@@ -1835,7 +1838,7 @@ class OpenAIRealtimeService {
                   );
                 }
               }
-            } else if (conn._aiIsSpeaking) {
+            } else if (isActiveResponse) {
               if (this.canAIRespond(callId) && !this.isInGracePeriod(callId)) {
                 conn._pendingUserResponseAfterAiStops = true;
                 conn._userTurnResponseCreateSent = false;
@@ -1858,7 +1861,7 @@ class OpenAIRealtimeService {
                   conn._pendingUserResponseAfterAiStops = true;
                   conn._userTurnResponseCreateSent = false;
                   logger.info(
-                    `[RealtimeRC] speech_stopped:main_path_blocked — _aiIsSpeaking true, deferring to response.done ${callId}`
+                    `[RealtimeRC] speech_stopped:while_response_active_no_queue — active response in progress, deferring to response.done ${callId}`
                   );
                 }
                 this._rcDiagSpeechStopped(callId, conn, 'speech_stopped_while_ai_speaking_no_queue', {
@@ -1867,27 +1870,22 @@ class OpenAIRealtimeService {
                   isInGracePeriod: this.isInGracePeriod(callId),
                   _aiAudioComplete: conn._aiAudioComplete,
                   _pendingUserResponseAfterAiStops: conn._pendingUserResponseAfterAiStops,
+                  _responseCreated: conn._responseCreated,
+                  _responseCreateInFlight: conn._responseCreateInFlight,
                 });
               }
-              logger.info(`[OpenAI Realtime] User finished speaking but AI is already speaking for ${callId}`);
+              logger.info(
+                `[OpenAI Realtime] User finished speaking but AI is already speaking or a response is in progress for ${callId}`
+              );
             } else {
-              // Typically !_aiIsSpeaking && !canAIRespond. Defensive: if _aiIsSpeaking is true (ordering / guard skew),
-              // still defer a real user turn so maybeFlush can run after response.done.
-              const hasUserTurnMainBlocked =
-                (conn.pendingUserTranscript || '').trim().length > 0 ||
-                Boolean(conn.activeUserMessageId) ||
-                conn._waitingForUserTranscript;
-              if (conn._aiIsSpeaking && hasUserTurnMainBlocked && !conn._userTurnResponseCreateSent) {
-                conn._pendingUserResponseAfterAiStops = true;
-                conn._userTurnResponseCreateSent = false;
-                logger.info(
-                  `[RealtimeRC] speech_stopped:main_path_blocked — _aiIsSpeaking true, deferring to response.done ${callId}`
-                );
-              }
+              // !isActiveResponse && !canAIRespond (e.g. GREETING_ACTIVE before any response.create). Any in-flight or
+              // ack'd response is handled above via isActiveResponse — including pre–output_audio.delta greeting.
               this._rcDiagSpeechStopped(callId, conn, 'main_path_blocked', {
                 outcome: 'sendResponseCreate_not_scheduled',
-                reason: '!_aiIsSpeaking && canAIRespond was false, or _aiIsSpeaking path not taken',
+                reason: '!isActiveResponse && canAIRespond was false',
                 _aiIsSpeaking: conn._aiIsSpeaking,
+                _responseCreated: conn._responseCreated,
+                _responseCreateInFlight: conn._responseCreateInFlight,
                 _aiAudioComplete: conn._aiAudioComplete,
                 canAIRespond: this.canAIRespond(callId),
                 state: this.getConversationState(callId),
