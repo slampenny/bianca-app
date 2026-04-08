@@ -205,6 +205,37 @@ class OpenAIRealtimeService {
     return StateMachine.isInGracePeriod(conn, CONSTANTS.GRACE_PERIOD_MS);
   }
 
+  _clearAiAudioCompleteDebounceTimer(conn) {
+    if (conn?._aiAudioCompleteDebounceTimer) {
+      clearTimeout(conn._aiAudioCompleteDebounceTimer);
+      conn._aiAudioCompleteDebounceTimer = null;
+    }
+  }
+
+  /** Fallback if `response.output_audio.done` is not emitted for this session. */
+  _scheduleAiAudioCompleteDebounced(callId, conn) {
+    if (!conn) return;
+    this._clearAiAudioCompleteDebounceTimer(conn);
+    conn._aiAudioCompleteDebounceTimer = setTimeout(() => {
+      const c = this.connections.get(callId);
+      if (!c || !c._aiIsSpeaking) return;
+      if (c._aiAudioComplete) return;
+      c._aiAudioComplete = true;
+      c._aiAudioCompleteDebounceTimer = null;
+      logger.info(
+        `[RealtimeRC] ${callId}: _aiAudioComplete=true (150ms debounce after last output_audio.delta)`
+      );
+    }, 150);
+  }
+
+  /** New assistant audio turn: clear completion / delta tracking (per conn). */
+  _resetAssistantOutputAudioLifecycle(conn) {
+    if (!conn) return;
+    conn._aiAudioComplete = false;
+    conn._aiOutputAudioDeltaSeen = false;
+    this._clearAiAudioCompleteDebounceTimer(conn);
+  }
+
   /**
    * OPTIMIZATION: Start global commit timer that processes ALL pending commits in batches
    */
@@ -505,6 +536,16 @@ class OpenAIRealtimeService {
       _responseCreateInFlight: false,
       _responseCreated: false,
       _aiIsSpeaking: false,
+      // True after at least one response.output_audio.delta this turn (avoids treating pre-audio "optimistic" _aiIsSpeaking as barge-in).
+      _aiOutputAudioDeltaSeen: false,
+      // True when output audio stream finished (response.output_audio.done or debounce after last delta); still before response.done.
+      _aiAudioComplete: false,
+      _aiAudioCompleteDebounceTimer: null,
+      // One 500ms speech_stopped finalize pass per utterance; duplicate VAD speech_stopped must not stack timers.
+      _speechStoppedFinalizePending: false,
+      _speechStoppedFinalizeTimer: null,
+      // True after speech_stopped transitioned to AI_RESPONDING (200ms send pending); duplicate VAD must not re-run main path.
+      _speechStoppedCommittedAiResponding: false,
       // Set in speech_stopped 500ms path when placeholder exists but ASR not ready yet; cleared when ASR completes or on cleanup paths.
       _waitingForUserTranscript: false,
 
@@ -1200,6 +1241,7 @@ class OpenAIRealtimeService {
             
             // Track that AI is speaking
             if (conn && !conn._aiIsSpeaking) {
+              this._resetAssistantOutputAudioLifecycle(conn);
               conn._aiIsSpeaking = true;
               conn._lastAiSpeechStart = Date.now();
               logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId} (${apiVersion})`);
@@ -1218,6 +1260,12 @@ class OpenAIRealtimeService {
               }
             }
 
+            if (conn) {
+              conn._aiOutputAudioDeltaSeen = true;
+              conn._aiAudioComplete = false;
+              this._scheduleAiAudioCompleteDebounced(callId, conn);
+            }
+
             // STRANGLER FIG: Use MessageHandler for audio delta processing
             const processed = MessageHandler.handleResponseAudioDelta(
               conn,
@@ -1228,6 +1276,15 @@ class OpenAIRealtimeService {
             if (!processed) {
               logger.warn(`[OpenAI Realtime] Failed to process ${eventType} for ${callId}`);
             }
+          }
+          break;
+
+        case 'response.audio.done': // Beta
+        case 'response.output_audio.done': // GA — output audio stream finished (before response.done)
+          if (conn) {
+            this._clearAiAudioCompleteDebounceTimer(conn);
+            conn._aiAudioComplete = true;
+            logger.info(`[RealtimeRC] ${callId}: _aiAudioComplete=true (response.output_audio.done)`);
           }
           break;
 
@@ -1269,8 +1326,19 @@ class OpenAIRealtimeService {
 
           if (conn) {
             conn._userIsSpeaking = true;
-            conn._pendingUserResponseAfterAiStops = false;
-            conn._userTurnResponseCreateSent = false;
+            const stForUserTurnGuards = this.getConversationState(callId);
+            const alreadyUserSpeaking = stForUserTurnGuards === CONVERSATION_STATES.USER_SPEAKING;
+            // Duplicate speech_started (VAD) while still USER_SPEAKING must not clear defer / sent flags — same utterance.
+            if (!alreadyUserSpeaking) {
+              conn._pendingUserResponseAfterAiStops = false;
+              conn._userTurnResponseCreateSent = false;
+              if (conn._speechStoppedFinalizeTimer) {
+                clearTimeout(conn._speechStoppedFinalizeTimer);
+                conn._speechStoppedFinalizeTimer = null;
+              }
+              conn._speechStoppedFinalizePending = false;
+              conn._speechStoppedCommittedAiResponding = false;
+            }
             conn._lastUserSpeechStart = Date.now();
             conn._userTranscriptLiveBuffer = '';
             if (conn._userTranscriptFlushTimer) {
@@ -1278,14 +1346,18 @@ class OpenAIRealtimeService {
               conn._userTranscriptFlushTimer = null;
             }
 
-            // CRITICAL: Cancel AI audio FIRST when interrupting. If we transitioned to USER_SPEAKING while still
-            // AI_RESPONDING, the interrupt path would try CONVERSATION_ACTIVE from USER_SPEAKING (invalid).
-            // Order: resolve AI state → then USER_SPEAKING (see STATE_TRANSITIONS).
-            if (conn._aiIsSpeaking) {
+            // CRITICAL: Cancel AI audio ONLY during true barge-in (output audio still streaming).
+            // After the last output_audio.delta (or output_audio.done), _aiAudioComplete is true until response.done;
+            // user speech there is post-audio tail, not barge-in — do not cancel (would drop a nearly-finished turn).
+            // Before first delta, _aiOutputAudioDeltaSeen is false — do not cancel (optimistic _aiIsSpeaking from our timer).
+            const shouldCancelAiForBargeIn =
+              conn._aiIsSpeaking && conn._aiOutputAudioDeltaSeen && !conn._aiAudioComplete;
+            if (shouldCancelAiForBargeIn) {
               logger.info(`[OpenAI Realtime] USER INTERRUPTING AI - canceling AI response for ${callId}`);
               try {
                 await this.sendJsonMessage(callId, { type: 'response.cancel' });
                 conn._aiIsSpeaking = false;
+                this._resetAssistantOutputAudioLifecycle(conn);
                 conn._responseCanceled = true;
                 conn._responseCanceledAt = Date.now();
                 conn.pendingAssistantTranscript = '';
@@ -1300,11 +1372,21 @@ class OpenAIRealtimeService {
               } catch (err) {
                 logger.error(`[OpenAI Realtime] Failed to cancel AI response: ${err.message}`);
               }
+            } else if (conn._aiIsSpeaking && conn._aiAudioComplete) {
+              logger.info(
+                `[OpenAI Realtime] User speech during assistant tail (audio complete, response.done pending) for ${callId} — skipping response.cancel`
+              );
             }
 
-            // STATE MACHINE: USER_SPEAKING when the transition table allows (includes AI_RESPONDING → USER_SPEAKING for barge-in)
+            // STATE MACHINE: USER_SPEAKING when allowed. AI_RESPONDING→USER_SPEAKING covers barge-in / post-audio tail.
+            // USER_SPEAKING→USER_SPEAKING is invalid — treat duplicate VAD as idempotent (common cause of "blocked" logs).
             const stBeforeUser = this.getConversationState(callId);
-            if (StateMachine.canTransitionTo(conn, CONVERSATION_STATES.USER_SPEAKING)) {
+            if (stBeforeUser === CONVERSATION_STATES.USER_SPEAKING) {
+              logger.info(`[RealtimeRC] speech_started → USER_SPEAKING (idempotent, already user_speaking) ${callId}`, {
+                _aiIsSpeaking: conn._aiIsSpeaking,
+                _aiAudioComplete: conn._aiAudioComplete,
+              });
+            } else if (StateMachine.canTransitionTo(conn, CONVERSATION_STATES.USER_SPEAKING)) {
               const ok = this.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, 'user_started_speaking');
               logger.info(`[RealtimeRC] speech_started → USER_SPEAKING ${callId}`, {
                 success: ok,
@@ -1315,6 +1397,9 @@ class OpenAIRealtimeService {
               logger.info(`[RealtimeRC] speech_started USER_SPEAKING blocked ${callId}`, {
                 state: stBeforeUser,
                 allowedNext: STATE_TRANSITIONS[stBeforeUser] ? [...STATE_TRANSITIONS[stBeforeUser]] : [],
+                _aiIsSpeaking: conn._aiIsSpeaking,
+                _aiAudioComplete: conn._aiAudioComplete,
+                _aiOutputAudioDeltaSeen: conn._aiOutputAudioDeltaSeen,
               });
             }
 
@@ -1352,6 +1437,8 @@ class OpenAIRealtimeService {
               logger.warn(
                 `[RealtimeRC] recovery ${callId}: state=ai_responding and _aiIsSpeaking=false → transition to conversation_active (enables next response.create)`
               );
+              conn._speechStoppedCommittedAiResponding = false;
+              conn._userTurnResponseCreateSent = false;
               this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'recovery_stuck_ai_responding');
               this._rcDiagSpeechStopped(callId, conn, 'after_stuck_ai_responding_recovery', {
                 previousState: stBeforeRecovery,
@@ -1376,10 +1463,22 @@ class OpenAIRealtimeService {
               });
             }
 
+            const stAfterSpeechStoppedRecovery = this.getConversationState(callId);
+            if (
+              stAfterSpeechStoppedRecovery === CONVERSATION_STATES.AI_RESPONDING &&
+              conn._userTurnResponseCreateSent
+            ) {
+              logger.info(
+                `[RealtimeRC] speech_stopped:idempotent — already AI_RESPONDING with response sent, ignoring duplicate VAD event ${callId}`
+              );
+            } else {
             // CRITICAL: Wait a moment for transcription to complete (race condition)
             // The transcript might arrive via input_audio_transcription.completed AFTER speech_stopped
-            // So we wait a bit, then check again
-            setTimeout(async () => {
+            // So we wait a bit, then check again. Duplicate speech_stopped must not stack 500ms passes.
+            if (!conn._speechStoppedFinalizePending) {
+              conn._speechStoppedFinalizePending = true;
+              conn._speechStoppedFinalizeTimer = setTimeout(async () => {
+                try {
               const currentConn = this.connections.get(callId);
               if (!currentConn) return;
 
@@ -1479,8 +1578,30 @@ class OpenAIRealtimeService {
               } else if (currentConn._pendingAiPlaceholder && currentConn._aiIsSpeaking) {
                 logger.warn(`[OpenAI Realtime] AI placeholder deferred but user message not finalized - skipping placeholder creation to preserve queue order`);
               }
-            }, 500); // Wait 500ms for transcription to complete
+                } finally {
+                  const c = this.connections.get(callId);
+                  if (c) {
+                    c._speechStoppedFinalizePending = false;
+                    c._speechStoppedFinalizeTimer = null;
+                  }
+                }
+              }, 500); // Wait 500ms for transcription to complete
+            } else {
+              logger.info(
+                `[RealtimeRC] speech_stopped:idempotent — ASR finalize (500ms) already scheduled, ignoring duplicate VAD ${callId}`
+              );
+            }
 
+            const stForDupMainPath = this.getConversationState(callId);
+            if (
+              conn._speechStoppedCommittedAiResponding &&
+              stForDupMainPath === CONVERSATION_STATES.AI_RESPONDING &&
+              !conn._userTurnResponseCreateSent
+            ) {
+              logger.info(
+                `[RealtimeRC] speech_stopped:idempotent — duplicate VAD while awaiting response.create (200ms), ignoring ${callId}`
+              );
+            } else {
             // STATE MACHINE: Only trigger AI response if we're in the right state
             // CRITICAL: If we just canceled a response, wait a bit before triggering a new one
             // This prevents race conditions where response.done arrives after we cancel
@@ -1525,6 +1646,8 @@ class OpenAIRealtimeService {
 
                   // Transition to AI_RESPONDING state
                   if (this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_finished_speaking_after_cancel')) {
+                    const postCancelConn = this.connections.get(callId);
+                    if (postCancelConn) postCancelConn._speechStoppedCommittedAiResponding = true;
                     logger.info(`[OpenAI Realtime] User finished speaking (after cancel debounce) - will trigger AI response for ${callId}`);
                     
                     setTimeout(async () => {
@@ -1539,10 +1662,13 @@ class OpenAIRealtimeService {
                       try {
                         await this.sendResponseCreate(callId);
                         finalConn._userTurnResponseCreateSent = true;
+                        this._resetAssistantOutputAudioLifecycle(finalConn);
                         finalConn._aiIsSpeaking = true;
                         logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking (post-cancel) for ${callId}`);
                       } catch (err) {
                         logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
+                        const failConn = this.connections.get(callId);
+                        if (failConn) failConn._speechStoppedCommittedAiResponding = false;
                         this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
                       }
                     }, 200);
@@ -1612,9 +1738,32 @@ class OpenAIRealtimeService {
                 }
               }
 
+              const stStale = this.getConversationState(callId);
+              const hasUserTurnEvidence =
+                (conn.pendingUserTranscript || '').trim().length > 0 ||
+                Boolean(conn.activeUserMessageId) ||
+                conn._waitingForUserTranscript ||
+                hadPendingFlag;
+              const staleVadLikely =
+                !conn._waitingForInitialGreeting &&
+                (stStale === CONVERSATION_STATES.CONVERSATION_ACTIVE ||
+                  stStale === CONVERSATION_STATES.GREETING_COMPLETE);
+              if (staleVadLikely && !hasUserTurnEvidence) {
+                logger.info(
+                  `[RealtimeRC] speech_stopped:stale_vad_event — no active user turn, ignoring ${callId}`
+                );
+                this._rcDiagSpeechStopped(callId, conn, 'stale_vad_skip', {
+                  outcome: 'sendResponseCreate_not_scheduled',
+                  conversationState: stStale,
+                  _userTurnResponseCreateSent: conn._userTurnResponseCreateSent,
+                });
+                return;
+              }
+
               // Transition to AI_RESPONDING state
               const stateBeforeAiResponding = this.getConversationState(callId);
               if (this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_finished_speaking')) {
+                conn._speechStoppedCommittedAiResponding = true;
                 this._rcDiagSpeechStopped(callId, conn, 'transition_ok_user_to_ai_responding', {
                   outcome: 'schedule_sendResponseCreate_200ms',
                   stateBefore: stateBeforeAiResponding,
@@ -1649,10 +1798,13 @@ class OpenAIRealtimeService {
                     logger.info(`[OpenAI Realtime] DEBUG: About to trigger response for ${callId} - _responseCreated: ${currentConn._responseCreated}, _responseStartTime: ${currentConn._responseStartTime}`);
                     await this.sendResponseCreate(callId);
                     currentConn._userTurnResponseCreateSent = true;
+                    this._resetAssistantOutputAudioLifecycle(currentConn);
                     currentConn._aiIsSpeaking = true;
                     logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
                   } catch (err) {
                     logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
+                    const failConn = this.connections.get(callId);
+                    if (failConn) failConn._speechStoppedCommittedAiResponding = false;
                     this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
                   }
                 }, 200);
@@ -1663,6 +1815,17 @@ class OpenAIRealtimeService {
                   hint: 'invalid_transition_often_ai_responding_stuck_without_response_done',
                 });
                 logger.warn(`[OpenAI Realtime] Cannot transition to AI_RESPONDING state for ${callId}`);
+                if (
+                  stateBeforeAiResponding === CONVERSATION_STATES.AI_RESPONDING &&
+                  conn._aiAudioComplete &&
+                  this.canAIRespond(callId) &&
+                  !this.isInGracePeriod(callId)
+                ) {
+                  conn._pendingUserResponseAfterAiStops = true;
+                  logger.info(
+                    `[RealtimeRC] speech_stopped:transition_denied — audio complete, deferring to response.done ${callId}`
+                  );
+                }
               }
             } else if (conn._aiIsSpeaking) {
               if (this.canAIRespond(callId) && !this.isInGracePeriod(callId)) {
@@ -1676,22 +1839,37 @@ class OpenAIRealtimeService {
                   `(will flush after response.done clears AI guard)`
                 );
               } else {
+                // Primary defer path requires canAIRespond && !grace. If we landed here due to grace (or rare
+                // !canAIRespond while AI still "speaking"), still queue when audio is done and we have a transcript
+                // so maybeFlush can run after response.done (maybeFlush drops pending if state still disallows).
+                if (conn._aiAudioComplete && (conn.pendingUserTranscript || '').trim()) {
+                  conn._pendingUserResponseAfterAiStops = true;
+                  logger.info(
+                    `[RealtimeRC] speech_stopped:while_ai_speaking_no_queue — audio complete, deferring to response.done ${callId}`
+                  );
+                }
                 this._rcDiagSpeechStopped(callId, conn, 'speech_stopped_while_ai_speaking_no_queue', {
                   outcome: 'sendResponseCreate_not_scheduled',
                   canAIRespond: this.canAIRespond(callId),
                   isInGracePeriod: this.isInGracePeriod(callId),
+                  _aiAudioComplete: conn._aiAudioComplete,
+                  _pendingUserResponseAfterAiStops: conn._pendingUserResponseAfterAiStops,
                 });
               }
               logger.info(`[OpenAI Realtime] User finished speaking but AI is already speaking for ${callId}`);
             } else {
+              // This branch is only reachable when !_aiIsSpeaking && !canAIRespond (see if / else-if above).
               this._rcDiagSpeechStopped(callId, conn, 'main_path_blocked', {
                 outcome: 'sendResponseCreate_not_scheduled',
                 reason: '!_aiIsSpeaking && canAIRespond was false, or _aiIsSpeaking path not taken',
                 _aiIsSpeaking: conn._aiIsSpeaking,
+                _aiAudioComplete: conn._aiAudioComplete,
                 canAIRespond: this.canAIRespond(callId),
                 state: this.getConversationState(callId),
               });
               logger.info(`[OpenAI Realtime] User finished speaking but cannot respond in current state: ${this.getConversationState(callId)}`);
+            }
+            }
             }
           }
 
@@ -2144,6 +2322,8 @@ class OpenAIRealtimeService {
       return;
     }
 
+    conn._speechStoppedCommittedAiResponding = true;
+
     logger.info(`[RealtimeRC] maybeFlushDeferredResponse ${callId}: success — cleared pending after transition to AI_RESPONDING`, {
       outcome: 'pending_cleared_after_successful_transition',
     });
@@ -2159,10 +2339,13 @@ class OpenAIRealtimeService {
       try {
         await this.sendResponseCreate(callId);
         currentConn._userTurnResponseCreateSent = true;
+        this._resetAssistantOutputAudioLifecycle(currentConn);
         currentConn._aiIsSpeaking = true;
         logger.info(`[OpenAI Realtime] Flushed deferred user response for ${callId} after AI response.done`);
       } catch (err) {
         logger.error(`[OpenAI Realtime] Deferred user response flush failed for ${callId}: ${err.message}`);
+        const failConn = this.connections.get(callId);
+        if (failConn) failConn._speechStoppedCommittedAiResponding = false;
         this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'deferred_response_failed');
       }
     }, 200);
@@ -2195,6 +2378,7 @@ class OpenAIRealtimeService {
     if (wasCanceled) {
       logger.info(`[OpenAI Realtime] Response done event received for ${callId} but response was canceled (status: ${responseStatus || 'tracked locally'}) - skipping processing`);
 
+      conn._speechStoppedCommittedAiResponding = false;
       conn._responseCanceled = false;
       conn._responseCanceledAt = null;
 
@@ -2212,6 +2396,7 @@ class OpenAIRealtimeService {
       }
 
       conn._aiIsSpeaking = false;
+      this._resetAssistantOutputAudioLifecycle(conn);
       conn._responseCreated = false;
       conn._responseCreateInFlight = false;
       conn._responseStartTime = null;
@@ -2250,6 +2435,8 @@ class OpenAIRealtimeService {
 
     // 2) Clear AI-speaking guard before response lifecycle flags (ordering for deferred flush + commits)
     conn._aiIsSpeaking = false;
+    conn._speechStoppedCommittedAiResponding = false;
+    this._resetAssistantOutputAudioLifecycle(conn);
     // 3) OpenAI response.create ack / stuck guards
     conn._responseCreated = false;
     conn._responseCreateInFlight = false;
@@ -2714,6 +2901,7 @@ class OpenAIRealtimeService {
             try {
               await this.sendResponseCreate(callId);
               currentConn._userTurnResponseCreateSent = true;
+              this._resetAssistantOutputAudioLifecycle(currentConn);
               currentConn._aiIsSpeaking = true;
               logger.info(`[OpenAI Realtime] Triggered AI response after delayed transcript completion for ${callId}`);
             } catch (err) {
@@ -2775,6 +2963,7 @@ class OpenAIRealtimeService {
           try {
             await this.sendResponseCreate(callId);
             currentConn._userTurnResponseCreateSent = true;
+            this._resetAssistantOutputAudioLifecycle(currentConn);
             currentConn._aiIsSpeaking = true;
             logger.info(`[OpenAI Realtime] Triggered AI response from ASR fallback for ${callId}`);
           } catch (err) {
@@ -3714,6 +3903,7 @@ class OpenAIRealtimeService {
 
       // Force a new response in English
       await this.sendResponseCreate(callId);
+      this._resetAssistantOutputAudioLifecycle(conn);
       conn._aiIsSpeaking = true;
 
       logger.info(`[Language Fix] Language reset to English attempted for ${callId}`);
@@ -4179,6 +4369,14 @@ class OpenAIRealtimeService {
     const connPreDelete = this.connections.get(callId);
     if (connPreDelete) {
       connPreDelete._responseCreateInFlight = false;
+      this._clearAiAudioCompleteDebounceTimer(connPreDelete);
+      if (connPreDelete._speechStoppedFinalizeTimer) {
+        clearTimeout(connPreDelete._speechStoppedFinalizeTimer);
+        connPreDelete._speechStoppedFinalizeTimer = null;
+      }
+      connPreDelete._speechStoppedFinalizePending = false;
+      connPreDelete._speechStoppedCommittedAiResponding = false;
+      connPreDelete._userTurnResponseCreateSent = false;
     }
 
     const deleted = this.connections.delete(callId);

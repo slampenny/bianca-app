@@ -32,6 +32,9 @@ deploy-*.log
 *.temp
 *.cache
 
+# Local CloudWatch exports (may contain PHI / call metadata)
+realtime-rc-production-cloudwatch.txt
+
 # Test and development logs
 test-output.txt
 docker-dev.log
