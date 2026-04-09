@@ -23,5 +23,7 @@ module.exports = {
   // After initial voice greeting: ignore speech_stopped so bridge/echo doesn’t trigger a reply.
   // Keep short — long windows feel like Bianca ignores the first real answer.
   GRACE_PERIOD_MS: 350,
+  /** After session.updated + flush: brief pause before response.create so OpenAI finishes applying session.update (esp. turn_detection). */
+  INITIAL_GREETING_AFTER_SESSION_READY_MS: 100,
 };
 

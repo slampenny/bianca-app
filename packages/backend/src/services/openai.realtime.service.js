@@ -706,19 +706,22 @@ class OpenAIRealtimeService {
   /**
    * Send response.create to trigger OpenAI to generate responses - ENHANCED with diagnostics
    */
+  /**
+   * @returns {Promise<boolean>} True if response.create was sent on the wire; false if blocked or send threw.
+   */
   async sendResponseCreate(callId) {
     logger.info(`[OpenAI Realtime] DEBUG: sendResponseCreate called for ${callId}`);
     const connection = this.connections.get(callId);
     if (!connection) {
       this._rcDiagSendResponseCreate(callId, null, 'BLOCKED', 'no_connection');
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no connection object for ${callId}`);
-      return;
+      return false;
     }
 
     if (!connection.webSocket) {
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'no_websocket');
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no WebSocket for ${callId}`);
-      return;
+      return false;
     }
 
     if (connection.webSocket.readyState !== WebSocket.OPEN) {
@@ -726,13 +729,13 @@ class OpenAIRealtimeService {
         readyState: connection.webSocket.readyState,
       });
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - WebSocket not open for ${callId} (state: ${connection.webSocket.readyState})`);
-      return;
+      return false;
     }
 
     if (!connection.sessionReady) {
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'session_not_ready');
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - session not ready for ${callId}`);
-      return;
+      return false;
     }
 
     // STATE MACHINE: Check if we can create a response in current state
@@ -740,7 +743,7 @@ class OpenAIRealtimeService {
       const currentState = this.getConversationState(callId);
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'canAIRespond_false', { currentState });
       logger.warn(`[OpenAI Realtime] Cannot create response in state ${currentState} for ${callId}`);
-      return;
+      return false;
     }
 
     // _responseCreated is set when OpenAI emits response.created, not when we send — so it does not close the
@@ -750,7 +753,7 @@ class OpenAIRealtimeService {
       logger.warn(
         `[OpenAI Realtime] response.create already in flight for ${callId} — skipping duplicate sendResponseCreate`
       );
-      return;
+      return false;
     }
     connection._responseCreateInFlight = true;
 
@@ -868,10 +871,67 @@ class OpenAIRealtimeService {
         validAudioChunksSent: connection.validAudioChunksSent,
         pendingCommit: connection.pendingCommit
       });
+      return true;
     } catch (err) {
       connection._responseCreateInFlight = false;
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'send_threw', { error: err.message });
       logger.error(`[OpenAI Realtime] CRITICAL: Error sending response.create for ${callId}: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Initial greeting: transition once, then response.create after session is applied (create_response:false relies on us).
+   * Retries on a later session.updated if the first send was blocked. Does not set _initialGreetingTriggered until send succeeds.
+   */
+  async _sendInitialGreetingIfNeeded(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn || conn._initialGreetingTriggered) {
+      return;
+    }
+    if (conn._initialGreetingSendInProgress) {
+      return;
+    }
+
+    conn._initialGreetingSendInProgress = true;
+    try {
+      conn._waitingForInitialGreeting = true;
+
+      const state = this.getConversationState(callId);
+      if (state === CONVERSATION_STATES.INITIALIZING) {
+        if (!this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'session_ready')) {
+          logger.warn(
+            `[OpenAI Realtime] Cannot transition to WAITING_FOR_GREETING for ${callId} (state=${state}) — greeting deferred for retry`
+          );
+          return;
+        }
+      } else if (state !== CONVERSATION_STATES.WAITING_FOR_GREETING) {
+        return;
+      }
+
+      await new Promise((r) => setTimeout(r, CONSTANTS.INITIAL_GREETING_AFTER_SESSION_READY_MS));
+
+      logger.info(`[RealtimeRC] greeting sendResponseCreate firing after session ready ${callId}`, {
+        conversationState: this.getConversationState(callId),
+        sessionReady: conn.sessionReady,
+        _responseCreateInFlight: conn._responseCreateInFlight,
+      });
+
+      const sent = await this.sendResponseCreate(callId);
+      if (sent) {
+        conn._initialGreetingTriggered = true;
+        logger.info(`[OpenAI Realtime] Initial greeting response.create sent for ${callId}`);
+      } else {
+        logger.warn(
+          `[RealtimeRC] greeting sendResponseCreate did not send (blocked) — will retry on next session.updated if connection still waiting ${callId}`,
+          {
+            conversationState: this.getConversationState(callId),
+            _responseCreateInFlight: conn._responseCreateInFlight,
+          }
+        );
+      }
+    } finally {
+      conn._initialGreetingSendInProgress = false;
     }
   }
 
@@ -2044,7 +2104,9 @@ class OpenAIRealtimeService {
     conn.sessionUpdateTime = Date.now();
     logger.info(`[OpenAI Realtime] Session update timestamp for ${callId}: ${new Date().toISOString()}`);
 
+    let sessionBecameReady = false;
     if (!conn.sessionReady) {
+      sessionBecameReady = true;
       // Clear the connection timeout since handshake is complete
       this.clearConnectionTimeout(callId);
 
@@ -2072,33 +2134,21 @@ class OpenAIRealtimeService {
       }
 
       logger.info(`[OpenAI Realtime] Audio pipeline ready for ${callId} - waiting for user input`);
-      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Triggering initial greeting.`);
+      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Will run initial greeting after session is applied.`);
+    }
 
-      try {
-        // Trigger initial greeting immediately - Bianca should say hello first
-        logger.info(`[OpenAI Realtime] Session ready for ${callId} - triggering initial greeting`);
-        
-        // Prevent multiple initial greeting triggers
-        if (!conn._initialGreetingTriggered) {
-          conn._initialGreetingTriggered = true;
-          conn._waitingForInitialGreeting = true;
-          
-          // STATE MACHINE: Transition to waiting for greeting and trigger initial greeting
-          if (this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'session_ready')) {
-            await this.sendResponseCreate(callId);
-            logger.info(`[OpenAI Realtime] Initial greeting triggered for ${callId}`);
-          } else {
-            logger.warn(`[OpenAI Realtime] Cannot transition to WAITING_FOR_GREETING state for ${callId}`);
-          }
-        } else {
-          logger.info(`[OpenAI Realtime] Initial greeting already triggered for ${callId}, skipping`);
-        }
-        
-        this.notify(callId, 'openai_session_ready', {});
-      } catch (err) {
-        logger.error(`[OpenAI Realtime] Error in session setup for ${callId}: ${err.message}`);
-        this.cleanup(callId);
+    try {
+      // Greeting runs whenever session is ready and not yet successfully sent — including a later
+      // session.updated if the first response.create was blocked (create_response:false removes OpenAI auto-reply).
+      if (conn.sessionReady) {
+        await this._sendInitialGreetingIfNeeded(callId);
       }
+      if (sessionBecameReady) {
+        this.notify(callId, 'openai_session_ready', {});
+      }
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Error in session setup for ${callId}: ${err.message}`);
+      this.cleanup(callId);
     }
   }
 
