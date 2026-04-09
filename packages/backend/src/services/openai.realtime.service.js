@@ -714,12 +714,14 @@ class OpenAIRealtimeService {
     const connection = this.connections.get(callId);
     if (!connection) {
       this._rcDiagSendResponseCreate(callId, null, 'BLOCKED', 'no_connection');
+      logger.info(`[RealtimeRC] sendResponseCreate:BLOCKED reason=no_connection callId=${callId}`);
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no connection object for ${callId}`);
       return false;
     }
 
     if (!connection.webSocket) {
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'no_websocket');
+      logger.info(`[RealtimeRC] sendResponseCreate:BLOCKED reason=no_websocket callId=${callId}`);
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - no WebSocket for ${callId}`);
       return false;
     }
@@ -728,12 +730,16 @@ class OpenAIRealtimeService {
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'websocket_not_open', {
         readyState: connection.webSocket.readyState,
       });
+      logger.info(
+        `[RealtimeRC] sendResponseCreate:BLOCKED reason=websocket_not_open callId=${callId} readyState=${connection.webSocket.readyState}`
+      );
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - WebSocket not open for ${callId} (state: ${connection.webSocket.readyState})`);
       return false;
     }
 
     if (!connection.sessionReady) {
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'session_not_ready');
+      logger.info(`[RealtimeRC] sendResponseCreate:BLOCKED reason=not_session_ready callId=${callId}`);
       logger.error(`[OpenAI Realtime] CRITICAL: Cannot send response.create - session not ready for ${callId}`);
       return false;
     }
@@ -742,6 +748,9 @@ class OpenAIRealtimeService {
     if (!this.canAIRespond(callId)) {
       const currentState = this.getConversationState(callId);
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'canAIRespond_false', { currentState });
+      logger.info(
+        `[RealtimeRC] sendResponseCreate:BLOCKED reason=canAIRespond_false callId=${callId} state=${currentState}`
+      );
       logger.warn(`[OpenAI Realtime] Cannot create response in state ${currentState} for ${callId}`);
       return false;
     }
@@ -750,6 +759,9 @@ class OpenAIRealtimeService {
     // gap between send and ack (e.g. double speech_stopped + deferred flush within ~200ms). Guard with in-flight.
     if (connection._responseCreateInFlight) {
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'response_create_already_in_flight');
+      logger.info(
+        `[RealtimeRC] sendResponseCreate:BLOCKED reason=response_create_already_in_flight callId=${callId}`
+      );
       logger.warn(
         `[OpenAI Realtime] response.create already in flight for ${callId} — skipping duplicate sendResponseCreate`
       );
@@ -758,16 +770,21 @@ class OpenAIRealtimeService {
     connection._responseCreateInFlight = true;
 
     try {
-      const responseCreateEvent = {
-        type: 'response.create',
-        response: {
-          modalities: ['text', 'audio'],
-        },
-      };
+      const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+      // GA Realtime rejects response.modalities; session output_modalities already set in session.update.
+      const responseCreateEvent = useGA
+        ? { type: 'response.create' }
+        : {
+            type: 'response.create',
+            response: {
+              modalities: ['text', 'audio'],
+            },
+          };
 
       const messageStr = JSON.stringify(responseCreateEvent);
       connection.webSocket.send(messageStr);
       this._rcDiagSendResponseCreate(callId, connection, 'SENT', 'websocket_send_ok');
+      logger.info(`[RealtimeRC] sendResponseCreate:SENT callId=${callId}`);
       // Don't set _responseCreated for initial greeting - allow commits
       connection._responseStartTime = Date.now(); // Track when response was created
       logger.info(`[OpenAI Realtime] SUCCESS: Sent response.create for ${callId}`);
@@ -875,6 +892,9 @@ class OpenAIRealtimeService {
     } catch (err) {
       connection._responseCreateInFlight = false;
       this._rcDiagSendResponseCreate(callId, connection, 'BLOCKED', 'send_threw', { error: err.message });
+      logger.info(
+        `[RealtimeRC] sendResponseCreate:BLOCKED reason=send_threw callId=${callId} error=${err.message}`
+      );
       logger.error(`[OpenAI Realtime] CRITICAL: Error sending response.create for ${callId}: ${err.message}`);
       return false;
     }
@@ -911,13 +931,16 @@ class OpenAIRealtimeService {
 
       await new Promise((r) => setTimeout(r, CONSTANTS.INITIAL_GREETING_AFTER_SESSION_READY_MS));
 
-      logger.info(`[RealtimeRC] greeting sendResponseCreate firing after session ready ${callId}`, {
-        conversationState: this.getConversationState(callId),
-        sessionReady: conn.sessionReady,
-        _responseCreateInFlight: conn._responseCreateInFlight,
-      });
+      logger.info(
+        `[RealtimeRC] greeting: about to call sendResponseCreate, sessionReady=${conn.sessionReady}, state=${this.getConversationState(callId)}, _waitingForInitialGreeting=${conn._waitingForInitialGreeting} ${callId}`
+      );
 
       const sent = await this.sendResponseCreate(callId);
+
+      logger.info(
+        `[RealtimeRC] greeting: sendResponseCreate returned callId=${callId} sent=${sent} state=${this.getConversationState(callId)} _responseCreateInFlight=${conn._responseCreateInFlight}`
+      );
+
       if (sent) {
         conn._initialGreetingTriggered = true;
         logger.info(`[OpenAI Realtime] Initial greeting response.create sent for ${callId}`);
@@ -942,6 +965,10 @@ class OpenAIRealtimeService {
     // Always use GA API
     const apiVersion = 'GA';
     logger.info(`[OpenAI Realtime] WebSocket opened for callId: ${callId} (${apiVersion} API)`);
+    const c = this.connections.get(callId);
+    if (c) {
+      c._realtimeRcLoggedFirstOutputAudioDelta = false;
+    }
     this.updateConnectionStatus(callId, 'connected');
     this.reconnectAttempts.set(callId, 0);
     // OpenAI will send session.created automatically
@@ -1195,34 +1222,6 @@ class OpenAIRealtimeService {
     });
   }
 
-  async handleSessionCreated(callId, message) {
-    const conn = this.connections.get(callId);
-    if (!conn) return;
-
-    logger.info(`[OpenAI Realtime] Session CREATED for ${callId}, Session ID: ${message.session.id}`);
-    conn.sessionId = message.session.id;
-
-    // CRITICAL: Add turn detection to prevent AI from talking over user
-    // Use MessageHandler to build session config (supports both Beta and GA formats)
-    const sessionConfig = MessageHandler.buildSessionConfig(conn);
-    // Always use GA API
-    const apiVersion = 'GA';
-
-    logger.info(`[OpenAI Realtime] Sending session.update with turn detection for ${callId} (${apiVersion} format)`);
-    logger.debug(`[OpenAI Realtime] Session config (${apiVersion}): ${JSON.stringify(sessionConfig.session, null, 2)}`);
-
-    try {
-      await this.sendJsonMessage(callId, sessionConfig);
-      logger.info(`[OpenAI Realtime] Session.update with turn detection sent successfully for ${callId}`);
-    } catch (sendError) {
-      logger.error(`[OpenAI Realtime] Failed to send session.update for ${callId}: ${sendError.message}`);
-      this.cleanup(callId);
-    }
-  }
-
-  // 3. COMPLETE handleOpenAIMessage method with turn detection
-  // Replace the entire handleOpenAIMessage method in openai.realtime.service.js:
-
   async handleOpenAIMessage(callId, data) {
     if (!this.connections.has(callId)) {
       logger.warn(`[OpenAI Realtime] Received message for cleaned up callId ${callId}. Discarding.`);
@@ -1298,6 +1297,12 @@ class OpenAIRealtimeService {
             
             // Log that we received the event
             logger.info(`[OpenAI Realtime] Received ${eventType} event for ${callId} (GA), delta length: ${message.delta?.length || 0}`);
+            if (conn && !conn._realtimeRcLoggedFirstOutputAudioDelta) {
+              conn._realtimeRcLoggedFirstOutputAudioDelta = true;
+              logger.info(
+                `[RealtimeRC] first response.output_audio.delta callId=${callId} waitingForInitialGreeting=${Boolean(conn._waitingForInitialGreeting)} deltaLen=${message.delta?.length || 0}`
+              );
+            }
             
             // Track that AI is speaking
             if (conn && !conn._aiIsSpeaking) {
@@ -2020,6 +2025,13 @@ class OpenAIRealtimeService {
           break;
 
         case 'error':
+          logger.warn(`[RealtimeRC] openai error event callId=${callId}`, {
+            type: message.type,
+            code: message.error?.code,
+            message: message.error?.message,
+            param: message.error?.param,
+            event_id: message.event_id,
+          });
           await this.handleApiError(callId, message);
           break;
 
@@ -2082,6 +2094,10 @@ class OpenAIRealtimeService {
     try {
       await this.sendJsonMessage(callId, sessionConfig);
       logger.info(`[OpenAI Realtime] Session.update with turn detection sent for ${callId}`);
+      const td = sessionConfig.session?.audio?.input?.turn_detection;
+      logger.info(
+        `[RealtimeRC] session.update sent: callId=${callId} turn_detection=${JSON.stringify(td)}`
+      );
     } catch (sendError) {
       logger.error(`[OpenAI Realtime] Failed to send session.update: ${sendError.message}`);
       this.cleanup(callId);
@@ -2141,6 +2157,9 @@ class OpenAIRealtimeService {
       // Greeting runs whenever session is ready and not yet successfully sent — including a later
       // session.updated if the first response.create was blocked (create_response:false removes OpenAI auto-reply).
       if (conn.sessionReady) {
+        logger.info(
+          `[RealtimeRC] greeting: invoking _sendInitialGreetingIfNeeded callId=${callId} sessionBecameReady=${sessionBecameReady} _initialGreetingTriggered=${conn._initialGreetingTriggered}`
+        );
         await this._sendInitialGreetingIfNeeded(callId);
       }
       if (sessionBecameReady) {
@@ -3156,6 +3175,12 @@ class OpenAIRealtimeService {
   async handleApiError(callId, message) {
     const errorMsg = message.error?.message || 'Unknown OpenAI API error';
     const errorCode = message.error?.code || 'UNKNOWN_CODE';
+    logger.warn(`[RealtimeRC] handleApiError callId=${callId}`, {
+      code: errorCode,
+      message: errorMsg,
+      param: message.error?.param,
+      type: message.error?.type,
+    });
     // Log the full error object for detailed debugging
     logger.error(`[OpenAI Realtime] API error from OpenAI for ${callId}. Code: ${errorCode}, Message: "${errorMsg}"`, {
       openAIError: message.error,

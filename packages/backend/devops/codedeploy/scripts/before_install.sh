@@ -343,7 +343,11 @@ PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
 # Get secrets from AWS Secrets Manager
 AWS_ACCOUNT_ID="730335291008"
-SECRET_ID="MySecretsManagerSecret"
+if [ "$ENVIRONMENT" = "staging" ]; then
+  SECRET_ID="MySecretsManagerSecret-Staging"
+else
+  SECRET_ID="MySecretsManagerSecret"
+fi
 
 echo "   Fetching secrets from AWS Secrets Manager..."
 # Fetch all secrets at once - use a simple approach with error handling
@@ -492,7 +496,7 @@ services:
         awslogs-create-group: "true"
     environment:
       - AWS_REGION=$AWS_REGION
-      - AWS_SECRET_ID=MySecretsManagerSecret
+      - AWS_SECRET_ID=$SECRET_ID
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - NODE_ENV=$NODE_ENV
       - API_BASE_URL=$API_BASE_URL

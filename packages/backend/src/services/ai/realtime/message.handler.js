@@ -91,6 +91,7 @@ class MessageHandler {
       1000,
       config.audio?.turnDetection?.silenceDurationMs ?? 1000
     );
+    const vadCreateResponse = config.audio?.turnDetection?.createResponse === true;
 
     baseConfig.session.audio = {
       input: {
@@ -109,13 +110,8 @@ class MessageHandler {
           threshold: turnDetectionThreshold,
           prefix_padding_ms: turnDetectionPrefixPadding,
           silence_duration_ms: turnDetectionSilenceDuration,
-          // create_response: false — we manage response scheduling via
-          // sendResponseCreate to avoid double response.create collisions
-          // with our state machine. OpenAI still handles VAD detection
-          // and server-side buffer commit.
-          // OPENAI_REALTIME_SESSION_CONFIG is not merged into this payload; if it ever is,
-          // do not allow env to set turn_detection.create_response: true (reintroduces the race).
-          create_response: false,
+          // false (default): we own response.create via sendResponseCreate. true: set OPENAI_REALTIME_VAD_CREATE_RESPONSE=true for A/B (OpenAI auto response on VAD stop).
+          create_response: vadCreateResponse,
         }
       },
       output: {
@@ -131,6 +127,35 @@ class MessageHandler {
       baseConfig.session.tools = getOnboardingRealtimeTools();
       baseConfig.session.tool_choice = 'auto';
     }
+
+    const td = baseConfig.session.audio.input.turn_detection;
+    const sessionShape = {
+      type: baseConfig.type,
+      session: {
+        type: baseConfig.session.type,
+        hasInstructions: Boolean(baseConfig.session.instructions),
+        audio: {
+          input: {
+            format: baseConfig.session.audio.input.format,
+            transcription: {
+              model: baseConfig.session.audio.input.transcription.model,
+              language: baseConfig.session.audio.input.transcription.language,
+            },
+            noise_reduction: baseConfig.session.audio.input.noise_reduction,
+            turn_detection: td,
+          },
+          output: { format: baseConfig.session.audio.output.format, voice: baseConfig.session.audio.output.voice },
+        },
+        hasTools: Boolean(baseConfig.session.tools),
+        tool_choice: baseConfig.session.tool_choice,
+      },
+    };
+    logger.info(
+      `[RealtimeRC] buildSessionConfig sessionShape=${JSON.stringify(sessionShape)} correlation=${connection?.callSid || connection?.asteriskChannelId || 'n/a'}`
+    );
+    logger.info(
+      `[RealtimeRC] buildSessionConfig turn_detection.create_response=${vadCreateResponse} (env OPENAI_REALTIME_VAD_CREATE_RESPONSE=${process.env.OPENAI_REALTIME_VAD_CREATE_RESPONSE ?? 'unset'}) correlation=${connection?.callSid || connection?.asteriskChannelId || 'n/a'}`
+    );
 
     return baseConfig;
   }

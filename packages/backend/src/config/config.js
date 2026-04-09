@@ -138,6 +138,8 @@ const envVarsSchema = Joi.object({
   OPENAI_MODEL: Joi.string().default('gpt-4o-2025-01-12'),
   // Transcription model: 'gpt-4o-mini-transcribe' (latest, faster) or 'gpt-4o-transcribe' (higher accuracy) or 'whisper-1' (legacy)
   OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().default('gpt-4o-mini-transcribe'),
+  /** Set to "true" so OpenAI server_vad auto response.create on turn end (A/B vs our scheduler). Default unset = false in code. */
+  OPENAI_REALTIME_VAD_CREATE_RESPONSE: Joi.string().valid('true', 'false').optional(),
   
   // Cache configuration (optional - defaults to in-memory)
   CACHE_TYPE: Joi.string().valid('memory', 'redis').default('memory'),
@@ -234,6 +236,8 @@ const baselineConfig = {
         const base = Number.isFinite(raw) && raw > 0 ? raw : 1000;
         return Math.max(1000, base);
       })(),
+      // OpenAI turn_detection.create_response — only "true" enables auto response on VAD stop (see OPENAI_REALTIME_VAD_CREATE_RESPONSE).
+      createResponse: process.env.OPENAI_REALTIME_VAD_CREATE_RESPONSE === 'true',
     },
   },
   google: {

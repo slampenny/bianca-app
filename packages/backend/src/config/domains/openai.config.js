@@ -52,6 +52,7 @@ const validateOpenAIEnvVars = (envVars) => {
     OPENAI_MODEL: Joi.string().optional(),
     OPENAI_SENTIMENT_MODEL: Joi.string().optional(),
     OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().optional(),
+    OPENAI_REALTIME_VAD_CREATE_RESPONSE: Joi.string().valid('true', 'false').optional(),
   });
   return schema.validate(envVars, { allowUnknown: true });
 };

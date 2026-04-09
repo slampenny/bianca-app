@@ -71,6 +71,9 @@ describe('OpenAI Realtime API Integration Tests', () => {
       expect(sessionConfig.session.audio.output.format.type).toBe('audio/pcmu');
       expect(sessionConfig.session.audio.output.voice).toBeDefined();
       expect(sessionConfig.session.modalities).toBeUndefined();
+      expect(sessionConfig.session.audio.input.turn_detection.create_response).toBe(
+        config.audio.turnDetection.createResponse === true
+      );
     });
   });
 
