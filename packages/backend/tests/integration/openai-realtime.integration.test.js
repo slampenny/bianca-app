@@ -75,6 +75,14 @@ describe('OpenAI Realtime API Integration Tests', () => {
         config.audio.turnDetection.createResponse === true
       );
     });
+
+    it('should not attach Realtime tools for onboarding calls (capture is server-side)', () => {
+      const MessageHandler = require('../../src/services/ai/realtime/message.handler');
+      const onboardingConn = { initialPrompt: 'Test', onboardingDay: 1 };
+      const sessionConfig = MessageHandler.buildSessionConfig(onboardingConn);
+      expect(sessionConfig.session.tools).toBeUndefined();
+      expect(sessionConfig.session.tool_choice).toBeUndefined();
+    });
   });
 
   describe('Call Workflow with OpenAI Realtime', () => {

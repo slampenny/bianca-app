@@ -3391,7 +3391,7 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Persist PRD onboarding tool calls and acknowledge to the model.
+   * Legacy: onboarding no longer uses Realtime tools; kept for any in-flight sessions still exposing tools.
    */
   async processOnboardingToolInvocation(callId, item, dbConversationId) {
     const conn = this.connections.get(callId);
@@ -4926,6 +4926,41 @@ class OpenAIRealtimeService {
             logger.debug(`[Context Window] Cleared context for patient ${conn.clientId} at call end`);
           } catch (error) {
             logger.warn(`[Context Window] Failed to clear context: ${error.message}`);
+          }
+        }
+
+        // Onboarding: derive structured answers from saved transcripts (no Realtime tools)
+        if (conn.onboardingDay >= 1 && conn.onboardingDay <= 4 && conversationId && conn.clientId) {
+          try {
+            const onboardingTranscriptCaptureService = require('./onboardingTranscriptCapture.service');
+            await onboardingTranscriptCaptureService.captureFromConversation({
+              conversationId,
+              clientId: conn.clientId,
+              dayNumber: conn.onboardingDay,
+              callMongoId: conn.onboardingCallMongoId,
+            });
+          } catch (capErr) {
+            logger.warn(`[Onboarding] Transcript capture failed: ${capErr.message}`);
+          }
+        }
+
+        // Onboarding: mark the onboarding Call complete when the voice session ends
+        if (conn.onboardingDay >= 1 && conn.onboardingDay <= 4 && conn.onboardingCallMongoId) {
+          try {
+            const { Call } = require('../models');
+            const onboardingService = require('./onboarding.service');
+            const existing = await Call.findById(conn.onboardingCallMongoId).select('onboardingCompletedAt').lean();
+            if (existing && !existing.onboardingCompletedAt) {
+              await onboardingService.completeSession({
+                callMongoId: conn.onboardingCallMongoId,
+                endedEarlyReason: 'completed',
+              });
+              logger.info(
+                `[Onboarding] Marked call ${conn.onboardingCallMongoId} complete at voice session end (day ${conn.onboardingDay})`
+              );
+            }
+          } catch (obErr) {
+            logger.warn(`[Onboarding] Could not auto-complete session on call end: ${obErr.message}`);
           }
         }
       }

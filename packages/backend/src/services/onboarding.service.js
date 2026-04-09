@@ -2,9 +2,15 @@ const mongoose = require('mongoose');
 const { OnboardingResponse } = require('../models/onboardingResponse.model');
 const { Call } = require('../models');
 const logger = require('../config/logger');
+const { getQuestionIdsForDay } = require('../templates/onboardingQuestionOrder');
 
-/** Expected capture topics per day (matches onboardingPrompts.js). */
-const QUESTIONS_PER_DAY = { 1: 6, 2: 5, 3: 4, 4: 4 };
+/** Expected capture topics per day (same order as onboardingQuestionOrder.js / transcript capture). */
+const QUESTIONS_PER_DAY = {
+  1: getQuestionIdsForDay(1).length,
+  2: getQuestionIdsForDay(2).length,
+  3: getQuestionIdsForDay(3).length,
+  4: getQuestionIdsForDay(4).length,
+};
 
 /**
  * Build journey + flags from onboarding responses and onboarding calls for a single client.

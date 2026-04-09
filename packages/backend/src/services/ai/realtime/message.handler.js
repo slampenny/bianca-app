@@ -122,11 +122,7 @@ class MessageHandler {
       }
     };
 
-    if (connection?.onboardingDay >= 1 && connection?.onboardingDay <= 4) {
-      const { getOnboardingRealtimeTools } = require('../../../templates/onboardingTools');
-      baseConfig.session.tools = getOnboardingRealtimeTools();
-      baseConfig.session.tool_choice = 'auto';
-    }
+    // Onboarding structured capture is handled server-side (transcripts / future pipelines), not via Realtime tools.
 
     const td = baseConfig.session.audio.input.turn_detection;
     const sessionShape = {
