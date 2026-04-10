@@ -61,6 +61,11 @@ export function ResidentCallPage() {
   const resident = apiClient ? mapClientToResident(apiClient) : null
   const displayName = resident ? `${resident.firstName} ${resident.lastName}`.trim() : "Resident"
   const effectiveCallStatus = liveCallStatus?.data?.status || activeCall?.status || ""
+  /** Twilio leg can be active while DB status is stale (out-of-order webhooks). */
+  const twilioLiveCallStatus = liveCallStatus?.data?.callStatus
+  const isLiveCall =
+    effectiveCallStatus === "in-progress" ||
+    ["ringing", "connected", "answered"].includes(twilioLiveCallStatus || "")
   const liveCallMessages = liveCallStatus?.data?.messages ?? []
   const liveOnboarding = liveCallStatus?.data?.onboarding
   const liveIsOnboardingCall = liveOnboarding?.isOnboardingCall ?? activeCall?.isOnboardingCall ?? false
@@ -138,11 +143,11 @@ export function ResidentCallPage() {
                 fontWeight: 700,
                 padding: "0.2rem 0.55rem",
                 borderRadius: 999,
-                background: callStatusTone(effectiveCallStatus).bg,
-                color: callStatusTone(effectiveCallStatus).fg,
+                background: callStatusTone(isLiveCall ? "in-progress" : effectiveCallStatus).bg,
+                color: callStatusTone(isLiveCall ? "in-progress" : effectiveCallStatus).fg,
               }}
             >
-              {effectiveCallStatus.toUpperCase()}
+              {(isLiveCall ? "in-progress" : effectiveCallStatus).toUpperCase()}
             </span>
           ) : null}
         </div>
@@ -194,8 +199,15 @@ export function ResidentCallPage() {
 
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--va-slate-600)" }}>
-                {callStatusMessage(effectiveCallStatus, liveCallStatus?.data?.callOutcome, displayName)}
-                {liveCallStatus?.data?.startTime ? ` · ${formatLiveCallDuration(liveCallStatus.data.startTime, effectiveCallStatus, liveCallStatus.data.duration)}` : ""}
+                {callStatusMessage(
+                  effectiveCallStatus,
+                  liveCallStatus?.data?.callOutcome,
+                  displayName,
+                  isLiveCall,
+                )}
+                {liveCallStatus?.data?.startTime
+                  ? ` · ${formatLiveCallDuration(liveCallStatus.data.startTime, isLiveCall ? "in-progress" : effectiveCallStatus, liveCallStatus.data.duration)}`
+                  : ""}
                 {liveCallFetching ? " · Updating..." : ""}
                 {liveCallStatusError ? " · Status temporarily unavailable" : ""}
               </p>
@@ -203,7 +215,7 @@ export function ResidentCallPage() {
                 <button type="button" className="va-btn-secondary" onClick={() => setActiveCall(null)}>
                   Dismiss
                 </button>
-                {effectiveCallStatus === "in-progress" ? (
+                {isLiveCall ? (
                   <button type="button" className="va-btn-primary" style={{ background: "var(--va-red-600)" }} onClick={() => void onEndLiveCall()} disabled={isEndingCall}>
                     {isEndingCall ? "Ending..." : "End call"}
                   </button>
@@ -263,10 +275,16 @@ function callStatusTone(status: string): { bg: string; fg: string } {
   return { bg: "var(--va-amber-100)", fg: "var(--va-amber-700)" }
 }
 
-function callStatusMessage(status: string, outcome: string | undefined, residentName: string): string {
+function callStatusMessage(
+  status: string,
+  outcome: string | undefined,
+  residentName: string,
+  isLiveCall?: boolean,
+): string {
   if (outcome === "voicemail") return "Answering machine detected"
   if (outcome === "no_answer") return "No answer"
   if (outcome === "busy") return "Line busy"
+  if (isLiveCall) return `Connected with ${residentName}`
   if (status === "initiated") return "Setting up call..."
   if (status === "in-progress") return `Connected with ${residentName}`
   if (status === "completed") return outcome === "answered" ? "Call completed" : "Call ended"

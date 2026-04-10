@@ -166,12 +166,15 @@ const getCallStatus = catchAsync(async (req, res) => {
     userIsSpeaking: false,
     conversationState: 'unknown'
   };
-  
+  /** True when this conversation has an active Realtime session (covers missed/out-of-order Twilio webhooks). */
+  let realtimeSessionLive = false;
+
   try {
     const openAIService = require('../services/openai.realtime.service');
-    // Find the connection by conversationId (callSid)
-    for (const [callId, conn] of openAIService.connections.entries()) {
-      if (conn.conversationId === conversationId) {
+    const WebSocket = require('ws');
+    const convIdStr = String(conversationId);
+    for (const [, conn] of openAIService.connections.entries()) {
+      if (conn.conversationId != null && String(conn.conversationId) === convIdStr) {
         aiSpeakingStatus = {
           isSpeaking: conn._aiIsSpeaking || false,
           userIsSpeaking: conn._userIsSpeaking || false,
@@ -179,6 +182,13 @@ const getCallStatus = catchAsync(async (req, res) => {
           lastAiSpeechStart: conn._lastAiSpeechStart || null,
           lastUserSpeechStart: conn._lastUserSpeechStart || null
         };
+        if (
+          conn.webSocket &&
+          conn.webSocket.readyState === WebSocket.OPEN &&
+          conn.sessionReady
+        ) {
+          realtimeSessionLive = true;
+        }
         break;
       }
     }
@@ -233,11 +243,20 @@ const getCallStatus = catchAsync(async (req, res) => {
   const onboardingDash = await onboardingService.getDashboardForClient(clientMongoId);
   const isOnboardingCall = !!(call.onboardingDay >= 1 && call.onboardingDay <= 4);
 
+  let responseStatus = call.status;
+  let responseCallStatus = call.callStatus;
+  if (responseStatus === 'initiated' && realtimeSessionLive) {
+    responseStatus = 'in-progress';
+    if (!responseCallStatus || responseCallStatus === 'initiating') {
+      responseCallStatus = 'connected';
+    }
+  }
+
   const status = {
     conversationId: conversation._id,
     callId: call._id,
-    status: call.status,
-    callStatus: call.callStatus,
+    status: responseStatus,
+    callStatus: responseCallStatus,
     callOutcome: call.callOutcome, // Include outcome for voicemail detection
     startTime: call.startTime,
     endTime: call.endTime,

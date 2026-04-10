@@ -660,6 +660,14 @@ class TwilioVoiceProvider {
               call.callStatus = 'ringing';
               break;
             case 'initiated':
+              // Twilio often delivers callbacks out of order. Call workflow sets in-progress before
+              // returning to the client; a late "initiated" must not downgrade UI to "setting up" / hide end call.
+              if (['in-progress', 'completed', 'failed', 'machine'].includes(call.status)) {
+                logger.info(
+                  `[Twilio Service] Ignoring Twilio initiated for ${CallSid}; call already ${call.status}`
+                );
+                break;
+              }
               call.status = 'initiated';
               call.callStatus = 'initiating';
               break;
@@ -786,7 +794,12 @@ class TwilioVoiceProvider {
               }
               break;
             default:
-              // For any other status, keep as initiated
+              if (['in-progress', 'completed', 'failed', 'machine'].includes(call.status)) {
+                logger.warn(
+                  `[Twilio Service] Unknown Twilio CallStatus "${CallStatus}" for ${CallSid}; preserving ${call.status}`
+                );
+                break;
+              }
               call.status = 'initiated';
               call.callStatus = 'initiating';
               logger.warn(`[Twilio Service] Unknown call status: ${CallStatus}, defaulting to initiated`);

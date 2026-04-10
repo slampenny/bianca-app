@@ -406,6 +406,27 @@ describe('TwilioCallService - Call Retry Functionality', () => {
     });
   });
 
+  describe('handleCallStatus - webhook ordering', () => {
+    it('should not downgrade in-progress to initiated on late Twilio initiated callback', async () => {
+      call.status = 'in-progress';
+      call.callStatus = 'ringing';
+      await call.save();
+
+      const req = {
+        body: {
+          CallSid: call.callSid,
+          CallStatus: 'initiated',
+        },
+      };
+
+      await twilioCallService.handleCallStatus(req);
+
+      const updated = await Call.findById(call._id);
+      expect(updated.status).toBe('in-progress');
+      expect(updated.callStatus).toBe('ringing');
+    });
+  });
+
   describe('handleCallStatus - successful calls', () => {
     it('should not schedule retry for successful call', async () => {
       const req = {

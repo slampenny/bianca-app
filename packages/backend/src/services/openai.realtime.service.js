@@ -508,6 +508,8 @@ class OpenAIRealtimeService {
       preferredLanguage,
       webSocket: null,
       sessionReady: false,
+      /** True after first successful session.updated (Realtime usable). Onboarding must not advance if this stays false. */
+      realtimeSessionEstablished: false,
       startTime: Date.now(),
       initialPrompt,
       lastActivity: Date.now(),
@@ -2127,6 +2129,7 @@ class OpenAIRealtimeService {
       this.clearConnectionTimeout(callId);
 
       conn.sessionReady = true;
+      conn.realtimeSessionEstablished = true;
       // CRITICAL: Set session setup flag to prevent commits during setup
       conn._sessionSetupInProgress = true;
 
@@ -4931,33 +4934,46 @@ class OpenAIRealtimeService {
 
         // Onboarding: derive structured answers from saved transcripts (no Realtime tools)
         if (conn.onboardingDay >= 1 && conn.onboardingDay <= 4 && conversationId && conn.clientId) {
-          try {
-            const onboardingTranscriptCaptureService = require('./onboardingTranscriptCapture.service');
-            await onboardingTranscriptCaptureService.captureFromConversation({
-              conversationId,
-              clientId: conn.clientId,
-              dayNumber: conn.onboardingDay,
-              callMongoId: conn.onboardingCallMongoId,
-            });
-          } catch (capErr) {
-            logger.warn(`[Onboarding] Transcript capture failed: ${capErr.message}`);
+          if (!conn.realtimeSessionEstablished) {
+            logger.info(
+              `[Onboarding] Skipping transcript capture for ${callId} day ${conn.onboardingDay}: Realtime session never became ready`
+            );
+          } else {
+            try {
+              const onboardingTranscriptCaptureService = require('./onboardingTranscriptCapture.service');
+              await onboardingTranscriptCaptureService.captureFromConversation({
+                conversationId,
+                clientId: conn.clientId,
+                dayNumber: conn.onboardingDay,
+                callMongoId: conn.onboardingCallMongoId,
+              });
+            } catch (capErr) {
+              logger.warn(`[Onboarding] Transcript capture failed: ${capErr.message}`);
+            }
           }
         }
 
-        // Onboarding: mark the onboarding Call complete when the voice session ends
+        // Onboarding: mark the onboarding Call complete when the voice session ends — only if Realtime actually connected.
+        // Otherwise a failed WS/handshake still ends the phone leg but must not advance journey to the next day.
         if (conn.onboardingDay >= 1 && conn.onboardingDay <= 4 && conn.onboardingCallMongoId) {
           try {
             const { Call } = require('../models');
             const onboardingService = require('./onboarding.service');
             const existing = await Call.findById(conn.onboardingCallMongoId).select('onboardingCompletedAt').lean();
             if (existing && !existing.onboardingCompletedAt) {
-              await onboardingService.completeSession({
-                callMongoId: conn.onboardingCallMongoId,
-                endedEarlyReason: 'completed',
-              });
-              logger.info(
-                `[Onboarding] Marked call ${conn.onboardingCallMongoId} complete at voice session end (day ${conn.onboardingDay})`
-              );
+              if (!conn.realtimeSessionEstablished) {
+                logger.warn(
+                  `[Onboarding] Not marking onboarding complete for call ${conn.onboardingCallMongoId} (day ${conn.onboardingDay}): OpenAI Realtime session never became ready — next outbound will retry the same day`
+                );
+              } else {
+                await onboardingService.completeSession({
+                  callMongoId: conn.onboardingCallMongoId,
+                  endedEarlyReason: 'completed',
+                });
+                logger.info(
+                  `[Onboarding] Marked call ${conn.onboardingCallMongoId} complete at voice session end (day ${conn.onboardingDay})`
+                );
+              }
             }
           } catch (obErr) {
             logger.warn(`[Onboarding] Could not auto-complete session on call end: ${obErr.message}`);

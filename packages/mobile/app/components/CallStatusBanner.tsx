@@ -95,19 +95,24 @@ export const CallStatusBanner: React.FC<CallStatusBannerProps> = ({
         statusChanged: newStatus !== status
       })
       
-      // Always update the status from the API - it's the source of truth
-      if (newStatus && newStatus !== status) {
-        logger.debug('🔄 CallStatusBanner - Status changed, updating to:', newStatus)
-        setStatus(newStatus)
-        onStatusChange?.(newStatus)
+      const twilioCs = callStatusData.data.callStatus
+      const derivedLive =
+        newStatus === 'in-progress' || ['ringing', 'connected', 'answered'].includes(twilioCs || '')
+      const uiStatus = derivedLive ? 'in-progress' : newStatus
+
+      // Prefer derived live state when DB status is stale (out-of-order Twilio webhooks)
+      if (uiStatus && uiStatus !== status) {
+        logger.debug('🔄 CallStatusBanner - Status changed, updating to:', uiStatus)
+        setStatus(uiStatus)
+        onStatusChange?.(uiStatus)
         
         // Update Redux store
         dispatch(updateCallStatus({
           conversationId,
-          status: newStatus
+          status: uiStatus
         }))
       } else {
-        logger.debug('⏸️ CallStatusBanner - Status unchanged:', newStatus)
+        logger.debug('⏸️ CallStatusBanner - Status unchanged:', uiStatus)
       }
       
       // Update duration and start time if available
