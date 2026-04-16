@@ -178,8 +178,11 @@ const registerWithInvite = catchAsync(async (req, res) => {
 });
 
 const login = catchAsync(async (req, res, next) => {
-  const { email, password, mfaToken } = req.body;
-  
+  let { email, password, mfaToken } = req.body;
+  if (typeof email === 'string') email = email.trim().toLowerCase();
+  // Trim password so copy/paste from Secrets Manager / notes (trailing newline/spaces) does not break bcrypt
+  if (typeof password === 'string') password = password.trim();
+
   try {
     // Step 1: Validate credentials
     const loginData = await authService.loginCaregiverWithEmailAndPassword(email, password);

@@ -107,6 +107,27 @@ async function startServer() {
       }
     }
 
+    // Sync superAdmin from AWS Secrets Manager → MongoDB on every start (production/staging).
+    // Login only checks MongoDB; this makes the secret the source of truth without manual CLI runs.
+    if (
+      mongoConnected &&
+      (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging')
+    ) {
+      const skip =
+        process.env.SYNC_SUPERADMIN_FROM_SECRET_ON_START === 'false' ||
+        process.env.SYNC_SUPERADMIN_FROM_SECRET_ON_START === '0';
+      if (skip) {
+        logger.info('[SuperAdmin bootstrap] Skipped (SYNC_SUPERADMIN_FROM_SECRET_ON_START=false)');
+      } else {
+        try {
+          const { syncSuperAdminFromAwsSecret } = require('./services/superadminBootstrap.service');
+          await syncSuperAdminFromAwsSecret();
+        } catch (err) {
+          logger.error(`[SuperAdmin bootstrap] Startup sync failed (fix IAM/secret/DB): ${err.message}`);
+        }
+      }
+    }
+
     // Initialize ARI Client connection (non-blocking)
     let ariReady = false;
     if (config.asterisk) {
