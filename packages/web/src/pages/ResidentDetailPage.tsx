@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { apiRecordId, mapClientToResident } from "../lib/liveData"
+import { intervalsForDraft, weekdayShortLabel } from "../lib/scheduleDraft"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import { CONSENT_BULLETS } from "../data/residentMock"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
@@ -15,6 +16,7 @@ import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdat
 import type { MedicalAnalysisResult, MedicalAnalysisSummaryResponse } from "../services/api/medicalAnalysisApi"
 import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
 import { AvatarPicker } from "../components/AvatarPicker"
+import { NewScheduleFormFields } from "../components/NewScheduleFormFields"
 import { ClientOnboardingSection } from "../components/ClientOnboardingSection"
 import { canAddResidents } from "../lib/roleAccess"
 import { getCurrentUser } from "../store/authSlice"
@@ -26,12 +28,6 @@ function formatDurationSeconds(sec?: number | null): string {
   const m = Math.floor(sec / 60)
   const s = Math.floor(sec % 60)
   return `${m}m ${s}s`
-}
-
-function weekdayShortLabel(day?: number): string {
-  const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-  if (day == null || day < 0 || day > 6) return "?"
-  return labels[day]
 }
 
 function formatConsentTimestamp(iso: string | null | undefined): string {
@@ -344,29 +340,12 @@ export function ResidentDetailPage() {
     }
   }
 
-  const residentSchedules = (apiClient.schedules ?? []).filter((s) => !!s.id && s.isActive !== false)
-
-  const parseMonthlyDays = (raw: string): number[] => {
-    const nums = raw
-      .split(",")
-      .map((t) => Number(t.trim()))
-      .filter((n) => Number.isFinite(n) && n >= 1 && n <= 31)
-    return [...new Set(nums)].sort((a, b) => a - b)
-  }
-
-  const intervalsForDraft = (
-    frequency: "daily" | "weekly" | "monthly",
-    weeklyDays: number[],
-    weeklyWeeks: number,
-    monthlyDaysRaw: string,
-  ): Array<{ day?: number; weeks?: number }> => {
-    if (frequency === "daily") return []
-    if (frequency === "weekly") {
-      const days = [...new Set(weeklyDays)].filter((d) => d >= 0 && d <= 6).sort((a, b) => a - b)
-      return days.map((day) => ({ day, weeks: Math.max(1, Number(weeklyWeeks) || 1) }))
-    }
-    return parseMonthlyDays(monthlyDaysRaw).map((day) => ({ day }))
-  }
+  const residentSchedules = useMemo(() => {
+    const list = (apiClient?.schedules ?? []).filter((s) => !!s.id && s.isActive !== false)
+    return [...list].sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")))
+  }, [apiClient?.schedules])
+  /** UI exposes a single schedule; backend may still store more than one. */
+  const primarySchedule = residentSchedules[0]
 
   const toggleWeeklyDay = (day: number, mode: "new" | "edit") => {
     const setter = mode === "new" ? setNewScheduleWeeklyDays : setEditScheduleWeeklyDays
@@ -645,116 +624,84 @@ export function ResidentDetailPage() {
       {canManageResidents ? (
         <div className="va-card va-card-pad" data-testid="resident-schedules-card">
           <div style={{ marginBottom: "0.9rem" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: "var(--va-navy)" }}>Call Schedules</h2>
-            <p style={{ margin: "0.35rem 0 0", fontSize: "0.825rem", color: "var(--va-slate-500)" }}>Configure one or many recurring call schedules for this resident.</p>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: "var(--va-navy)" }}>Call schedule</h2>
+            <p style={{ margin: "0.35rem 0 0", fontSize: "0.825rem", color: "var(--va-slate-500)" }}>
+              Configure the recurring call schedule for this resident.
+            </p>
           </div>
 
-          {residentSchedules.length === 0 ? (
-            <div style={{ marginBottom: "0.9rem", border: "1px dashed var(--va-slate-300)", borderRadius: 10, padding: "0.7rem 0.8rem", color: "var(--va-slate-500)", fontSize: "0.84rem" }}>
-              No schedules yet.
+          {!primarySchedule ? (
+            <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: 10, padding: "0.85rem", display: "grid", gap: 10, background: "var(--va-slate-50)" }}>
+              <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--va-navy)" }}>Add schedule</h3>
+              <NewScheduleFormFields
+                testIdPrefix="resident-schedule-new"
+                frequency={newScheduleFrequency}
+                setFrequency={setNewScheduleFrequency}
+                time={newScheduleTime}
+                setTime={setNewScheduleTime}
+                active={newScheduleActive}
+                setActive={setNewScheduleActive}
+                weeklyDays={newScheduleWeeklyDays}
+                toggleWeeklyDay={(d) => toggleWeeklyDay(d, "new")}
+                weeklyWeeks={newScheduleWeeklyWeeks}
+                setWeeklyWeeks={setNewScheduleWeeklyWeeks}
+                monthlyDaysRaw={newScheduleMonthlyDaysRaw}
+                setMonthlyDaysRaw={setNewScheduleMonthlyDaysRaw}
+              />
+              {scheduleError ? <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-red-600)" }}>{scheduleError}</p> : null}
+              {scheduleNotice ? (
+                <p data-testid="resident-schedule-notice" style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-emerald-700)" }}>
+                  {scheduleNotice}
+                </p>
+              ) : null}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" data-testid="resident-schedule-add" className="va-btn-primary" onClick={() => void onAddSchedule()} disabled={creatingSchedule}>
+                  {creatingSchedule ? "Saving..." : "Save"}
+                </button>
+              </div>
             </div>
-          ) : (
-            <div style={{ display: "grid", gap: 8, marginBottom: "0.95rem" }}>
-              {residentSchedules.map((s) => {
-                const sid = String(s.id)
-                return (
-                  <div key={sid} data-testid={`resident-schedule-${sid}`} style={{ border: "1px solid var(--va-slate-200)", borderRadius: 10, background: "#fff" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", padding: "0.72rem 0.8rem" }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: "0.86rem", color: "var(--va-slate-900)", fontWeight: 600 }}>
-                          <span style={{ textTransform: "capitalize" }}>{s.frequency}</span> at {s.time}
-                        </div>
-                        <div style={{ marginTop: 2, fontSize: "0.79rem", color: "var(--va-slate-500)" }}>
-                          {s.frequency === "weekly"
-                            ? `Days ${s.intervals.map((i) => weekdayShortLabel(i.day)).join(", ")}`
-                            : s.frequency === "monthly"
-                              ? `Days ${s.intervals.map((i) => i.day).join(", ")}`
-                              : "Every day"}
-                          {s.nextCallDate ? ` · Next ${new Date(s.nextCallDate).toLocaleString()}` : ""}
-                          {s.isActive === false ? " · Inactive" : ""}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button type="button" className="va-btn-secondary" data-testid={`resident-schedule-edit-${sid}`} onClick={() => startEditSchedule(sid)}>
-                          Edit
-                        </button>
+          ) : editingScheduleId ? (
+            <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: 10, padding: "0.85rem", display: "grid", gap: 10, background: "var(--va-slate-50)" }}>
+              <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--va-navy)" }}>Edit schedule</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(130px, 180px) minmax(130px, 180px) auto", gap: 8, alignItems: "center" }}>
+                <select data-testid="resident-schedule-edit-frequency" className="va-login-input" value={editScheduleFrequency} onChange={(e) => setEditScheduleFrequency(e.target.value as "daily" | "weekly" | "monthly")}>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+                <input data-testid="resident-schedule-edit-time" className="va-login-input" type="time" value={editScheduleTime} onChange={(e) => setEditScheduleTime(e.target.value)} />
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "var(--va-slate-700)" }}>
+                  <input data-testid="resident-schedule-edit-active" type="checkbox" checked={editScheduleActive} onChange={(e) => setEditScheduleActive(e.target.checked)} />
+                  Active
+                </label>
+              </div>
+              {editScheduleFrequency === "weekly" ? (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {[0, 1, 2, 3, 4, 5, 6].map((d) => {
+                      const active = editScheduleWeeklyDays.includes(d)
+                      return (
                         <button
+                          key={d}
                           type="button"
-                          className="va-btn-ghost"
-                          data-testid={`resident-schedule-delete-${sid}`}
-                          style={{ color: "var(--va-red-600)", borderColor: "var(--va-red-200)" }}
-                          onClick={() => void onDeleteSchedule(sid)}
-                          disabled={deletingSchedule}
+                          data-testid={`resident-schedule-edit-day-${d}`}
+                          style={{
+                            padding: "0.25rem 0.58rem",
+                            fontSize: "0.75rem",
+                            borderRadius: 999,
+                            border: active ? "1px solid #14b8a6" : "1px solid #cbd5e1",
+                            background: active ? "#14b8a6" : "#ffffff",
+                            color: active ? "#ffffff" : "#334155",
+                          }}
+                          onClick={() => toggleWeeklyDay(d, "edit")}
                         >
-                          Delete
+                          {weekdayShortLabel(d)}
                         </button>
-                      </div>
-                    </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
-            </div>
-          )}
-
-          <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: 10, padding: "0.85rem", display: "grid", gap: 10, background: "var(--va-slate-50)" }}>
-            <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--va-navy)" }}>{editingScheduleId ? "Edit schedule" : "Add schedule"}</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(130px, 180px) minmax(130px, 180px) auto", gap: 8, alignItems: "center" }}>
-              {editingScheduleId ? (
-                <>
-                  <select data-testid="resident-schedule-edit-frequency" className="va-login-input" value={editScheduleFrequency} onChange={(e) => setEditScheduleFrequency(e.target.value as "daily" | "weekly" | "monthly")}>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                  <input data-testid="resident-schedule-edit-time" className="va-login-input" type="time" value={editScheduleTime} onChange={(e) => setEditScheduleTime(e.target.value)} />
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "var(--va-slate-700)" }}>
-                    <input data-testid="resident-schedule-edit-active" type="checkbox" checked={editScheduleActive} onChange={(e) => setEditScheduleActive(e.target.checked)} />
-                    Active
-                  </label>
-                </>
-              ) : (
-                <>
-                  <select data-testid="resident-schedule-new-frequency" className="va-login-input" value={newScheduleFrequency} onChange={(e) => setNewScheduleFrequency(e.target.value as "daily" | "weekly" | "monthly")}>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                  </select>
-                  <input data-testid="resident-schedule-new-time" className="va-login-input" type="time" value={newScheduleTime} onChange={(e) => setNewScheduleTime(e.target.value)} />
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "var(--va-slate-700)" }}>
-                    <input type="checkbox" checked={newScheduleActive} onChange={(e) => setNewScheduleActive(e.target.checked)} />
-                    Active
-                  </label>
-                </>
-              )}
-            </div>
-            {(editingScheduleId ? editScheduleFrequency : newScheduleFrequency) === "weekly" ? (
-              <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {[0, 1, 2, 3, 4, 5, 6].map((d) => {
-                    const active = editingScheduleId ? editScheduleWeeklyDays.includes(d) : newScheduleWeeklyDays.includes(d)
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        data-testid={editingScheduleId ? `resident-schedule-edit-day-${d}` : `resident-schedule-new-day-${d}`}
-                        style={{
-                          padding: "0.25rem 0.58rem",
-                          fontSize: "0.75rem",
-                          borderRadius: 999,
-                          border: active ? "1px solid #14b8a6" : "1px solid #cbd5e1",
-                          background: active ? "#14b8a6" : "#ffffff",
-                          color: active ? "#ffffff" : "#334155",
-                        }}
-                        onClick={() => toggleWeeklyDay(d, editingScheduleId ? "edit" : "new")}
-                      >
-                        {weekdayShortLabel(d)}
-                      </button>
-                    )
-                  })}
-                </div>
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
-                  Repeat every
-                  {editingScheduleId ? (
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
+                    Repeat every
                     <input
                       data-testid="resident-schedule-edit-weeks"
                       className="va-login-input"
@@ -764,54 +711,74 @@ export function ResidentDetailPage() {
                       onChange={(e) => setEditScheduleWeeklyWeeks(Math.max(1, Number(e.target.value) || 1))}
                       style={{ width: 86 }}
                     />
-                  ) : (
-                    <input
-                      data-testid="resident-schedule-new-weeks"
-                      className="va-login-input"
-                      type="number"
-                      min={1}
-                      value={newScheduleWeeklyWeeks}
-                      onChange={(e) => setNewScheduleWeeklyWeeks(Math.max(1, Number(e.target.value) || 1))}
-                      style={{ width: 86 }}
-                    />
-                  )}
-                  week(s)
-                </label>
-              </div>
-            ) : null}
-            {(editingScheduleId ? editScheduleFrequency : newScheduleFrequency) === "monthly" ? (
-              <label style={{ display: "grid", gap: 6, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
-                Days of month (comma-separated, 1-31)
-                {editingScheduleId ? (
+                    week(s)
+                  </label>
+                </div>
+              ) : null}
+              {editScheduleFrequency === "monthly" ? (
+                <label style={{ display: "grid", gap: 6, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
+                  Days of month (comma-separated, 1-31)
                   <input data-testid="resident-schedule-edit-monthdays" className="va-login-input" value={editScheduleMonthlyDaysRaw} onChange={(e) => setEditScheduleMonthlyDaysRaw(e.target.value)} />
-                ) : (
-                  <input data-testid="resident-schedule-new-monthdays" className="va-login-input" value={newScheduleMonthlyDaysRaw} onChange={(e) => setNewScheduleMonthlyDaysRaw(e.target.value)} />
-                )}
-              </label>
-            ) : null}
-            {scheduleError ? <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-red-600)" }}>{scheduleError}</p> : null}
-            {scheduleNotice ? (
-              <p data-testid="resident-schedule-notice" style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-emerald-700)" }}>
-                {scheduleNotice}
-              </p>
-            ) : null}
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {editingScheduleId ? (
-                <>
-                  <button type="button" data-testid="resident-schedule-save" className="va-btn-primary" onClick={() => void onSaveSchedule()} disabled={updatingSchedule}>
-                    {updatingSchedule ? "Saving..." : "Save"}
-                  </button>
-                  <button type="button" data-testid="resident-schedule-cancel-edit" className="va-btn-secondary" onClick={() => setEditingScheduleId(null)}>
-                    Cancel
-                  </button>
-                </>
-              ) : (
-                <button type="button" data-testid="resident-schedule-add" className="va-btn-primary" onClick={() => void onAddSchedule()} disabled={creatingSchedule}>
-                  {creatingSchedule ? "Adding..." : "Add schedule"}
+                </label>
+              ) : null}
+              {scheduleError ? <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-red-600)" }}>{scheduleError}</p> : null}
+              {scheduleNotice ? (
+                <p data-testid="resident-schedule-notice" style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-emerald-700)" }}>
+                  {scheduleNotice}
+                </p>
+              ) : null}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" data-testid="resident-schedule-save" className="va-btn-primary" onClick={() => void onSaveSchedule()} disabled={updatingSchedule}>
+                  {updatingSchedule ? "Saving..." : "Save"}
                 </button>
-              )}
+                <button type="button" data-testid="resident-schedule-cancel-edit" className="va-btn-secondary" onClick={() => setEditingScheduleId(null)}>
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div
+              data-testid={`resident-schedule-${String(primarySchedule.id)}`}
+              style={{ border: "1px solid var(--va-slate-200)", borderRadius: 10, background: "#fff" }}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", padding: "0.72rem 0.8rem" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: "0.86rem", color: "var(--va-slate-900)", fontWeight: 600 }}>
+                    <span style={{ textTransform: "capitalize" }}>{primarySchedule.frequency}</span> at {primarySchedule.time}
+                  </div>
+                  <div style={{ marginTop: 2, fontSize: "0.79rem", color: "var(--va-slate-500)" }}>
+                    {primarySchedule.frequency === "weekly"
+                      ? `Days ${primarySchedule.intervals.map((i) => weekdayShortLabel(i.day)).join(", ")}`
+                      : primarySchedule.frequency === "monthly"
+                        ? `Days ${primarySchedule.intervals.map((i) => i.day).join(", ")}`
+                        : "Every day"}
+                    {primarySchedule.nextCallDate ? ` · Next ${new Date(primarySchedule.nextCallDate).toLocaleString()}` : ""}
+                    {primarySchedule.isActive === false ? " · Inactive" : ""}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    className="va-btn-secondary"
+                    data-testid={`resident-schedule-edit-${String(primarySchedule.id)}`}
+                    onClick={() => startEditSchedule(String(primarySchedule.id))}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="va-btn-ghost"
+                    data-testid={`resident-schedule-delete-${String(primarySchedule.id)}`}
+                    style={{ color: "var(--va-red-600)", borderColor: "var(--va-red-200)" }}
+                    onClick={() => void onDeleteSchedule(String(primarySchedule.id))}
+                    disabled={deletingSchedule}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
 

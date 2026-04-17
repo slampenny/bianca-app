@@ -210,7 +210,7 @@ export function ResidentsPage() {
         }}
         className="va-res-head"
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: "0.75rem", alignItems: "flex-start", justifyContent: "space-between", width: "100%" }}>
           <div>
             <h1 className="va-page-title">Residents</h1>
             <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 4 }}>
@@ -218,6 +218,17 @@ export function ResidentsPage() {
               {pages?.totalResults != null ? ` (${pages.totalResults} in directory)` : ""}
             </p>
           </div>
+          {showAdd ? (
+            <Link
+              to="/residents/new"
+              className="va-btn-primary"
+              aria-label="Add resident"
+              data-testid="residents-add"
+              style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", flexShrink: 0 }}
+            >
+              Add
+            </Link>
+          ) : null}
         </div>
         <div className="va-search">
           <SearchIcon size={16} />
@@ -328,44 +339,7 @@ export function ResidentsPage() {
         </table>
       </div>
 
-      {showAdd ? (
-        <Link
-          to="/residents/new"
-          aria-label="Add resident"
-          className="va-residents-fab"
-          data-testid="residents-add"
-        >
-          +
-        </Link>
-      ) : null}
-
       <style>{`
-        .va-residents-fab {
-          position: fixed;
-          right: 1.5rem;
-          bottom: 1.5rem;
-          width: 3rem;
-          height: 3rem;
-          border-radius: 999px;
-          background: var(--va-teal);
-          color: #fff;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          text-decoration: none;
-          font-size: 1.75rem;
-          line-height: 1;
-          box-shadow: 0 10px 25px rgba(15, 23, 42, 0.25);
-          z-index: 20;
-        }
-        .va-residents-fab:hover {
-          background: #0f9f90;
-        }
-        .va-residents-fab:focus-visible {
-          outline: 2px solid #fff;
-          outline-offset: 2px;
-          box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.45);
-        }
         @media (min-width: 640px) {
           .va-res-head {
             flex-direction: row !important;

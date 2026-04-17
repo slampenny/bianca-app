@@ -133,7 +133,7 @@ Then("I should see the caregivers management page", async function () {
 
 Then("I should see the resident schedules section", async function () {
   await expect(this.page.getByTestId("resident-schedules-card")).toBeVisible({ timeout: 30000 })
-  await expect(this.page.getByRole("heading", { name: "Call Schedules" })).toBeVisible()
+  await expect(this.page.getByRole("heading", { name: "Call schedule" })).toBeVisible()
 })
 
 When("I add a weekly resident schedule at {string} for days {string}", async function (time, daysCsv) {

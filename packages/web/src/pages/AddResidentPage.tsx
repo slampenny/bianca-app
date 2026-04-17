@@ -2,8 +2,11 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
+import { intervalsForDraft } from "../lib/scheduleDraft"
 import { AvatarPicker } from "../components/AvatarPicker"
+import { NewScheduleFormFields, type ScheduleFrequency } from "../components/NewScheduleFormFields"
 import { useCreateClientMutation, useAssignCaregiverToClientMutation, useUploadClientAvatarMutation } from "../services/api/clientApi"
+import { useCreateScheduleForClientMutation } from "../services/api/scheduleApi"
 import { useGetCaregiversQuery } from "../services/api/caregiverApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -40,10 +43,17 @@ export function AddResidentPage() {
   const [extraCaregiverIds, setExtraCaregiverIds] = useState<Set<string>>(new Set())
   const [formError, setFormError] = useState("")
   const [partialCreateId, setPartialCreateId] = useState<string | null>(null)
+  const [newScheduleFrequency, setNewScheduleFrequency] = useState<ScheduleFrequency>("weekly")
+  const [newScheduleTime, setNewScheduleTime] = useState("09:00")
+  const [newScheduleWeeklyDays, setNewScheduleWeeklyDays] = useState<number[]>([1, 3, 5])
+  const [newScheduleWeeklyWeeks, setNewScheduleWeeklyWeeks] = useState(1)
+  const [newScheduleMonthlyDaysRaw, setNewScheduleMonthlyDaysRaw] = useState("1,15")
+  const [newScheduleActive, setNewScheduleActive] = useState(true)
 
   const [createClient, { isLoading: creating }] = useCreateClientMutation()
   const [assignCaregiver] = useAssignCaregiverToClientMutation()
   const [uploadClientAvatar] = useUploadClientAvatarMutation()
+  const [createScheduleForClient, { isLoading: creatingSchedule }] = useCreateScheduleForClientMutation()
 
   useEffect(() => {
     if (!canAddResidents(role)) {
@@ -73,6 +83,13 @@ export function AddResidentPage() {
     setExtraCaregiverIds(new Set())
   }
 
+  const toggleNewScheduleDay = (day: number) => {
+    setNewScheduleWeeklyDays((prev) => {
+      const next = prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+      return next.sort((a, b) => a - b)
+    })
+  }
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setFormError("")
@@ -82,6 +99,16 @@ export function AddResidentPage() {
     const ph = phone.replace(/\s/g, "")
     if (!n || !em || !ph) {
       setFormError(t("residents.fieldsRequired"))
+      return
+    }
+    const scheduleIntervals = intervalsForDraft(
+      newScheduleFrequency,
+      newScheduleWeeklyDays,
+      newScheduleWeeklyWeeks,
+      newScheduleMonthlyDaysRaw,
+    )
+    if (newScheduleFrequency !== "daily" && scheduleIntervals.length === 0) {
+      setFormError("Select at least one interval for weekly/monthly schedules.")
       return
     }
     try {
@@ -111,6 +138,22 @@ export function AddResidentPage() {
       const failedCount = assignResults.filter((r) => r.status === "rejected").length
       if (failedCount > 0) {
         setFormError(t("residents.assignPartialError"))
+        setPartialCreateId(cid)
+        return
+      }
+      try {
+        await createScheduleForClient({
+          clientId: cid,
+          body: {
+            frequency: newScheduleFrequency,
+            intervals: scheduleIntervals,
+            time: newScheduleTime,
+            isActive: newScheduleActive,
+          },
+        }).unwrap()
+      } catch (schedErr: unknown) {
+        const msg = (schedErr as { data?: { message?: string } })?.data?.message
+        setFormError(typeof msg === "string" ? msg : "Resident created, but schedule could not be saved.")
         setPartialCreateId(cid)
         return
       }
@@ -196,11 +239,39 @@ export function AddResidentPage() {
               ))}
             </select>
           </label>
-          <AvatarPicker
-            label="Resident photo (optional)"
-            initialsSource={name || "?"}
-            onPick={setAvatarFile}
-          />
+
+          <div style={{ marginBottom: "1rem" }}>
+            <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, marginBottom: 6 }}>Call schedule</h2>
+            <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
+              Configure a recurring call schedule for this resident.
+            </p>
+            <div
+              style={{
+                border: "1px solid var(--va-slate-200)",
+                borderRadius: 10,
+                padding: "0.85rem",
+                display: "grid",
+                gap: 10,
+                background: "var(--va-slate-50)",
+              }}
+            >
+              <NewScheduleFormFields
+                testIdPrefix="add-resident-schedule"
+                frequency={newScheduleFrequency}
+                setFrequency={setNewScheduleFrequency}
+                time={newScheduleTime}
+                setTime={setNewScheduleTime}
+                active={newScheduleActive}
+                setActive={setNewScheduleActive}
+                weeklyDays={newScheduleWeeklyDays}
+                toggleWeeklyDay={toggleNewScheduleDay}
+                weeklyWeeks={newScheduleWeeklyWeeks}
+                setWeeklyWeeks={setNewScheduleWeeklyWeeks}
+                monthlyDaysRaw={newScheduleMonthlyDaysRaw}
+                setMonthlyDaysRaw={setNewScheduleMonthlyDaysRaw}
+              />
+            </div>
+          </div>
 
           <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, marginBottom: 8 }}>{t("residents.caregiversHeading")}</h2>
           <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
@@ -257,6 +328,12 @@ export function AddResidentPage() {
             </div>
           )}
 
+          <AvatarPicker
+            label="Resident photo (optional)"
+            initialsSource={name || "?"}
+            onPick={setAvatarFile}
+          />
+
           {formError ? (
             <div className="va-login-error" style={{ marginBottom: "1rem" }} role="alert">
               <div>{formError}</div>
@@ -271,8 +348,8 @@ export function AddResidentPage() {
           ) : null}
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.5rem" }}>
-            <button type="submit" className="va-btn-primary" disabled={creating} data-testid="add-resident-submit">
-              {creating ? t("residents.submitting") : t("residents.submit")}
+            <button type="submit" className="va-btn-primary" disabled={creating || creatingSchedule} data-testid="add-resident-submit">
+              {creating || creatingSchedule ? t("residents.submitting") : t("residents.submit")}
             </button>
             <Link to="/residents" className="va-btn-secondary" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
               {t("residents.cancel")}
