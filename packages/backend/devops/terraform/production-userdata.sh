@@ -337,8 +337,8 @@ chown 1000:1000 /opt/asterisk-recordings
 
 # Pull and start containers
 echo "Starting containers..."
-docker compose pull
-docker compose up -d
+docker-compose pull
+docker-compose up -d
 
 # Copy source code to host for editing (after containers are running)
 echo "Copying source code to host for editing..."
@@ -360,8 +360,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=/opt/bianca-production
-ExecStart=/usr/bin/docker compose up -d
-ExecStop=/usr/bin/docker compose down
+ExecStart=/usr/bin/docker-compose up -d
+ExecStop=/usr/bin/docker-compose down
 StandardOutput=journal
 
 [Install]
@@ -403,7 +403,7 @@ fi
 if ! docker ps | grep -q "production_app"; then
     echo "$(date): CRITICAL - App container not running! Restarting all services..." >> "$LOG_FILE"
     cd /opt/bianca-production
-    docker compose up -d
+    docker-compose up -d
     echo "0" > "$FAILURE_COUNT_FILE"
     exit 0
 fi
@@ -423,7 +423,7 @@ else
     if [ "$FAILURES" -ge "$MAX_FAILURES" ]; then
         echo "$(date): Max failures reached. Restarting services..." >> "$LOG_FILE"
         cd /opt/bianca-production
-        docker compose restart app
+        docker-compose restart app
         echo "0" > "$FAILURE_COUNT_FILE"
     fi
 fi
@@ -445,7 +445,7 @@ DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BACKUP_DIR"
 
 # Backup MongoDB
-docker compose exec -T mongodb mongodump --archive | gzip > "$BACKUP_DIR/mongodb_$DATE.gz"
+docker-compose exec -T mongodb mongodump --archive | gzip > "$BACKUP_DIR/mongodb_$DATE.gz"
 
 # Keep only last 7 days of backups
 find "$BACKUP_DIR" -name "mongodb_*.gz" -mtime +7 -delete
