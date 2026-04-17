@@ -296,9 +296,37 @@ EOF
 echo "Logging into ECR..."
 aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
 
-# Create data directories for persistent storage
-mkdir -p /opt/mongodb-data
-chown 999:999 /opt/mongodb-data
+# Format and mount EBS volume for MongoDB data (same behavior as staging-userdata.sh).
+# The Terraform-tagged volume (bianca-production-mongodb-data) is attached as /dev/sdf by
+# blue/green swap; on Nitro instances it may appear as /dev/nvme1n1 (see buildspec-swap-and-terminate.yml).
+echo "Setting up EBS volume for MongoDB..."
+MONGO_DEV=""
+for cand in /dev/sdf /dev/nvme1n1 /dev/xvdf; do
+  if [ -b "$cand" ]; then
+    MONGO_DEV="$cand"
+    break
+  fi
+done
+
+if [ -n "$MONGO_DEV" ]; then
+  if ! blkid "$MONGO_DEV" >/dev/null 2>&1; then
+    echo "Formatting EBS volume $MONGO_DEV..."
+    mkfs.ext4 "$MONGO_DEV"
+  fi
+  mkdir -p /opt/mongodb-data
+  mount "$MONGO_DEV" /opt/mongodb-data
+  chown 999:999 /opt/mongodb-data
+  chmod 755 /opt/mongodb-data
+  if ! grep -q '/opt/mongodb-data' /etc/fstab; then
+    echo "$MONGO_DEV /opt/mongodb-data ext4 defaults,nofail 0 2" >> /etc/fstab
+  fi
+  echo "EBS volume mounted successfully at $MONGO_DEV -> /opt/mongodb-data"
+else
+  echo "Warning: MongoDB data EBS not found (/dev/sdf, /dev/nvme1n1, /dev/xvdf). Using /opt/mongodb-data on root volume until the bianca-production-mongodb-data volume is attached."
+  mkdir -p /opt/mongodb-data
+  chown 999:999 /opt/mongodb-data
+  chmod 755 /opt/mongodb-data
+fi
 
 mkdir -p /opt/redis-data
 chown 999:999 /opt/redis-data
