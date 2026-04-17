@@ -167,7 +167,7 @@ services:
       - bianca-network
 
   asterisk:
-    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:latest
+    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:production
     container_name: production_asterisk
     restart: unless-stopped
     ports:
