@@ -38,6 +38,7 @@ export function AddResidentPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
+  const [room, setRoom] = useState("")
   const [preferredLanguage, setPreferredLanguage] = useState("en")
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [extraCaregiverIds, setExtraCaregiverIds] = useState<Set<string>>(new Set())
@@ -117,6 +118,7 @@ export function AddResidentPage() {
         email: em,
         phone: ph,
         preferredLanguage: preferredLanguage || undefined,
+        room: room.trim() || undefined,
       }).unwrap()
       const cid = client.id != null ? String(client.id) : ""
       if (!cid) {
@@ -222,6 +224,18 @@ export function AddResidentPage() {
               onChange={(e) => setPhone(e.target.value)}
               required
               data-testid="add-resident-phone"
+            />
+          </label>
+          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
+            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelRoom")}</span>
+            <input
+              className="va-login-input"
+              type="text"
+              autoComplete="off"
+              value={room}
+              onChange={(e) => setRoom(e.target.value)}
+              placeholder="e.g. 101A"
+              data-testid="add-resident-room"
             />
           </label>
           <label style={{ display: "block", marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>

@@ -102,6 +102,7 @@ export const appLocalesPages = {
     labelFullName: "Full name",
     labelEmail: "Email",
     labelPhone: "Phone",
+    labelRoom: "Room",
     labelLanguage: "Preferred language",
     caregiversHeading: "Assign to caregivers",
     caregiversHint: "Select teammates who should see this resident. Leave all unchecked to create without assignments.",

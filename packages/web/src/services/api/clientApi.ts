@@ -47,7 +47,7 @@ export const clientApi = createApi({
     }),
     createClient: builder.mutation<
       Client,
-      { name: string; email: string; phone: string; preferredLanguage?: string }
+      { name: string; email: string; phone: string; preferredLanguage?: string; room?: string }
     >({
       query: (body) => ({ url: "/clients", method: "POST", body }),
       invalidatesTags: ["Client"],

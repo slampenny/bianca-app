@@ -210,25 +210,36 @@ export function ResidentsPage() {
         }}
         className="va-res-head"
       >
-        <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", gap: "0.75rem", alignItems: "flex-start", justifyContent: "space-between", width: "100%" }}>
-          <div>
-            <h1 className="va-page-title">Residents</h1>
-            <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 4 }}>
-              {rows.length} resident{rows.length === 1 ? "" : "s"}
-              {pages?.totalResults != null ? ` (${pages.totalResults} in directory)` : ""}
-            </p>
+        <div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "0.65rem",
+              rowGap: "0.5rem",
+            }}
+          >
+            <h1 className="va-page-title" style={{ margin: 0 }}>
+              Residents
+            </h1>
+            {showAdd ? (
+              <Link
+                to="/residents/new"
+                className="va-btn-primary"
+                aria-label="Add resident"
+                data-testid="residents-add"
+                style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", flexShrink: 0 }}
+              >
+                Add
+              </Link>
+            ) : null}
           </div>
-          {showAdd ? (
-            <Link
-              to="/residents/new"
-              className="va-btn-primary"
-              aria-label="Add resident"
-              data-testid="residents-add"
-              style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", flexShrink: 0 }}
-            >
-              Add
-            </Link>
-          ) : null}
+          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 4 }}>
+            {rows.length} resident{rows.length === 1 ? "" : "s"}
+            {pages?.totalResults != null ? ` (${pages.totalResults} in directory)` : ""}
+          </p>
         </div>
         <div className="va-search">
           <SearchIcon size={16} />

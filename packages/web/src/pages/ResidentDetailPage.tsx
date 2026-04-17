@@ -264,6 +264,13 @@ export function ResidentDetailPage() {
       })
   }, [convPages?.results])
 
+  const residentSchedules = useMemo(() => {
+    const list = (apiClient?.schedules ?? []).filter((s) => !!s.id && s.isActive !== false)
+    return [...list].sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")))
+  }, [apiClient?.schedules])
+  /** UI exposes a single schedule; backend may still store more than one. */
+  const primarySchedule = residentSchedules[0]
+
   if (clientLoading) {
     return (
       <div style={{ padding: "3rem", textAlign: "center", color: "var(--va-slate-500)" }}>Loading client…</div>
@@ -339,13 +346,6 @@ export function ResidentDetailPage() {
       setSaveError(typeof msg === "string" ? msg : "Could not delete resident.")
     }
   }
-
-  const residentSchedules = useMemo(() => {
-    const list = (apiClient?.schedules ?? []).filter((s) => !!s.id && s.isActive !== false)
-    return [...list].sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")))
-  }, [apiClient?.schedules])
-  /** UI exposes a single schedule; backend may still store more than one. */
-  const primarySchedule = residentSchedules[0]
 
   const toggleWeeklyDay = (day: number, mode: "new" | "edit") => {
     const setter = mode === "new" ? setNewScheduleWeeklyDays : setEditScheduleWeeklyDays
