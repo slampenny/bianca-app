@@ -136,6 +136,33 @@ Then("I should see the resident schedules section", async function () {
   await expect(this.page.getByRole("heading", { name: "Call schedule" })).toBeVisible()
 })
 
+/**
+ * Detail page only shows the "add schedule" form when the resident has no active schedule.
+ * Seeded residents often already have schedules — delete until the add form is visible.
+ */
+async function ensureResidentAddScheduleFormVisible(page) {
+  const card = page.getByTestId("resident-schedules-card")
+  await expect(card).toBeVisible({ timeout: 30000 })
+  const cancelEdit = page.getByTestId("resident-schedule-cancel-edit")
+  if (await cancelEdit.isVisible().catch(() => false)) {
+    await cancelEdit.click()
+  }
+  const newFrequency = page.getByTestId("resident-schedule-new-frequency")
+  for (let i = 0; i < 30; i++) {
+    if (await newFrequency.isVisible().catch(() => false)) {
+      return
+    }
+    const deleteBtn = card.getByRole("button", { name: "Delete" })
+    if ((await deleteBtn.count()) === 0) {
+      break
+    }
+    page.once("dialog", (dialog) => dialog.accept())
+    await deleteBtn.first().click()
+    await page.waitForTimeout(800)
+  }
+  await expect(newFrequency).toBeVisible({ timeout: 20000 })
+}
+
 When("I add a weekly resident schedule at {string} for days {string}", async function (time, daysCsv) {
   const dayMap = { sun: 0, mon: 1, tue: 2, tues: 2, wed: 3, thu: 4, thur: 4, thurs: 4, fri: 5, sat: 6 }
   const days = daysCsv
@@ -144,6 +171,7 @@ When("I add a weekly resident schedule at {string} for days {string}", async fun
     .map((x) => dayMap[x])
     .filter((x) => Number.isInteger(x))
 
+  await ensureResidentAddScheduleFormVisible(this.page)
   await this.page.getByTestId("resident-schedule-new-frequency").selectOption("weekly")
   await this.page.getByTestId("resident-schedule-new-time").fill(time)
   for (const d of days) {
