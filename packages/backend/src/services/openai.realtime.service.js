@@ -2142,12 +2142,22 @@ class OpenAIRealtimeService {
       conn.audioChunksSent = 0;
       conn.validAudioChunksSent = 0;
 
-      // Flush pending audio to OpenAI (this includes the user's "hello")
+      // Caller audio received before session.updated was queued in pendingAudio. Flushing it here runs *before*
+      // _sendInitialGreetingIfNeeded — it fills OpenAI's input buffer while the greeting starts (phantom overlap /
+      // extra turns). After the initial greeting succeeded once, reconnects should flush again for real speech.
       const pendingAudio = this.pendingAudio.get(callId);
       if (pendingAudio && pendingAudio.length > 0) {
-        logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} pending audio chunks for ${callId} (includes user's initial speech)`);
-        logger.info(`[OpenAI Realtime] First chunk size: ${pendingAudio[0]?.length || 0} bytes`);
-        await this.flushPendingAudio(callId);
+        if (!conn._initialGreetingTriggered) {
+          logger.info(
+            `[OpenAI Realtime] Discarding ${pendingAudio.length} pre-ready audio chunks for ${callId} ` +
+              '(avoid stacking caller audio under initial greeting; normal streaming resumes after greeting)'
+          );
+          this.pendingAudio.set(callId, []);
+        } else {
+          logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} pending audio chunks for ${callId} (post-greeting session)`);
+          logger.info(`[OpenAI Realtime] First chunk size: ${pendingAudio[0]?.length || 0} bytes`);
+          await this.flushPendingAudio(callId);
+        }
       } else {
         logger.info(`[OpenAI Realtime] No pending audio to flush for ${callId}`);
       }

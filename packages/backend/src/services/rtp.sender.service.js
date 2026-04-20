@@ -43,10 +43,10 @@ class RtpSenderService extends EventEmitter {
         this.SAMPLES_PER_FRAME = 160;
         this.PACKET_INTERVAL_MS = 20;
         
-        // Diagnostic: zero pre-buffer to test triple-response / greeting overlap (tune for quality after)
+        // Increased buffer sizes to prevent underruns and chunk dropping
         this.MAX_BUFFER_SIZE_BYTES = 2560;   // 160ms max (16 frames) - quadrupled
-        this.TARGET_BUFFER_SIZE_BYTES = 0;
-        this.MIN_BUFFER_SIZE_BYTES = 0;
+        this.TARGET_BUFFER_SIZE_BYTES = 1280; // 80ms target (8 frames) - doubled
+        this.MIN_BUFFER_SIZE_BYTES = 640;    // 40ms min (4 frames) - doubled
 
         this.adaptiveBuffering = new Map();
         
@@ -269,11 +269,6 @@ class RtpSenderService extends EventEmitter {
                 logger.info(`[RTP Sender] Buffer recovered for ${callId} after ${this.bufferUnderrunCount.get(callId)} underruns`);
                 this.bufferUnderrunCount.set(callId, 0);
             }
-        }
-
-        if (frameData.length < this.SAMPLES_PER_FRAME) {
-            const pad = Buffer.alloc(this.SAMPLES_PER_FRAME - frameData.length, 0x7F);
-            frameData = Buffer.concat([frameData, pad]);
         }
     
         // Send the frame
