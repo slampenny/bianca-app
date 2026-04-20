@@ -325,16 +325,20 @@ describe('RTP Sender Service', () => {
       expect(remainingBuffer.length).toBe(0);
     });
 
-    it('should not send frame when insufficient data', () => {
-      // Add insufficient audio data
+    it('pads sub-frame buffer to one RTP frame when MIN_BUFFER_SIZE_BYTES is 0', () => {
       const audioData = Buffer.alloc(service.SAMPLES_PER_FRAME - 1);
       service.audioBuffers.set(testCallId, audioData);
-      
-      service.createRtpPacket = jest.fn();
-      
+
+      const mockPacket = Buffer.alloc(12 + service.SAMPLES_PER_FRAME);
+      service.createRtpPacket = jest.fn().mockReturnValue(mockPacket);
+
       service.sendNextFrame(testCallId);
-      
-      expect(service.createRtpPacket).not.toHaveBeenCalled();
+
+      expect(service.createRtpPacket).toHaveBeenCalled();
+      const payloadArg = service.createRtpPacket.mock.calls[0][1];
+      expect(payloadArg.length).toBe(service.SAMPLES_PER_FRAME);
+      expect(mockSocket.send).toHaveBeenCalled();
+      expect(service.audioBuffers.get(testCallId).length).toBe(0);
     });
 
     it('should not send frame when call is not initialized', () => {

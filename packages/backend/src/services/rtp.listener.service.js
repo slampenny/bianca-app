@@ -27,18 +27,17 @@ class RtpListener {
         this.isActive = false;
         this.isShuttingDown = false;
         
-        // Audio buffering for OpenAI
-        // Optimized for lower latency
+        // Audio buffering for OpenAI (diagnostic: no pre-buffer — see RTP sender MIN=0 experiment)
         this.audioBuffer = Buffer.alloc(0);
         this.lastFlushTime = Date.now();
         this.flushInterval = 50; // Reduced from 100ms for faster audio delivery
-        this.minAudioBytes = 160; // Reduced from 320 (20ms instead of 40ms at 8kHz)
+        this.minAudioBytes = 0;
         
         // Smart gap detection - adaptive buffering
         this.lastSequenceNumber = null;
         this.gapCount = 0;
         this.stablePeriodStart = Date.now();
-        this.adaptiveMinAudioBytes = 160; // Start at minimum, adjust if gaps detected
+        this.adaptiveMinAudioBytes = 0;
         this.STABLE_PERIOD_MS = 5000; // 5 seconds of stability before reducing buffer
         
         // Start flush timer
@@ -142,18 +141,12 @@ class RtpListener {
                 if (gap > 1 && gap < 100) { // Gap detected (ignore wraparound)
                     this.gapCount++;
                     logger.warn(`[RTP Listener ${this.port}] Gap detected for ${this.callId}: expected ${expectedNext}, got ${actualSeq} (gap: ${gap} packets)`);
-                    
-                    // Increase buffer temporarily to handle gaps
-                    if (this.adaptiveMinAudioBytes < 320) { // Max 40ms buffer
-                        this.adaptiveMinAudioBytes = Math.min(this.adaptiveMinAudioBytes + 40, 320);
-                        this.stablePeriodStart = Date.now(); // Reset stability timer
-                        logger.info(`[RTP Listener ${this.port}] Increased buffer to ${this.adaptiveMinAudioBytes} bytes (${this.adaptiveMinAudioBytes / 8}ms) for ${this.callId}`);
-                    }
+                    // Diagnostic: do not increase inbound buffer (was up to 320 bytes on gaps)
                 } else if (gap === 1) {
                     // No gap - check if we can reduce buffer after stable period
                     const stableDuration = Date.now() - this.stablePeriodStart;
-                    if (stableDuration > this.STABLE_PERIOD_MS && this.adaptiveMinAudioBytes > 160) {
-                        this.adaptiveMinAudioBytes = Math.max(this.adaptiveMinAudioBytes - 40, 160);
+                    if (stableDuration > this.STABLE_PERIOD_MS && this.adaptiveMinAudioBytes > 0) {
+                        this.adaptiveMinAudioBytes = Math.max(this.adaptiveMinAudioBytes - 40, 0);
                         logger.info(`[RTP Listener ${this.port}] Reduced buffer to ${this.adaptiveMinAudioBytes} bytes (${this.adaptiveMinAudioBytes / 8}ms) for ${this.callId} after stable period`);
                     }
                 }
