@@ -12,9 +12,12 @@ RUN yarn install --frozen-lockfile || (echo "Lockfile out of sync, updating..." 
 ARG BUILD_ENV=production
 ARG VITE_API_URL=
 ARG VITE_GRAFANA_URL=
+# Facility (caregiver) web app — used for super-admin "Open as user" (postMessage handoff). Must match public site origin.
+ARG VITE_FACILITY_APP_URL=
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_GRAFANA_URL=$VITE_GRAFANA_URL
+ENV VITE_FACILITY_APP_URL=$VITE_FACILITY_APP_URL
 
 WORKDIR /app/packages/admin
 RUN echo "Building admin (BUILD_ENV=$BUILD_ENV, VITE_API_URL=${VITE_API_URL:-<unset>})..." && \

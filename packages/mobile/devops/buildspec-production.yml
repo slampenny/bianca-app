@@ -46,6 +46,7 @@ phases:
       - |
         if docker build --build-arg BUILD_ENV=production \
                      --build-arg VITE_API_URL=https://api.biancawellness.com/v1 \
+                     --build-arg VITE_FACILITY_APP_URL=https://app.biancawellness.com/ \
                      -t $REPOSITORY_URI_ADMIN:$IMAGE_TAG \
                      -t $REPOSITORY_URI_ADMIN:production \
                      -f packages/admin/devops/Dockerfile .; then

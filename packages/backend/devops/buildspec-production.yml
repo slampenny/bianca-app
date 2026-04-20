@@ -75,6 +75,7 @@ phases:
         if docker build --no-cache \
                      --build-arg BUILD_ENV=production \
                      --build-arg VITE_API_URL=https://api.biancawellness.com/v1 \
+                     --build-arg VITE_FACILITY_APP_URL=https://app.biancawellness.com/ \
                      -t $ECR_REGISTRY/bianca-app-admin:latest \
                      -t $ECR_REGISTRY/bianca-app-admin:production \
                      -f packages/admin/devops/Dockerfile .; then

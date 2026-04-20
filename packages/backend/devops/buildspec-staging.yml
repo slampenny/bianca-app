@@ -117,6 +117,7 @@ phases:
         if docker build --no-cache \
                      --build-arg BUILD_ENV=staging \
                      --build-arg VITE_API_URL=https://staging-api.biancawellness.com/v1 \
+                     --build-arg VITE_FACILITY_APP_URL=https://staging.biancawellness.com/ \
                      -t $ECR_REGISTRY/bianca-app-admin:latest \
                      -t $ECR_REGISTRY/bianca-app-admin:staging \
                      -f packages/admin/devops/Dockerfile .; then
