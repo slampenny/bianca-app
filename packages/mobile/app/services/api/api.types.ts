@@ -117,6 +117,9 @@ export interface ClientPages {
 export interface Client {
   id?: string
   name: string
+  firstName?: string
+  lastName?: string
+  preferredName?: string | null
   avatar: string
   email: string
   phone: string

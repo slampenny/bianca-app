@@ -1,6 +1,7 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useMemo } from "react"
 import { useNavigate } from "react-router-dom"
+import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
@@ -21,7 +22,7 @@ export function AlertsPage() {
     const m = new Map<string, string>()
     for (const c of clientPages?.results ?? []) {
       const id = apiRecordId(c as { id?: string; _id?: string })
-      if (id) m.set(id, c.name)
+      if (id) m.set(id, clientDisplayName(c))
     }
     return m
   }, [clientPages?.results])

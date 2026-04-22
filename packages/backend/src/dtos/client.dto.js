@@ -1,6 +1,7 @@
 const ScheduleDTO = require('./schedule.dto');
 const callService = require('../services/call.service');
 const clientHomeSnapshotService = require('../services/clientHomeSnapshot.service');
+const { splitFullName, fullNameFromParts } = require('../utils/clientName.util');
 
 const toIsoOrNull = (d) => {
   if (d == null) return null;
@@ -14,6 +15,8 @@ const ClientDTO = (client) => {
   const {
     _id,
     name,
+    firstName: rawFirst,
+    lastName: rawLast,
     preferredName,
     age,
     notes,
@@ -37,6 +40,17 @@ const ClientDTO = (client) => {
     moveInDate,
     emergencyContact,
   } = source;
+  let firstName = rawFirst;
+  let lastName = rawLast;
+  if ((firstName == null || firstName === '') && (lastName == null || lastName === '') && name) {
+    const s = splitFullName(String(name));
+    firstName = s.firstName;
+    lastName = s.lastName;
+  } else {
+    if (firstName == null) firstName = '';
+    if (lastName == null) lastName = '';
+  }
+  const combinedName = fullNameFromParts(firstName, lastName) || (name && String(name).trim()) || '';
   // Use direct property access for populated array (destructuring can miss it on Mongoose docs)
   const schedulesRaw = source.schedules;
   const scheduleDTOs = Array.isArray(schedulesRaw) ? schedulesRaw.map(ScheduleDTO) : [];
@@ -49,7 +63,9 @@ const ClientDTO = (client) => {
     caregivers && Array.isArray(caregivers) ? caregivers.map((cg) => (typeof cg === 'object' ? cg._id : cg)) : [];
   return {
     id,
-    name,
+    name: combinedName,
+    firstName: (firstName && String(firstName).trim()) || '',
+    lastName: (lastName && String(lastName).trim()) || '',
     preferredName: preferredName || null,
     age: age == null ? null : Number(age),
     notes: notes || null,

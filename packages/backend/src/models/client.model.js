@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const mongooseDelete = require('mongoose-delete');
 const validator = require('validator');
 const { toJSON, paginate } = require('./plugins');
+const { splitFullName, fullNameFromParts } = require('../utils/clientName.util');
 
 const emergencyContactSchema = new mongoose.Schema(
   {
@@ -31,6 +32,15 @@ const clientSchema = mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    firstName: {
+      type: String,
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      trim: true,
+      default: '',
     },
     avatar: {
       type: String,
@@ -146,6 +156,29 @@ clientSchema.statics.isEmailTaken = async function (email, excludeClientId) {
   const client = await this.findOne({ email, _id: { $ne: excludeClientId } });
   return !!client;
 };
+
+clientSchema.pre('validate', function (next) {
+  if (this.isModified('name') && !this.isModified('firstName') && !this.isModified('lastName') && this.name) {
+    const s = splitFullName(this.name);
+    this.firstName = s.firstName;
+    this.lastName = s.lastName;
+  } else {
+    const fn0 = this.firstName != null ? String(this.firstName).trim() : '';
+    if (!fn0 && this.name) {
+      const s = splitFullName(this.name);
+      this.firstName = s.firstName;
+      this.lastName = s.lastName;
+    }
+  }
+  this.name = fullNameFromParts(
+    this.firstName != null ? String(this.firstName).trim() : '',
+    this.lastName != null ? String(this.lastName).trim() : ''
+  );
+  if (!this.name) {
+    this.invalidate('name', 'First name and last name (or a full name) are required');
+  }
+  next();
+});
 
 clientSchema.pre('find', function () {
   this.where({ $or: [{ deleted: { $ne: true } }, { deleted: { $exists: false } }] });

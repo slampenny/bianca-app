@@ -14,7 +14,7 @@ function randomId(): string {
 }
 
 export function generateActivityFeed(residents: Resident[]): ActivityItem[] {
-  const pool = residents.map((r) => ({ id: r.id, firstName: r.firstName, lastName: r.lastName }))
+  const pool = residents.map((r) => ({ id: r.id, displayName: r.displayName }))
   const now = Date.now()
   const windowMs = 4 * 60 * 60 * 1000
   const items: ActivityItem[] = []
@@ -24,7 +24,7 @@ export function generateActivityFeed(residents: Resident[]): ActivityItem[] {
     items.push({
       id: randomId(),
       type: "call_completed",
-      residentName: `${r.firstName} ${r.lastName}`,
+      residentName: r.displayName,
       residentId: r.id,
       timestamp: new Date(now - ago),
       message: CALL_MESSAGES[Math.floor(Math.random() * CALL_MESSAGES.length)],
@@ -38,7 +38,7 @@ export function randomCallActivity(residents: Resident[]): ActivityItem {
   return {
     id: randomId(),
     type: "call_completed",
-    residentName: `${r.firstName} ${r.lastName}`,
+    residentName: r.displayName,
     residentId: r.id,
     timestamp: new Date(),
     message: CALL_MESSAGES[Math.floor(Math.random() * CALL_MESSAGES.length)],

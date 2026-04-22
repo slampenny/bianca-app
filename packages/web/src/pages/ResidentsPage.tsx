@@ -1,6 +1,7 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { clientInitialsFromClient } from "../lib/clientDisplayName"
 import { mapClientToResident } from "../lib/liveData"
 import type { ClientOnboardingRollup } from "../services/api/api.types"
 import { useGetAllClientsQuery, useGetClientsOnboardingRollupsQuery } from "../services/api/clientApi"
@@ -147,12 +148,15 @@ export function ResidentsPage() {
     }
     const t = q.trim().toLowerCase()
     if (t) {
-      list = list.filter(
-        ({ resident: r }) =>
+      list = list.filter(({ resident: r }) => {
+        const pref = (r.preferredName || "").toLowerCase()
+        return (
+          r.displayName.toLowerCase().includes(t) ||
           r.firstName.toLowerCase().includes(t) ||
           r.lastName.toLowerCase().includes(t) ||
-          `${r.firstName} ${r.lastName}`.toLowerCase().includes(t),
-      )
+          pref.includes(t)
+        )
+      })
     }
     list.sort((a, b) => {
       const ar = a.resident
@@ -173,7 +177,12 @@ export function ResidentsPage() {
     return list
   }, [residents, filter, q, rollups, onboardingSortFirst])
 
-  const initialsFor = (r: Resident) => `${r.firstName[0] ?? "?"}${r.lastName[0] ?? ""}`.toUpperCase()
+  const initialsFor = (r: Resident) =>
+    clientInitialsFromClient({
+      preferredName: r.preferredName,
+      firstName: r.firstName,
+      lastName: r.lastName,
+    })
 
   if (!authed) {
     return null
@@ -328,9 +337,7 @@ export function ResidentsPage() {
                         initialsFor(r)
                       )}
                     </span>
-                    <span>
-                      {r.firstName} {r.lastName}
-                    </span>
+                    <span>{r.displayName}</span>
                   </span>
                 </td>
                 <td>{r.room}</td>

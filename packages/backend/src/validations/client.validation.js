@@ -22,11 +22,14 @@ const emergencyContact = Joi.object()
   .optional();
 
 const createClient = {
-  body: Joi.object().keys({
+  body: Joi.object()
+    .keys({
     org: Joi.string().custom(objectId).optional(),
     email: Joi.string().required().email(),
     avatar: Joi.string().optional(),
-    name: Joi.string().required(),
+    name: Joi.string().trim().allow('').optional(),
+    firstName: Joi.string().trim().allow('').optional(),
+    lastName: Joi.string().trim().allow('').optional(),
     preferredName: Joi.string().allow('').optional(),
     age: Joi.number().integer().min(0).max(150).optional(),
     notes: Joi.string().allow('').optional(),
@@ -63,7 +66,15 @@ const createClient = {
         })
       )
       .optional(),
-  }),
+  })
+    .custom((value, helpers) => {
+      const hasFull = value.name && String(value.name).trim() !== '';
+      const hasFirst = value.firstName && String(value.firstName).trim() !== '';
+      if (!hasFull && !hasFirst) {
+        return helpers.message('Either a full "name" or a "firstName" is required');
+      }
+      return value;
+    }),
 };
 
 const getClients = {
@@ -94,6 +105,8 @@ const updateClient = {
       avatar: Joi.string().optional(),
       email: Joi.string().email().optional(),
       name: Joi.string().optional(),
+      firstName: Joi.string().trim().allow('').optional(),
+      lastName: Joi.string().trim().allow('').optional(),
       preferredName: Joi.string().allow('').optional(),
       age: Joi.number().integer().min(0).max(150).optional(),
       notes: Joi.string().allow('').optional(),

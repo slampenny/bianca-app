@@ -3,6 +3,7 @@ import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
 import { useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { mapConversationToTranscript } from "../lib/mapConversationToTranscript"
+import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
 import { useGetAllAlertsQuery, useMarkAlertAsReadMutation, useResolveAlertMutation } from "../services/api/alertApi"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
@@ -50,7 +51,7 @@ export function AlertDetailPage() {
     const m = new Map<string, string>()
     for (const c of clientPages?.results ?? []) {
       const id = apiRecordId(c as { id?: string; _id?: string })
-      if (id) m.set(id, c.name)
+      if (id) m.set(id, clientDisplayName(c))
     }
     return m
   }, [clientPages?.results])

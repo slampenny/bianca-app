@@ -1,4 +1,5 @@
 import type { Client } from "../services/api/api.types"
+import { clientDisplayName } from "./clientDisplayName"
 import { mapClientToResident } from "./liveData"
 
 function riskLevelLabel(riskLevel: ReturnType<typeof mapClientToResident>["riskLevel"]): string {
@@ -31,7 +32,7 @@ export function riskSentimentReportSubtitle(clientCount: number, scopeFullOrgani
 /** One table row (without per-resident trend series — use the live report for sparklines). */
 export function buildRiskSentimentTableRowStrings(client: Client): [string, string, string, string, string] {
   const r = mapClientToResident(client)
-  const name = (client.preferredName || client.name || "—").trim()
+  const name = clientDisplayName(client)
   const room = (client.room && String(client.room).trim()) || "—"
   const risk = riskLevelLabel(r.riskLevel)
   const sentiment = sentimentLabel(client.sentimentTrendDirection)

@@ -3,6 +3,8 @@ const { Client } = require('../../src/models');
 // Note: org field is required - must be provided when creating clients
 const clientOne = {
   name: 'Agnes Alphabet',
+  firstName: 'Agnes',
+  lastName: 'Alphabet',
   preferredName: 'Agnes',
   age: 84,
   room: '101A',
@@ -23,6 +25,8 @@ const clientOne = {
 
 const clientTwo = {
   name: 'Barnaby Button',
+  firstName: 'Barnaby',
+  lastName: 'Button',
   preferredName: 'Barnaby',
   age: 79,
   room: '102B',

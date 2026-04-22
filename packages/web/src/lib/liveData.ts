@@ -1,5 +1,6 @@
 import type { ApiAlertRecord, Client, Schedule } from "../services/api/api.types"
 import type { Alert, Resident } from "../types"
+import { clientDisplayName } from "./clientDisplayName"
 
 function schedulesList(c: Client): Schedule[] {
   const raw = c.schedules
@@ -11,7 +12,7 @@ export function apiRecordId(record: { id?: string; _id?: string }): string {
   return String(record.id ?? record._id ?? "")
 }
 
-function splitName(full: string): { firstName: string; lastName: string } {
+export function splitName(full: string): { firstName: string; lastName: string } {
   const t = full.trim()
   if (!t) return { firstName: "—", lastName: "" }
   const parts = t.split(/\s+/)
@@ -73,7 +74,18 @@ function mapEmergencyContact(c: Client): Resident["emergencyContact"] {
 
 /** Map API client → facility “resident” row. */
 export function mapClientToResident(c: Client): Resident {
-  const { firstName, lastName } = splitName(c.preferredName || c.name)
+  const fromApi = c.firstName != null && String(c.firstName).trim() !== ""
+  const parts = fromApi
+    ? { firstName: String(c.firstName).trim(), lastName: (c.lastName && String(c.lastName).trim()) || "" }
+    : splitName(c.name)
+  const { firstName, lastName } = parts
+  const preferred = c.preferredName != null && String(c.preferredName).trim() !== "" ? String(c.preferredName).trim() : null
+  const displayName = clientDisplayName({
+    ...c,
+    preferredName: preferred,
+    firstName,
+    lastName,
+  })
   const last = formatLastCall(c)
   const id = apiRecordId(c)
   const room = (c.room && String(c.room).trim()) || "—"
@@ -81,6 +93,8 @@ export function mapClientToResident(c: Client): Resident {
     id,
     firstName,
     lastName,
+    preferredName: preferred,
+    displayName,
     age: c.age ?? 0,
     room,
     status: clientStatus(c),

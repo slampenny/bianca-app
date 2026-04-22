@@ -33,7 +33,9 @@ describe("mapClientToResident", () => {
   it("maps name, room, move-in, and emergency contact from API fields", () => {
     const r = mapClientToResident(
       baseClient({
-        preferredName: "Jane Public",
+        firstName: "Jane",
+        lastName: "Public",
+        preferredName: "Jane",
         age: 82,
         room: "204A",
         moveInDate: "2024-01-15T00:00:00.000Z",
@@ -42,6 +44,7 @@ describe("mapClientToResident", () => {
     )
     expect(r.firstName).toBe("Jane")
     expect(r.lastName).toBe("Public")
+    expect(r.displayName).toBe("Jane Public")
     expect(r.room).toBe("204A")
     expect(r.moveInDate).toMatch(/Jan/)
     expect(r.emergencyContact).toEqual({

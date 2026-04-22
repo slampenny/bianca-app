@@ -1,5 +1,6 @@
 import type { ReportPayload } from "../data/reportsMock"
 import type { Client, Schedule } from "../services/api/api.types"
+import { clientDisplayName } from "./clientDisplayName"
 
 function schedulesList(c: Client): Schedule[] {
   const raw = c.schedules
@@ -32,11 +33,6 @@ function consentLabel(c: Client): string {
   return "Pending"
 }
 
-function residentDisplayName(c: Client): string {
-  const n = (c.preferredName || c.name || "").trim()
-  return n || "—"
-}
-
 /** Live consent + schedule summary from GET /clients (same roster as Residents). */
 export function buildConsentRosterReportPayload(
   clients: Client[],
@@ -46,7 +42,7 @@ export function buildConsentRosterReportPayload(
     .map((c) => {
       const room = (c.room && String(c.room).trim()) || "—"
       return [
-        residentDisplayName(c),
+        clientDisplayName(c),
         room,
         consentLabel(c),
         formatScheduleSummary(c),

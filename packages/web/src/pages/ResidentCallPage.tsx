@@ -59,7 +59,7 @@ export function ResidentCallPage() {
   }, [liveCallStatus?.data])
 
   const resident = apiClient ? mapClientToResident(apiClient) : null
-  const displayName = resident ? `${resident.firstName} ${resident.lastName}`.trim() : "Resident"
+  const displayName = resident ? resident.displayName : "Resident"
   const effectiveCallStatus = liveCallStatus?.data?.status || activeCall?.status || ""
   /** Twilio leg can be active while DB status is stale (out-of-order webhooks). */
   const twilioLiveCallStatus = liveCallStatus?.data?.callStatus

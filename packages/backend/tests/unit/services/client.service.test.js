@@ -61,6 +61,8 @@ describe('clientService', () => {
     const updateBody = { name: 'Updated Client' };
     const updatedClient = await clientService.updateClientById(client.id, updateBody);
     expect(updatedClient).toHaveProperty('name', updateBody.name);
+    expect(String(updatedClient.firstName)).toBe('Updated');
+    expect(String(updatedClient.lastName)).toBe('Client');
   });
 
   it('should delete a client by id', async () => {

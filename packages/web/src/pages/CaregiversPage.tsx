@@ -348,7 +348,7 @@ function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; co
                   <option value="">Assign resident...</option>
                   {assignable.map((r) => (
                     <option key={r.id} value={r.id}>
-                      {r.firstName} {r.lastName} ({r.room})
+                      {r.displayName} ({r.room})
                     </option>
                   ))}
                 </select>
@@ -371,9 +371,7 @@ function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; co
                 <div>
                   {rows.map((r) => (
                     <div key={r.id} className="va-caregiver-client-line">
-                      <span style={{ fontWeight: 600, color: "var(--va-navy)" }}>
-                        {r.firstName} {r.lastName}
-                      </span>
+                      <span style={{ fontWeight: 600, color: "var(--va-navy)" }}>{r.displayName}</span>
                       <span style={{ color: "var(--va-slate-600)" }}>Room {r.room}</span>
                       <StatusPill status={r.status} />
                       <span style={{ color: "var(--va-slate-600)" }}>

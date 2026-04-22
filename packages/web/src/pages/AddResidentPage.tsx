@@ -35,7 +35,9 @@ export function AddResidentPage() {
     { skip: !canAddResidents(role) },
   )
 
-  const [name, setName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [preferredName, setPreferredName] = useState("")
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [room, setRoom] = useState("")
@@ -95,10 +97,11 @@ export function AddResidentPage() {
     e.preventDefault()
     setFormError("")
     setPartialCreateId(null)
-    const n = name.trim()
+    const fn = firstName.trim()
+    const ln = lastName.trim()
     const em = email.trim()
     const ph = phone.replace(/\s/g, "")
-    if (!n || !em || !ph) {
+    if (!fn || !em || !ph) {
       setFormError(t("residents.fieldsRequired"))
       return
     }
@@ -114,7 +117,9 @@ export function AddResidentPage() {
     }
     try {
       const client = await createClient({
-        name: n,
+        firstName: fn,
+        lastName: ln,
+        preferredName: preferredName.trim() || undefined,
         email: em,
         phone: ph,
         preferredLanguage: preferredLanguage || undefined,
@@ -191,15 +196,37 @@ export function AddResidentPage() {
       <div className="va-card va-card-pad">
         <form onSubmit={(e) => void onSubmit(e)} className="va-login-form">
           <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelFullName")}</span>
+            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelFirstName")}</span>
             <input
               className="va-login-input"
               type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               required
-              data-testid="add-resident-name"
+              data-testid="add-resident-first-name"
+            />
+          </label>
+          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
+            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelLastName")}</span>
+            <input
+              className="va-login-input"
+              type="text"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              data-testid="add-resident-last-name"
+            />
+          </label>
+          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
+            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelPreferredName")}</span>
+            <input
+              className="va-login-input"
+              type="text"
+              autoComplete="nickname"
+              value={preferredName}
+              onChange={(e) => setPreferredName(e.target.value)}
+              data-testid="add-resident-preferred-name"
             />
           </label>
           <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
@@ -344,7 +371,7 @@ export function AddResidentPage() {
 
           <AvatarPicker
             label="Resident photo (optional)"
-            initialsSource={name || "?"}
+            initialsSource={preferredName || firstName || "?"}
             onPick={setAvatarFile}
           />
 

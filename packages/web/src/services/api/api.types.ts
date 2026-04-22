@@ -81,6 +81,8 @@ export interface Schedule {
 export interface Client {
   id?: string
   name: string
+  firstName?: string
+  lastName?: string
   preferredName?: string | null
   notes?: string | null
   avatar?: string
@@ -95,7 +97,6 @@ export interface Client {
   /** ISO string when consent was recorded */
   consentedAt?: string | null
   consentEmailVersion?: string | null
-  preferredName?: string
   room?: string | null
   moveInDate?: string | null
   emergencyContact?: { name?: string; relationship?: string; phone?: string; email?: string } | null

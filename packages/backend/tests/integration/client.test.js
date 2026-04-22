@@ -117,6 +117,8 @@ describe('Client routes', () => {
           id: expect.any(String),
           org: org.id.toString(),
           name: clientOne.name,
+          firstName: clientOne.firstName,
+          lastName: clientOne.lastName,
           email: clientOne.email,
           phone: clientOne.phone,
           isEmailVerified: false,
@@ -308,6 +310,8 @@ describe('Client routes', () => {
       expect(res.body).toMatchObject({
         id: client.id,
         name: updateBody.name,
+        firstName: 'Updated',
+        lastName: 'Name',
         email: updateBody.email.toLowerCase(),
         phone: client.phone,
       });

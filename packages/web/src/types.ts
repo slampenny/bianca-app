@@ -8,6 +8,10 @@ export interface Resident {
   id: string
   firstName: string
   lastName: string
+  /** Preferred name if set, else legal first — see displayName for full label */
+  preferredName: string | null
+  /** List / card label: preferred or first + last name */
+  displayName: string
   age: number
   room: string
   status: "active" | "inactive" | "at_risk"

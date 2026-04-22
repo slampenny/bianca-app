@@ -11,14 +11,26 @@ import residentsJson from "../data/residents.json"
 import transcriptsJson from "../data/transcripts.json"
 import { SEED_ALERT } from "../data/seedAlert"
 import { generateActivityFeed, randomCallActivity } from "../lib/activityFeed"
+import { clientDisplayName } from "../lib/clientDisplayName"
 import type { DemoAction, DemoState, Resident, Transcript } from "../types"
 
 function normalizeResidents(list: Resident[]): Resident[] {
-  return list.map((r) =>
-    r.firstName === "Margaret" && r.lastName === "Thompson"
-      ? { ...r, status: "active", riskLevel: "none", riskType: null }
-      : r,
-  )
+  return list.map((r) => {
+    const preferredName =
+      "preferredName" in r && r.preferredName != null && r.preferredName !== ""
+        ? String(r.preferredName)
+        : null
+    const displayName = clientDisplayName({
+      name: `${r.firstName} ${r.lastName}`.trim(),
+      preferredName,
+      firstName: r.firstName,
+      lastName: r.lastName,
+    })
+    const base: Resident = { ...r, preferredName, displayName }
+    return base.firstName === "Margaret" && base.lastName === "Thompson"
+      ? { ...base, status: "active", riskLevel: "none", riskType: null }
+      : base
+  })
 }
 
 function demoReducer(state: DemoState, action: DemoAction): DemoState {

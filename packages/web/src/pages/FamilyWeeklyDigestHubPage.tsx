@@ -1,14 +1,9 @@
 import { useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
+import { clientDisplayName } from "../lib/clientDisplayName"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import { ChevronLeftIcon } from "../icons"
 import "../app.css"
-
-function clientDisplayName(c: { preferredName?: string | null; name: string }): string {
-  const pref = c.preferredName?.trim()
-  if (pref) return pref
-  return c.name?.trim() || "Resident"
-}
 
 export function FamilyWeeklyDigestHubPage() {
   const navigate = useNavigate()

@@ -3,7 +3,8 @@ import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { apiRecordId, mapClientToResident } from "../lib/liveData"
+import { clientInitialsFromClient } from "../lib/clientDisplayName"
+import { apiRecordId, mapClientToResident, splitName } from "../lib/liveData"
 import { intervalsForDraft, weekdayShortLabel } from "../lib/scheduleDraft"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import { CONSENT_BULLETS } from "../data/residentMock"
@@ -55,7 +56,8 @@ export function ResidentDetailPage() {
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("sentiment")
   const [editing, setEditing] = useState(false)
   const [saveError, setSaveError] = useState("")
-  const [residentName, setResidentName] = useState("")
+  const [residentFirstName, setResidentFirstName] = useState("")
+  const [residentLastName, setResidentLastName] = useState("")
   const [residentPreferredName, setResidentPreferredName] = useState("")
   const [residentAge, setResidentAge] = useState("")
   const [residentNotes, setResidentNotes] = useState("")
@@ -149,7 +151,12 @@ export function ResidentDetailPage() {
 
   useEffect(() => {
     if (!apiClient) return
-    setResidentName(apiClient.name || "")
+    const fromApi = apiClient.firstName != null && String(apiClient.firstName).trim() !== ""
+    const parts = fromApi
+      ? { firstName: String(apiClient.firstName).trim(), lastName: (apiClient.lastName && String(apiClient.lastName).trim()) || "" }
+      : splitName(apiClient.name)
+    setResidentFirstName(parts.firstName)
+    setResidentLastName(parts.lastName)
     setResidentPreferredName(apiClient.preferredName || "")
     setResidentAge(apiClient.age == null ? "" : String(apiClient.age))
     setResidentNotes(apiClient.notes || "")
@@ -294,8 +301,12 @@ export function ResidentDetailPage() {
     )
   }
 
-  const initials = `${resident.firstName[0] ?? "?"}${resident.lastName[0] ?? ""}`
-  const displayName = `${resident.firstName} ${resident.lastName}`.trim()
+  const displayName = resident.displayName
+  const initials = clientInitialsFromClient({
+    preferredName: apiClient.preferredName,
+    firstName: resident.firstName,
+    lastName: resident.lastName,
+  })
 
   const onSaveResident = async (e: FormEvent) => {
     e.preventDefault()
@@ -305,7 +316,8 @@ export function ResidentDetailPage() {
       await patchClient({
         clientId: apiClient.id,
         body: {
-          name: residentName.trim(),
+          firstName: residentFirstName.trim(),
+          lastName: residentLastName.trim(),
           preferredName: residentPreferredName.trim() || undefined,
           age: residentAge.trim() ? Number(residentAge) : undefined,
           notes: residentNotes.trim() || undefined,
@@ -515,13 +527,30 @@ export function ResidentDetailPage() {
           <form onSubmit={(e) => void onSaveResident(e)} style={{ display: "grid", gap: "0.75rem" }}>
             <AvatarPicker
               label="Resident photo"
-              initialsSource={residentPreferredName || residentName || "?"}
+              initialsSource={residentPreferredName || residentFirstName || "?"}
               existingAvatarUrl={apiClient?.avatar}
               onPick={setResidentAvatarFile}
             />
             <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Name
-              <input className="va-login-input" type="text" value={residentName} onChange={(e) => setResidentName(e.target.value)} required />
+              First name
+              <input
+                className="va-login-input"
+                type="text"
+                value={residentFirstName}
+                onChange={(e) => setResidentFirstName(e.target.value)}
+                required
+                autoComplete="given-name"
+              />
+            </label>
+            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
+              Last name
+              <input
+                className="va-login-input"
+                type="text"
+                value={residentLastName}
+                onChange={(e) => setResidentLastName(e.target.value)}
+                autoComplete="family-name"
+              />
             </label>
             <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
               Preferred name
@@ -834,6 +863,16 @@ export function ResidentDetailPage() {
           className="va-res-grid"
         >
           <div>
+            <InfoRow
+              icon={<MessageIcon size={16} />}
+              label="Legal name"
+              value={`${resident.firstName} ${resident.lastName}`.trim() || "—"}
+            />
+            <InfoRow
+              icon={<MessageIcon size={16} />}
+              label="Preferred name"
+              value={apiClient.preferredName?.trim() || "—"}
+            />
             <InfoRow icon={<PhoneIcon size={16} />} label="Phone" value={resident.phone} />
             <InfoRow icon={<MessageIcon size={16} />} label="Email" value={apiClient.email || "—"} />
             <InfoRow
