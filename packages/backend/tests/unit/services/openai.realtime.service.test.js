@@ -297,6 +297,8 @@ describe('OpenAI Realtime Service', () => {
       const connection = service.connections.get(mockCallId);
       connection.sessionReady = true;
       connection.webSocket = mockWebSocket;
+      // Production gates user mic until first assistant output; tests send without that event.
+      connection._userInputToOpenAIAllowed = true;
     });
 
     it('should send audio chunk successfully', async () => {
@@ -336,8 +338,8 @@ describe('OpenAI Realtime Service', () => {
       
       await service.sendAudioChunk(mockCallId, mockAudioData);
       
-      // Should queue the audio chunk
-      expect(service.pendingAudio.get(mockCallId)).toContain(mockAudioData);
+      // Pre-session audio is dropped (not queued) to avoid flush-before-greeting overlap
+      expect(service.pendingAudio.get(mockCallId) || []).toHaveLength(0);
     });
 
     it('should handle bypass buffering', async () => {

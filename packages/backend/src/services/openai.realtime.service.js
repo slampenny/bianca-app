@@ -557,6 +557,8 @@ class OpenAIRealtimeService {
       _userHasSpoken: false, // Track if user has spoken to trigger first response
       _waitingForInitialGreeting: true, // Track if we're waiting for Bianca's initial greeting
       _initialGreetingTriggered: false, // Prevent multiple initial greeting triggers
+      /** Set true on first response.output_audio.delta; until then, user mic is not sent to input_audio_buffer (no pending queue). */
+      _userInputToOpenAIAllowed: false,
       _initialGreetingCompletedAt: null, // Track when initial greeting finished (to prevent lingering audio from triggering response)
 
       // CRITICAL: Speech end detection variables
@@ -1305,6 +1307,13 @@ class OpenAIRealtimeService {
                 `[RealtimeRC] first response.output_audio.delta callId=${callId} waitingForInitialGreeting=${Boolean(conn._waitingForInitialGreeting)} deltaLen=${message.delta?.length || 0}`
               );
             }
+
+            if (conn && !conn._userInputToOpenAIAllowed) {
+              conn._userInputToOpenAIAllowed = true;
+              logger.info(
+                `[OpenAI Realtime] User mic → OpenAI enabled for ${callId} (first assistant output audio delta received)`
+              );
+            }
             
             // Track that AI is speaking
             if (conn && !conn._aiIsSpeaking) {
@@ -1352,6 +1361,12 @@ class OpenAIRealtimeService {
             this._clearAiAudioCompleteDebounceTimer(conn);
             conn._aiAudioComplete = true;
             logger.info(`[RealtimeRC] ${callId}: _aiAudioComplete=true (response.output_audio.done)`);
+            if (!conn._userInputToOpenAIAllowed) {
+              conn._userInputToOpenAIAllowed = true;
+              logger.info(
+                `[OpenAI Realtime] User mic → OpenAI enabled (fallback: output_audio.done, no output_audio.delta) for ${callId}`
+              );
+            }
           }
           break;
 
@@ -2142,22 +2157,12 @@ class OpenAIRealtimeService {
       conn.audioChunksSent = 0;
       conn.validAudioChunksSent = 0;
 
-      // Caller audio received before session.updated was queued in pendingAudio. Flushing it here runs *before*
-      // _sendInitialGreetingIfNeeded — it fills OpenAI's input buffer while the greeting starts (phantom overlap /
-      // extra turns). After the initial greeting succeeded once, reconnects should flush again for real speech.
+      // Flush pending audio to OpenAI (this includes the user's "hello")
       const pendingAudio = this.pendingAudio.get(callId);
       if (pendingAudio && pendingAudio.length > 0) {
-        if (!conn._initialGreetingTriggered) {
-          logger.info(
-            `[OpenAI Realtime] Discarding ${pendingAudio.length} pre-ready audio chunks for ${callId} ` +
-              '(avoid stacking caller audio under initial greeting; normal streaming resumes after greeting)'
-          );
-          this.pendingAudio.set(callId, []);
-        } else {
-          logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} pending audio chunks for ${callId} (post-greeting session)`);
-          logger.info(`[OpenAI Realtime] First chunk size: ${pendingAudio[0]?.length || 0} bytes`);
-          await this.flushPendingAudio(callId);
-        }
+        logger.info(`[OpenAI Realtime] Flushing ${pendingAudio.length} pending audio chunks for ${callId} (includes user's initial speech)`);
+        logger.info(`[OpenAI Realtime] First chunk size: ${pendingAudio[0]?.length || 0} bytes`);
+        await this.flushPendingAudio(callId);
       } else {
         logger.info(`[OpenAI Realtime] No pending audio to flush for ${callId}`);
       }
@@ -3586,17 +3591,8 @@ class OpenAIRealtimeService {
       }
     }
 
-    // Buffer audio appends when session isn't ready
+    // Pre-session: do not buffer appends (see sendAudioChunk; flush-before-greeting caused overlap)
     if (messageObj.type === 'input_audio_buffer.append' && callId && conn && (!conn.sessionReady || conn._sessionSetupInProgress)) {
-      const pending = this.pendingAudio.get(callId) || [];
-      if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-        const audioData = messageObj.audio;
-        if (audioData) {
-          pending.push(audioData);
-          this.pendingAudio.set(callId, pending);
-          logger.debug(`[OpenAI Realtime] Buffered audio chunk for ${callId} (buffer size: ${pending.length})`);
-        }
-      }
       return Promise.resolve(true);
     }
 
@@ -3885,21 +3881,22 @@ class OpenAIRealtimeService {
     const canSendImmediately = conn.webSocket && conn.webSocket.readyState === WebSocket.OPEN && conn.sessionReady;
 
     if (!canSendImmediately) {
-      // Session not ready - buffer audio
-      const shouldBuffer = !bypassBuffering && conn.status !== 'closed' && conn.status !== 'error_terminal';
+      // Do not buffer pre-session audio: it all landed in one flush before the greeting and caused overlap/extra turns.
+      const nPre = (conn._dropPreSessionAudioLogged = (conn._dropPreSessionAudioLogged || 0) + 1);
+      if (nPre <= 3) {
+        logger.debug(
+          `[OpenAI Realtime] Dropping user audio chunk (session not ready) for ${callId} — no pendingAudio buffer`
+        );
+      }
+      return;
+    }
 
-      if (shouldBuffer) {
-        const pending = this.pendingAudio.get(callId) || [];
-        if (pending.length < CONSTANTS.MAX_PENDING_CHUNKS) {
-          pending.push(audioChunkBase64ULaw);
-          this.pendingAudio.set(callId, pending);
-
-          if (pending.length <= 10) {
-            logger.info(`[OpenAI Realtime] Buffered audio chunk #${pending.length} for ${callId}`);
-          }
-        } else {
-          logger.warn(`[OpenAI Realtime] Buffer full for ${callId}, dropping audio chunk`);
-        }
+    if (!bypassBuffering && !conn._userInputToOpenAIAllowed) {
+      const nGate = (conn._dropUntilAssistantAudioLogged = (conn._dropUntilAssistantAudioLogged || 0) + 1);
+      if (nGate <= 3) {
+        logger.debug(
+          `[OpenAI Realtime] Dropping user audio until first assistant output audio for ${callId} (bypass only for test/noise pipelines)`
+        );
       }
       return;
     }
