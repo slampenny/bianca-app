@@ -64,4 +64,35 @@ router.patch(
   adminController.setCaregiverRole,
 );
 
+/** Embedding anchor phrases (OpenAI text-embedding-3-large) — same defaults as legacy hardcoded ANCHOR_TREE, editable per env */
+router.get(
+  '/embedding-anchors',
+  auth(),
+  validate(adminValidation.embeddingAnchorsList),
+  adminController.listEmbeddingAnchorPhrases,
+);
+
+router.post(
+  '/embedding-anchors',
+  auth(),
+  validate(adminValidation.embeddingAnchorCreate),
+  adminController.createEmbeddingAnchorPhrase,
+);
+
+router.post('/embedding-anchors/merge-defaults', auth(), adminController.mergeDefaultEmbeddingAnchorPhrases);
+
+router.patch(
+  '/embedding-anchors/:phraseId',
+  auth(),
+  validate(adminValidation.embeddingAnchorUpdate),
+  adminController.updateEmbeddingAnchorPhrase,
+);
+
+router.delete(
+  '/embedding-anchors/:phraseId',
+  auth(),
+  validate(adminValidation.embeddingAnchorIdParam),
+  adminController.deleteEmbeddingAnchorPhrase,
+);
+
 module.exports = router;

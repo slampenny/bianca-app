@@ -1,11 +1,20 @@
 /**
  * Embedding-based anchor similarity for emergency, abuse/neglect, financial, and relationship-pattern detectors.
+ * Phrase text is stored in Mongo (EmbeddingAnchorPhrase), seeded from defaults when empty; editable via admin API.
  * Uses OpenAI text-embedding-3-large; callers must await initialize() before use.
  */
+const mongoose = require('mongoose');
 const { getOpenAIConstructor } = require('../utils/openaiSdk');
 const OpenAI = getOpenAIConstructor();
 const logger = require('../config/logger');
 const config = require('../config/config');
+const {
+  ANCHOR_TREE,
+  flattenListFromTree,
+  countUniquePhrasesInTree,
+  flattenPhraseList,
+  countUniquePhrases,
+} = require('../config/embeddingAnchor.defaults');
 
 const EMBEDDING_MODEL = 'text-embedding-3-large';
 
@@ -14,205 +23,6 @@ const ABUSE_HIGH_FP_BUCKETS = {
   basicNeeds: 0.82,
   medicalCare: 0.82,
 };
-
-/**
- * Flat anchor phrases per detector / bucket. Embeddings are computed per unique phrase at init.
- */
-const ANCHOR_TREE = {
-  emergencyDetector: {
-    medical_emergency: {
-      severity: 'CRITICAL',
-      category: 'medical_emergency',
-      phrases: [
-        'heart attack',
-        'myocardial infarction',
-        'having a heart attack',
-        'stroke right now',
-        'severe stroke',
-        'cannot breathe emergency',
-        'overdose',
-        'severe chest pain',
-        'crushing chest pain',
-      ],
-    },
-    breathing: {
-      severity: 'CRITICAL',
-      category: 'medical_emergency',
-      phrases: ["can't breathe", 'cannot breathe', 'choking', 'not getting air'],
-    },
-    self_harm: {
-      severity: 'CRITICAL',
-      category: 'self_harm',
-      phrases: [
-        'kill myself',
-        'want to die',
-        'end my life',
-        'suicide',
-        'hurt myself on purpose',
-        'self harm',
-      ],
-    },
-    physical_acute: {
-      severity: 'HIGH',
-      category: 'physical_acute',
-      phrases: [
-        'fell and cannot get up',
-        'severe pain right now',
-        'unbearable pain',
-        'bleeding heavily',
-        'passed out',
-      ],
-    },
-    request_urgent: {
-      severity: 'MEDIUM',
-      category: 'Request',
-      phrases: ['call 911 now', 'need an ambulance immediately', 'emergency help right now'],
-    },
-    third_party_emergency: {
-      severity: 'HIGH',
-      category: 'medical_emergency',
-      phrases: [
-        'someone collapsed',
-        'roommate not breathing',
-        'person next to me unconscious',
-        'they are having a heart attack',
-      ],
-    },
-    passive_ideation: {
-      severity: 'HIGH',
-      category: 'self_harm',
-      phrases: [
-        'wish I was dead',
-        'no point living',
-        'better off dead',
-        'thoughts of hurting myself',
-      ],
-    },
-  },
-  abuseNeglectDetector: {
-    physical: {
-      injuries: ['hit me', 'slapped me', 'bruises on my arms', 'someone hurt me'],
-      fearOfPerson: ['afraid of the aide', 'scared when they come in'],
-      punishment: ['punished me', 'taught me a lesson'],
-    },
-    emotional: {
-      emotionalIsolation: ['not allowed to call my daughter', 'forbidden to leave'],
-      control: ['controls everything I do', 'won’t let me choose'],
-      threats: ['threatened me', 'said they would hurt me'],
-      belittling: ['worthless', 'stupid', 'burden to everyone'],
-      fearLanguage: ['walking on eggshells', 'afraid to speak'],
-    },
-    neglect: {
-      basicNeeds: [
-        'no food for two days',
-        'left hungry',
-        'no water',
-        'no heat in winter',
-      ],
-      medicalCare: [
-        'cannot see a doctor',
-        'missed all my medications',
-        'no medical care',
-      ],
-      neglectIsolation: ['no one visits', 'abandoned here'],
-      timeAlone: ['alone for weeks', 'no staff for hours'],
-    },
-  },
-  financialExploitationDetector: {
-    scamIndicators: [
-      'irs demanding payment in gift cards',
-      'you won the lottery send fee',
-      'grandchild in jail wire money',
-      'social security number verify now',
-    ],
-    urgencyLanguage: [
-      'act now or lose everything',
-      'do not tell anyone',
-      'deadline today only',
-      'urgent send money immediately',
-    ],
-    transferMethods: [
-      'wire transfer to this account',
-      'buy gift cards and read numbers',
-      'bitcoin wallet address',
-      'western union payment',
-    ],
-    helpRequests: [
-      'lend me five thousand dollars',
-      'need emergency loan today',
-      'borrow money from your account',
-    ],
-    largeAmounts: [
-      'send ten thousand dollars',
-      'fifty thousand dollar wire',
-    ],
-    relationshipMoney: [
-      'new friend online needs money',
-      'person I met asked me to send cash',
-    ],
-  },
-  /**
-   * Relationship / exploitation-adjacent social patterns (flat buckets; one score per key).
-   */
-  relationshipPatternDetector: {
-    newPeople: [
-      'I met someone new online who messages me every day',
-      'A new person in my life wants me to keep it secret',
-      'A stranger I just met is asking for my help',
-    ],
-    isolation: [
-      'Nobody comes to visit me anymore',
-      'I am not allowed to see my family or friends',
-      'I feel cut off from everyone I know',
-    ],
-    control: [
-      'They control everything I do in this house',
-      'I have to ask permission to leave or call anyone',
-      'They decide who I am allowed to talk to',
-    ],
-    dependency: [
-      'They are the only one who can help me',
-      'I have nobody else to turn to I rely on them for everything',
-      'If they leave I have no one I depend on them completely',
-    ],
-    suspiciousBehavior: [
-      'They want me to send money to a new account',
-      'They keep asking for my PIN and bank information',
-      'They asked me to buy gift cards and read the numbers',
-    ],
-  },
-};
-
-function flattenPhraseList() {
-  const list = [];
-  const emergency = ANCHOR_TREE.emergencyDetector;
-  Object.keys(emergency).forEach((bucket) => {
-    emergency[bucket].phrases.forEach((p) => list.push({ detector: 'emergencyDetector', bucket, phrase: p }));
-  });
-  const abuse = ANCHOR_TREE.abuseNeglectDetector;
-  Object.keys(abuse).forEach((cat) => {
-    Object.keys(abuse[cat]).forEach((bucket) => {
-      abuse[cat][bucket].forEach((p) =>
-        list.push({ detector: 'abuseNeglectDetector', category: cat, bucket, phrase: p })
-      );
-    });
-  });
-  const fin = ANCHOR_TREE.financialExploitationDetector;
-  Object.keys(fin).forEach((bucket) => {
-    fin[bucket].forEach((p) => list.push({ detector: 'financialExploitationDetector', bucket, phrase: p }));
-  });
-  const rel = ANCHOR_TREE.relationshipPatternDetector;
-  Object.keys(rel).forEach((bucket) => {
-    rel[bucket].forEach((p) => list.push({ detector: 'relationshipPatternDetector', bucket, phrase: p }));
-  });
-  return list;
-}
-
-function countUniquePhrases() {
-  const seen = new Set();
-  flattenPhraseList().forEach((x) => seen.add(x.phrase));
-  return seen.size;
-}
 
 /**
  * Cosine similarity for equal-length number arrays.
@@ -237,9 +47,14 @@ class EmbeddingAnchorService {
     this.initialized = false;
     /** phrase -> Float32Array or number[] */
     this.phraseVectors = new Map();
-    /** detector -> bucketKey -> max phrase list (for getAnchors) */
-    this._flatList = flattenPhraseList();
+    /** resolved at initialize from DB or defaults */
+    this._runtimeTree = null;
+    this._flatList = null;
     this.totalUniquePhrases = countUniquePhrases();
+  }
+
+  getTree() {
+    return this._runtimeTree != null ? this._runtimeTree : ANCHOR_TREE;
   }
 
   getOpenAI() {
@@ -247,6 +62,17 @@ class EmbeddingAnchorService {
       this.openai = new OpenAI({ apiKey: config.openai.apiKey });
     }
     return this.openai;
+  }
+
+  /**
+   * Clear cached vectors and runtime tree so the next initialize() reloads from DB/defaults.
+   */
+  forceReload() {
+    this.initialized = false;
+    this.phraseVectors.clear();
+    this._runtimeTree = null;
+    this._flatList = null;
+    this.totalUniquePhrases = countUniquePhrases();
   }
 
   /**
@@ -267,9 +93,27 @@ class EmbeddingAnchorService {
     const client = this.getOpenAI();
     if (!client) {
       logger.warn('[EmbeddingAnchor] OpenAI not configured; anchor embeddings unavailable');
+      this._runtimeTree = ANCHOR_TREE;
+      this._flatList = flattenListFromTree(this._runtimeTree);
+      this.totalUniquePhrases = countUniquePhrasesInTree(this._runtimeTree);
       this.initialized = true;
       return;
     }
+
+    const phraseMod = require('./embeddingAnchorPhrase.service');
+    if (mongoose.connection.readyState === 1) {
+      try {
+        await phraseMod.seedIfEmpty();
+        this._runtimeTree = await phraseMod.loadRuntimeTreeFromDatabase();
+      } catch (e) {
+        logger.error(`[EmbeddingAnchor] Failed to load phrases from DB, using static defaults: ${e.message}`);
+        this._runtimeTree = ANCHOR_TREE;
+      }
+    } else {
+      this._runtimeTree = ANCHOR_TREE;
+    }
+
+    this._flatList = flattenListFromTree(this._runtimeTree);
     const unique = [...new Set(this._flatList.map((x) => x.phrase))];
     for (const phrase of unique) {
       const res = await client.embeddings.create({
@@ -278,6 +122,7 @@ class EmbeddingAnchorService {
       });
       this.phraseVectors.set(phrase, res.data[0].embedding);
     }
+    this.totalUniquePhrases = unique.length;
     this.initialized = true;
     logger.info(`[EmbeddingAnchor] Initialized ${unique.length} unique anchor embeddings`);
   }
@@ -286,9 +131,10 @@ class EmbeddingAnchorService {
    * @returns {{ phrase: string, vector: number[] }[]}
    */
   getAnchors(detectorName, category, bucket) {
+    const tree = this.getTree();
     const out = [];
     if (detectorName === 'abuseNeglectDetector') {
-      const phrases = ANCHOR_TREE.abuseNeglectDetector[category]?.[bucket] || [];
+      const phrases = tree.abuseNeglectDetector[category]?.[bucket] || [];
       phrases.forEach((phrase) => {
         const vector = this.phraseVectors.get(phrase);
         if (vector) out.push({ phrase, vector });
@@ -296,7 +142,7 @@ class EmbeddingAnchorService {
       return out;
     }
     if (detectorName === 'emergencyDetector') {
-      const block = ANCHOR_TREE.emergencyDetector[bucket];
+      const block = tree.emergencyDetector[bucket];
       if (!block) return [];
       block.phrases.forEach((phrase) => {
         const vector = this.phraseVectors.get(phrase);
@@ -305,7 +151,7 @@ class EmbeddingAnchorService {
       return out;
     }
     if (detectorName === 'financialExploitationDetector') {
-      const list = ANCHOR_TREE.financialExploitationDetector[bucket] || [];
+      const list = tree.financialExploitationDetector[bucket] || [];
       list.forEach((phrase) => {
         const vector = this.phraseVectors.get(phrase);
         if (vector) out.push({ phrase, vector });
@@ -313,7 +159,7 @@ class EmbeddingAnchorService {
       return out;
     }
     if (detectorName === 'relationshipPatternDetector') {
-      const list = ANCHOR_TREE.relationshipPatternDetector[bucket] || [];
+      const list = tree.relationshipPatternDetector[bucket] || [];
       list.forEach((phrase) => {
         const vector = this.phraseVectors.get(phrase);
         if (vector) out.push({ phrase, vector });
@@ -323,10 +169,6 @@ class EmbeddingAnchorService {
     return out;
   }
 
-  /**
-   * Max cosine similarity between query vector and all anchor vectors in each bucket.
-   * @returns string[] bucket keys meeting threshold rules
-   */
   getMatchingBuckets(queryVector, detectorName, baseThreshold = 0.78) {
     if (!queryVector) return [];
     const scores = this._scoreAllBucketsInternal(queryVector, detectorName);
@@ -341,24 +183,22 @@ class EmbeddingAnchorService {
     return matched;
   }
 
-  /**
-   * Exposed for detectors / tests: raw max cosine per bucket name.
-   */
   getBucketScores(queryVector, detectorName) {
     return this._scoreAllBucketsInternal(queryVector, detectorName);
   }
 
   _scoreAllBucketsInternal(queryVector, detectorName) {
+    const tree = this.getTree();
     const scores = {};
     if (detectorName === 'emergencyDetector') {
-      Object.keys(ANCHOR_TREE.emergencyDetector).forEach((bucket) => {
+      Object.keys(tree.emergencyDetector).forEach((bucket) => {
         const anchors = this.getAnchors('emergencyDetector', null, bucket);
         scores[bucket] = this._maxSim(queryVector, anchors);
       });
       return scores;
     }
     if (detectorName === 'abuseNeglectDetector') {
-      const abuse = ANCHOR_TREE.abuseNeglectDetector;
+      const abuse = tree.abuseNeglectDetector;
       Object.keys(abuse).forEach((cat) => {
         Object.keys(abuse[cat]).forEach((bucket) => {
           const anchors = this.getAnchors('abuseNeglectDetector', cat, bucket);
@@ -368,14 +208,14 @@ class EmbeddingAnchorService {
       return scores;
     }
     if (detectorName === 'financialExploitationDetector') {
-      Object.keys(ANCHOR_TREE.financialExploitationDetector).forEach((bucket) => {
+      Object.keys(tree.financialExploitationDetector).forEach((bucket) => {
         const anchors = this.getAnchors('financialExploitationDetector', null, bucket);
         scores[bucket] = this._maxSim(queryVector, anchors);
       });
       return scores;
     }
     if (detectorName === 'relationshipPatternDetector') {
-      Object.keys(ANCHOR_TREE.relationshipPatternDetector).forEach((bucket) => {
+      Object.keys(tree.relationshipPatternDetector).forEach((bucket) => {
         const anchors = this.getAnchors('relationshipPatternDetector', null, bucket);
         scores[bucket] = this._maxSim(queryVector, anchors);
       });
@@ -393,9 +233,6 @@ class EmbeddingAnchorService {
     return max;
   }
 
-  /**
-   * Per-bucket max similarity scores for tuning (manual script).
-   */
   async scoreAgainstAllBuckets(text) {
     await this.initialize();
     const q = await this.embedText(text);
@@ -408,7 +245,7 @@ class EmbeddingAnchorService {
   }
 
   getEmergencyMetaForBucket(bucketKey) {
-    const b = ANCHOR_TREE.emergencyDetector[bucketKey];
+    const b = this.getTree().emergencyDetector[bucketKey];
     if (!b) return { severity: 'HIGH', category: 'medical_emergency', matchedPhrase: 'emergency similarity' };
     return {
       severity: b.severity,
@@ -417,13 +254,13 @@ class EmbeddingAnchorService {
     };
   }
 
-  /** Pick highest severity bucket from matched bucket names */
   getHighestSeverityEmergencyBucket(matchedBuckets) {
     const order = { CRITICAL: 3, HIGH: 2, MEDIUM: 1 };
+    const tree = this.getTree();
     let best = null;
     let bestScore = -1;
     matchedBuckets.forEach((bk) => {
-      const meta = ANCHOR_TREE.emergencyDetector[bk];
+      const meta = tree.emergencyDetector[bk];
       if (!meta) return;
       const s = order[meta.severity] || 0;
       if (s > bestScore) {
@@ -432,7 +269,7 @@ class EmbeddingAnchorService {
       }
     });
     if (!best) return this.getEmergencyMetaForBucket(matchedBuckets[0]);
-    const m = ANCHOR_TREE.emergencyDetector[best];
+    const m = tree.emergencyDetector[best];
     return {
       severity: m.severity,
       category: m.category,
@@ -441,8 +278,26 @@ class EmbeddingAnchorService {
   }
 }
 
+let singleton = null;
+function getEmbeddingAnchorService() {
+  if (!singleton) {
+    // Runtime self-require so Jest can substitute EmbeddingAnchorService with a mock (partial mock does not
+    // replace the constructor reference used by lexical new EmbeddingAnchorService in this file).
+    const { EmbeddingAnchorService: Ctor } = require('./embeddingAnchor.service');
+    singleton = new Ctor();
+  }
+  return singleton;
+}
+
+/** Test-only: clears singleton so Jest mocks of EmbeddingAnchorService apply to the next getEmbeddingAnchorService(). */
+function resetEmbeddingAnchorServiceForTests() {
+  singleton = null;
+}
+
 module.exports = {
   EmbeddingAnchorService,
+  getEmbeddingAnchorService,
+  resetEmbeddingAnchorServiceForTests,
   cosineSimilarity,
   ANCHOR_TREE,
   countUniquePhrases,

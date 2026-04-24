@@ -4,7 +4,7 @@ const natural = require('natural');
 const logger = require('../../config/logger');
 const appConfig = require('../../config/config');
 const { useKeywordBasedDetectors } = require('../../utils/detectionMode');
-const { EmbeddingAnchorService, ABUSE_HIGH_FP_BUCKETS } = require('../embeddingAnchor.service');
+const { getEmbeddingAnchorService, ABUSE_HIGH_FP_BUCKETS } = require('../embeddingAnchor.service');
 
 /**
  * Abuse and Neglect Detector Service
@@ -600,7 +600,7 @@ class AbuseNeglectDetector {
    */
   async analyze(text, _clientId) {
     try {
-      const svc = new EmbeddingAnchorService();
+      const svc = getEmbeddingAnchorService();
       await svc.initialize();
       const q = await svc.embedText(text);
       if (!q) {

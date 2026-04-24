@@ -8,6 +8,7 @@ const scimService = require('../services/scim.service');
 const { AlertDTO, CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall } = require('../dtos');
 const { AuditLog, Caregiver } = require('../models');
 const logger = require('../config/logger');
+const embeddingAnchorPhraseService = require('../services/embeddingAnchorPhrase.service');
 
 function assertSuperAdmin(req) {
   if (req.caregiver.role !== 'superAdmin') {
@@ -294,6 +295,36 @@ const setCaregiverRole = catchAsync(async (req, res) => {
   res.send({ ...dto, id: dto.id != null ? String(dto.id) : undefined });
 });
 
+const listEmbeddingAnchorPhrases = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const rows = await embeddingAnchorPhraseService.listPhrases({ detector: req.query.detector });
+  res.send(rows);
+});
+
+const createEmbeddingAnchorPhrase = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const row = await embeddingAnchorPhraseService.createPhrase(req.body);
+  res.status(httpStatus.CREATED).send(row);
+});
+
+const updateEmbeddingAnchorPhrase = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const row = await embeddingAnchorPhraseService.updatePhrase(req.params.phraseId, req.body);
+  res.send(row);
+});
+
+const deleteEmbeddingAnchorPhrase = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const out = await embeddingAnchorPhraseService.deletePhrase(req.params.phraseId);
+  res.send(out);
+});
+
+const mergeDefaultEmbeddingAnchorPhrases = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const out = await embeddingAnchorPhraseService.mergeMissingFromDefaults();
+  res.send(out);
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -304,4 +335,9 @@ module.exports = {
   sendSuperAdminInvite,
   impersonate,
   setCaregiverRole,
+  listEmbeddingAnchorPhrases,
+  createEmbeddingAnchorPhrase,
+  updateEmbeddingAnchorPhrase,
+  deleteEmbeddingAnchorPhrase,
+  mergeDefaultEmbeddingAnchorPhrases,
 };

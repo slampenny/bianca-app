@@ -125,6 +125,9 @@ export function ScimProvisioningPage() {
           <Link to="/" className="admin-btn admin-btn--ghost">
             Observability
           </Link>
+          <Link to="/embedding-anchors" className="admin-btn admin-btn--ghost">
+            Embedding anchors
+          </Link>
           <Link to="/impersonate" className="admin-btn admin-btn--ghost">
             Sign in as user
           </Link>

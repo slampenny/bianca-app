@@ -92,3 +92,27 @@ export interface ObservabilityPayload {
     version: string
   }
 }
+
+export type EmbeddingAnchorDetector =
+  | "emergencyDetector"
+  | "abuseNeglectDetector"
+  | "financialExploitationDetector"
+  | "relationshipPatternDetector"
+
+export interface EmbeddingAnchorPhraseRow {
+  _id: string
+  detector: EmbeddingAnchorDetector
+  category: string | null
+  bucket: string
+  phrase: string
+  order: number
+  isActive: boolean
+  emergencySeverity?: "CRITICAL" | "HIGH" | "MEDIUM" | null
+  emergencyCategory?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface EmbeddingAnchorMergeResponse {
+  merged: number
+}

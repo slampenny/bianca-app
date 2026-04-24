@@ -5,12 +5,10 @@ const { getOpenAIConstructor } = require('../utils/openaiSdk');
 const OpenAI = getOpenAIConstructor();
 const logger = require('../config/logger');
 const config = require('../config/config');
-const { EmbeddingAnchorService } = require('./embeddingAnchor.service');
+const { getEmbeddingAnchorService } = require('./embeddingAnchor.service');
 
-let embeddingServiceSingleton = null;
 function getEmbeddingService() {
-  if (!embeddingServiceSingleton) embeddingServiceSingleton = new EmbeddingAnchorService();
-  return embeddingServiceSingleton;
+  return getEmbeddingAnchorService();
 }
 
 function getOpenAI() {

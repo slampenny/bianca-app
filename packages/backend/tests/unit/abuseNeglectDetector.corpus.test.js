@@ -9,7 +9,7 @@ jest.mock('../../src/services/embeddingAnchor.service', () => {
   };
 });
 
-const { EmbeddingAnchorService } = require('../../src/services/embeddingAnchor.service');
+const { EmbeddingAnchorService, resetEmbeddingAnchorServiceForTests } = require('../../src/services/embeddingAnchor.service');
 
 describe('AbuseNeglectDetector corpus', () => {
   let detector;
@@ -18,6 +18,7 @@ describe('AbuseNeglectDetector corpus', () => {
   let mockGetBucketScores;
 
   beforeEach(() => {
+    resetEmbeddingAnchorServiceForTests();
     detector = new AbuseNeglectDetector();
     mockInitialize = jest.fn().mockResolvedValue(undefined);
     mockEmbedText = jest.fn().mockResolvedValue([1, 0, 0]);

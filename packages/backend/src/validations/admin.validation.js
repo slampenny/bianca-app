@@ -50,6 +50,64 @@ const setCaregiverRole = {
   }),
 };
 
+const embeddingAnchorsList = {
+  query: Joi.object().keys({
+    detector: Joi.string()
+      .valid('emergencyDetector', 'abuseNeglectDetector', 'financialExploitationDetector', 'relationshipPatternDetector')
+      .optional(),
+  }),
+};
+
+const embeddingAnchorCreate = {
+  body: Joi.object()
+    .keys({
+      detector: Joi.string()
+        .valid('emergencyDetector', 'abuseNeglectDetector', 'financialExploitationDetector', 'relationshipPatternDetector')
+        .required(),
+      category: Joi.when('detector', {
+        is: 'abuseNeglectDetector',
+        then: Joi.string().valid('physical', 'emotional', 'neglect').required(),
+        otherwise: Joi.valid(null, '').optional(),
+      }),
+      bucket: Joi.string().trim().min(1).max(200).required(),
+      phrase: Joi.string().trim().min(1).max(8000).required(),
+      order: Joi.number().integer().min(0).optional(),
+      isActive: Joi.boolean().optional(),
+      emergencySeverity: Joi.string()
+        .valid('CRITICAL', 'HIGH', 'MEDIUM')
+        .when('detector', { is: 'emergencyDetector', then: Joi.required(), otherwise: Joi.forbidden() }),
+      emergencyCategory: Joi.string()
+        .trim()
+        .max(200)
+        .when('detector', { is: 'emergencyDetector', then: Joi.required(), otherwise: Joi.forbidden() }),
+    })
+    .required(),
+};
+
+const embeddingAnchorIdParam = {
+  params: Joi.object().keys({
+    phraseId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const embeddingAnchorUpdate = {
+  ...embeddingAnchorIdParam,
+  body: Joi.object()
+    .keys({
+      detector: Joi.string()
+        .valid('emergencyDetector', 'abuseNeglectDetector', 'financialExploitationDetector', 'relationshipPatternDetector')
+        .optional(),
+      category: Joi.string().valid('physical', 'emotional', 'neglect').allow(null).optional(),
+      bucket: Joi.string().trim().min(1).max(200).optional(),
+      phrase: Joi.string().trim().min(1).max(8000).optional(),
+      order: Joi.number().integer().min(0).optional(),
+      isActive: Joi.boolean().optional(),
+      emergencySeverity: Joi.string().valid('CRITICAL', 'HIGH', 'MEDIUM').allow(null).optional(),
+      emergencyCategory: Joi.string().trim().max(200).allow('', null).optional(),
+    })
+    .min(1),
+};
+
 module.exports = {
   searchCaregivers,
   impersonate,
@@ -57,4 +115,8 @@ module.exports = {
   orgIdParam,
   sendSuperAdminInvite,
   setCaregiverRole,
+  embeddingAnchorsList,
+  embeddingAnchorCreate,
+  embeddingAnchorIdParam,
+  embeddingAnchorUpdate,
 };

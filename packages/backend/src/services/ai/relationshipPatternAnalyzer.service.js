@@ -4,7 +4,7 @@ const natural = require('natural');
 const logger = require('../../config/logger');
 const appConfig = require('../../config/config');
 const { useKeywordBasedDetectors } = require('../../utils/detectionMode');
-const { EmbeddingAnchorService } = require('../embeddingAnchor.service');
+const { getEmbeddingAnchorService } = require('../embeddingAnchor.service');
 
 /**
  * Relationship Pattern Analyzer Service
@@ -71,7 +71,7 @@ class RelationshipPatternAnalyzer {
     if (!appConfig.openai?.apiKey) {
       return { ...this.getDefaultMetrics(), confidence: 'low' };
     }
-    const svc = new EmbeddingAnchorService();
+    const svc = getEmbeddingAnchorService();
     await svc.initialize();
     const q = await svc.embedText(combinedText);
     if (!q) {

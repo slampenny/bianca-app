@@ -3,6 +3,8 @@ import type {
   AdminCaregiverSearchResponse,
   AdminCaregiverSearchRow,
   AdminOrgSearchResponse,
+  EmbeddingAnchorMergeResponse,
+  EmbeddingAnchorPhraseRow,
   ImpersonateResponse,
   ObservabilityPayload,
   ScimAdminStatus,
@@ -13,7 +15,7 @@ import baseQueryWithAuth from "./baseQueryWithAuth"
 export const adminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: baseQueryWithAuth(),
-  tagTypes: ["Observability", "Scim"],
+  tagTypes: ["Observability", "Scim", "EmbeddingAnchors"],
   endpoints: (builder) => ({
     getObservability: builder.query<ObservabilityPayload, void>({
       query: () => ({
@@ -84,6 +86,47 @@ export const adminApi = createApi({
         body,
       }),
     }),
+    getEmbeddingAnchorPhrases: builder.query<EmbeddingAnchorPhraseRow[], { detector?: string } | void>({
+      query: (params) => ({
+        url: "/admin/embedding-anchors",
+        method: "GET",
+        params: params && params.detector ? { detector: params.detector } : undefined,
+      }),
+      providesTags: ["EmbeddingAnchors"],
+    }),
+    createEmbeddingAnchorPhrase: builder.mutation<EmbeddingAnchorPhraseRow, Partial<EmbeddingAnchorPhraseRow>>({
+      query: (body) => ({
+        url: "/admin/embedding-anchors",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["EmbeddingAnchors"],
+    }),
+    updateEmbeddingAnchorPhrase: builder.mutation<
+      EmbeddingAnchorPhraseRow,
+      { phraseId: string; body: Partial<EmbeddingAnchorPhraseRow> }
+    >({
+      query: ({ phraseId, body }) => ({
+        url: `/admin/embedding-anchors/${phraseId}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: ["EmbeddingAnchors"],
+    }),
+    deleteEmbeddingAnchorPhrase: builder.mutation<{ deleted: boolean; id: string }, string>({
+      query: (phraseId) => ({
+        url: `/admin/embedding-anchors/${phraseId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["EmbeddingAnchors"],
+    }),
+    mergeEmbeddingAnchorDefaults: builder.mutation<EmbeddingAnchorMergeResponse, void>({
+      query: () => ({
+        url: "/admin/embedding-anchors/merge-defaults",
+        method: "POST",
+      }),
+      invalidatesTags: ["EmbeddingAnchors"],
+    }),
   }),
 })
 
@@ -98,4 +141,9 @@ export const {
   useImpersonateCaregiverMutation,
   useUpdateCaregiverRoleMutation,
   useSendSuperAdminInviteMutation,
+  useGetEmbeddingAnchorPhrasesQuery,
+  useCreateEmbeddingAnchorPhraseMutation,
+  useUpdateEmbeddingAnchorPhraseMutation,
+  useDeleteEmbeddingAnchorPhraseMutation,
+  useMergeEmbeddingAnchorDefaultsMutation,
 } = adminApi
