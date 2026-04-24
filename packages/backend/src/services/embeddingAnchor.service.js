@@ -1,5 +1,5 @@
 /**
- * Embedding-based anchor similarity for emergency, abuse/neglect, and financial detectors.
+ * Embedding-based anchor similarity for emergency, abuse/neglect, financial, and relationship-pattern detectors.
  * Uses OpenAI text-embedding-3-large; callers must await initialize() before use.
  */
 const { getOpenAIConstructor } = require('../utils/openaiSdk');
@@ -151,6 +151,36 @@ const ANCHOR_TREE = {
       'person I met asked me to send cash',
     ],
   },
+  /**
+   * Relationship / exploitation-adjacent social patterns (flat buckets; one score per key).
+   */
+  relationshipPatternDetector: {
+    newPeople: [
+      'I met someone new online who messages me every day',
+      'A new person in my life wants me to keep it secret',
+      'A stranger I just met is asking for my help',
+    ],
+    isolation: [
+      'Nobody comes to visit me anymore',
+      'I am not allowed to see my family or friends',
+      'I feel cut off from everyone I know',
+    ],
+    control: [
+      'They control everything I do in this house',
+      'I have to ask permission to leave or call anyone',
+      'They decide who I am allowed to talk to',
+    ],
+    dependency: [
+      'They are the only one who can help me',
+      'I have nobody else to turn to I rely on them for everything',
+      'If they leave I have no one I depend on them completely',
+    ],
+    suspiciousBehavior: [
+      'They want me to send money to a new account',
+      'They keep asking for my PIN and bank information',
+      'They asked me to buy gift cards and read the numbers',
+    ],
+  },
 };
 
 function flattenPhraseList() {
@@ -170,6 +200,10 @@ function flattenPhraseList() {
   const fin = ANCHOR_TREE.financialExploitationDetector;
   Object.keys(fin).forEach((bucket) => {
     fin[bucket].forEach((p) => list.push({ detector: 'financialExploitationDetector', bucket, phrase: p }));
+  });
+  const rel = ANCHOR_TREE.relationshipPatternDetector;
+  Object.keys(rel).forEach((bucket) => {
+    rel[bucket].forEach((p) => list.push({ detector: 'relationshipPatternDetector', bucket, phrase: p }));
   });
   return list;
 }
@@ -270,11 +304,22 @@ class EmbeddingAnchorService {
       });
       return out;
     }
-    const list = ANCHOR_TREE.financialExploitationDetector[bucket] || [];
-    list.forEach((phrase) => {
-      const vector = this.phraseVectors.get(phrase);
-      if (vector) out.push({ phrase, vector });
-    });
+    if (detectorName === 'financialExploitationDetector') {
+      const list = ANCHOR_TREE.financialExploitationDetector[bucket] || [];
+      list.forEach((phrase) => {
+        const vector = this.phraseVectors.get(phrase);
+        if (vector) out.push({ phrase, vector });
+      });
+      return out;
+    }
+    if (detectorName === 'relationshipPatternDetector') {
+      const list = ANCHOR_TREE.relationshipPatternDetector[bucket] || [];
+      list.forEach((phrase) => {
+        const vector = this.phraseVectors.get(phrase);
+        if (vector) out.push({ phrase, vector });
+      });
+      return out;
+    }
     return out;
   }
 
@@ -329,6 +374,13 @@ class EmbeddingAnchorService {
       });
       return scores;
     }
+    if (detectorName === 'relationshipPatternDetector') {
+      Object.keys(ANCHOR_TREE.relationshipPatternDetector).forEach((bucket) => {
+        const anchors = this.getAnchors('relationshipPatternDetector', null, bucket);
+        scores[bucket] = this._maxSim(queryVector, anchors);
+      });
+      return scores;
+    }
     return scores;
   }
 
@@ -351,7 +403,8 @@ class EmbeddingAnchorService {
     const emergency = this._scoreAllBucketsInternal(q, 'emergencyDetector');
     const abuse = this._scoreAllBucketsInternal(q, 'abuseNeglectDetector');
     const fin = this._scoreAllBucketsInternal(q, 'financialExploitationDetector');
-    return { ...emergency, ...abuse, ...fin };
+    const rel = this._scoreAllBucketsInternal(q, 'relationshipPatternDetector');
+    return { ...emergency, ...abuse, ...fin, ...rel };
   }
 
   getEmergencyMetaForBucket(bucketKey) {

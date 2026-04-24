@@ -149,6 +149,9 @@ const envVarsSchema = Joi.object({
 
   /** If set, GET /metrics requires Authorization: Bearer <token> in production and staging */
   METRICS_SCRAPE_TOKEN: Joi.string().optional().allow(''),
+
+  /** "true" = use legacy keyword/DB phrase/regex detectors; "false" (default) = embedding-first for fraud + emergency */
+  USE_KEYWORD_BASED_DETECTORS: Joi.string().valid('true', 'false').optional(),
   
 }).unknown();
 
@@ -274,6 +277,15 @@ const baselineConfig = {
     typeof envVars.METRICS_SCRAPE_TOKEN === 'string' && envVars.METRICS_SCRAPE_TOKEN.trim() !== ''
       ? envVars.METRICS_SCRAPE_TOKEN.trim()
       : null,
+  /**
+   * Detection mode: by default the app uses embedding (vector) similarity for fraud post-call
+   * analysis and the realtime emergency pre-check. Set USE_KEYWORD_BASED_DETECTORS=true to use
+   * the legacy keyword/DB phrase/regex path instead of or in addition to emergency fallbacks
+   * (see detectionMode util and per-service comments).
+   */
+  detection: {
+    useKeywordBasedDetectors: envVars.USE_KEYWORD_BASED_DETECTORS === 'true',
+  },
 };
 
 // CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation

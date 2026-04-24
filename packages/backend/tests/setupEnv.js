@@ -8,3 +8,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 if (!process.env.OPENAI_API_KEY) {
   process.env.OPENAI_API_KEY = 'test-openai-placeholder';
 }
+// Legacy keyword/regex/DB-phrase paths for fraud + emergency; set to "false" to exercise embedding-only tests with real/mocked OpenAI
+if (process.env.USE_KEYWORD_BASED_DETECTORS == null) {
+  process.env.USE_KEYWORD_BASED_DETECTORS = 'true';
+}

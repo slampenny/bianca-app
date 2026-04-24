@@ -2,6 +2,9 @@
 
 const natural = require('natural');
 const logger = require('../../config/logger');
+const appConfig = require('../../config/config');
+const { useKeywordBasedDetectors } = require('../../utils/detectionMode');
+const { EmbeddingAnchorService } = require('../embeddingAnchor.service');
 
 /**
  * Relationship Pattern Analyzer Service
@@ -37,6 +40,82 @@ class RelationshipPatternAnalyzer {
         'loan', 'help financially', 'send money', 'give money',
         'takes care of', 'manages', 'handles', 'in charge of'
       ]
+    };
+  }
+
+  _embeddingCountFromScore(s, key) {
+    const v = s[key] || 0;
+    if (v < 0.25) return 0;
+    return Math.min(10, Math.max(1, Math.round(v * 10)));
+  }
+
+  /**
+   * Post-call default: `relationshipPatternDetector` embeddings. If
+   * `USE_KEYWORD_BASED_DETECTORS=true`, uses keyword `analyzeRelationshipPatterns` only.
+   */
+  async buildRelationshipMetricsFromEmbedding(conversations) {
+    if (useKeywordBasedDetectors()) {
+      return this.analyzeRelationshipPatterns(conversations);
+    }
+    if (!conversations || conversations.length === 0) {
+      return this.getDefaultMetrics();
+    }
+    const patientMessages = await this.extractPatientMessagesWithTimestamps(conversations);
+    if (patientMessages.length === 0) {
+      return this.getDefaultMetrics();
+    }
+    const combinedText = patientMessages.map((m) => m.content).join(' ');
+    if (combinedText.length < 30) {
+      return this.getDefaultMetrics();
+    }
+    if (!appConfig.openai?.apiKey) {
+      return { ...this.getDefaultMetrics(), confidence: 'low' };
+    }
+    const svc = new EmbeddingAnchorService();
+    await svc.initialize();
+    const q = await svc.embedText(combinedText);
+    if (!q) {
+      return { ...this.getDefaultMetrics(), confidence: 'low' };
+    }
+    const scores = svc.getBucketScores(q, 'relationshipPatternDetector');
+    if (!Object.keys(scores).length) {
+      return { ...this.getDefaultMetrics(), confidence: 'low' };
+    }
+    const newPeopleAnalysis = { count: this._embeddingCountFromScore(scores, 'newPeople') };
+    const isolationAnalysis = { count: this._embeddingCountFromScore(scores, 'isolation') };
+    const controlAnalysis = { count: this._embeddingCountFromScore(scores, 'control') };
+    const dependencyAnalysis = { count: this._embeddingCountFromScore(scores, 'dependency') };
+    const suspiciousAnalysis = { count: this._embeddingCountFromScore(scores, 'suspiciousBehavior') };
+    const temporalAnalysis = this.analyzeTemporalChanges(patientMessages);
+    const riskScore = this.calculateRiskScore({
+      newPeople: newPeopleAnalysis,
+      isolation: isolationAnalysis,
+      control: controlAnalysis,
+      dependency: dependencyAnalysis,
+      suspicious: suspiciousAnalysis,
+      temporal: temporalAnalysis
+    });
+    const indicators = this.generateIndicators({
+      newPeople: newPeopleAnalysis,
+      isolation: isolationAnalysis,
+      control: controlAnalysis,
+      dependency: dependencyAnalysis,
+      suspicious: suspiciousAnalysis,
+      temporal: temporalAnalysis
+    });
+    return {
+      riskScore: Math.round(riskScore * 100) / 100,
+      confidence: this.calculateConfidence(patientMessages.length),
+      indicators,
+      newPeopleCount: newPeopleAnalysis.count,
+      isolationCount: isolationAnalysis.count,
+      controlCount: controlAnalysis.count,
+      dependencyCount: dependencyAnalysis.count,
+      suspiciousBehaviorCount: suspiciousAnalysis.count,
+      temporalChanges: temporalAnalysis,
+      // Keyword-only; enable USE_KEYWORD_BASED_DETECTORS for name/timeline heuristics
+      flaggedPeople: [],
+      relationshipTimeline: []
     };
   }
 

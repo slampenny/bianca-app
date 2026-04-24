@@ -53,20 +53,19 @@ class FraudAbuseAnalyzer {
         };
       }
 
-      // Perform financial exploitation analysis
-      const financialRisk = this.financialDetector.detectFinancialExploitation(
+      // Financial / abuse / relationship: embedding-first; keyword paths gated by
+      // USE_KEYWORD_BASED_DETECTORS — see `utils/detectionMode` and each *build* method.
+      const financialRisk = await this.financialDetector.buildFinancialMetricsFromEmbedding(
         patientMessages,
-        combinedText
+        combinedText,
+        null
       );
-      
-      // Perform abuse/neglect analysis
-      const abuseRisk = this.abuseDetector.detectAbuseNeglect(
+      const abuseRisk = await this.abuseDetector.buildAbuseMetricsFromEmbedding(
         patientMessages,
-        combinedText
+        combinedText,
+        null
       );
-      
-      // Perform relationship pattern analysis
-      const relationshipRisk = await this.relationshipAnalyzer.analyzeRelationshipPatterns(
+      const relationshipRisk = await this.relationshipAnalyzer.buildRelationshipMetricsFromEmbedding(
         conversations
       );
 

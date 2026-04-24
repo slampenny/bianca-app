@@ -2,6 +2,8 @@
 
 const natural = require('natural');
 const logger = require('../../config/logger');
+const appConfig = require('../../config/config');
+const { useKeywordBasedDetectors } = require('../../utils/detectionMode');
 const { EmbeddingAnchorService, ABUSE_HIGH_FP_BUCKETS } = require('../embeddingAnchor.service');
 
 /**
@@ -516,6 +518,80 @@ class AbuseNeglectDetector {
       basicNeedsMentions: 0,
       temporalPatterns: { hasEscalation: false, trend: 'insufficient_data' },
       flaggedPhrases: []
+    };
+  }
+
+  _bucketScoreToMentionsScore(score) {
+    const v = score || 0;
+    if (v < 0.25) return 0;
+    return Math.min(10, Math.max(1, Math.round(v * 10)));
+  }
+
+  /**
+   * Post-call default: `analyze()` embeddings. If `USE_KEYWORD_BASED_DETECTORS=true`, uses
+   * `detectAbuseNeglect` (keyword) instead.
+   */
+  async buildAbuseMetricsFromEmbedding(patientMessages, combinedText, _clientId = null) {
+    if (useKeywordBasedDetectors()) {
+      return this.detectAbuseNeglect(patientMessages, combinedText);
+    }
+    if (!appConfig.openai?.apiKey) {
+      return { ...this.getDefaultMetrics(), confidence: 'low' };
+    }
+    const emb = await this.analyze(combinedText, _clientId);
+    const hasScores = emb.scores && Object.keys(emb.scores).length > 0;
+    if (!hasScores) {
+      return { ...this.getDefaultMetrics(), confidence: 'low' };
+    }
+    return this._mapAbuseEmbeddingToLegacyMetrics(emb, patientMessages, combinedText);
+  }
+
+  _mapAbuseEmbeddingToLegacyMetrics(embeddingResult, patientMessages, combinedText) {
+    const s = embeddingResult.scores || {};
+    const pScore = Math.min(100, Math.round((embeddingResult.physicalScore || 0) * 1000) / 10);
+    const eScore = Math.min(100, Math.round((embeddingResult.emotionalScore || 0) * 1000) / 10);
+    const nScore = Math.min(100, Math.round((embeddingResult.neglectScore || 0) * 1000) / 10);
+    const temporalPatterns = this.analyzeTemporalPatterns(patientMessages);
+
+    const physicalAbuse = { score: pScore };
+    const emotionalAbuse = { score: eScore };
+    const neglect = { score: nScore };
+
+    const injuryMentions = this._bucketScoreToMentionsScore(s.injuries);
+    const fearMentions = Math.max(
+      this._bucketScoreToMentionsScore(s.fearOfPerson),
+      this._bucketScoreToMentionsScore(s.fearLanguage)
+    );
+    const isolationMentions =
+      this._bucketScoreToMentionsScore(s.emotionalIsolation) +
+      this._bucketScoreToMentionsScore(s.neglectIsolation);
+    const basicNeedsMentions = this._bucketScoreToMentionsScore(s.basicNeeds);
+
+    const analyses = { physicalAbuse, emotionalAbuse, neglect, temporalPatterns };
+    let riskScore = this.calculateRiskScore(analyses);
+    if (embeddingResult.shouldAlert) {
+      riskScore = Math.max(riskScore, 50);
+    }
+
+    const indicators = this.generateIndicators(analyses);
+    const flaggedPhrases = Object.entries(s)
+      .filter(([, v]) => (v || 0) >= 0.55)
+      .map(([k, v]) => `${k}: ${(v * 100).toFixed(0)}%`)
+      .slice(0, 10);
+
+    return {
+      riskScore: Math.min(100, Math.round(riskScore * 100) / 100),
+      confidence: this.calculateConfidence(combinedText.length, patientMessages.length),
+      indicators,
+      physicalAbuseScore: pScore,
+      emotionalAbuseScore: eScore,
+      neglectScore: nScore,
+      injuryMentions,
+      isolationMentions,
+      fearMentions,
+      basicNeedsMentions,
+      temporalPatterns,
+      flaggedPhrases
     };
   }
 

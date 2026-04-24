@@ -5,6 +5,7 @@ const { localizedEmergencyDetector } = require('./localizedEmergencyDetector.ser
 const emergencyEmbeddingPipeline = require('./emergencyEmbeddingPipeline.service');
 const { getAlertDeduplicator } = require('../utils/alertDeduplicator');
 const { getConversationContextWindow } = require('../utils/conversationContextWindow');
+const { useKeywordBasedDetectors } = require('../utils/detectionMode');
 const { config } = require('../config/emergency.config');
 const appConfig = require('../config/config');
 const { snsService } = require('./sns.service');
@@ -104,7 +105,9 @@ class EmergencyProcessor {
                 category: pipeline.category,
                 language: clientLanguage,
               };
-            } else if (pipeline.buckets && pipeline.buckets.length > 0) {
+            } else {
+              // Includes empty buckets: embedding ran and did not match; do not fall through to
+              // phrase/regex match unless USE_KEYWORD_BASED_DETECTORS is enabled.
               emergencyResult = {
                 isEmergency: false,
                 severity: null,
@@ -113,15 +116,25 @@ class EmergencyProcessor {
                 language: clientLanguage,
               };
             }
-            // buckets empty → leave emergencyResult null and fall through to phrase detectors
           }
         } catch (pipeErr) {
           logger.warn(`[Emergency] Embedding pipeline error, falling back: ${pipeErr.message}`);
         }
       }
 
-      // Step 1b: Phrase-based localized detector (+ basic fallback) when pipeline did not decide
-      if (!emergencyResult) {
+      // When embeddings are off or failed, or keyword path is off: explicit non-emergency
+      if (!emergencyResult && !useKeywordBasedDetectors()) {
+        emergencyResult = {
+          isEmergency: false,
+          severity: null,
+          matchedPhrase: null,
+          category: null,
+          language: clientLanguage,
+        };
+      }
+
+      // Step 1b: Phrase/DB and basic regex (feature-flagged) when pipeline did not set a result
+      if (!emergencyResult && useKeywordBasedDetectors()) {
         emergencyResult = await localizedEmergencyDetector.detectEmergency(text, clientLanguage);
       }
       
