@@ -1,6 +1,7 @@
 module.exports.AlertDTO = require('./alert.dto');
 module.exports.CaregiverDTO = require('./caregiver.dto');
 module.exports.ConversationDTO = require('./conversation.dto');
+module.exports.CallListItemDTO = require('./callListItem.dto');
 module.exports.OrgDTO = require('./org.dto');
 const { ClientDTO, clientsToDTOsWithLastCall } = require('./client.dto');
 module.exports.ClientDTO = ClientDTO;

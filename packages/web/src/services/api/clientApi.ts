@@ -1,11 +1,17 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import type { Client, ClientOnboardingDashboard, ClientPages, ClientOnboardingRollup } from "./api.types"
+import type {
+  Client,
+  ClientOnboardingDashboard,
+  ClientPages,
+  ClientOnboardingRollup,
+  ConversationPages,
+} from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export const clientApi = createApi({
   reducerPath: "clientApi",
   baseQuery: baseQueryWithReauth(),
-  tagTypes: ["Client", "OnboardingRollup"],
+  tagTypes: ["Client", "OnboardingRollup", "ClientConversations"],
   endpoints: (builder) => ({
     getAllClients: builder.query<
       ClientPages,
@@ -21,6 +27,24 @@ export const clientApi = createApi({
     getClient: builder.query<Client, { id: string }>({
       query: ({ id }) => `/clients/${id}`,
       providesTags: (_r, _e, { id }) => [{ type: "Client", id }],
+    }),
+    /** Call-first history (newest by Call.startTime); each row matches ConversationDTO shape when a conversation exists. */
+    getCallsByClient: builder.query<
+      ConversationPages,
+      { clientId: string; page?: number; limit?: number; sortBy?: string }
+    >({
+      query: ({ clientId, page, limit, sortBy }) => ({
+        url: `/clients/${clientId}/calls`,
+        params: {
+          ...(page != null && { page }),
+          ...(limit != null && { limit }),
+          ...(sortBy && { sortBy }),
+        },
+      }),
+      providesTags: (_r, _e, { clientId }) => [
+        { type: "ClientConversations", id: clientId },
+        { type: "ClientConversations", id: "LIST" },
+      ],
     }),
     getClientOnboarding: builder.query<ClientOnboardingDashboard, { clientId: string; day?: number }>({
       query: ({ clientId, day }) => ({
@@ -154,6 +178,7 @@ export const clientApi = createApi({
 export const {
   useGetAllClientsQuery,
   useGetClientQuery,
+  useGetCallsByClientQuery,
   useGetClientOnboardingQuery,
   useGetClientsOnboardingRollupsQuery,
   useVerifyConsentMutation,

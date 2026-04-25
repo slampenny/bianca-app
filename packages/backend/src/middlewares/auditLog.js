@@ -25,6 +25,7 @@ const PHI_ROUTES = {
   'PUT /v1/clients/:clientId': { action: 'UPDATE', resource: 'client', phiAccessed: true },
   'DELETE /v1/clients/:id': { action: 'DELETE', resource: 'client', phiAccessed: true, highRisk: true },
   'DELETE /v1/clients/:clientId': { action: 'DELETE', resource: 'client', phiAccessed: true, highRisk: true },
+  'GET /v1/clients/:clientId/calls': { action: 'READ', resource: 'call', phiAccessed: true },
 
   // Conversation routes (contain PHI)
   'GET /v1/conversations/:id': { action: 'READ', resource: 'conversation', phiAccessed: true },

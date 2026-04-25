@@ -81,6 +81,15 @@ router
   .delete(auth('deleteAny:client'), clientController.removeCaregiver);
 
 router
+  .route('/:clientId/calls')
+  .get(
+    auth('readOwn:client', 'readAny:client'),
+    minimumNecessaryMiddleware('conversation'),
+    validate(clientValidation.getCallsByClient),
+    clientController.getCallsByClient
+  );
+
+router
   .route('/:clientId/conversations')
   .get(
     auth('readOwn:client', 'readAny:client'),

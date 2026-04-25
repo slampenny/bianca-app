@@ -1,5 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import baseQueryWithReauth from "./baseQueryWithAuth"
+import { clientApi } from "./clientApi"
 import { conversationApi } from "./conversationApi"
 
 export interface InitiateCallRequest {
@@ -52,12 +53,12 @@ export interface CallStatusResponse {
 
 function invalidateClientConversations(dispatch: (action: unknown) => void, clientId: string | undefined) {
   if (!clientId) return
-  dispatch(
-    conversationApi.util.invalidateTags([
-      { type: "ClientConversations", id: clientId },
-      { type: "ClientConversations", id: "LIST" },
-    ]),
-  )
+  const tags = [
+    { type: "ClientConversations" as const, id: clientId },
+    { type: "ClientConversations" as const, id: "LIST" },
+  ]
+  dispatch(conversationApi.util.invalidateTags(tags))
+  dispatch(clientApi.util.invalidateTags(tags))
 }
 
 export const callWorkflowApi = createApi({

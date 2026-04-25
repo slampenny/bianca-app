@@ -93,8 +93,16 @@ const queryConversationsByClient = async (clientId, options) => {
   logger.info(`[Conversation Service] Querying conversations for client ${clientId} with filter:`, filter);
   logger.info(`[Conversation Service] Options:`, options);
 
-  // Ensure proper sorting - default to startTime:desc, fallback to createdAt:desc if startTime is not available
-  const sortBy = options.sortBy || 'startTime:desc';
+  // Conversation has no `startTime` in Mongo; sorting by `startTime:desc` in the query is a no-op and yields
+  // an arbitrary 20 documents per page — new calls can land on page 2+ and never show in "Recent" (in-memory
+  // re-sort only reorders the wrong page). Use createdAt for the DB pass; in-memory still refines by call time.
+  const rawSort = options.sortBy || 'createdAt:desc';
+  const sortBy =
+    rawSort === 'startTime:desc' || rawSort === 'startTime:asc'
+      ? rawSort.endsWith('desc')
+        ? 'createdAt:desc'
+        : 'createdAt:asc'
+      : rawSort;
 
   const result = await Conversation.paginate(filter, {
     ...options,

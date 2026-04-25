@@ -9,8 +9,13 @@ import { intervalsForDraft, weekdayShortLabel } from "../lib/scheduleDraft"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import { CONSENT_BULLETS } from "../data/residentMock"
 import { useGetAllAlertsQuery } from "../services/api/alertApi"
-import { useDeleteClientMutation, useGetClientQuery, usePatchClientMutation, useUploadClientAvatarMutation } from "../services/api/clientApi"
-import { useGetConversationsByClientQuery } from "../services/api/conversationApi"
+import {
+  useDeleteClientMutation,
+  useGetClientQuery,
+  useGetCallsByClientQuery,
+  usePatchClientMutation,
+  useUploadClientAvatarMutation,
+} from "../services/api/clientApi"
 import { useGetSentimentSummaryQuery, useGetSentimentTrendQuery } from "../services/api/sentimentApi"
 import { useGetMedicalAnalysisResultsQuery, useGetMedicalAnalysisSummaryQuery } from "../services/api/medicalAnalysisApi"
 import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdateScheduleMutation } from "../services/api/scheduleApi"
@@ -109,9 +114,8 @@ export function ResidentDetailPage() {
   const [updateSchedule, { isLoading: updatingSchedule }] = useUpdateScheduleMutation()
   const [deleteSchedule, { isLoading: deletingSchedule }] = useDeleteScheduleMutation()
 
-  // Only fetch when the Conversations tab is active so a list from before a live call cannot sit in cache
-  // while the user is on Overview or the Live Call route (fixes missing new calls in history).
-  const { data: convPages, isLoading: convLoading } = useGetConversationsByClientQuery(
+  // Call-first list (GET /clients/:id/calls) so order matches billable Call.startTime; only fetch on Conversations tab.
+  const { data: convPages, isLoading: convLoading } = useGetCallsByClientQuery(
     apiClient?.id ? { clientId: apiClient.id, limit: 20 } : skipToken,
     { skip: !apiClient?.id || mainTab !== "conversations" },
   )

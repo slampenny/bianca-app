@@ -5,9 +5,9 @@ const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const onboardingService = require('../services/onboarding.service');
-const { caregiverService, conversationService, clientService, scheduleService } = require('../services');
+const { caregiverService, conversationService, clientService, scheduleService, callService } = require('../services');
 const { Client } = require('../models');
-const { ConversationDTO, ClientDTO, clientsToDTOsWithLastCall } = require('../dtos');
+const { ConversationDTO, ClientDTO, clientsToDTOsWithLastCall, CallListItemDTO } = require('../dtos');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
 const {
   toIdString,
@@ -275,7 +275,7 @@ const getConversationsByClient = catchAsync(async (req, res) => {
       throw new ApiError(httpStatus.FORBIDDEN, "You do not have access to this client's conversations");
     }
   }
-  if (!options.sortBy) options.sortBy = 'startTime:desc';
+  if (!options.sortBy) options.sortBy = 'createdAt:desc';
   const result = await conversationService.queryConversationsByClient(clientId, options);
   const transformedResults = [];
   for (const conversation of result.results) {
@@ -296,7 +296,45 @@ const getConversationsByClient = catchAsync(async (req, res) => {
       `[ClientController] Dropped ${dropped} conversation(s) for client ${clientId} due to DTO errors (check logs above).`
     );
   }
-  res.status(httpStatus.OK).send({ ...result, results: transformedResults, totalResults: transformedResults.length });
+  res.status(httpStatus.OK).send({ ...result, results: transformedResults });
+});
+
+/**
+ * List calls for a client (newest first), with conversation + messages when present.
+ * Preferred for facility “conversation history” so ordering matches billable Call.startTime.
+ */
+const getCallsByClient = catchAsync(async (req, res) => {
+  const { clientId } = req.params;
+  const options = pick(req.query, ['sortBy', 'limit', 'page']);
+  const { caregiver } = req;
+  const client = await clientService.getClientById(clientId);
+  if (!client) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid client ID');
+  }
+  if (caregiver.role === 'staff') {
+    await assertStaffHasClientAccess(caregiver, clientId, client, "You do not have access to this client's calls");
+  } else if (caregiver.role === 'orgAdmin') {
+    const clientOrgId = toOrgIdString(client.org);
+    const caregiverOrgId = toOrgIdString(caregiver.org);
+    if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
+      throw new ApiError(httpStatus.FORBIDDEN, "You do not have access to this client's calls");
+    }
+  }
+  const result = await callService.queryCallsByClient(clientId, options);
+  const transformedResults = [];
+  for (const call of result.results) {
+    try {
+      if (!call._id && !call.id) continue;
+      transformedResults.push(CallListItemDTO(call));
+    } catch (error) {
+      logger.error('[ClientController] Error transforming call list item', {
+        error: error.message,
+        callId: call?._id?.toString?.() ?? call?.id,
+        clientId,
+      });
+    }
+  }
+  res.status(httpStatus.OK).send({ ...result, results: transformedResults });
 });
 
 const getCaregivers = catchAsync(async (req, res) => {
@@ -357,6 +395,7 @@ module.exports = {
   getClient,
   getClientOnboarding,
   getConversationsByClient,
+  getCallsByClient,
   updateClient,
   verifyConsent,
   uploadClientAvatar,

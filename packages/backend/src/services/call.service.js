@@ -127,10 +127,46 @@ const getLastCallTimestampsForClientIds = async (clientIds) => {
   }
 };
 
+/**
+ * Paginate calls for a client (source of truth for time ordering / billing). Populates conversation + messages when present.
+ * @param {string|import('mongoose').Types.ObjectId} clientId
+ * @param {{ limit?: number|string, page?: number|string, sortBy?: string }} options
+ */
+const queryCallsByClient = async (clientId, options = {}) => {
+  const limit = options.limit && parseInt(String(options.limit), 10) > 0 ? parseInt(String(options.limit), 10) : 10;
+  const page = options.page && parseInt(String(options.page), 10) > 0 ? parseInt(String(options.page), 10) : 1;
+  const skip = (page - 1) * limit;
+  const filter = { clientId };
+
+  const [totalResults, results] = await Promise.all([
+    Call.countDocuments(filter).exec(),
+    Call.find(filter)
+      .sort({ startTime: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate({
+        path: 'conversationId',
+        populate: { path: 'messages' },
+      })
+      .exec(),
+  ]);
+
+  const totalPages = limit > 0 ? Math.ceil(totalResults / limit) : 0;
+
+  return {
+    results,
+    page,
+    limit,
+    totalPages,
+    totalResults,
+  };
+};
+
 module.exports = {
   getCallById,
   processCallRecording,
   sendResponseAsCall,
   getLastContactTime,
   getLastCallTimestampsForClientIds,
+  queryCallsByClient,
 };

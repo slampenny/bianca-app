@@ -174,6 +174,17 @@ const getConversationsByClient = {
   }),
 };
 
+const getCallsByClient = {
+  params: Joi.object().keys({
+    clientId: Joi.string().custom(objectId),
+  }),
+  query: Joi.object().keys({
+    sortBy: Joi.string(),
+    limit: Joi.number().integer(),
+    page: Joi.number().integer(),
+  }),
+};
+
 const getClientOnboarding = {
   params: Joi.object().keys({
     clientId: Joi.string().custom(objectId),
@@ -209,6 +220,7 @@ const assignUnassignedClients = {
 module.exports = {
   createClient,
   getConversationsByClient,
+  getCallsByClient,
   getClientOnboarding,
   getClientsOnboardingRollups,
   getClients,
