@@ -5,6 +5,7 @@ import baseQueryWithReauth from "./baseQueryWithAuth"
 export const conversationApi = createApi({
   reducerPath: "conversationApi",
   baseQuery: baseQueryWithReauth(),
+  tagTypes: ["ClientConversations"],
   endpoints: (builder) => ({
     getConversationsByClient: builder.query<
       ConversationPages,
@@ -18,6 +19,10 @@ export const conversationApi = createApi({
           ...(sortBy && { sortBy }),
         },
       }),
+      providesTags: (_result, _err, { clientId }) => [
+        { type: "ClientConversations" as const, id: clientId },
+        { type: "ClientConversations" as const, id: "LIST" },
+      ],
     }),
     getConversationById: builder.query<ConversationDetail, string>({
       query: (conversationId) => ({

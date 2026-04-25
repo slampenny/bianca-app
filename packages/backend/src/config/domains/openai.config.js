@@ -83,6 +83,15 @@ const applyOpenAISecrets = (config, secrets) => {
     config.openai.idleTimeout = Number.isFinite(n) ? Math.max(0, n) : config.openai.idleTimeout;
   }
 
+  // Chat completions (LangChain summaries, etc.): must mirror loadSecrets' process.env merge so
+  // config.openai.model matches Secrets Manager (baseline was built at module load, before async fetch).
+  if (typeof secrets.OPENAI_MODEL === 'string' && secrets.OPENAI_MODEL.trim() !== '') {
+    config.openai.model = secrets.OPENAI_MODEL.trim();
+  }
+  if (typeof secrets.OPENAI_SENTIMENT_MODEL === 'string' && secrets.OPENAI_SENTIMENT_MODEL.trim() !== '') {
+    config.openai.sentimentModel = secrets.OPENAI_SENTIMENT_MODEL.trim();
+  }
+
   return config;
 };
 

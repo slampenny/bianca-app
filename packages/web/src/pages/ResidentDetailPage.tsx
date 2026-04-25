@@ -109,8 +109,11 @@ export function ResidentDetailPage() {
   const [updateSchedule, { isLoading: updatingSchedule }] = useUpdateScheduleMutation()
   const [deleteSchedule, { isLoading: deletingSchedule }] = useDeleteScheduleMutation()
 
+  // Only fetch when the Conversations tab is active so a list from before a live call cannot sit in cache
+  // while the user is on Overview or the Live Call route (fixes missing new calls in history).
   const { data: convPages, isLoading: convLoading } = useGetConversationsByClientQuery(
     apiClient?.id ? { clientId: apiClient.id, limit: 20 } : skipToken,
+    { skip: !apiClient?.id || mainTab !== "conversations" },
   )
 
   const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)

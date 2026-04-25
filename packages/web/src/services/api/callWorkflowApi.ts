@@ -1,5 +1,6 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
 import baseQueryWithReauth from "./baseQueryWithAuth"
+import { conversationApi } from "./conversationApi"
 
 export interface InitiateCallRequest {
   clientId: string
@@ -49,6 +50,16 @@ export interface CallStatusResponse {
   }
 }
 
+function invalidateClientConversations(dispatch: (action: unknown) => void, clientId: string | undefined) {
+  if (!clientId) return
+  dispatch(
+    conversationApi.util.invalidateTags([
+      { type: "ClientConversations", id: clientId },
+      { type: "ClientConversations", id: "LIST" },
+    ]),
+  )
+}
+
 export const callWorkflowApi = createApi({
   reducerPath: "callWorkflowApi",
   baseQuery: baseQueryWithReauth(),
@@ -61,6 +72,14 @@ export const callWorkflowApi = createApi({
         body,
       }),
       invalidatesTags: ["CallWorkflow"],
+      async onQueryStarted(arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled
+          invalidateClientConversations(dispatch, data?.clientId || arg.clientId)
+        } catch {
+          // ignore; errors do not need cache invalidation
+        }
+      },
     }),
     getCallStatus: builder.query<{ data: CallStatusResponse }, { conversationId: string }>({
       query: ({ conversationId }) => ({
@@ -69,13 +88,24 @@ export const callWorkflowApi = createApi({
       }),
       providesTags: (_r, _e, { conversationId }) => [{ type: "CallWorkflow", id: conversationId }],
     }),
-    endCall: builder.mutation<{ data?: unknown }, { conversationId: string; outcome: string; notes?: string }>({
+    endCall: builder.mutation<
+      { clientId?: string; id?: string },
+      { conversationId: string; outcome: string; notes?: string }
+    >({
       query: ({ conversationId, outcome, notes }) => ({
         url: `/calls/${conversationId}/end`,
         method: "POST",
         body: { outcome, notes },
       }),
       invalidatesTags: (_r, _e, { conversationId }) => [{ type: "CallWorkflow", id: conversationId }],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled
+          if (data?.clientId) invalidateClientConversations(dispatch, data.clientId)
+        } catch {
+          // ignore
+        }
+      },
     }),
   }),
 })

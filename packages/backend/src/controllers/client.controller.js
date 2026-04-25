@@ -283,8 +283,18 @@ const getConversationsByClient = catchAsync(async (req, res) => {
       if (!conversation._id && !conversation.id) continue;
       transformedResults.push(ConversationDTO(conversation));
     } catch (error) {
-      logger.error('[ClientController] Error transforming conversation with DTO', { error: error.message });
+      logger.error('[ClientController] Error transforming conversation with DTO', {
+        error: error.message,
+        conversationId: conversation?._id?.toString?.() ?? conversation?.id,
+        clientId,
+      });
     }
+  }
+  const dropped = (result.results?.length ?? 0) - transformedResults.length;
+  if (dropped > 0) {
+    logger.warn(
+      `[ClientController] Dropped ${dropped} conversation(s) for client ${clientId} due to DTO errors (check logs above).`
+    );
   }
   res.status(httpStatus.OK).send({ ...result, results: transformedResults, totalResults: transformedResults.length });
 });
