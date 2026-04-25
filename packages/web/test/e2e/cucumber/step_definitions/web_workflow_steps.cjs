@@ -94,27 +94,31 @@ When("I go back to resident detail from resident call workspace", async function
 })
 
 Then("I should see resident analysis tabs", async function () {
+  await this.page.getByTestId("resident-main-tab-analysis").click()
   await expect(this.page.getByTestId("resident-analysis-tablist")).toBeVisible({ timeout: 20000 })
-  await expect(this.page.getByRole("tab", { name: "Sentiment" })).toBeVisible()
-  await expect(this.page.getByRole("tab", { name: "Medical" })).toBeVisible()
-  await expect(this.page.getByRole("tab", { name: "Security" })).toBeVisible()
+  const analysisTablist = this.page.getByTestId("resident-analysis-tablist")
+  await expect(analysisTablist.getByRole("tab", { name: "Sentiment" })).toBeVisible()
+  await expect(analysisTablist.getByRole("tab", { name: "Medical" })).toBeVisible()
+  await expect(analysisTablist.getByRole("tab", { name: "Security" })).toBeVisible()
 })
 
 Then("sentiment should be the default analysis tab", async function () {
-  const sentimentTab = this.page.getByRole("tab", { name: "Sentiment" })
+  const sentimentTab = this.page.getByTestId("resident-analysis-tablist").getByRole("tab", { name: "Sentiment" })
   await expect(sentimentTab).toHaveAttribute("aria-selected", "true")
 })
 
 When("I switch resident analysis tab to {string}", async function (tabName) {
-  await this.page.getByRole("tab", { name: tabName }).click()
+  await this.page.getByTestId("resident-main-tab-analysis").click()
+  await this.page.getByTestId("resident-analysis-tablist").getByRole("tab", { name: tabName }).click()
 })
 
 Then("the {string} analysis tab should be active", async function (tabName) {
-  const tab = this.page.getByRole("tab", { name: tabName })
+  const tab = this.page.getByTestId("resident-analysis-tablist").getByRole("tab", { name: tabName })
   await expect(tab).toHaveAttribute("aria-selected", "true")
 })
 
 Then("I should see the recent conversations section", async function () {
+  await this.page.getByTestId("resident-main-tab-conversations").click()
   await expect(this.page.getByRole("heading", { name: "Recent Conversations" })).toBeVisible({ timeout: 10000 })
 })
 

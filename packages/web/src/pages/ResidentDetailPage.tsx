@@ -48,12 +48,14 @@ function toDateInputValue(iso: string | null | undefined): string {
 
 type SentimentTimeRange = "lastCall" | "month" | "lifetime"
 type AnalysisTab = "medical" | "sentiment" | "security"
+type MainTab = "overview" | "analysis" | "conversations"
 
 export function ResidentDetailPage() {
   const { residentId } = useParams()
   const navigate = useNavigate()
   const [consentOpen, setConsentOpen] = useState(false)
   const [sentimentTimeRange, setSentimentTimeRange] = useState<SentimentTimeRange>("lastCall")
+  const [mainTab, setMainTab] = useState<MainTab>("overview")
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("sentiment")
   const [editing, setEditing] = useState(false)
   const [saveError, setSaveError] = useState("")
@@ -309,6 +311,34 @@ export function ResidentDetailPage() {
     lastName: resident.lastName,
   })
 
+  /** Same request body as the add-schedule card. Returns false if weekly/monthly has no days (message set). Throws on API error. */
+  const createScheduleFromAddForm = async (noticeText = "Schedule added."): Promise<boolean> => {
+    if (!apiClient.id) return false
+    setScheduleError("")
+    setScheduleNotice("")
+    const intervals = intervalsForDraft(
+      newScheduleFrequency,
+      newScheduleWeeklyDays,
+      newScheduleWeeklyWeeks,
+      newScheduleMonthlyDaysRaw,
+    )
+    if (newScheduleFrequency !== "daily" && intervals.length === 0) {
+      setScheduleError("Select at least one interval for weekly/monthly schedules.")
+      return false
+    }
+    await createScheduleForClient({
+      clientId: String(apiClient.id),
+      body: {
+        frequency: newScheduleFrequency,
+        intervals,
+        time: newScheduleTime,
+        isActive: newScheduleActive,
+      },
+    }).unwrap()
+    setScheduleNotice(noticeText)
+    return true
+  }
+
   const onSaveResident = async (e: FormEvent) => {
     e.preventDefault()
     if (!apiClient?.id) return
@@ -338,6 +368,17 @@ export function ResidentDetailPage() {
       if (residentAvatarFile) {
         await uploadClientAvatar({ clientId: apiClient.id, file: residentAvatarFile }).unwrap()
         setResidentAvatarFile(null)
+      }
+      if (canManageResidents && !primarySchedule) {
+        try {
+          const created = await createScheduleFromAddForm("Resident profile saved. Call schedule added from the add schedule defaults.")
+          if (created) setMainTab("overview")
+        } catch (schedErr: unknown) {
+          const smsg = (schedErr as { data?: { message?: string } })?.data?.message
+          setScheduleError(
+            typeof smsg === "string" ? smsg : "Could not create call schedule from the add form defaults. Fix Call schedule and save again.",
+          )
+        }
       }
       setEditing(false)
       await refetch()
@@ -393,30 +434,9 @@ export function ResidentDetailPage() {
 
   const onAddSchedule = async () => {
     if (!apiClient.id) return
-    setScheduleError("")
-    setScheduleNotice("")
-    const intervals = intervalsForDraft(
-      newScheduleFrequency,
-      newScheduleWeeklyDays,
-      newScheduleWeeklyWeeks,
-      newScheduleMonthlyDaysRaw,
-    )
-    if (newScheduleFrequency !== "daily" && intervals.length === 0) {
-      setScheduleError("Select at least one interval for weekly/monthly schedules.")
-      return
-    }
     try {
-      await createScheduleForClient({
-        clientId: String(apiClient.id),
-        body: {
-          frequency: newScheduleFrequency,
-          intervals,
-          time: newScheduleTime,
-          isActive: newScheduleActive,
-        },
-      }).unwrap()
-      setScheduleNotice("Schedule added.")
-      await refetch()
+      const created = await createScheduleFromAddForm()
+      if (created) await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
       setScheduleError(typeof msg === "string" ? msg : "Could not add schedule.")
@@ -506,7 +526,15 @@ export function ResidentDetailPage() {
       </button>
       {canManageResidents ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
-          <button type="button" className="va-btn-secondary" onClick={() => setEditing((v) => !v)} data-testid="resident-edit-toggle">
+          <button
+            type="button"
+            className="va-btn-secondary"
+            onClick={() => {
+              if (!editing) setMainTab("overview")
+              setEditing((v) => !v)
+            }}
+            data-testid="resident-edit-toggle"
+          >
             {editing ? "Cancel edit" : "Edit resident"}
           </button>
           <button
@@ -522,7 +550,92 @@ export function ResidentDetailPage() {
         </div>
       ) : null}
 
-      {canManageResidents && editing ? (
+      <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: "rgba(37, 99, 235, 0.12)",
+            color: "#1d4ed8",
+            fontSize: "1.25rem",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          {apiClient.avatar ? (
+            <img
+              src={apiClient.avatar}
+              alt={`${displayName} avatar`}
+              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            initials
+          )}
+        </div>
+        <div>
+          <h1 className="va-page-title" style={{ fontSize: "1.75rem" }}>
+            {displayName}
+          </h1>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: 6, alignItems: "center" }}>
+            <span style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>Room {resident.room}</span>
+            <StatusPill status={resident.status} />
+            <span style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
+              Age {resident.age > 0 ? resident.age : "—"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        data-testid="resident-main-tablist"
+        role="tablist"
+        aria-label="Resident sections"
+        style={{ display: "flex", borderBottom: "1px solid var(--va-slate-200)", gap: 4, flexWrap: "wrap" }}
+      >
+        {(
+          [
+            { id: "overview" as const, label: "Overview" },
+            { id: "analysis" as const, label: "Analysis" },
+            { id: "conversations" as const, label: "Conversations" },
+          ] as const
+        ).map((tab) => {
+          const active = mainTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              data-testid={`resident-main-tab-${tab.id}`}
+              aria-selected={active}
+              id={`resident-main-section-${tab.id}`}
+              className="va-btn-ghost"
+              style={{
+                border: "none",
+                borderRadius: 0,
+                background: "transparent",
+                padding: "0.35rem 0.7rem 0.5rem",
+                marginBottom: -1,
+                fontSize: "0.9rem",
+                fontWeight: active ? 700 : 500,
+                color: active ? "var(--va-teal-700, #0f766e)" : "var(--va-slate-500)",
+                borderBottom: active ? "2px solid var(--va-teal)" : "2px solid transparent",
+              }}
+              onClick={() => setMainTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {mainTab === "overview" ? (
+        <>
+          {canManageResidents && editing ? (
         <div className="va-card va-card-pad">
           <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Edit resident</h2>
           <form onSubmit={(e) => void onSaveResident(e)} style={{ display: "grid", gap: "0.75rem" }}>
@@ -812,47 +925,6 @@ export function ResidentDetailPage() {
         </div>
       ) : null}
 
-      <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-        <div
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: "50%",
-            background: "rgba(37, 99, 235, 0.12)",
-            color: "#1d4ed8",
-            fontSize: "1.25rem",
-            fontWeight: 700,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          {apiClient.avatar ? (
-            <img
-              src={apiClient.avatar}
-              alt={`${displayName} avatar`}
-              style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            initials
-          )}
-        </div>
-        <div>
-          <h1 className="va-page-title" style={{ fontSize: "1.75rem" }}>
-            {displayName}
-          </h1>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: 6, alignItems: "center" }}>
-            <span style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>Room {resident.room}</span>
-            <StatusPill status={resident.status} />
-            <span style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-              Age {resident.age > 0 ? resident.age : "—"}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <div className="va-card va-card-pad">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem" }}>Resident Information</h2>
         <div
@@ -980,8 +1052,11 @@ export function ResidentDetailPage() {
           </div>
         </div>
       </div>
+        </>
+      ) : null}
 
-      <div className="va-card va-card-pad">
+      {mainTab === "analysis" ? (
+        <div className="va-card va-card-pad">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Analysis</h2>
           <div
@@ -1247,8 +1322,10 @@ export function ResidentDetailPage() {
           </div>
         )}
       </div>
+      ) : null}
 
-      <div className="va-card va-card-pad">
+      {mainTab === "conversations" ? (
+        <div className="va-card va-card-pad">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Recent Conversations</h2>
         {convLoading ? (
           <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading…</p>
@@ -1398,6 +1475,7 @@ export function ResidentDetailPage() {
           </div>
         )}
       </div>
+      ) : null}
 
       {consentOpen && (
         <ConsentModal client={apiClient} displayName={displayName} onClose={() => setConsentOpen(false)} />

@@ -41,10 +41,37 @@ export interface CallCompletionLogQueryArgs {
   limit?: number
 }
 
+export interface AlertAuditTrailRow {
+  alertId: string
+  alertType: string
+  importance: string
+  resident: string
+  message: string
+  createdAt: string | null
+  acknowledgedBy: string
+  readCount: number
+}
+
+export interface AlertAuditTrailResponse {
+  reportType: string
+  title: string
+  generatedAt: string
+  dateFrom: string
+  dateTo: string
+  summary: { totalAlerts: number; orgId: string }
+  rows: AlertAuditTrailRow[]
+}
+
+export interface AlertAuditTrailQueryArgs {
+  dateFrom?: string
+  dateTo?: string
+  orgId?: string
+}
+
 export const facilityReportsApi = createApi({
   reducerPath: "facilityReportsApi",
   baseQuery: baseQueryWithReauth(),
-  tagTypes: ["CallCompletionLog"],
+  tagTypes: ["CallCompletionLog", "AlertAuditTrail"],
   endpoints: (builder) => ({
     getCallCompletionLog: builder.query<CallCompletionLogResponse, CallCompletionLogQueryArgs | void>({
       query: (arg) => {
@@ -62,7 +89,20 @@ export const facilityReportsApi = createApi({
       },
       providesTags: ["CallCompletionLog"],
     }),
+    getAlertAuditTrail: builder.query<AlertAuditTrailResponse, AlertAuditTrailQueryArgs | void>({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg && typeof arg === "object") {
+          if (arg.dateFrom) params.set("dateFrom", arg.dateFrom)
+          if (arg.dateTo) params.set("dateTo", arg.dateTo)
+          if (arg.orgId) params.set("orgId", arg.orgId)
+        }
+        const q = params.toString()
+        return { url: `/facility-reports/alert-audit-trail${q ? `?${q}` : ""}`, method: "GET" }
+      },
+      providesTags: ["AlertAuditTrail"],
+    }),
   }),
 })
 
-export const { useGetCallCompletionLogQuery } = facilityReportsApi
+export const { useGetCallCompletionLogQuery, useGetAlertAuditTrailQuery } = facilityReportsApi

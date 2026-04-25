@@ -1,7 +1,7 @@
 import type { CallCompletionLogResponse } from "../services/api/facilityReportsApi"
 import type { ReportPayload } from "../data/reportsMock"
 
-function formatReportDateRange(dateFromIso: string, dateToIso: string): string {
+export function formatReportDateRange(dateFromIso: string, dateToIso: string): string {
   const from = new Date(dateFromIso)
   const to = new Date(dateToIso)
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {

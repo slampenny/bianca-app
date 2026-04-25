@@ -73,6 +73,8 @@ const updateOrg = {
         alertOnAllMissedCalls: Joi.boolean().optional(),
       }).optional(),
       requireClientConsent: Joi.boolean().optional(),
+      /** Super admin / org admin: allow S3 debug audio for this org's Realtime calls */
+      debugAudioUploadEnabled: Joi.boolean().optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

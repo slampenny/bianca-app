@@ -48,6 +48,17 @@ export interface AdminOrgSearchResponse {
   totalResults: number
 }
 
+/** GET/PATCH /v1/orgs/:orgId (super admin) */
+export interface AdminOrgDetail {
+  id?: string
+  name: string
+  email: string
+  debugAudioUploadEnabled?: boolean
+  timezone?: string
+  country?: string
+  requireClientConsent?: boolean
+}
+
 export interface ScimAdminStatus {
   enabled: boolean
   tokenHint: string | null

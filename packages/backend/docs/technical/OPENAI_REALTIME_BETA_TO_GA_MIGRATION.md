@@ -490,7 +490,7 @@ Our migration is simpler - just remove the beta header and verify events work.
 
 We've already updated to:
 - Realtime: `gpt-4o-realtime-preview-2025-01-12`
-- Standard: `gpt-4o-2025-01-12`
+- Standard (chat / LangChain): `gpt-4o` (see `OPENAI_MODEL` in config)
 
 Verify these work with GA API.
 

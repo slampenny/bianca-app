@@ -44,7 +44,7 @@ const mongoose = require('mongoose');
 const { Buffer } = require('buffer');
 const config = require('../config/config');
 const logger = require('../config/logger');
-const { Call, Client, Conversation, Message } = require('../models'); // Assuming Message model is used for saving transcripts
+const { Call, Client, Conversation, Message, Org } = require('../models'); // Assuming Message model is used for saving transcripts
 const AudioUtils = require('../api/audio.utils'); // Assumes this uses alawmulaw and has resamplePcm
 const { emergencyProcessor } = require('./emergencyProcessor.service');
 const { getConversationContextWindow } = require('../utils/conversationContextWindow');
@@ -388,8 +388,9 @@ class OpenAIRealtimeService {
   }
 
   async appendAudioToLocalFile(callId, pcmBuffer) {
-    const useDebugMode = config.openai?.debugAudio !== false;
-    if (!useDebugMode) return;
+    const conn = this.connections.get(callId);
+    const allow = process.env.OPENAI_DEBUG_AUDIO === 'true' || conn?.debugAudioUploadEnabled;
+    if (!allow) return;
 
     if (!pcmBuffer || pcmBuffer.length === 0) {
       return;
@@ -497,12 +498,32 @@ class OpenAIRealtimeService {
         : null;
     const onboardingCallMongoId = realtimeOptions?.onboardingCallMongoId || null;
 
+    let orgId = null;
+    let debugAudioUploadEnabled = false;
+    if (clientId) {
+      try {
+        const clientRow = await Client.findById(clientId).select('org').lean();
+        if (clientRow?.org) {
+          orgId = clientRow.org.toString();
+          const orgRow = await Org.findById(clientRow.org).select('debugAudioUploadEnabled').lean();
+          debugAudioUploadEnabled = orgRow?.debugAudioUploadEnabled === true;
+        }
+      } catch (orgErr) {
+        logger.warn(`[OpenAI Realtime] Could not load org for debug-audio flag (client ${clientId}): ${orgErr.message}`);
+      }
+    }
+    if (process.env.OPENAI_DEBUG_AUDIO === 'true') {
+      debugAudioUploadEnabled = true;
+    }
+
     this.connections.set(callId, {
       status: 'initializing',
       conversationId: finalConversationId,
       callSid, // Store the Twilio CallSid if provided
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
       clientId,
+      orgId,
+      debugAudioUploadEnabled,
       onboardingDay,
       onboardingCallMongoId,
       preferredLanguage,
@@ -3901,12 +3922,6 @@ class OpenAIRealtimeService {
       return;
     }
 
-    // Initialize debug files if needed
-    if (!conn._debugFilesInitialized) {
-      this.initializeContinuousDebugFiles(callId);
-      conn._debugFilesInitialized = true;
-    }
-
     conn.audioChunksReceived++;
 
     // Track when first audio was received
@@ -4643,6 +4658,16 @@ class OpenAIRealtimeService {
   async appendToContinuousDebugFile(callId, filename, buffer) {
     if (!buffer || buffer.length === 0) return;
 
+    const conn = this.connections.get(callId);
+    const allow = process.env.OPENAI_DEBUG_AUDIO === 'true' || conn?.debugAudioUploadEnabled;
+    if (!allow) return;
+
+    const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
+    if (!fs.existsSync(callAudioDir) || !conn?._debugFilesInitialized) {
+      this.initializeContinuousDebugFiles(callId);
+      if (conn) conn._debugFilesInitialized = true;
+    }
+
     const filepath = path.join(DEBUG_AUDIO_LOCAL_DIR, callId, filename);
     try {
       fs.appendFileSync(filepath, buffer);
@@ -4701,6 +4726,15 @@ class OpenAIRealtimeService {
     const S3Service = require('./s3.service');
 
     try {
+      const allow =
+        process.env.OPENAI_DEBUG_AUDIO === 'true' || (conn && conn.debugAudioUploadEnabled);
+      if (!allow) {
+        logger.info(
+          `[AUDIO DEBUG] Skipping S3 debug upload (disabled; enable per-org in admin or set OPENAI_DEBUG_AUDIO=true) for ${callId}`
+        );
+        return [];
+      }
+
       const callAudioDir = path.join(DEBUG_AUDIO_LOCAL_DIR, callId);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const dateFolder = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
@@ -5033,8 +5067,8 @@ class OpenAIRealtimeService {
         }
       }
 
-      // Upload debug audio for every call (enhanced functionality)
-      logger.info(`[OpenAI Call End] Attempting debug audio upload for ${callId}...`);
+      // Upload debug audio when per-org (or env) allows it
+      logger.info(`[OpenAI Call End] Debug audio upload path for ${callId} (if enabled for org or OPENAI_DEBUG_AUDIO)...`);
 
       // Log call statistics before upload
       if (conn) {

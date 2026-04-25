@@ -135,7 +135,10 @@ const envVarsSchema = Joi.object({
   OPENAI_REALTIME_SESSION_CONFIG: Joi.string().default('{}'),
   // 0 = no idle disconnect (calls run until hangup). Set ms to re-enable (e.g. 300000).
   OPENAI_IDLE_TIMEOUT: Joi.number().default(0),
-  OPENAI_MODEL: Joi.string().default('gpt-4o-2025-01-12'),
+  /** Chat-completions / LangChain (summaries, etc.). Use a current model id (e.g. gpt-4o). */
+  OPENAI_MODEL: Joi.string().default('gpt-4o'),
+  /** When "true", record debug audio for all calls (overrides per-org off). */
+  OPENAI_DEBUG_AUDIO: Joi.string().valid('true', 'false').optional(),
   // Transcription model: 'gpt-4o-mini-transcribe' (latest, faster) or 'gpt-4o-transcribe' (higher accuracy) or 'whisper-1' (legacy)
   OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().default('gpt-4o-mini-transcribe'),
   /** Set to "true" so OpenAI server_vad auto response.create on turn end (A/B vs our scheduler). Default unset = false in code. */

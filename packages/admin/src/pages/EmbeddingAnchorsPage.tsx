@@ -161,6 +161,9 @@ export function EmbeddingAnchorsPage() {
           <Link to="/scim" className="admin-btn admin-btn--ghost">
             SCIM
           </Link>
+          <Link to="/org-flags" className="admin-btn admin-btn--ghost">
+            Org flags
+          </Link>
           <Link to="/impersonate" className="admin-btn admin-btn--ghost">
             Sign in as user
           </Link>

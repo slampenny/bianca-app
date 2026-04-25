@@ -149,6 +149,14 @@ const orgSchema = mongoose.Schema(
       required: false,
       trim: true,
     },
+    /**
+     * When true, full-call debug ulaw/PCM is written locally and, on hangup, uploaded to the S3 debug bucket.
+     * Default false — super admins can enable per org in the admin portal. Set OPENAI_DEBUG_AUDIO=true in env to force for all calls (e.g. local dev).
+     */
+    debugAudioUploadEnabled: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

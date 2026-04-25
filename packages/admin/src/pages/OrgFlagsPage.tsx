@@ -1,17 +1,12 @@
-import { type FormEvent, useState } from "react"
+import { type FormEvent, useEffect, useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useLogoutMutation } from "../services/api/authApi"
-import {
-  useDisableOrgScimMutation,
-  useGetOrgScimStatusQuery,
-  useIssueOrgScimTokenMutation,
-  useLazySearchOrgsQuery,
-} from "../services/api/adminApi"
+import { useGetOrgQuery, useLazySearchOrgsQuery, usePatchOrgMutation } from "../services/api/adminApi"
 import { clearAuth, getAuthTokens, getCurrentUser, isAuthenticated } from "../store/authSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import type { AdminOrgSearchRow } from "../services/api/api.types"
 
-export function ScimProvisioningPage() {
+export function OrgFlagsPage() {
   const authed = useAppSelector(isAuthenticated)
   const user = useAppSelector(getCurrentUser)
   const tokens = useAppSelector(getAuthTokens)
@@ -25,20 +20,25 @@ export function ScimProvisioningPage() {
   const [searching, setSearching] = useState(false)
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null)
   const [selectedOrgName, setSelectedOrgName] = useState("")
-  const [actionError, setActionError] = useState("")
-  const [revealedToken, setRevealedToken] = useState<string | null>(null)
 
   const [runSearch] = useLazySearchOrgsQuery()
-  const { data: scimStatus, isFetching: statusLoading } = useGetOrgScimStatusQuery(selectedOrgId!, {
+  const { data: orgDetail, isFetching: orgLoading } = useGetOrgQuery(selectedOrgId!, {
     skip: !authed || !selectedOrgId,
   })
-  const [issueToken, { isLoading: issuing }] = useIssueOrgScimTokenMutation()
-  const [disableScim, { isLoading: disabling }] = useDisableOrgScimMutation()
+  const [patchOrg, { isLoading: saving }] = usePatchOrgMutation()
+
+  const [localDebugAudio, setLocalDebugAudio] = useState(false)
+  const [saveError, setSaveError] = useState("")
+
+  useEffect(() => {
+    if (orgDetail) {
+      setLocalDebugAudio(orgDetail.debugAudioUploadEnabled === true)
+    }
+  }, [orgDetail])
 
   const handleSearch = async (e?: FormEvent) => {
     e?.preventDefault()
     setSearchError("")
-    setRevealedToken(null)
     const term = q.trim()
     if (term.length < 2) {
       setSearchError("Enter at least 2 characters (org name, email, or organization id).")
@@ -64,38 +64,16 @@ export function ScimProvisioningPage() {
     if (!id) return
     setSelectedOrgId(id)
     setSelectedOrgName(row.name)
-    setRevealedToken(null)
-    setActionError("")
+    setSaveError("")
   }
 
-  const handleIssueToken = async () => {
+  const handleSave = async () => {
     if (!selectedOrgId) return
-    setActionError("")
-    setRevealedToken(null)
+    setSaveError("")
     try {
-      const out = await issueToken(selectedOrgId).unwrap()
-      setRevealedToken(out.token)
+      await patchOrg({ orgId: selectedOrgId, body: { debugAudioUploadEnabled: localDebugAudio } }).unwrap()
     } catch {
-      setActionError("Could not issue token. Ensure the organization exists.")
-    }
-  }
-
-  const handleDisable = async () => {
-    if (!selectedOrgId) return
-    setActionError("")
-    setRevealedToken(null)
-    try {
-      await disableScim(selectedOrgId).unwrap()
-    } catch {
-      setActionError("Could not disable SCIM for this organization.")
-    }
-  }
-
-  const copyText = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-    } catch {
-      setActionError("Clipboard copy failed.")
+      setSaveError("Could not update organization. Ensure you are a super administrator.")
     }
   }
 
@@ -115,18 +93,16 @@ export function ScimProvisioningPage() {
       <header className="admin-header">
         <div>
           <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">SCIM provisioning</h1>
-          <p className="admin-header-sub">
-            Enable SCIM 2.0 for an organization so their IdP can provision facility users (caregivers).
-          </p>
+          <h1 className="admin-header-title">Organization flags</h1>
+          <p className="admin-header-sub">Per-organization feature toggles (super admin).</p>
         </div>
         <div className="admin-header-actions">
           <span className="admin-muted admin-header-user">{user?.email}</span>
           <Link to="/" className="admin-btn admin-btn--ghost">
             Observability
           </Link>
-          <Link to="/org-flags" className="admin-btn admin-btn--ghost">
-            Org flags
+          <Link to="/scim" className="admin-btn admin-btn--ghost">
+            SCIM
           </Link>
           <Link to="/embedding-anchors" className="admin-btn admin-btn--ghost">
             Embedding anchors
@@ -213,75 +189,43 @@ export function ScimProvisioningPage() {
               Org id <code className="admin-code">{selectedOrgId}</code>
             </p>
 
-            {statusLoading && !scimStatus ? (
-              <p className="admin-muted">Loading status…</p>
-            ) : scimStatus ? (
-              <ul className="admin-kv" style={{ marginBottom: "1rem" }}>
-                <li>
-                  <span>SCIM enabled</span>
-                  <strong>{scimStatus.enabled ? "Yes" : "No"}</strong>
-                </li>
-                <li>
-                  <span>Token hint</span>
-                  <strong>{scimStatus.tokenHint ? `…${scimStatus.tokenHint}` : "—"}</strong>
-                </li>
-                <li style={{ flexDirection: "column", alignItems: "stretch", gap: "0.35rem" }}>
-                  <span>Base URL (for IdP)</span>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-                    <code className="admin-code" style={{ wordBreak: "break-all" }}>
-                      {scimStatus.scimBaseUrl}
-                    </code>
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--ghost"
-                      onClick={() => void copyText(scimStatus.scimBaseUrl)}
-                    >
-                      Copy
-                    </button>
-                  </div>
-                </li>
-              </ul>
-            ) : null}
-
-            {revealedToken ? (
-              <div
-                className="admin-card admin-card--warn"
-                style={{ marginBottom: "1rem", border: "1px solid rgba(251, 191, 36, 0.35)" }}
-              >
-                <p className="admin-section-title" style={{ marginTop: 0 }}>
-                  Bearer token (copy now)
+            {orgLoading && !orgDetail ? (
+              <p className="admin-muted">Loading organization…</p>
+            ) : (
+              <div style={{ maxWidth: 640 }}>
+                <p className="admin-muted" style={{ fontSize: "0.9rem", lineHeight: 1.5, marginBottom: "1rem" }}>
+                  <strong>Debug audio (S3)</strong> — When enabled, after each Realtime call the backend writes debug ulaw/PCM
+                  and uploads it to the configured debug S3 prefix (requires IAM on the app instance). Off by default; use for
+                  targeted support investigations. Developers can also set <code className="admin-code">OPENAI_DEBUG_AUDIO=true</code>{" "}
+                  in the API environment to record all calls.
                 </p>
-                <p className="admin-muted" style={{ fontSize: "0.8125rem", marginBottom: "0.5rem" }}>
-                  This value is shown only once. Store it in your IdP; you cannot retrieve it again without rotating.
-                </p>
-                <pre className="admin-pre" style={{ marginBottom: "0.5rem", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                  {revealedToken}
-                </pre>
-                <button type="button" className="admin-btn admin-btn--primary" onClick={() => void copyText(revealedToken)}>
-                  Copy token
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.65rem",
+                    cursor: "pointer",
+                    marginBottom: "1rem",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={localDebugAudio}
+                    onChange={(e) => setLocalDebugAudio(e.target.checked)}
+                  />
+                  <span>Enable debug audio upload for this organization</span>
+                </label>
+                {saveError ? (
+                  <p className="admin-error" role="alert" style={{ marginBottom: "0.75rem" }}>
+                    {saveError}
+                  </p>
+                ) : null}
+                <button type="button" className="admin-btn admin-btn--primary" disabled={saving} onClick={() => void handleSave()}>
+                  {saving ? "Saving…" : "Save"}
                 </button>
               </div>
-            ) : null}
-
-            {actionError ? (
-              <p className="admin-error" role="alert" style={{ marginBottom: "0.75rem" }}>
-                {actionError}
-              </p>
-            ) : null}
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-              <button type="button" className="admin-btn admin-btn--primary" disabled={issuing} onClick={() => void handleIssueToken()}>
-                {scimStatus?.enabled ? "Rotate token" : "Enable SCIM & issue token"}
-              </button>
-              <button
-                type="button"
-                className="admin-btn admin-btn--ghost"
-                disabled={disabling || !scimStatus?.enabled}
-                onClick={() => void handleDisable()}
-              >
-                Disable SCIM
-              </button>
-            </div>
+            )}
           </div>
         ) : null}
       </main>

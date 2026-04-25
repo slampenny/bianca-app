@@ -7,8 +7,14 @@ import { downloadReportPayloadCsv, getReportPayload, printReportFromPayload, rep
 import { buildCallCompletionReportPayload } from "../lib/callCompletionReportPayload"
 import { buildConsentRosterReportPayload } from "../lib/consentRosterReportPayload"
 import { filterClientsToCaregiverRoster, seesWholeFacilityInReports } from "../lib/caregiverClientFilter"
+import { buildAlertAuditReportPayload } from "../lib/alertAuditReportPayload"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
-import { useGetCallCompletionLogQuery, type CallCompletionLogQueryArgs } from "../services/api/facilityReportsApi"
+import {
+  useGetAlertAuditTrailQuery,
+  useGetCallCompletionLogQuery,
+  type AlertAuditTrailQueryArgs,
+  type CallCompletionLogQueryArgs,
+} from "../services/api/facilityReportsApi"
 import { useGetCaregiverQuery } from "../services/api/caregiverApi"
 import { isAuthenticated, getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -27,6 +33,7 @@ function liveFilenameBase(id: ReportTemplateId): string {
   if (id === "risk_sentiment") return "bianca-risk-sentiment"
   if (id === "consent_roster") return "bianca-consent-roster"
   if (id === "call_log") return "bianca-call-completion-log"
+  if (id === "alert_audit") return "bianca-alert-audit-trail"
   return "bianca-report"
 }
 
@@ -60,6 +67,12 @@ export function ReportTemplateDetailPage() {
   )
   const skipCallLogQuery = !wantsLiveCallLog || callLogOrgMissing
 
+  const wantsLiveAlertAudit = Boolean(validId === "alert_audit" && authed)
+  const alertAuditOrgMissing = Boolean(
+    wantsLiveAlertAudit && currentUser?.role === "superAdmin" && !(org?.id != null && String(org.id).trim() !== ""),
+  )
+  const skipAlertAuditQuery = !wantsLiveAlertAudit || alertAuditOrgMissing
+
   const [callLogPage, setCallLogPage] = useState(1)
   useEffect(() => {
     setCallLogPage(1)
@@ -79,6 +92,21 @@ export function ReportTemplateDetailPage() {
     isFetching: callLogFetching,
     isError: callLogError,
   } = useGetCallCompletionLogQuery(callLogQueryArg, { skip: skipCallLogQuery })
+
+  const alertAuditQueryArg = useMemo((): AlertAuditTrailQueryArgs => {
+    const arg: AlertAuditTrailQueryArgs = {}
+    if (currentUser?.role === "superAdmin" && org?.id != null && String(org.id).trim() !== "") {
+      arg.orgId = String(org.id)
+    }
+    return arg
+  }, [currentUser?.role, org?.id])
+
+  const {
+    data: alertAuditData,
+    isLoading: alertAuditLoading,
+    isFetching: alertAuditFetching,
+    isError: alertAuditError,
+  } = useGetAlertAuditTrailQuery(alertAuditQueryArg, { skip: skipAlertAuditQuery })
 
   if (!validId) {
     return <Navigate to="/reports" replace />
@@ -126,8 +154,21 @@ export function ReportTemplateDetailPage() {
     })
   }, [callLogData, validId, org?.name, currentUser?.role])
 
-  const payload: ReportPayload | null =
-    validId === "call_log" && authed ? callLogPayload : loadLiveClients && validId !== "risk_sentiment" ? livePayload : mockPayload
+  const alertAuditPayload = useMemo((): ReportPayload | null => {
+    if (!alertAuditData || validId !== "alert_audit") return null
+    return buildAlertAuditReportPayload(alertAuditData, {
+      facilityLine: org?.name?.trim() || "Your organization",
+      generatedAtLabel: new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
+      scopeFacilityWide: seesWholeFacilityInReports(currentUser?.role),
+    })
+  }, [alertAuditData, validId, org?.name, currentUser?.role])
+
+  const payload: ReportPayload | null = useMemo(() => {
+    if (validId === "call_log" && authed) return callLogPayload
+    if (validId === "alert_audit" && authed) return alertAuditPayload
+    if (loadLiveClients && validId !== "risk_sentiment") return livePayload
+    return mockPayload
+  }, [validId, authed, callLogPayload, alertAuditPayload, loadLiveClients, mockPayload, livePayload])
 
   const showSampleBanner = LIVE_CLIENT_TEMPLATES.has(validId) && !authed
 
@@ -138,6 +179,11 @@ export function ReportTemplateDetailPage() {
   const showCallLogError = wantsLiveCallLog && !callLogOrgMissing && callLogError
   const showCallLogLoading =
     wantsLiveCallLog && !callLogOrgMissing && !callLogError && (callLogLoading || callLogFetching)
+
+  const showAlertAuditOrgHint = wantsLiveAlertAudit && alertAuditOrgMissing
+  const showAlertAuditError = wantsLiveAlertAudit && !alertAuditOrgMissing && alertAuditError
+  const showAlertAuditLoading =
+    wantsLiveAlertAudit && !alertAuditOrgMissing && !alertAuditError && (alertAuditLoading || alertAuditFetching)
 
   const facilityLine = org?.name?.trim() || "Your organization"
   const generatedAtLabel = new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
@@ -169,6 +215,16 @@ export function ReportTemplateDetailPage() {
           </p>
         ) : showCallLogLoading ? (
           <p style={{ margin: 0, color: "var(--va-slate-600)" }}>Loading call log…</p>
+        ) : showAlertAuditOrgHint ? (
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>
+            Choose an organization context to load the alert audit trail (super admin).
+          </p>
+        ) : showAlertAuditError ? (
+          <p style={{ margin: 0, color: "var(--va-red-600)" }}>
+            Could not load alert audit data. Check your connection and try again.
+          </p>
+        ) : showAlertAuditLoading ? (
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>Loading alert audit…</p>
         ) : showLiveError ? (
           <p style={{ margin: 0, color: "var(--va-red-600)" }}>
             Could not load clients. Check your connection and try again.

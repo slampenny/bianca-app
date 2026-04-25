@@ -73,6 +73,9 @@ export function ObservabilityPage() {
           <Link to="/scim" className="admin-btn admin-btn--ghost">
             SCIM
           </Link>
+          <Link to="/org-flags" className="admin-btn admin-btn--ghost">
+            Org flags
+          </Link>
           <Link to="/embedding-anchors" className="admin-btn admin-btn--ghost">
             Embedding anchors
           </Link>

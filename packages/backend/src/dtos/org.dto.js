@@ -23,7 +23,8 @@ const OrgDTO = (org) => {
     patients,
     callRetrySettings,
     privacyOfficerId,
-    requireClientConsent
+    requireClientConsent,
+    debugAudioUploadEnabled
   } = orgObj;
   
   const id = _id;
@@ -54,6 +55,7 @@ const OrgDTO = (org) => {
     callRetrySettings,
     privacyOfficerId: privacyOfficerId ? (privacyOfficerId instanceof ObjectId ? privacyOfficerId.toString() : (privacyOfficerId?._id || privacyOfficerId)) : null,
     requireClientConsent: requireClientConsent === true,
+    debugAudioUploadEnabled: debugAudioUploadEnabled === true,
   };
 };
 

@@ -3,6 +3,7 @@ import type {
   AdminCaregiverSearchResponse,
   AdminCaregiverSearchRow,
   AdminOrgSearchResponse,
+  AdminOrgDetail,
   EmbeddingAnchorMergeResponse,
   EmbeddingAnchorPhraseRow,
   ImpersonateResponse,
@@ -15,7 +16,7 @@ import baseQueryWithAuth from "./baseQueryWithAuth"
 export const adminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: baseQueryWithAuth(),
-  tagTypes: ["Observability", "Scim", "EmbeddingAnchors"],
+  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail"],
   endpoints: (builder) => ({
     getObservability: builder.query<ObservabilityPayload, void>({
       query: () => ({
@@ -37,6 +38,21 @@ export const adminApi = createApi({
         method: "GET",
         params: { q, page, limit },
       }),
+    }),
+    getOrg: builder.query<AdminOrgDetail, string>({
+      query: (orgId) => ({
+        url: `/orgs/${orgId}`,
+        method: "GET",
+      }),
+      providesTags: (_r, _e, orgId) => [{ type: "OrgDetail", id: orgId }],
+    }),
+    patchOrg: builder.mutation<AdminOrgDetail, { orgId: string; body: { debugAudioUploadEnabled: boolean } }>({
+      query: ({ orgId, body }) => ({
+        url: `/orgs/${orgId}`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_r, _e, { orgId }) => [{ type: "OrgDetail", id: orgId }],
     }),
     getOrgScimStatus: builder.query<ScimAdminStatus, string>({
       query: (orgId) => ({
@@ -146,4 +162,6 @@ export const {
   useUpdateEmbeddingAnchorPhraseMutation,
   useDeleteEmbeddingAnchorPhraseMutation,
   useMergeEmbeddingAnchorDefaultsMutation,
+  useGetOrgQuery,
+  usePatchOrgMutation,
 } = adminApi
