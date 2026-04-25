@@ -119,6 +119,7 @@ const ANCHOR_TREE = {
       'wire transfer to this account',
       'buy gift cards and read numbers',
       'bitcoin wallet address',
+      'buy bitcoin with my savings',
       'western union payment',
     ],
     helpRequests: [
@@ -126,7 +127,12 @@ const ANCHOR_TREE = {
       'need emergency loan today',
       'borrow money from your account',
     ],
-    largeAmounts: ['send ten thousand dollars', 'fifty thousand dollar wire'],
+    largeAmounts: [
+      'send ten thousand dollars',
+      'fifty thousand dollar wire',
+      'a hundred thousand dollars',
+      'hundred grand',
+    ],
     relationshipMoney: [
       'new friend online needs money',
       'person I met asked me to send cash',

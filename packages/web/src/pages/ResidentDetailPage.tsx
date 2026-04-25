@@ -19,6 +19,7 @@ import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/
 import { AvatarPicker } from "../components/AvatarPicker"
 import { NewScheduleFormFields } from "../components/NewScheduleFormFields"
 import { ClientOnboardingSection } from "../components/ClientOnboardingSection"
+import { FraudAbuseAnalysisPanel } from "../components/FraudAbuseAnalysisPanel"
 import { canAddResidents } from "../lib/roleAccess"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -1239,6 +1240,13 @@ export function ResidentDetailPage() {
                 </div>
               </div>
             )}
+
+            <div style={{ marginTop: "0.5rem", paddingTop: "1rem", borderTop: "1px solid var(--va-slate-200)" }}>
+              <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--va-slate-800)", marginBottom: "0.65rem" }}>
+                Fraud and abuse analysis
+              </h3>
+              {clientIdForApi ? <FraudAbuseAnalysisPanel clientId={clientIdForApi} /> : null}
+            </div>
           </div>
         )}
       </div>

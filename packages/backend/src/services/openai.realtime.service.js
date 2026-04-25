@@ -1514,8 +1514,17 @@ class OpenAIRealtimeService {
 
             // Recovery: prior turn can leave AI_RESPONDING with _aiIsSpeaking false if sendResponseCreate never
             // produced a response (invalid self-transition AI_RESPONDING→AI_RESPONDING blocks the next speech_stopped).
+            //
+            // Do NOT run while a user turn is legitimately in flight: after speech_stopped we move to AI_RESPONDING
+            // and set _aiIsSpeaking on a 200ms timer — a duplicate VAD speech_stopped in that window looks "stuck"
+            // and would clear flags, then a second 200ms fires and we get two assistant messages in a row.
             const stBeforeRecovery = this.getConversationState(callId);
-            if (stBeforeRecovery === CONVERSATION_STATES.AI_RESPONDING && !conn._aiIsSpeaking) {
+            const inUserTurnPipeline =
+              conn._userTurnResponseCreateSent ||
+              (conn._speechStoppedCommittedAiResponding && !conn._userTurnResponseCreateSent) ||
+              conn._responseCreateInFlight ||
+              conn._responseCreated;
+            if (stBeforeRecovery === CONVERSATION_STATES.AI_RESPONDING && !conn._aiIsSpeaking && !inUserTurnPipeline) {
               logger.warn(
                 `[RealtimeRC] recovery ${callId}: state=ai_responding and _aiIsSpeaking=false → transition to conversation_active (enables next response.create)`
               );
@@ -1742,12 +1751,20 @@ class OpenAIRealtimeService {
                         return;
                       }
                       try {
-                        await this.sendResponseCreate(callId);
                         finalConn._userTurnResponseCreateSent = true;
+                        const sent = await this.sendResponseCreate(callId);
+                        if (!sent) {
+                          finalConn._userTurnResponseCreateSent = false;
+                          const failConn = this.connections.get(callId);
+                          if (failConn) failConn._speechStoppedCommittedAiResponding = false;
+                          this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
+                          return;
+                        }
                         this._resetAssistantOutputAudioLifecycle(finalConn);
                         finalConn._aiIsSpeaking = true;
                         logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking (post-cancel) for ${callId}`);
                       } catch (err) {
+                        finalConn._userTurnResponseCreateSent = false;
                         logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
                         const failConn = this.connections.get(callId);
                         if (failConn) failConn._speechStoppedCommittedAiResponding = false;
@@ -1881,12 +1898,20 @@ class OpenAIRealtimeService {
                       outcome: 'calling_sendResponseCreate',
                     });
                     logger.info(`[OpenAI Realtime] DEBUG: About to trigger response for ${callId} - _responseCreated: ${currentConn._responseCreated}, _responseStartTime: ${currentConn._responseStartTime}`);
-                    await this.sendResponseCreate(callId);
                     currentConn._userTurnResponseCreateSent = true;
+                    const sent = await this.sendResponseCreate(callId);
+                    if (!sent) {
+                      currentConn._userTurnResponseCreateSent = false;
+                      const failConn = this.connections.get(callId);
+                      if (failConn) failConn._speechStoppedCommittedAiResponding = false;
+                      this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'response_failed');
+                      return;
+                    }
                     this._resetAssistantOutputAudioLifecycle(currentConn);
                     currentConn._aiIsSpeaking = true;
                     logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
                   } catch (err) {
+                    currentConn._userTurnResponseCreateSent = false;
                     logger.error(`[OpenAI Realtime] Failed to trigger AI response: ${err.message}`);
                     const failConn = this.connections.get(callId);
                     if (failConn) failConn._speechStoppedCommittedAiResponding = false;
@@ -2447,12 +2472,20 @@ class OpenAIRealtimeService {
         return;
       }
       try {
-        await this.sendResponseCreate(callId);
         currentConn._userTurnResponseCreateSent = true;
+        const sent = await this.sendResponseCreate(callId);
+        if (!sent) {
+          currentConn._userTurnResponseCreateSent = false;
+          const failConn = this.connections.get(callId);
+          if (failConn) failConn._speechStoppedCommittedAiResponding = false;
+          this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'deferred_response_failed');
+          return;
+        }
         this._resetAssistantOutputAudioLifecycle(currentConn);
         currentConn._aiIsSpeaking = true;
         logger.info(`[OpenAI Realtime] Flushed deferred user response for ${callId} after AI response.done`);
       } catch (err) {
+        currentConn._userTurnResponseCreateSent = false;
         logger.error(`[OpenAI Realtime] Deferred user response flush failed for ${callId}: ${err.message}`);
         const failConn = this.connections.get(callId);
         if (failConn) failConn._speechStoppedCommittedAiResponding = false;
@@ -3009,12 +3042,18 @@ class OpenAIRealtimeService {
               return;
             }
             try {
-              await this.sendResponseCreate(callId);
               currentConn._userTurnResponseCreateSent = true;
+              const sent = await this.sendResponseCreate(callId);
+              if (!sent) {
+                currentConn._userTurnResponseCreateSent = false;
+                this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'post_asr_response_failed');
+                return;
+              }
               this._resetAssistantOutputAudioLifecycle(currentConn);
               currentConn._aiIsSpeaking = true;
               logger.info(`[OpenAI Realtime] Triggered AI response after delayed transcript completion for ${callId}`);
             } catch (err) {
+              currentConn._userTurnResponseCreateSent = false;
               logger.error(`[OpenAI Realtime] Failed post-ASR response trigger for ${callId}: ${err.message}`);
               this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'post_asr_response_failed');
             }
@@ -3071,12 +3110,18 @@ class OpenAIRealtimeService {
             return;
           }
           try {
-            await this.sendResponseCreate(callId);
             currentConn._userTurnResponseCreateSent = true;
+            const sent = await this.sendResponseCreate(callId);
+            if (!sent) {
+              currentConn._userTurnResponseCreateSent = false;
+              this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'asr_fallback_response_failed');
+              return;
+            }
             this._resetAssistantOutputAudioLifecycle(currentConn);
             currentConn._aiIsSpeaking = true;
             logger.info(`[OpenAI Realtime] Triggered AI response from ASR fallback for ${callId}`);
           } catch (err) {
+            currentConn._userTurnResponseCreateSent = false;
             logger.error(`[OpenAI Realtime] Failed ASR fallback response trigger for ${callId}: ${err.message}`);
             this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'asr_fallback_response_failed');
           }

@@ -30,6 +30,7 @@ import { paymentMethodApi } from "../services/api/paymentMethodApi"
 import { dailyDigestApi } from "../services/api/dailyDigestApi"
 import { familyWeeklyDigestApi } from "../services/api/familyWeeklyDigestApi"
 import { facilityReportsApi } from "../services/api/facilityReportsApi"
+import { fraudAbuseAnalysisApi } from "../services/api/fraudAbuseAnalysisApi"
 
 const authPersistConfig = {
   key: "auth",
@@ -62,6 +63,7 @@ const rootReducer = combineReducers({
   [dailyDigestApi.reducerPath]: dailyDigestApi.reducer,
   [familyWeeklyDigestApi.reducerPath]: familyWeeklyDigestApi.reducer,
   [facilityReportsApi.reducerPath]: facilityReportsApi.reducer,
+  [fraudAbuseAnalysisApi.reducerPath]: fraudAbuseAnalysisApi.reducer,
 })
 
 export const store = configureStore({
@@ -89,6 +91,7 @@ export const store = configureStore({
       dailyDigestApi.middleware,
       familyWeeklyDigestApi.middleware,
       facilityReportsApi.middleware,
+      fraudAbuseAnalysisApi.middleware,
     ),
 })
 
