@@ -14,12 +14,12 @@ import { useGetConversationsByClientQuery } from "../services/api/conversationAp
 import { useGetSentimentSummaryQuery, useGetSentimentTrendQuery } from "../services/api/sentimentApi"
 import { useGetMedicalAnalysisResultsQuery, useGetMedicalAnalysisSummaryQuery } from "../services/api/medicalAnalysisApi"
 import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdateScheduleMutation } from "../services/api/scheduleApi"
-import type { MedicalAnalysisResult, MedicalAnalysisSummaryResponse } from "../services/api/medicalAnalysisApi"
 import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
 import { AvatarPicker } from "../components/AvatarPicker"
 import { NewScheduleFormFields } from "../components/NewScheduleFormFields"
 import { ClientOnboardingSection } from "../components/ClientOnboardingSection"
 import { FraudAbuseAnalysisPanel } from "../components/FraudAbuseAnalysisPanel"
+import { MedicalAnalysisReportPanel } from "../components/MedicalAnalysisReportPanel"
 import { canAddResidents } from "../lib/roleAccess"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -1029,7 +1029,7 @@ export function ResidentDetailPage() {
 
         {analysisTab === "medical" ? (
           <div role="tabpanel" id="analysis-panel-medical" aria-labelledby="analysis-tab-medical">
-            <MedicalAnalysisPanel
+            <MedicalAnalysisReportPanel
               summary={medicalSummary}
               latestResult={medicalResults?.results?.[0]}
               isLoading={medicalSummaryLoading || medicalResultsLoading}
@@ -1241,10 +1241,7 @@ export function ResidentDetailPage() {
               </div>
             )}
 
-            <div style={{ marginTop: "0.5rem", paddingTop: "1rem", borderTop: "1px solid var(--va-slate-200)" }}>
-              <h3 style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--va-slate-800)", marginBottom: "0.65rem" }}>
-                Fraud and abuse analysis
-              </h3>
+            <div style={{ marginTop: "0.35rem" }}>
               {clientIdForApi ? <FraudAbuseAnalysisPanel clientId={clientIdForApi} /> : null}
             </div>
           </div>
@@ -1668,111 +1665,6 @@ function AnalysisStat({
   )
 }
 
-
-function MedicalAnalysisPanel({
-  summary,
-  latestResult,
-  isLoading,
-  isError,
-}: {
-  summary: MedicalAnalysisSummaryResponse | undefined
-  latestResult: MedicalAnalysisResult | undefined
-  isLoading: boolean
-  isError: boolean
-}) {
-  if (isLoading) {
-    return <p style={{ marginTop: "0.9rem", color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading medical analysis…</p>
-  }
-  if (isError) {
-    return <p style={{ marginTop: "0.9rem", color: "var(--va-red-600)", fontSize: "0.875rem" }}>Could not load medical analysis for this resident.</p>
-  }
-  const hasData = Boolean(summary?.data?.hasData || latestResult)
-  if (!hasData) {
-    return <p style={{ marginTop: "0.9rem", color: "var(--va-slate-500)", fontSize: "0.875rem" }}>No medical analysis available yet.</p>
-  }
-
-  const overallHealth = summary?.data?.summary?.overallHealthScore
-  const conversationCount = summary?.data?.conversationCount ?? summary?.data?.summary?.totalConversations ?? latestResult?.conversationCount
-  const messageCount = summary?.data?.messageCount ?? latestResult?.messageCount
-  const confidence = latestResult?.confidence
-  const lastDate = summary?.data?.lastAnalysisDate ?? summary?.data?.summary?.lastAnalysisDate ?? latestResult?.analysisDate
-  const riskIndicators = summary?.data?.summary?.riskIndicators ?? []
-  const concerns = summary?.data?.summary?.concerns ?? []
-  const recommendations = latestResult?.recommendations ?? []
-
-  return (
-    <div style={{ marginTop: "0.8rem", display: "grid", gap: "0.85rem" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-        <AnalysisStat label="Overall health" value={overallHealth != null ? `${Math.round(overallHealth)}%` : "—"} tone={overallHealth != null && overallHealth < 50 ? "danger" : overallHealth != null && overallHealth < 70 ? "warn" : "ok"} />
-        <AnalysisStat label="Conversations" value={conversationCount != null ? String(conversationCount) : "—"} tone="neutral" />
-        <AnalysisStat label="Messages" value={messageCount != null ? String(messageCount) : "—"} tone="neutral" />
-        <AnalysisStat label="Confidence" value={confidence ? confidence.toUpperCase() : "—"} tone={confidence === "low" || confidence === "none" ? "warn" : "ok"} />
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 10 }}>
-        <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: "0.75rem", padding: "0.65rem 0.75rem", background: "var(--va-slate-50)" }}>
-          <p style={{ margin: 0, fontSize: "0.72rem", color: "var(--va-slate-500)" }}>Cognitive risk</p>
-          <p style={{ margin: "0.2rem 0 0", fontSize: "1rem", fontWeight: 700, color: "var(--va-navy)" }}>
-            {latestResult?.cognitiveMetrics?.riskScore != null ? `${Math.round(latestResult.cognitiveMetrics.riskScore)}%` : "—"}
-          </p>
-        </div>
-        <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: "0.75rem", padding: "0.65rem 0.75rem", background: "var(--va-slate-50)" }}>
-          <p style={{ margin: 0, fontSize: "0.72rem", color: "var(--va-slate-500)" }}>Depression score</p>
-          <p style={{ margin: "0.2rem 0 0", fontSize: "1rem", fontWeight: 700, color: "var(--va-navy)" }}>
-            {latestResult?.psychiatricMetrics?.depressionScore != null ? `${Math.round(latestResult.psychiatricMetrics.depressionScore)}%` : "—"}
-          </p>
-        </div>
-        <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: "0.75rem", padding: "0.65rem 0.75rem", background: "var(--va-slate-50)" }}>
-          <p style={{ margin: 0, fontSize: "0.72rem", color: "var(--va-slate-500)" }}>Anxiety score</p>
-          <p style={{ margin: "0.2rem 0 0", fontSize: "1rem", fontWeight: 700, color: "var(--va-navy)" }}>
-            {latestResult?.psychiatricMetrics?.anxietyScore != null ? `${Math.round(latestResult.psychiatricMetrics.anxietyScore)}%` : "—"}
-          </p>
-        </div>
-        <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: "0.75rem", padding: "0.65rem 0.75rem", background: "var(--va-slate-50)" }}>
-          <p style={{ margin: 0, fontSize: "0.72rem", color: "var(--va-slate-500)" }}>Language complexity</p>
-          <p style={{ margin: "0.2rem 0 0", fontSize: "1rem", fontWeight: 700, color: "var(--va-navy)" }}>
-            {latestResult?.vocabularyMetrics?.complexityScore != null ? `${Math.round(latestResult.vocabularyMetrics.complexityScore)}%` : "—"}
-          </p>
-        </div>
-      </div>
-
-      <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-        Last analysis: {lastDate ? new Date(lastDate).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Unavailable"}
-      </p>
-
-      {riskIndicators.length > 0 ? (
-        <div style={{ border: "1px solid var(--va-red-100)", borderRadius: "0.75rem", background: "var(--va-red-50)", padding: "0.7rem 0.8rem" }}>
-          <p style={{ margin: 0, fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-red-700)" }}>Risk indicators</p>
-          <ul style={{ margin: "0.45rem 0 0", paddingLeft: "1.1rem", fontSize: "0.8125rem", color: "var(--va-red-700)" }}>
-            {riskIndicators.slice(0, 4).map((r, i) => (
-              <li key={`${r.category}-${i}`}>{r.description}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      {recommendations.length > 0 ? (
-        <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: "0.75rem", background: "var(--va-slate-50)", padding: "0.7rem 0.8rem" }}>
-          <p style={{ margin: 0, fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-slate-700)" }}>Recommendations</p>
-          <ul style={{ margin: "0.45rem 0 0", paddingLeft: "1.1rem", fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>
-            {recommendations.slice(0, 4).map((r, i) => (
-              <li key={`${r.title || "rec"}-${i}`}>{r.title || r.description || "Recommendation"}</li>
-            ))}
-          </ul>
-        </div>
-      ) : concerns.length > 0 ? (
-        <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: "0.75rem", background: "var(--va-slate-50)", padding: "0.7rem 0.8rem" }}>
-          <p style={{ margin: 0, fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-slate-700)" }}>Concerns</p>
-          <ul style={{ margin: "0.45rem 0 0", paddingLeft: "1.1rem", fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>
-            {concerns.slice(0, 4).map((c, i) => (
-              <li key={`${c.category}-${i}`}>{c.description}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
-  )
-}
 
 function StatusPill({ status }: { status: "active" | "inactive" | "at_risk" }) {
   const map = {

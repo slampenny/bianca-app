@@ -2,7 +2,36 @@ import { createApi } from "@reduxjs/toolkit/query/react"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 type MedicalSeverity = "low" | "medium" | "high" | "critical"
-type MedicalConfidence = "none" | "low" | "medium" | "high"
+export type MedicalConfidence = "none" | "low" | "medium" | "high"
+
+/** Matches API / mobile — used for full report UI on web. */
+export interface MedicalCognitiveMetrics {
+  riskScore?: number
+  fillerWordDensity?: number
+  vagueReferenceDensity?: number
+  repetitionScore?: number
+  temporalConfusionCount?: number
+  wordFindingDifficultyCount?: number
+  informationDensity?: { score?: number }
+  indicators?: Array<{ severity?: string; message?: string }>
+}
+
+export interface MedicalPsychiatricMetrics {
+  depressionScore?: number
+  anxietyScore?: number
+  overallRiskScore?: number
+  crisisIndicators?: { hasCrisisIndicators?: boolean }
+  emotionalTone?: { dominantTone?: string; negativeRatio?: number }
+  protectiveFactors?: number | string
+}
+
+export interface MedicalVocabularyMetrics {
+  complexityScore?: number
+  typeTokenRatio?: number
+  avgWordLength?: number
+  avgSentenceLength?: number
+  uniqueWords?: number
+}
 
 export interface MedicalAnalysisSummaryResponse {
   success: boolean
@@ -28,10 +57,12 @@ export interface MedicalAnalysisResult {
   analysisDate?: string
   conversationCount?: number
   messageCount?: number
+  totalWords?: number
   confidence?: MedicalConfidence
-  cognitiveMetrics?: { riskScore?: number }
-  psychiatricMetrics?: { depressionScore?: number; anxietyScore?: number; overallRiskScore?: number }
-  vocabularyMetrics?: { complexityScore?: number }
+  cognitiveMetrics?: MedicalCognitiveMetrics
+  psychiatricMetrics?: MedicalPsychiatricMetrics
+  vocabularyMetrics?: MedicalVocabularyMetrics
+  warnings?: string[]
   recommendations?: Array<{ title?: string; severity?: MedicalSeverity; description?: string }>
 }
 
