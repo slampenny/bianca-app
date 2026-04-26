@@ -1169,26 +1169,28 @@ const triggerAnalysisAfterCall = async (clientId) => {
       logger.error(`[Analysis Trigger] Error in medical analysis for client ${clientId}: ${medicalErr.message}`);
     }
 
-    // Trigger fraud/abuse analysis
+    // Trigger fraud/abuse analysis — must upsert the *current calendar month* document so
+    // GET /fraud-abuse-analysis?timeRange=month (Resident page cards) shows fresh numbers after each call.
     try {
       const FraudAbuseAnalyzer = require('./ai/fraudAbuseAnalyzer.service');
+      const FraudAbuseAnalysis = require('../models/fraudAbuseAnalysis.model');
       const analyzer = new FraudAbuseAnalyzer();
 
-      // Get all conversations for the patient
-      const conversations = await getConversationsByClient(clientId);
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      const monthConversations = await getConversationsByClientAndDateRange(clientId, monthStart, monthEnd);
+
       logger.info(
-        `[Analysis Trigger] Fraud/abuse analysis input for client ${clientId}: ${conversations.length} conversations`
+        `[Analysis Trigger] Fraud/abuse (month) input for client ${clientId}: ${monthConversations.length} conversations in current month window`
       );
 
-      if (conversations.length > 0) {
-        // Get baseline analysis (previous result)
-        const FraudAbuseAnalysis = require('../models/fraudAbuseAnalysis.model');
+      if (monthConversations.length > 0) {
         const baselineResults = await FraudAbuseAnalysis.find({ clientId }).sort({ analysisDate: -1 }).limit(1);
         const baseline = baselineResults.length > 0 ? baselineResults[0] : null;
 
-        // Perform fraud/abuse analysis
         logger.info(`[Analysis Trigger] Fraud/abuse baseline ${baseline ? 'found' : 'missing'} for client ${clientId}`);
-        const analysisResult = await analyzer.analyzeConversations(conversations, baseline);
+        const analysisResult = await analyzer.analyzeConversations(monthConversations, baseline);
         logger.info(
           `[Analysis Trigger] Fraud/abuse analysis result for client ${clientId}: ` +
             `confidence=${(analysisResult && analysisResult.confidence) || 'unknown'}, warnings=${
@@ -1196,14 +1198,13 @@ const triggerAnalysisAfterCall = async (clientId) => {
             }`
         );
 
-        // Store analysis result
-        const resultToStore = {
+        const setDoc = {
           clientId,
           analysisDate: new Date(),
-          timeRange: 'custom',
-          startDate: conversations.length > 0 ? conversations[conversations.length - 1].createdAt : new Date(),
-          endDate: conversations.length > 0 ? conversations[0].createdAt : new Date(),
-          conversationCount: conversations.length,
+          timeRange: 'month',
+          startDate: monthStart,
+          endDate: monthEnd,
+          conversationCount: monthConversations.length,
           messageCount: analysisResult.messageCount,
           totalWords: analysisResult.totalWords,
           financialRisk: analysisResult.financialRisk,
@@ -1217,15 +1218,22 @@ const triggerAnalysisAfterCall = async (clientId) => {
           processingTime: 0,
           version: '1.0',
         };
-        await FraudAbuseAnalysis.create(resultToStore);
 
-        logger.info(`[Analysis Trigger] Fraud/abuse analysis completed for client ${clientId}`, {
-          conversationCount: conversations.length,
+        await FraudAbuseAnalysis.findOneAndUpdate(
+          { clientId, timeRange: 'month', startDate: monthStart, endDate: monthEnd },
+          { $set: setDoc },
+          { upsert: true, new: true }
+        );
+
+        logger.info(`[Analysis Trigger] Fraud/abuse month record upserted for client ${clientId}`, {
+          conversationCount: monthConversations.length,
           confidence: analysisResult.confidence,
           overallRiskScore: analysisResult.overallRiskScore,
         });
       } else {
-        logger.info(`[Analysis Trigger] No conversations found for client ${clientId}, skipping fraud/abuse analysis`);
+        logger.info(
+          `[Analysis Trigger] No conversations in current month for client ${clientId}, skipping fraud/abuse month upsert`
+        );
       }
     } catch (fraudErr) {
       logger.error(`[Analysis Trigger] Error in fraud/abuse analysis for client ${clientId}: ${fraudErr.message}`);

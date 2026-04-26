@@ -235,9 +235,30 @@ class EmergencyProcessor {
       }
 
       // Step 4: Determine if we should alert
-      const shouldAlert = emergencyResult.isEmergency && 
-                         !falsePositiveResult.isFalsePositive && 
-                         deduplicationResult.shouldAlert;
+      let shouldAlert =
+        emergencyResult.isEmergency &&
+        !falsePositiveResult.isFalsePositive &&
+        deduplicationResult.shouldAlert;
+
+      // Step 4b: High-risk money language (crypto, large transfer, scam patterns) when the medical
+      // emergency / embedding path did not alert — e.g. "a hundred grand in Bitcoin".
+      let financialPathSource = null;
+      if (!shouldAlert) {
+        const fin = await this.tryFinancialExploitationPath(
+          clientId,
+          text,
+          timestamp,
+          clientLanguage,
+          contextWindow
+        );
+        if (fin) {
+          financialPathSource = 'financial_exploitation';
+          emergencyResult = fin.emergencyResult;
+          falsePositiveResult = { isFalsePositive: false, reason: null };
+          deduplicationResult = fin.dedup;
+          shouldAlert = true;
+        }
+      }
 
       // Step 5: Calculate confidence score
       const confidence = this.calculateConfidence(emergencyResult, falsePositiveResult);
@@ -261,7 +282,10 @@ class EmergencyProcessor {
         }
       }
 
-      const detectionSource = embeddingPipelinePositive ? 'embedding_pipeline' : 'phrase_match';
+      let detectionSource = embeddingPipelinePositive ? 'embedding_pipeline' : 'phrase_match';
+      if (financialPathSource) {
+        detectionSource = financialPathSource;
+      }
 
       // Step 7: Create response
       const response = {
@@ -313,6 +337,28 @@ class EmergencyProcessor {
    * @param {string} severity
    * @param {string} [category]
    */
+  /**
+   * SMS is reserved for true safety-oriented emergencies. Dashboard-only alerts
+   * (e.g. financial risk from the financial exploitation path) still use createAlert
+   * but must not text caregivers.
+   * @param {Object} alertData
+   * @param {Object} meta
+   * @returns {boolean}
+   */
+  _shouldSendSmsToCaregivers(alertData, meta = {}) {
+    if (meta.sendSms === true) return true;
+    if (meta.sendSms === false) return false;
+    if (meta.detectionSource === 'financial_exploitation') return false;
+    const cat = String(alertData?.category || '')
+      .trim()
+      .toLowerCase();
+    if (cat === 'financial' || cat.startsWith('financial_') || cat.startsWith('financial:')) {
+      return false;
+    }
+    if (meta.dashboardOnly === true) return false;
+    return true;
+  }
+
   buildRecommendedActions(severity, category) {
     const actions = [
       { id: 'review_conversation', labelKey: 'alertActions.reviewConversation', actionType: 'review_conversation' },
@@ -404,39 +450,61 @@ class EmergencyProcessor {
 
       const alert = await alertService.createAlert(alertRecord);
 
-      // Send push notifications if enabled
+      // SMS only for real emergency alerts (not financial/dashboard-only, unless meta.sendSms).
+      // Other features should use alertService.createAlert directly and never call sendEmergencyAlert.
       let notificationResult = null;
-      logger.info(`[Emergency Processor] Checking SMS notifications - enableSNSPushNotifications: ${config.enableSNSPushNotifications}`);
-      
-      if (config.enableSNSPushNotifications) {
-        const caregivers = await this.getClientCaregivers(clientId);
-        logger.info(`[Emergency Processor] Found ${caregivers.length} caregiver(s) with phone numbers for client ${clientId}`);
-        
-        if (caregivers.length === 0) {
-          logger.warn(`[Emergency Processor] No caregivers with phone numbers found for client ${clientId} - SMS will not be sent`);
-        } else {
-          logger.info(`[Emergency Processor] Sending emergency SMS alerts to ${caregivers.length} caregiver(s)`);
-          notificationResult = await snsService.sendEmergencyAlert(
-            {
-              clientId,
-              clientName: client.name || client.preferredName || 'Unknown Client',
-              severity: alertData.severity,
-              category: alertData.category,
-              phrase: alertData.phrase
-            },
-            caregivers
-          );
-          logger.info(`[Emergency Processor] SMS notification result:`, notificationResult);
-        }
+      let smsNotificationSent = false;
+      const allowSms = this._shouldSendSmsToCaregivers(alertData, meta);
+
+      if (!allowSms) {
+        logger.info(
+          `[Emergency Processor] Skipping SMS — dashboard-only alert (category=${alertData?.category}, source=${meta.detectionSource || 'n/a'})`
+        );
       } else {
-        logger.warn(`[Emergency Processor] SMS notifications are DISABLED in config - no SMS will be sent`);
-        logger.warn(`[Emergency Processor] To enable, set NODE_ENV=staging/production or set AWS_REGION env var`);
+        logger.info(
+          `[Emergency Processor] Checking SMS notifications - enableSNSPushNotifications: ${config.enableSNSPushNotifications}`
+        );
+
+        if (config.enableSNSPushNotifications) {
+          const caregivers = await this.getClientCaregivers(clientId);
+          logger.info(
+            `[Emergency Processor] Found ${caregivers.length} caregiver(s) with phone numbers for client ${clientId}`
+          );
+
+          if (caregivers.length === 0) {
+            logger.warn(
+              `[Emergency Processor] No caregivers with phone numbers found for client ${clientId} - SMS will not be sent`
+            );
+          } else {
+            logger.info(
+              `[Emergency Processor] Sending emergency SMS alerts to ${caregivers.length} caregiver(s)`
+            );
+            notificationResult = await snsService.sendEmergencyAlert(
+              {
+                clientId,
+                clientName: client.name || client.preferredName || 'Unknown Client',
+                severity: alertData.severity,
+                category: alertData.category,
+                phrase: alertData.phrase
+              },
+              caregivers
+            );
+            smsNotificationSent = Boolean(notificationResult && notificationResult.success);
+            logger.info(`[Emergency Processor] SMS notification result:`, notificationResult);
+          }
+        } else {
+          logger.warn(`[Emergency Processor] SMS notifications are DISABLED in config - no SMS will be sent`);
+          logger.warn(
+            `[Emergency Processor] To enable, set NODE_ENV=staging/production or set AWS_REGION env var`
+          );
+        }
       }
 
       return {
         success: true,
         alert,
         notificationResult,
+        smsNotificationSent,
         client: {
           id: clientId,
           name: client.name,
@@ -536,6 +604,59 @@ class EmergencyProcessor {
    * Get reason for alert decision
    * @private
    */
+  /**
+   * When the main pipeline is quiet, use embedding + keyword financial rules (same as fraud detector).
+   * @returns {Promise<null|{emergencyResult: object, dedup: object}>}
+   */
+  async tryFinancialExploitationPath(clientId, text, timestamp, clientLanguage, contextWindow) {
+    try {
+      const FinancialExploitationDetector = require('./ai/financialExploitationDetector.service');
+      const finDet = new FinancialExploitationDetector();
+      const emb = await finDet.analyze(text, clientId);
+      const kw = finDet.detectFinancialExploitation([text], text);
+      const grandish =
+        /\b(a\s+)?(one|two|three|four|five|ten|fifty|hundred|two\s+hundred|three\s+hundred)\s+grand\b/i.test(
+          text
+        ) ||
+        /\b\d{1,3}(?:,\d{3})*\s+grand\b/i.test(text) ||
+        /\b(hundred|thousand)\s+grand\b/i.test(text);
+      const keywordFire =
+        (kw.largeAmountMentions > 0 && kw.transferMethodMentions > 0) ||
+        (grandish && kw.transferMethodMentions > 0) ||
+        kw.riskScore >= 40 ||
+        (kw.scamIndicatorMentions > 0 && kw.transferMethodMentions > 0) ||
+        (kw.scamIndicatorMentions > 0 && grandish);
+      if (!emb.shouldAlert && !keywordFire) {
+        return null;
+      }
+      const finDedup = getAlertDeduplicator().shouldAlert(clientId, 'Financial', text, timestamp, {
+        severity: 'HIGH',
+        contextWindow: contextWindow.getRecentContext(clientId, 5),
+      });
+      if (!finDedup.shouldAlert) {
+        return null;
+      }
+      const rs = Number(emb.riskScore) || 0;
+      const severity =
+        rs >= 0.65 || kw.riskScore >= 55 || (emb.shouldAlert && kw.riskScore >= 35) ? 'HIGH' : 'MEDIUM';
+      const matchedPhrase =
+        (kw.flaggedPhrases && kw.flaggedPhrases[0]) || (text.length > 100 ? `${text.substring(0, 97)}…` : text);
+      return {
+        emergencyResult: {
+          isEmergency: true,
+          severity,
+          matchedPhrase,
+          category: 'Financial',
+          language: clientLanguage,
+        },
+        dedup: finDedup,
+      };
+    } catch (e) {
+      logger.warn(`[Emergency] tryFinancialExploitationPath: ${e.message}`);
+      return null;
+    }
+  }
+
   getReason(emergencyResult, falsePositiveResult, deduplicationResult) {
     if (!emergencyResult.isEmergency) {
       return 'No emergency patterns detected';

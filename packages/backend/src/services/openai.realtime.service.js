@@ -3189,21 +3189,29 @@ class OpenAIRealtimeService {
           if (alertResult.success) {
             logger.info(`[Emergency Detection] Alert created successfully: ${alertResult.alert?.id || alertResult.alert?._id}`);
 
-            try {
-              const emergencyInstruction = `\n\nCRITICAL: An emergency alert has been AUTOMATICALLY sent to the patient's caregiver via text message. In your next response, you MUST inform them: "I've already sent an alert to your caregiver. They'll be notified right away. Please call emergency services right away if you need immediate medical help." Do NOT offer to call emergency services yourself - you cannot make calls. Use "emergency services" (not "911") as it works in all countries. ONLY say this because the system has confirmed an alert was sent.`;
+            if (alertResult.smsNotificationSent) {
+              try {
+                const emergencyInstruction = `\n\nCRITICAL: An emergency alert has been AUTOMATICALLY sent to the patient's caregiver via text message. In your next response, you MUST inform them: "I've already sent an alert to your caregiver. They'll be notified right away. Please call emergency services right away if you need immediate medical help." Do NOT offer to call emergency services yourself - you cannot make calls. Use "emergency services" (not "911") as it works in all countries. ONLY say this because the system has confirmed an alert was sent.`;
 
-              const updatedInstructions = (conn.initialPrompt || '') + emergencyInstruction;
+                const updatedInstructions = (conn.initialPrompt || '') + emergencyInstruction;
 
-              await this.sendJsonMessage(callId, {
-                type: 'session.update',
-                session: {
-                  instructions: updatedInstructions
-                }
-              });
+                await this.sendJsonMessage(callId, {
+                  type: 'session.update',
+                  session: {
+                    instructions: updatedInstructions
+                  }
+                });
 
-              logger.info(`[Emergency Detection] Updated session instructions for ${callId} to include emergency alert notification`);
-            } catch (updateError) {
-              logger.error(`[Emergency Detection] Failed to update session instructions: ${updateError.message}`);
+                logger.info(
+                  `[Emergency Detection] Updated session instructions for ${callId} to include caregiver SMS confirmation`
+                );
+              } catch (updateError) {
+                logger.error(`[Emergency Detection] Failed to update session instructions: ${updateError.message}`);
+              }
+            } else {
+              logger.info(
+                `[Emergency Detection] No caregiver SMS for this alert (dashboard-only or SMS not sent) — session instructions unchanged`
+              );
             }
 
             if (emergencyResult.alertData.severity === 'CRITICAL') {

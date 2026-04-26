@@ -265,6 +265,28 @@ describe('Emergency Processor', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('Invalid client ID');
     });
+
+    test('should not send SMS for Financial / dashboard-only alerts', async () => {
+      const { snsService } = require('../../src/services/sns.service');
+      const sendSpy = jest.spyOn(snsService, 'sendEmergencyAlert').mockResolvedValue({ success: true });
+
+      const alertData = {
+        severity: 'HIGH',
+        category: 'Financial',
+        phrase: 'bitcoin',
+        confidence: 0.8,
+        responseTimeSeconds: 900
+      };
+
+      const result = await processor.createAlert(mockClient._id.toString(), alertData, 'large crypto purchase', {
+        detectionSource: 'financial_exploitation',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.smsNotificationSent).toBe(false);
+      expect(sendSpy).not.toHaveBeenCalled();
+      sendSpy.mockRestore();
+    });
   });
 
   describe('integration tests', () => {
