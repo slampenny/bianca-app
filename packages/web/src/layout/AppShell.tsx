@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import { isAlertUnreadForCaregiver } from "../lib/liveData"
 import { canManageCaregivers } from "../lib/roleAccess"
-import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { useGetCaregiverQuery } from "../services/api/caregiverApi"
 import { useDemo, useDemoActions } from "../state/DemoContext"
 import { useAppSelector } from "../store/store"
@@ -18,6 +18,7 @@ import {
   ZapIcon,
 } from "../icons"
 import { formatHeaderLastActivity } from "../lib/timeFormat"
+import { RealtimeSocketBridge } from "../realtime/RealtimeSocketBridge"
 import "../app.css"
 
 type NavItem = {
@@ -58,7 +59,10 @@ export function AppShell() {
   const avatarRaw = caregiverFresh?.avatar ?? currentUser?.avatar
   const avatarUrl = avatarRaw && String(avatarRaw).trim() ? String(avatarRaw).trim() : ""
 
-  const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
+  const { data: apiAlerts } = useGetAllAlertsQuery(undefined, {
+    ...liveAlertsQueryOptions,
+    skip: !authed,
+  })
   const liveUnread = useMemo(
     () => (apiAlerts ?? []).filter((a) => isAlertUnreadForCaregiver(a, currentUser?.id)).length,
     [apiAlerts, currentUser?.id],
@@ -102,6 +106,7 @@ export function AppShell() {
 
   return (
     <div className="va-app">
+      <RealtimeSocketBridge />
       <aside
         className={`va-aside ${sidebarCollapsed ? "va-aside--collapsed" : "va-aside--open"} group/sidebar`}
       >

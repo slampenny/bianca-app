@@ -56,6 +56,47 @@ function broadcastOrgAlertsChanged(orgId) {
   }
 }
 
+/**
+ * @param {string} clientId
+ * @returns {Promise<string|null>}
+ */
+async function resolveOrgIdForClientId(clientId) {
+  if (!clientId) return null;
+  const client = await Client.findById(clientId).select('org');
+  return client && client.org ? client.org.toString() : null;
+}
+
+/**
+ * @param {string} clientId
+ * @param {'medical' | 'fraudAbuse'} kind
+ */
+async function broadcastClientAnalysisUpdated(clientId, kind) {
+  if (!ioRef || !clientId) return;
+  const orgId = await resolveOrgIdForClientId(clientId);
+  if (!orgId) return;
+  try {
+    ioRef.to(`org:${orgId}`).emit('client:analysis:updated', {
+      clientId: String(clientId),
+      kind,
+      t: Date.now(),
+    });
+  } catch (err) {
+    logger.warn(`[alertBroadcast] client:analysis:updated emit failed: ${err.message}`);
+  }
+}
+
+/**
+ * @param {string} clientId
+ * @param {'medical' | 'fraudAbuse'} kind
+ */
+function scheduleClientAnalysisUpdated(clientId, kind) {
+  setImmediate(() => {
+    broadcastClientAnalysisUpdated(clientId, kind).catch((err) => {
+      logger.warn(`[alertBroadcast] client analysis: ${err.message}`);
+    });
+  });
+}
+
 async function broadcastAfterAlertChange(alertDocLike) {
   const orgId = await resolveOrgIdForAlert(alertDocLike);
   broadcastOrgAlertsChanged(orgId);
@@ -78,5 +119,7 @@ module.exports = {
   broadcastOrgAlertsChanged,
   broadcastAfterAlertChange,
   scheduleBroadcastAfterAlertChange,
+  scheduleClientAnalysisUpdated,
   resolveOrgIdForAlert,
+  resolveOrgIdForClientId,
 };

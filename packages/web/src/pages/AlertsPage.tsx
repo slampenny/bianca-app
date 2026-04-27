@@ -3,7 +3,7 @@ import { useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
-import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
@@ -16,7 +16,10 @@ export function AlertsPage() {
   const authed = useAppSelector((s) => !!s.auth.tokens)
 
   const { data: clientPages } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
-  const { data: apiAlerts, isLoading, isError, refetch, error } = useGetAllAlertsQuery(authed ? undefined : skipToken)
+  const { data: apiAlerts, isLoading, isError, refetch, error } = useGetAllAlertsQuery(undefined, {
+    ...liveAlertsQueryOptions,
+    skip: !authed,
+  })
 
   const clientNameById = useMemo(() => {
     const m = new Map<string, string>()

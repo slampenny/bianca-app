@@ -26,7 +26,7 @@ import {
   useUploadClientAvatarMutation,
   useGetClientOnboardingQuery,
 } from "../services/api/clientApi"
-import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { LoadingScreen } from "./LoadingScreen"
 import { useTheme } from "app/theme/ThemeContext"
 import { Button, TextField, PhoneInputWeb } from "app/components"
@@ -83,9 +83,8 @@ function ClientScreen() {
   const client = useSelector(getClient)
   const alertsFromStore = useSelector(getAlerts)
   const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
+    ...liveAlertsQueryOptions,
     skip: !currentUser?.id,
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
   })
   const { colors, isLoading: themeLoading } = useTheme()
 

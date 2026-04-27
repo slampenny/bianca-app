@@ -5,7 +5,12 @@ import { useNavigate, useParams } from "react-router-dom"
 import { mapConversationToTranscript } from "../lib/mapConversationToTranscript"
 import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
-import { useGetAllAlertsQuery, useMarkAlertAsReadMutation, useResolveAlertMutation } from "../services/api/alertApi"
+import {
+  useGetAllAlertsQuery,
+  useMarkAlertAsReadMutation,
+  useResolveAlertMutation,
+  liveAlertsQueryOptions,
+} from "../services/api/alertApi"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import { useGetConversationByIdQuery } from "../services/api/conversationApi"
 import { useDemo, useDemoActions } from "../state/DemoContext"
@@ -44,7 +49,10 @@ export function AlertDetailPage() {
   const [resolutionNote, setResolutionNote] = useState("")
   const [resolveError, setResolveError] = useState("")
 
-  const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
+  const { data: apiAlerts } = useGetAllAlertsQuery(undefined, {
+    ...liveAlertsQueryOptions,
+    skip: !authed,
+  })
   const { data: clientPages } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
 
   const clientNameById = useMemo(() => {

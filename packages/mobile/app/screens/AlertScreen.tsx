@@ -11,6 +11,7 @@ import {
   useMarkAlertAsReadMutation,
   useMarkAlertAsUnreadMutation,
   useGetAllAlertsQuery,
+  liveAlertsQueryOptions,
   useGetAllClientsQuery,
 } from "../services/api"
 import { getAlerts, setAlerts, selectUnreadAlertCount } from "app/store/alertSlice"
@@ -42,35 +43,13 @@ export function AlertScreen() {
     }
   }, [filterClientId])
 
-  // Determine polling interval - check dynamically to handle test mode
-  const getPollingInterval = React.useMemo(() => {
-    if (typeof window !== 'undefined') {
-      // Check URL parameter (set by Playwright tests)
-      if (window.location.search.includes('playwright_test=1')) return 3000;
-      // Check localStorage (can be set by tests) - check dynamically
-      try {
-        if (localStorage.getItem('playwright_test') === '1') return 3000;
-      } catch (e) {
-        // localStorage might not be available
-      }
-    }
-    // Check process.env (works in Node.js, might work in some build configs)
-    if (process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1') return 3000;
-    return 30000;
-  }, [])
-
   const {
     data: fetchAllAlerts,
     isLoading: isFetching,
     error: fetchError,
     refetch,
   } = useGetAllAlertsQuery(undefined, {
-    // Poll every 30 seconds to automatically fetch new alerts (or 3 seconds in test mode)
-    pollingInterval: getPollingInterval,
-    // Refetch when the screen comes into focus
-    refetchOnFocus: true,
-    // Refetch when the app reconnects
-    refetchOnReconnect: true,
+    ...liveAlertsQueryOptions,
   })
 
   const {

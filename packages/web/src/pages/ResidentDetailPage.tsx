@@ -8,7 +8,7 @@ import { apiRecordId, mapClientToResident, splitName } from "../lib/liveData"
 import { intervalsForDraft, weekdayShortLabel } from "../lib/scheduleDraft"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import { CONSENT_BULLETS } from "../data/residentMock"
-import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import {
   useDeleteClientMutation,
   useGetClientQuery,
@@ -120,7 +120,10 @@ export function ResidentDetailPage() {
     { skip: !apiClient?.id || mainTab !== "conversations" },
   )
 
-  const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
+  const { data: apiAlerts } = useGetAllAlertsQuery(undefined, {
+    ...liveAlertsQueryOptions,
+    skip: !authed,
+  })
 
   const clientIdForApi = apiClient?.id ?? ""
   const {

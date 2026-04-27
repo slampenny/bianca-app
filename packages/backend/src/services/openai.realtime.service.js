@@ -729,6 +729,45 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Increase server VAD `silence_duration_ms` for this call when the first assistant audio chunk arrives
+   * while OpenAI still considers the user to be in the "speaking" state (turn overlap / premature end-of-utterance).
+   */
+  async _bumpVadOnAssistantOverUser(callId, conn) {
+    if (!callId || !conn) return;
+    const { adaptiveSilence, silenceDurationMs: baseMs } = config.audio?.turnDetection || {};
+    if (adaptiveSilence?.enabled === false) return;
+    if (!conn.sessionReady || !conn._userIsSpeaking) return;
+
+    const stepMs = Math.max(1, adaptiveSilence?.stepMs ?? 200);
+    // Ceiling is at least the static base so a high `AUDIO_TURN_DETECTION_SILENCE_DURATION_MS` is never stuck under `maxMs`.
+    const maxMs = Math.max(baseMs ?? 500, Math.max(200, adaptiveSilence?.maxMs ?? 2000));
+    const current = Number.isFinite(conn.vadSilenceDurationMs)
+      ? conn.vadSilenceDurationMs
+      : (baseMs ?? 500);
+    if (current >= maxMs) return;
+    const next = Math.min(maxMs, current + stepMs);
+    if (next <= current) return;
+
+    const prev = conn.vadSilenceDurationMs;
+    try {
+      conn.vadSilenceDurationMs = next;
+      await this.sendJsonMessage(callId, MessageHandler.buildSessionUpdateForVad(conn));
+      logger.info(
+        `[RealtimeRC] adaptive VAD: silence_duration_ms ${current}→${next} (assistant audio while user_speaking) callId=${callId}`
+      );
+    } catch (e) {
+      if (Number.isFinite(prev) && prev > 0) {
+        conn.vadSilenceDurationMs = prev;
+      } else {
+        delete conn.vadSilenceDurationMs;
+      }
+      logger.error(
+        `[OpenAI Realtime] Adaptive VAD session.update failed for ${callId}: ${e?.message || e}`
+      );
+    }
+  }
+
+  /**
    * Send response.create to trigger OpenAI to generate responses - ENHANCED with diagnostics
    */
   /**
@@ -1342,6 +1381,11 @@ class OpenAIRealtimeService {
               conn._aiIsSpeaking = true;
               conn._lastAiSpeechStart = Date.now();
               logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId} (${apiVersion})`);
+
+              // If assistant output begins while VAD still marks the user as speaking, the model is overlapping the caller; increase end-of-utterance patience for this call.
+              if (conn._userIsSpeaking) {
+                void this._bumpVadOnAssistantOverUser(callId, conn);
+              }
               
               // CRITICAL: Only create placeholder if user is NOT currently speaking
               // If user is speaking, defer placeholder creation until user finishes

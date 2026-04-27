@@ -31,7 +31,7 @@ import { useLanguage } from "../hooks/useLanguage"
 import { logger } from "../utils/logger"
 import { PhoneVerificationBanner } from "../components/PhoneVerificationBanner"
 import { caregiverApi } from "../services/api/caregiverApi"
-import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { formatRelativeFromIso } from "../utils/formatDate"
 
 function formatSentimentGlanceLabel(
@@ -76,9 +76,8 @@ export function HomeScreen() {
   const alertsFromStore = useSelector(getAlerts)
 
   const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
+    ...liveAlertsQueryOptions,
     skip: !currentUser?.id,
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
   })
 
   /** Prefer RTK cache when loaded so home counts stay fresh without clobbering alert Redux merge logic */

@@ -37,6 +37,7 @@ import useRefreshToken from "./effects/useRefreshToken"
 import { SSOCallbackGate } from "./components/SSOCallbackGate"
 import { useLanguage } from "./hooks/useLanguage"
 import { AuthModalProvider } from "./contexts/AuthModalContext"
+import { RealtimeSocketBridge } from "./realtime/RealtimeSocketBridge"
 import { useSelector } from "react-redux"
 import { getCurrentUser } from "./store/authSlice"
 import { useTheme } from "./theme/ThemeContext"
@@ -250,6 +251,7 @@ function AppShell(props: AppShellProps) {
                       persistor={persistor}
                     >
                       <SSOCallbackGate>
+                        <RealtimeSocketBridge />
                         <AppNavigator
                           linking={linking}
                           initialState={initialNavigationState}

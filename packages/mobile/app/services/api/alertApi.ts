@@ -2,6 +2,13 @@ import { createApi } from "@reduxjs/toolkit/query/react"
 import { Alert } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
+/** New alerts: Socket.IO `alerts:changed` (RealtimeSocketBridge) + invalidation — not interval polling. */
+export const liveAlertsQueryOptions = {
+  pollingInterval: 0,
+  refetchOnFocus: false,
+  refetchOnReconnect: true,
+} as const
+
 export const alertApi = createApi({
   reducerPath: "alertApi",
   baseQuery: baseQueryWithReauth(),

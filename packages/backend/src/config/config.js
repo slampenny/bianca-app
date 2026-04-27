@@ -236,12 +236,24 @@ const baselineConfig = {
     turnDetection: {
       threshold: parseFloat(process.env.AUDIO_TURN_DETECTION_THRESHOLD) || 0.6, // Default: 0.6 (higher = more selective, ignores quiet background)
       prefixPaddingMs: parseInt(process.env.AUDIO_TURN_DETECTION_PREFIX_PADDING_MS) || 200, // Default: 200ms (captures speech start)
-      // OpenAI server_vad: min 1000ms silence before end-of-speech (env cannot set below 1000)
+      // OpenAI server_vad: how long the caller must be silent before end-of-speech (ms). Docs default 500; floor avoids ultra-aggressive VAD.
       silenceDurationMs: (() => {
         const raw = parseInt(process.env.AUDIO_TURN_DETECTION_SILENCE_DURATION_MS, 10);
-        const base = Number.isFinite(raw) && raw > 0 ? raw : 1000;
-        return Math.max(1000, base);
+        const base = Number.isFinite(raw) && raw > 0 ? raw : 500;
+        return Math.min(4000, Math.max(200, base));
       })(),
+      // Per call: if assistant output starts while user is still in speaking state (VAD), bump toward max (session.update)
+      adaptiveSilence: {
+        enabled: process.env.AUDIO_TURN_ADAPTIVE_SILENCE === 'false' ? false : true,
+        stepMs: (() => {
+          const s = parseInt(process.env.AUDIO_TURN_ADAPTIVE_SILENCE_STEP_MS, 10);
+          return Number.isFinite(s) && s > 0 ? s : 200;
+        })(),
+        maxMs: (() => {
+          const m = parseInt(process.env.AUDIO_TURN_ADAPTIVE_SILENCE_MAX_MS, 10);
+          return Number.isFinite(m) && m > 0 ? m : 2000;
+        })(),
+      },
       // OpenAI turn_detection.create_response — only "true" enables auto response on VAD stop (see OPENAI_REALTIME_VAD_CREATE_RESPONSE).
       createResponse: process.env.OPENAI_REALTIME_VAD_CREATE_RESPONSE === 'true',
     },

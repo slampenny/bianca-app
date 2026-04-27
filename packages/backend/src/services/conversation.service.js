@@ -9,6 +9,7 @@ const { langChainAPI } = require('../api/langChainAPI');
 const { prompts } = require('../templates/prompts'); // Original Bianca system prompt
 const { prompts: refinedPrompts } = require('../templates/prompts.refined'); // Refined prompt with voice-first rules
 const { computeConversationEngagementMetrics } = require('./conversationEngagement.service');
+const { scheduleClientAnalysisUpdated } = require('./alertBroadcast.service');
 
 // ===== CONVERSATION METHODS =====
 const createConversationForClient = async (clientId, callId) => {
@@ -828,6 +829,8 @@ const storeMedicalAnalysisResult = async (clientId, result) => {
       trends,
     });
 
+    scheduleClientAnalysisUpdated(clientId, 'medical');
+
     return medicalAnalysis;
   } catch (error) {
     logger.error('Error storing medical analysis result:', error);
@@ -1224,6 +1227,8 @@ const triggerAnalysisAfterCall = async (clientId) => {
           { $set: setDoc },
           { upsert: true, new: true }
         );
+
+        scheduleClientAnalysisUpdated(clientId, 'fraudAbuse');
 
         logger.info(`[Analysis Trigger] Fraud/abuse month record upserted for client ${clientId}`, {
           conversationCount: monthConversations.length,

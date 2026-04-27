@@ -42,6 +42,50 @@ class MessageHandler {
   }
 
   /**
+   * Effective server_vad silence (ms) for a call: per-connection override (adaptive) or config default, clamped.
+   * @param {Object|null} connection
+   * @returns {number}
+   */
+  static getTurnDetectionSilenceDurationMs(connection) {
+    const fromConfig = config.audio?.turnDetection?.silenceDurationMs ?? 500;
+    const override = connection?.vadSilenceDurationMs;
+    const raw = Number.isFinite(override) && override > 0 ? override : fromConfig;
+    return Math.min(4000, Math.max(200, raw));
+  }
+
+  /**
+   * GA `audio.input.turn_detection` object; uses connection.vadSilenceDurationMs when set.
+   * @param {Object} connection
+   */
+  static buildServerVadTurnDetection(connection) {
+    return {
+      type: 'server_vad',
+      threshold: config.audio?.turnDetection?.threshold ?? 0.6,
+      prefix_padding_ms: config.audio?.turnDetection?.prefixPaddingMs ?? 200,
+      silence_duration_ms: MessageHandler.getTurnDetectionSilenceDurationMs(connection),
+      create_response: config.audio?.turnDetection?.createResponse === true,
+    };
+  }
+
+  /**
+   * Partial session.update (merge) to change only turn_detection.
+   * @param {Object} connection
+   */
+  static buildSessionUpdateForVad(connection) {
+    return {
+      type: 'session.update',
+      session: {
+        type: 'realtime',
+        audio: {
+          input: {
+            turn_detection: MessageHandler.buildServerVadTurnDetection(connection),
+          },
+        },
+      },
+    };
+  }
+
+  /**
    * Build session configuration for session.update
    * Always uses GA format
    * @param {Object} connection - Connection object
@@ -83,14 +127,6 @@ class MessageHandler {
       noiseReductionObject = { type: mode };
     }
 
-    // Get turn detection settings from config (with defaults)
-    const turnDetectionThreshold = config.audio?.turnDetection?.threshold ?? 0.6;
-    const turnDetectionPrefixPadding = config.audio?.turnDetection?.prefixPaddingMs ?? 200;
-    // Require ≥1000ms silence before treating utterance as complete (product + OpenAI VAD floor)
-    const turnDetectionSilenceDuration = Math.max(
-      1000,
-      config.audio?.turnDetection?.silenceDurationMs ?? 1000
-    );
     const vadCreateResponse = config.audio?.turnDetection?.createResponse === true;
 
     baseConfig.session.audio = {
@@ -105,14 +141,7 @@ class MessageHandler {
         // OpenAI built-in noise reduction (optimized for phone calls)
         noise_reduction: noiseReductionObject,
         // Turn detection is nested under audio.input for GA
-        turn_detection: {
-          type: 'server_vad',
-          threshold: turnDetectionThreshold,
-          prefix_padding_ms: turnDetectionPrefixPadding,
-          silence_duration_ms: turnDetectionSilenceDuration,
-          // false (default): we own response.create via sendResponseCreate. true: set OPENAI_REALTIME_VAD_CREATE_RESPONSE=true for A/B (OpenAI auto response on VAD stop).
-          create_response: vadCreateResponse,
-        }
+        turn_detection: MessageHandler.buildServerVadTurnDetection(connection),
       },
       output: {
         format: {

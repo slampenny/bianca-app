@@ -5,7 +5,7 @@ import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recha
 import { isAlertUnreadForCaregiver, mapClientToResident } from "../lib/liveData"
 import { formatActivityRowTime } from "../lib/timeFormat"
 import { useGetCallsByHourTodayQuery, useGetRecentActivityQuery } from "../services/api/activityApi"
-import { useGetAllAlertsQuery } from "../services/api/alertApi"
+import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { useGetAllClientsQuery, useGetClientsOnboardingRollupsQuery } from "../services/api/clientApi"
 import { useDemo } from "../state/DemoContext"
 import { getCurrentUser } from "../store/authSlice"
@@ -59,11 +59,15 @@ export function DashboardPage() {
     isLoading: onbRollLoading,
     isError: onbRollError,
   } = useGetClientsOnboardingRollupsQuery(undefined, { skip: !authed, refetchOnFocus: true })
-  const { data: apiAlerts } = useGetAllAlertsQuery(authed ? undefined : skipToken)
+  const { data: apiAlerts } = useGetAllAlertsQuery(undefined, {
+    ...liveAlertsQueryOptions,
+    skip: !authed,
+  })
 
   const clients = clientPages?.results ?? []
   const totalFromApi = clientPages?.totalResults
 
+  /** Re-render periodically so rolling 24h client metrics (e.g. “active today”) update — not for fetching alerts (alerts use Socket.IO + RTK invalidation). */
   const [, force] = useState(0)
   const tick = useCallback(() => force((n) => n + 1), [])
   useEffect(() => {

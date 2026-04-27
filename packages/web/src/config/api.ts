@@ -18,3 +18,12 @@ export function getApiBaseUrl(): string {
   }
   return "http://localhost:3000/v1"
 }
+
+/**
+ * HTTP origin for Socket.IO (same host as the API, without `/v1`).
+ * The backend mounts `/socket.io` on the root server, not under the REST prefix.
+ */
+export function getSocketBaseUrl(): string {
+  const api = getApiBaseUrl()
+  return api.replace(/\/v1\/?$/, "")
+}

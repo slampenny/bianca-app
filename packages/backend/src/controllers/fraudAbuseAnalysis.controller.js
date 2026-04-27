@@ -9,6 +9,7 @@ const {
 } = require('../services');
 const { FraudAbuseAnalysis } = require('../models');
 const logger = require('../config/logger');
+const { scheduleClientAnalysisUpdated } = require('../services/alertBroadcast.service');
 
 /**
  * Get fraud/abuse analysis for a client for a specific time period
@@ -150,6 +151,7 @@ const getFraudAbuseAnalysis = catchAsync(async (req, res) => {
       try {
         await FraudAbuseAnalysis.create(analysisData);
         logger.info('Fraud/abuse analysis stored for client:', clientId);
+        scheduleClientAnalysisUpdated(clientId, 'fraudAbuse');
       } catch (error) {
         logger.error('Failed to store fraud/abuse analysis:', error);
         // Continue with response even if storage fails
@@ -302,6 +304,8 @@ const triggerClientAnalysis = catchAsync(async (req, res) => {
     };
 
     await FraudAbuseAnalysis.create(resultToStore);
+
+    scheduleClientAnalysisUpdated(clientId, 'fraudAbuse');
 
     logger.info('Synchronous fraud/abuse analysis completed', {
       clientId,

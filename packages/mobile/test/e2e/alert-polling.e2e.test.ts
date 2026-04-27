@@ -103,8 +103,7 @@ async function getCaregiverByEmail(page: Page, email: string): Promise<any | nul
 
 test.describe("Alert Polling", () => {
   test.beforeEach(async ({ page }) => {
-    // Set localStorage flag for test mode to enable faster polling
-    // This must be set before page loads to ensure polling interval is detected
+    // Legacy flag (some tests); alert list updates use Socket.IO, not HTTP polling
     await page.addInitScript(() => {
       localStorage.setItem('playwright_test', '1');
     });
@@ -119,7 +118,6 @@ test.describe("Alert Polling", () => {
   test("should automatically poll and display new alerts without refresh", async ({ page }) => {
     console.log('=== ALERT POLLING TEST ===')
     
-    // Set test mode flag in localStorage to ensure polling uses 3-second interval
     await page.evaluate(() => {
       localStorage.setItem('playwright_test', '1')
     })
@@ -203,21 +201,14 @@ test.describe("Alert Polling", () => {
       console.log(`Alert exists in backend: ${foundInBackend}, Total alerts: ${alerts.length}`)
     }
     
-    // THEN: Wait for polling interval (3 seconds in test mode, 30 seconds in production)
-    // The polling should automatically fetch the new alert
-    console.log('Waiting for polling interval (3 seconds in test mode)...')
-    
-    // Wait a bit longer than the polling interval to ensure it has time to poll
-    // In test mode, polling is 3 seconds, otherwise 30 seconds
-    // Wait for at least 3 polling cycles to ensure the alert is picked up
-    const pollingInterval = 3000 // Test mode should be 3 seconds
-    const waitTime = (pollingInterval * 3) + 2000 // Wait for 3 polling cycles + 2 second buffer
-    
+    // THEN: Wait for Socket.IO `alerts:changed` to invalidate + RTK refetch (or slow CI)
+    console.log("Waiting for real-time alert list update (no HTTP polling)...")
+    const waitTime = 12_000
     await page.waitForTimeout(waitTime)
-    console.log(`Waited ${waitTime}ms for polling to occur (3 cycles of ${pollingInterval}ms each)`)
+    console.log(`Waited ${waitTime}ms for alert to appear after broadcast`)
     
     // Try to manually trigger a refetch by clicking the refresh button if it exists
-    // This helps verify the alert can be fetched even if automatic polling has issues
+    // Fallback if the list has not updated yet
     const refreshButton = page.locator('[data-testid="refresh-alerts-button"], button[aria-label*="refresh" i]')
     const refreshButtonCount = await refreshButton.count()
     if (refreshButtonCount > 0) {
@@ -227,7 +218,7 @@ test.describe("Alert Polling", () => {
     }
     
     // AND: The new alert should appear in the list without manual refresh
-    // Try multiple times with small delays in case polling is slightly delayed
+    // Try multiple times with small delays (socket + refetch timing)
     let alertFound = false
     const maxAttempts = 20 // Increased attempts
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -356,11 +347,8 @@ test.describe("Alert Polling", () => {
       relatedClient: clientId,
     })
     
-    // Wait for polling to occur (polling should continue even when screen is not active)
-    // Note: Polling may pause when screen is in background, so we wait longer
-    const pollingInterval = (process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT_TEST === '1') ? 3000 : 30000
-    // Wait longer to ensure alert is created and available in the backend
-    await page.waitForTimeout(pollingInterval + 5000)
+    // Allow broadcast + cache update before returning to the alerts tab
+    await page.waitForTimeout(12_000)
     
     // Verify alert exists in backend before checking UI
     console.log('Verifying alert exists in backend...')
@@ -393,16 +381,14 @@ test.describe("Alert Polling", () => {
       page.getByLabel('alert-screen').or(page.getByTestId('alert-screen'))
     ).toBeVisible({ timeout: 10000 })
     
-    // Wait for screen to fully load and any pending polls to complete
-    // refetchOnFocus should trigger when returning to the screen
-    await page.waitForTimeout(5000) // Give more time for refetchOnFocus to trigger
+    await page.waitForTimeout(2000)
     
-    // Check if alert appears (refetchOnFocus should trigger when returning to screen)
+    // Check if alert appears (socket may have updated list in background; else manual refresh in loop)
     const alertWithMessage = page.locator('[data-testid="alert-item"]').filter({
       hasText: testAlertMessage,
     })
     
-    // Try multiple times as refetchOnFocus might take a moment
+    // Try multiple times (CI / socket timing)
     // Also try manually triggering a refresh by clicking refresh button if available
     let alertFound = false
     for (let attempt = 1; attempt <= 20; attempt++) {
@@ -421,9 +407,8 @@ test.describe("Alert Polling", () => {
         }
       }
       
-      // Also try navigating away and back to trigger refetchOnFocus
       if (attempt === 7) {
-        console.log('Navigating away and back to trigger refetchOnFocus...')
+        console.log("Navigating away and back to reload the alerts tab...")
         const homeTab = page.getByLabel('Home tab').or(page.getByTestId('tab-home'))
         await homeTab.click()
         await page.waitForTimeout(1000)
@@ -452,9 +437,9 @@ test.describe("Alert Polling", () => {
     expect(alertFound).toBe(true)
     if (alertFound) {
       await expect(alertWithMessage.first()).toBeVisible()
-      console.log('✅ Background polling test passed - alert appeared when returning to screen!')
+      console.log("✅ Background alert test passed - alert visible when returning to the alerts screen!")
     } else {
-      console.log('❌ Background polling test failed - alert not found after returning to screen')
+      console.log("❌ Background alert test failed - alert not found after returning to the alerts screen")
       // Log all alert messages for debugging
       const allAlerts = page.locator('[data-testid="alert-item"]')
       const allAlertCount = await allAlerts.count()
@@ -462,10 +447,9 @@ test.describe("Alert Polling", () => {
         const allAlertTexts = await allAlerts.allTextContents()
         console.log(`All available alerts (${allAlertCount}):`, allAlertTexts)
       }
-      // This test verifies that alerts poll when screen is in background
-      // If polling doesn't work in background, refetchOnFocus should still work when returning
-      // If both fail, the test should fail
-      throw new Error(`Alert with message "${testAlertMessage}" not found after ${20} attempts. This may indicate that polling doesn't work when screen is in background, or refetchOnFocus isn't triggering.`)
+      throw new Error(
+        `Alert with message "${testAlertMessage}" not found after 20 attempts. Check Socket.IO to org room and GET /alerts after broadcast.`,
+      )
     }
   })
 })
