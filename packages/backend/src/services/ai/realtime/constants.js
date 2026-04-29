@@ -20,6 +20,8 @@ module.exports = {
   MAX_CONSECUTIVE_SILENCE_CHUNKS: 50,
   SPEECH_END_SILENCE_MS: 500, // Heuristic: align with default OpenAI turn_detection (server_vad defaults ~500ms)
   MIN_SPEECH_DURATION_MS: 800, // Conservative: 800ms instead of 500ms
+  // FIX: Bug 2 — min accumulated user speech before we allow response.create (speech_stopped 200ms path, etc.)
+  MIN_SPEECH_DURATION_FOR_RESPONSE_MS: 1200,
   // After initial voice greeting: ignore speech_stopped so bridge/echo doesn’t trigger a reply.
   // Keep short — long windows feel like Bianca ignores the first real answer.
   GRACE_PERIOD_MS: 350,

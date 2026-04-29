@@ -100,6 +100,33 @@ describe("mapApiAlertToFacilityAlert", () => {
     const u = mapApiAlertToFacilityAlert(a, names, "cg-1")
     expect(u.status).toBe("acknowledged")
   })
+
+  it("converts API evidence.confidence from 0–1 to 0–100 for the facility card", () => {
+    const a: ApiAlertRecord = {
+      message: "Conversation analysis: test",
+      importance: "urgent",
+      alertType: "conversation",
+      relatedClient: "client-1",
+      readBy: [],
+      createdAt: "2026-04-29T10:00:00.000Z",
+      evidence: { confidence: 0.95 },
+    }
+    const u = mapApiAlertToFacilityAlert(a, names, "cg-1")
+    expect(u.confidence).toBe(95)
+  })
+
+  it("leaves already-percent evidence.confidence (>1) in 0–100 range", () => {
+    const a: ApiAlertRecord = {
+      message: "x",
+      importance: "low",
+      alertType: "client",
+      readBy: [],
+      createdAt: "2026-04-29T10:00:00.000Z",
+      evidence: { confidence: 70 },
+    }
+    const u = mapApiAlertToFacilityAlert(a, names, "cg-1")
+    expect(u.confidence).toBe(70)
+  })
 })
 
 describe("isAlertUnreadForCaregiver", () => {

@@ -63,6 +63,9 @@ class MessageHandler {
       threshold: config.audio?.turnDetection?.threshold ?? 0.6,
       prefix_padding_ms: config.audio?.turnDetection?.prefixPaddingMs ?? 200,
       silence_duration_ms: MessageHandler.getTurnDetectionSilenceDurationMs(connection),
+      // Default (createResponse !== true) must stay false: this app schedules its own `sendResponseCreate` on
+      // speech_stopped. Enabling OPENAI_REALTIME_VAD_CREATE_RESPONSE would double-fire and must not be used in production.
+      // FIX: Bug 2
       create_response: config.audio?.turnDetection?.createResponse === true,
     };
   }
@@ -311,6 +314,13 @@ class MessageHandler {
       if (item.type === 'message' && item.status === 'completed') {
         logger.debug(
           `[Message Handler] Skipping conversation.item persist for completed message (role=${item.role}) — saved on speaker finish / ASR path`
+        );
+        return;
+      }
+      // FIX: Bug 1 — partial / non-completed user message + audio.transcript: ASR + placeholder path owns all user rows
+      if (item.type === 'message' && item.role === 'user' && item.status !== 'completed' && item.audio?.transcript) {
+        logger.debug(
+          '[MessageHandler] Skipping partial user message with audio.transcript (handled by input_audio_transcription in openai.realtime.service)'
         );
         return;
       }

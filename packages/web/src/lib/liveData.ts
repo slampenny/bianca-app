@@ -125,6 +125,18 @@ function importanceConfidence(importance: string): number {
   }
 }
 
+/**
+ * API stores `evidence.confidence` as a probability in [0, 1] (see alert validation).
+ * Facility `Alert` UI and `importanceConfidence` use 0–100 for the bar/label.
+ */
+function evidenceConfidenceToDisplayPercent(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  if (n > 1) {
+    return Math.min(100, Math.max(0, Math.round(n)))
+  }
+  return Math.min(100, Math.max(0, Math.round(n * 100)))
+}
+
 function defaultActions(): Alert["recommendedActions"] {
   return [
     {
@@ -156,7 +168,7 @@ export function mapApiAlertToFacilityAlert(
     indicators.push(`Context: ${a.evidence.snippet}`)
   }
   if (typeof a.evidence?.confidence === "number") {
-    indicators.push(`Detector confidence: ${Math.round(a.evidence.confidence * 100)}%`)
+    indicators.push(`Detector confidence: ${evidenceConfidenceToDisplayPercent(a.evidence.confidence)}%`)
   }
 
   const fromApiActions =
@@ -174,7 +186,7 @@ export function mapApiAlertToFacilityAlert(
     severity: a.importance || "medium",
     confidence:
       typeof a.evidence?.confidence === "number"
-        ? Math.min(1, Math.max(0, a.evidence.confidence))
+        ? evidenceConfidenceToDisplayPercent(a.evidence.confidence)
         : importanceConfidence(a.importance || "medium"),
     status: read ? "acknowledged" : "new",
     detectedAt: a.createdAt ?? new Date().toISOString(),

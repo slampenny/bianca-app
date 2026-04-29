@@ -571,6 +571,17 @@ class OpenAIRealtimeService {
       _speechStoppedCommittedAiResponding: false,
       // Set in speech_stopped 500ms path when placeholder exists but ASR not ready yet; cleared when ASR completes or on cleanup paths.
       _waitingForUserTranscript: false,
+      // FIX: Bug 1 — dedup duplicate OpenAI .completed for same item_id; cleared each new user utterance (speech_started) and in cleanup
+      _processedTranscriptItemIds: new Set(),
+      // Set true after we handle a .completed in this user turn (avoids 500ms fallback + ASR both inserting)
+      _asrTranscriptionEventHandledThisTurn: false,
+      // Set at speech start of an utterance; at speech_stopped, duration = now - this (and FIX Bug 2 min response gate)
+      _turnSpeechStartTime: null,
+      _turnSpeechDurationMs: 0,
+      // When response.done runs (incl. cancel path); for stale-pending and stuck-recovery guards
+      _lastResponseDoneAt: null,
+      // Set whenever _pendingUserResponseAfterAiStops becomes true; compared to _lastResponseDoneAt in maybeFlush
+      _pendingStopsSetAt: null,
 
       // Track timing for each speaker
       lastUserSpeechTime: null,
@@ -905,6 +916,12 @@ class OpenAIRealtimeService {
               }
               c._stuckResponseRecoveryStartSnapshot = null;
 
+              // FIX: Bug 3 (stuck 20s path) — response may have completed during the outer timeout window
+              if (c._lastResponseDoneAt != null && c._lastResponseDoneAt > responseStartSnapshot) {
+                logger.info(`[RealtimeRC] Stuck timer (20s/inner) — response already completed, cancelling for ${callId}`);
+                return;
+              }
+
               // Check grace period to prevent dual responses after initial greeting
               const timeSinceGreeting = c._initialGreetingCompletedAt
                 ? Date.now() - c._initialGreetingCompletedAt
@@ -962,6 +979,14 @@ class OpenAIRealtimeService {
                   return;
                 }
                 c._stuckResponseRecoveryStartSnapshot = null;
+
+                // FIX: Bug 3 (stuck 30s path) — same as 20s inner: avoid second response if response.done won the race
+                if (c._lastResponseDoneAt != null && c._lastResponseDoneAt > responseStartSnapshot) {
+                  logger.info(
+                    `[RealtimeRC] Stuck timer (aggressive/inner) — response already completed, cancelling for ${callId}`
+                  );
+                  return;
+                }
 
                 const timeSinceGreeting = c._initialGreetingCompletedAt
                   ? Date.now() - c._initialGreetingCompletedAt
@@ -1523,6 +1548,13 @@ class OpenAIRealtimeService {
             if (!alreadyUserSpeaking) {
               conn._pendingUserResponseAfterAiStops = false;
               conn._userTurnResponseCreateSent = false;
+              if (conn._processedTranscriptItemIds) {
+                // FIX: Bug 1 (next utterance) — new turn; per-call Set also cleared in cleanup
+                conn._processedTranscriptItemIds.clear();
+              } else {
+                conn._processedTranscriptItemIds = new Set();
+              }
+              conn._asrTranscriptionEventHandledThisTurn = false;
               if (conn._speechStoppedFinalizeTimer) {
                 clearTimeout(conn._speechStoppedFinalizeTimer);
                 conn._speechStoppedFinalizeTimer = null;
@@ -1531,6 +1563,10 @@ class OpenAIRealtimeService {
               conn._speechStoppedCommittedAiResponding = false;
             }
             conn._lastUserSpeechStart = Date.now();
+            if (!alreadyUserSpeaking) {
+              // FIX: Bug 2 — utterance start for min speech gating
+              conn._turnSpeechStartTime = Date.now();
+            }
             conn._userTranscriptLiveBuffer = '';
             if (conn._userTranscriptFlushTimer) {
               clearTimeout(conn._userTranscriptFlushTimer);
@@ -1614,6 +1650,12 @@ class OpenAIRealtimeService {
           if (conn) {
             conn._userIsSpeaking = false;
             conn._lastUserSpeechEnd = Date.now();
+            if (conn._turnSpeechStartTime != null) {
+              // FIX: Bug 2 — end-of-utterance duration (used by 200ms sendResponseCreate min gate)
+              conn._turnSpeechDurationMs = Date.now() - conn._turnSpeechStartTime;
+            } else {
+              conn._turnSpeechDurationMs = 0;
+            }
 
             const pendingBefore = conn._pendingUserResponseAfterAiStops;
             this._rcDiagSpeechStopped(callId, conn, 'sync_on_event', {
@@ -1771,10 +1813,18 @@ class OpenAIRealtimeService {
                   }
                 } else {
                   // No placeholder exists - this shouldn't happen, but create new message as fallback
-                  logger.warn(`[OpenAI Realtime] No active user message ID - creating new message (this may break queue order)`);
-                  await this.saveCompleteMessage(callId, 'client', transcript);
-                  userMessageFinalized = true;
-                  await this.flushDeferredAssistantQueue(callId);
+                  // FIX: Bug 1 — ASR .completed may have finalized this turn; _userTurnResponseCreateSent = late send already won the race
+                  if (currentConn._asrTranscriptionEventHandledThisTurn || currentConn._userTurnResponseCreateSent) {
+                    logger.info(
+                      `[OpenAI Realtime] Skipping fallback saveCompleteMessage for ${callId} — ASR/turn path already applied (Bug 1: duplicate guard)`
+                    );
+                    currentConn.pendingUserTranscript = '';
+                  } else {
+                    logger.warn(`[OpenAI Realtime] No active user message ID - creating new message (this may break queue order)`);
+                    await this.saveCompleteMessage(callId, 'client', transcript);
+                    userMessageFinalized = true;
+                    await this.flushDeferredAssistantQueue(callId);
+                  }
                 }
                 
                 currentConn.pendingUserTranscript = ''; // Clear the pending transcript
@@ -2014,6 +2064,17 @@ class OpenAIRealtimeService {
                     logger.info(`[OpenAI Realtime] Skipping auto-response trigger for ${callId} - state changed or connection lost`);
                     return;
                   }
+                  // FIX: Bug 2 — do not let short noise + 500+200ms silence trigger Bianca; VAD can resume on more speech
+                  const minResponseMs = CONSTANTS.MIN_SPEECH_DURATION_FOR_RESPONSE_MS;
+                  const spDur = Number.isFinite(currentConn._turnSpeechDurationMs) ? currentConn._turnSpeechDurationMs : 0;
+                  if (spDur < minResponseMs) {
+                    logger.info(
+                      `[RealtimeRC] Skipping response.create — speech too short (${Math.round(spDur)}ms, min ${minResponseMs}ms) ${callId}`
+                    );
+                    currentConn._speechStoppedCommittedAiResponding = false;
+                    this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'speech_too_short_wait_more');
+                    return;
+                  }
                   if (currentConn._userTurnResponseCreateSent) {
                     logger.info(
                       `[RealtimeRC] speech_stopped 200ms timer skipped ${callId} — user-turn response.create already sent (ASR recovery path won)`
@@ -2063,6 +2124,8 @@ class OpenAIRealtimeService {
                   this.canAIRespond(callId) &&
                   !this.isInGracePeriod(callId)
                 ) {
+                  // FIX: Bug 3
+                  conn._pendingStopsSetAt = Date.now();
                   conn._pendingUserResponseAfterAiStops = true;
                   conn._userTurnResponseCreateSent = false;
                   logger.info(
@@ -2074,6 +2137,8 @@ class OpenAIRealtimeService {
               }
             } else if (isActiveResponse) {
               if (this.canAIRespond(callId) && !this.isInGracePeriod(callId)) {
+                // FIX: Bug 3
+                conn._pendingStopsSetAt = Date.now();
                 conn._pendingUserResponseAfterAiStops = true;
                 conn._userTurnResponseCreateSent = false;
                 this._rcDiagSpeechStopped(callId, conn, 'defer_until_response_done', {
@@ -2092,6 +2157,8 @@ class OpenAIRealtimeService {
                   Boolean(conn.activeUserMessageId) ||
                   conn._waitingForUserTranscript;
                 if (hasUserTurnForDefer && !conn._userTurnResponseCreateSent) {
+                  // FIX: Bug 3
+                  conn._pendingStopsSetAt = Date.now();
                   conn._pendingUserResponseAfterAiStops = true;
                   conn._userTurnResponseCreateSent = false;
                   logger.info(
@@ -2528,6 +2595,17 @@ class OpenAIRealtimeService {
     const conn = this.connections.get(callId);
     if (!conn || !conn._pendingUserResponseAfterAiStops) return;
 
+    // FIX: Bug 3 (stale pending) — pending from an older user turn, before the last response.done
+    if (conn._pendingStopsSetAt != null && conn._lastResponseDoneAt != null && conn._pendingStopsSetAt < conn._lastResponseDoneAt) {
+      // FIX: Bug 3
+      logger.warn(`[RealtimeRC] Discarding stale pending flush for ${callId} — pending set before last response.done`, {
+        _pendingStopsSetAt: conn._pendingStopsSetAt,
+        _lastResponseDoneAt: conn._lastResponseDoneAt,
+      });
+      conn._pendingUserResponseAfterAiStops = false;
+      return;
+    }
+
     if (conn._userIsSpeaking) {
       logger.info(`[RealtimeRC] maybeFlushDeferredResponse ${callId}: clear pending — user speaking again (premature clear)`, {
         outcome: 'pending_cleared_user_started_speaking',
@@ -2683,6 +2761,9 @@ class OpenAIRealtimeService {
       }
 
       await this.maybeFlushPendingUserResponseAfterAiDone(callId);
+      // After flush: this response is fully completed for ordering / stale-pending
+      // FIX: Bug 3
+      conn._lastResponseDoneAt = Date.now();
       this.notify(callId, 'response_done', { canceled: true });
       return;
     }
@@ -2747,6 +2828,8 @@ class OpenAIRealtimeService {
 
     // 5) Last: deferred user response (needs _aiIsSpeaking false + greeting transition if applicable)
     await this.maybeFlushPendingUserResponseAfterAiDone(callId);
+    // FIX: Bug 3 — so maybeFlush can compare _pendingStopsSetAt to the *previous* response's completion time
+    conn._lastResponseDoneAt = Date.now();
 
     this.notify(callId, 'response_done', {});
   }
@@ -3106,6 +3189,22 @@ class OpenAIRealtimeService {
       return;
     }
 
+    // FIX: Bug 1 — duplicate .completed for same item_id
+    const itemId = message?.item_id ?? message?.item?.id ?? null;
+    if (itemId) {
+      if (!conn._processedTranscriptItemIds) {
+        conn._processedTranscriptItemIds = new Set();
+      }
+      if (conn._processedTranscriptItemIds.has(String(itemId))) {
+        logger.warn(
+          `[OpenAI Realtime] Duplicate input_audio_transcription.completed for item_id=${itemId} — ignoring ${callId}`
+        );
+        return;
+      }
+      conn._processedTranscriptItemIds.add(String(itemId));
+    }
+    conn._asrTranscriptionEventHandledThisTurn = true;
+
     if (conn._userTranscriptFlushTimer) {
       clearTimeout(conn._userTranscriptFlushTimer);
       conn._userTranscriptFlushTimer = null;
@@ -3239,6 +3338,11 @@ class OpenAIRealtimeService {
           if (!currentConn) return;
           if (currentConn._aiIsSpeaking || currentConn._responseCreated || currentConn._responseStartTime) return;
           if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+          // FIX: Bug 3 — _userTurnResponseCreateSent alone is cleared on speech_started; 200ms path may have sent
+          if (currentConn._responseCreateInFlight) {
+            logger.info(`[RealtimeRC] ASR fallback skipped — response already in progress ${callId}`);
+            return;
+          }
           if (currentConn._userTurnResponseCreateSent) {
             logger.info(`[RealtimeRC] ASR fallback 80ms timer skipped ${callId} — user-turn response.create already sent`);
             return;
@@ -4667,6 +4771,10 @@ class OpenAIRealtimeService {
       connPreDelete._speechStoppedFinalizePending = false;
       connPreDelete._speechStoppedCommittedAiResponding = false;
       connPreDelete._userTurnResponseCreateSent = false;
+      if (connPreDelete._processedTranscriptItemIds) {
+        // FIX: Bug 1 — not only per speech_started; release Set on teardown
+        connPreDelete._processedTranscriptItemIds.clear();
+      }
     }
 
     const deleted = this.connections.delete(callId);
