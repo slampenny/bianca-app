@@ -15,7 +15,7 @@
  * 1. User speaks → placeholder row created on speech_started (after greeting)
  * 2. OpenAI ASR → conversation.item.input_audio_transcription.delta (debounced) and .completed
  * 3. Transcript text is written to the placeholder immediately (notify → DB), not only on speech_stopped; emergency detection runs after that
- * 4. speech_stopped still runs filler filtering and clears the active placeholder id when the turn ends
+ * 4. speech_stopped: filler-only ASR (e.g. "um" alone) gets a final line persisted, no response; not deleted
  * 
  * AI MESSAGE FLOW:
  * 1. AI generates text → response.content_part.added event → Accumulated in pendingAssistantTranscript
@@ -1709,14 +1709,32 @@ class OpenAIRealtimeService {
                 // Check if transcript is only filler words - if so, don't save or respond, just wait
                 if (isFiller(transcript, preferredLanguage)) {
                   this._rcDiagSpeechStopped(callId, currentConn, '500ms_block_filler_only_transcript', {
-                    outcome: 'skip_save_and_response',
+                    outcome: 'keep_row_no_response',
                     transcript: transcript.length > 200 ? `${transcript.slice(0, 200)}…` : transcript,
                   });
                   logger.info(
-                    `[OpenAI Realtime] User transcript contains only filler words (${preferredLanguage}): "${transcript}" — removing placeholder, no response`
+                    `[OpenAI Realtime] User transcript is filler-only (${preferredLanguage}): "${transcript}" — persisting as final line, no response`
                   );
                   currentConn.pendingUserTranscript = '';
-                  await this.removeUserSpeakingPlaceholder(callId, 'filler-only utterance');
+                  if (currentConn.activeUserMessageId) {
+                    try {
+                      const { Message } = require('../models');
+                      await Message.findByIdAndUpdate(
+                        currentConn.activeUserMessageId,
+                        { content: transcript, messageType: 'user_message' },
+                        { timestamps: false, runValidators: false }
+                      );
+                      this.notify(callId, 'user_transcript_updated', {
+                        messageId: currentConn.activeUserMessageId.toString(),
+                        conversationId: currentConn.conversationId,
+                        transcript,
+                      });
+                    } catch (err) {
+                      logger.error(`[OpenAI Realtime] Failed to persist filler-only user line: ${err.message}`);
+                    }
+                    currentConn.activeUserMessageId = null;
+                    await this.flushDeferredAssistantQueue(callId);
+                  }
                   return;
                 }
                 

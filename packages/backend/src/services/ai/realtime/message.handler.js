@@ -303,13 +303,18 @@ class MessageHandler {
     if (!item) return;
 
     try {
-      // Skip saving completed messages here - they're now saved when speakers finish
-      // (AI text is accumulated and saved in handleResponseDone, user transcription in handleInputAudioTranscriptionCompleted)
+      // conversation.item (message) when completed: persistence is owned elsewhere.
+      // - User: input_audio_transcription.* + placeholder updates (openai.realtime.service)
+      // - Assistant: response.done / text accumulation (openai.realtime.service)
+      // A previous bug logged "Skipping…" for completed items but did not return, so item.audio.transcript
+      // still ran and $push'd a second row with the same line as the canonical path.
       if (item.type === 'message' && item.status === 'completed') {
-        logger.debug(`[Message Handler] Skipping immediate save of ${item.role} message - will be saved when speaker finishes`);
+        logger.debug(
+          `[Message Handler] Skipping conversation.item persist for completed message (role=${item.role}) — saved on speaker finish / ASR path`
+        );
+        return;
       }
 
-      // Only save completed audio transcripts
       if (item.audio?.transcript && dbConversationId) {
         if (saveAudioTranscriptCallback) {
           await saveAudioTranscriptCallback(
