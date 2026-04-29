@@ -80,6 +80,8 @@ const fraudAbuseAnalysisSchema = new mongoose.Schema({
       message: String
     }],
     largeAmountMentions: Number,
+    /** Parsed from patient text; used for senior-care $5K+ dashboard alerts */
+    maxEstimatedUsd: Number,
     transferMethodMentions: Number,
     scamIndicatorMentions: Number,
     urgencyMentions: Number,

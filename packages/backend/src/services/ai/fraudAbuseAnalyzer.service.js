@@ -55,11 +55,15 @@ class FraudAbuseAnalyzer {
 
       // Financial / abuse / relationship: embedding-first; keyword paths gated by
       // USE_KEYWORD_BASED_DETECTORS — see `utils/detectionMode` and each *build* method.
-      const financialRisk = await this.financialDetector.buildFinancialMetricsFromEmbedding(
+      let financialRisk = await this.financialDetector.buildFinancialMetricsFromEmbedding(
         patientMessages,
         combinedText,
         null
       );
+      financialRisk = {
+        ...financialRisk,
+        maxEstimatedUsd: this.financialDetector.getMaxDollarEstimate(combinedText),
+      };
       const abuseRisk = await this.abuseDetector.buildAbuseMetricsFromEmbedding(
         patientMessages,
         combinedText,

@@ -10,6 +10,7 @@ const {
 const { FraudAbuseAnalysis } = require('../models');
 const logger = require('../config/logger');
 const { scheduleClientAnalysisUpdated } = require('../services/alertBroadcast.service');
+const { createSignificantDollarFraudAlertIfNeeded } = require('../services/alert.service');
 
 /**
  * Get fraud/abuse analysis for a client for a specific time period
@@ -306,6 +307,17 @@ const triggerClientAnalysis = catchAsync(async (req, res) => {
     await FraudAbuseAnalysis.create(resultToStore);
 
     scheduleClientAnalysisUpdated(clientId, 'fraudAbuse');
+
+    try {
+      await createSignificantDollarFraudAlertIfNeeded({
+        clientId,
+        conversationId: null,
+        maxEstimatedUsd: analysisResult.financialRisk && analysisResult.financialRisk.maxEstimatedUsd,
+        financialRiskScore: analysisResult.financialRisk && analysisResult.financialRisk.riskScore,
+      });
+    } catch (alertErr) {
+      logger.error(`Significant-dollar fraud alert (manual) for client ${clientId}: ${alertErr.message}`, alertErr);
+    }
 
     logger.info('Synchronous fraud/abuse analysis completed', {
       clientId,

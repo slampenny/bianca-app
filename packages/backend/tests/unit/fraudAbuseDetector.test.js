@@ -21,6 +21,12 @@ describe('Financial Exploitation Detector', () => {
       expect(result.largeAmountMentions).toBeGreaterThan(0);
     });
 
+    it('applies a high financial risk floor for $5K+ (senior care)', () => {
+      const messages = ['I moved five thousand into a new account'];
+      const result = detector.detectFinancialExploitation(messages, messages.join(' '));
+      expect(result.riskScore).toBeGreaterThanOrEqual(80);
+    });
+
     it('should detect money transfer methods', () => {
       const messages = ['I sent money through Western Union'];
       const result = detector.detectFinancialExploitation(messages, messages.join(' '));

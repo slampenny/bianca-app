@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const httpStatus = require('http-status');
 const { Alert, Caregiver } = require('../models');
+const FinancialExploitationDetector = require('./ai/financialExploitationDetector.service');
 const ApiError = require('../utils/ApiError');
 const { translateAlertMessage, parseAlertMessage } = require('../utils/alertTranslations');
 const { scheduleBroadcastAfterAlertChange } = require('./alertBroadcast.service');
@@ -126,6 +127,87 @@ const createAlert = async (alertData) => {
   const populated = await Alert.findById(created._id).populate(alertPopulate);
   scheduleBroadcastAfterAlertChange(populated);
   return formatAlertForResponse(populated);
+};
+
+const FRAUD_ABUSE_DOLLAR_DETECTOR = 'fraud_abuse_significant_amount';
+
+/**
+ * Dashboard alert when post-call (or manual) fraud analysis estimates ≥ $5K in patient speech.
+ * Dedupes: one per related conversation, or at most one per 24h per client when there is no conversation.
+ * Same pipeline fields as voicemail alerts (Client-created, assignedCaregivers).
+ * @param {{ clientId: string, conversationId?: string|null, maxEstimatedUsd?: number, financialRiskScore?: number }} params
+ * @returns {Promise<object|null>} created alert, or null if no-op
+ */
+const createSignificantDollarFraudAlertIfNeeded = async ({
+  clientId,
+  conversationId = null,
+  maxEstimatedUsd,
+  financialRiskScore,
+}) => {
+  const threshold = FinancialExploitationDetector.SENIOR_CARE_SIGNIFICANT_AMOUNT_USD || 5000;
+  if (maxEstimatedUsd == null || maxEstimatedUsd < threshold) {
+    return null;
+  }
+  if (!clientId || !mongoose.Types.ObjectId.isValid(clientId)) {
+    return null;
+  }
+  const clientOid = new mongoose.Types.ObjectId(clientId);
+  if (conversationId && mongoose.Types.ObjectId.isValid(conversationId)) {
+    const convOid = new mongoose.Types.ObjectId(conversationId);
+    const existConv = await Alert.findOne({
+      relatedClient: clientOid,
+      relatedConversation: convOid,
+      'evidence.detector': FRAUD_ABUSE_DOLLAR_DETECTOR,
+    })
+      .select('_id')
+      .lean();
+    if (existConv) {
+      return null;
+    }
+  } else {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existRecent = await Alert.findOne({
+      relatedClient: clientOid,
+      'evidence.detector': FRAUD_ABUSE_DOLLAR_DETECTOR,
+      createdAt: { $gte: oneDayAgo },
+    })
+      .select('_id')
+      .lean();
+    if (existRecent) {
+      return null;
+    }
+  }
+
+  const est = Math.round(Number(maxEstimatedUsd));
+  const message = `Conversation analysis: a large dollar amount was discussed (est. $${est.toLocaleString('en-US')}) — review for possible financial risk`;
+
+  const hasConv = Boolean(conversationId && mongoose.Types.ObjectId.isValid(conversationId));
+  const convOid = hasConv ? new mongoose.Types.ObjectId(conversationId) : null;
+  const conf =
+    typeof financialRiskScore === 'number' && !Number.isNaN(financialRiskScore)
+      ? Math.min(1, Math.max(0, financialRiskScore / 100))
+      : undefined;
+
+  const record = {
+    message,
+    importance: 'high',
+    alertType: hasConv ? 'conversation' : 'client',
+    relatedClient: clientOid,
+    createdBy: clientOid,
+    createdModel: 'Client',
+    visibility: 'assignedCaregivers',
+    relevanceUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    evidence: {
+      detector: FRAUD_ABUSE_DOLLAR_DETECTOR,
+      ...(conf != null ? { confidence: conf } : {}),
+      ...(hasConv && convOid ? { conversationId: convOid } : {}),
+    },
+  };
+  if (hasConv && convOid) {
+    record.relatedConversation = convOid;
+  }
+
+  return createAlert(record);
 };
 
 const getAlertById = async (alertId, caregiverId) => {
@@ -297,6 +379,7 @@ const deleteAlertById = async (alertId) => {
 
 module.exports = {
   createAlert,
+  createSignificantDollarFraudAlertIfNeeded,
   getAlertById,
   getAlerts,
   markAlertAsRead,

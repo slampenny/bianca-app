@@ -6,6 +6,8 @@ export type FraudAbuseConfidence = "high" | "medium" | "low" | "none"
 export interface FinancialRiskMetrics {
   riskScore?: number
   confidence?: FraudAbuseConfidence
+  /** Parsed from patient text; $5K+ can create a dashboard alert */
+  maxEstimatedUsd?: number
   largeAmountMentions?: number
   transferMethodMentions?: number
   scamIndicatorMentions?: number

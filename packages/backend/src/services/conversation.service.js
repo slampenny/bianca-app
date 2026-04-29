@@ -624,7 +624,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       logger.info(
         `[Finalize] Scheduling post-call analysis for client ${clientIdForAnalysis} from conversation ${conversationId}`
       );
-      triggerAnalysisAfterCall(clientIdForAnalysis).catch((err) => {
+      triggerAnalysisAfterCall(clientIdForAnalysis, conversationId).catch((err) => {
         logger.error(
           `[Finalize] Error triggering analysis after call for client ${clientIdForAnalysis}: ${err.message}`,
           err
@@ -1120,7 +1120,7 @@ const calculateVariance = (values) => {
  * This runs asynchronously and doesn't block call finalization
  * @param {string} clientId - Client ID
  */
-const triggerAnalysisAfterCall = async (clientId) => {
+const triggerAnalysisAfterCall = async (clientId, conversationId = null) => {
   try {
     logger.info(`[Analysis Trigger] Triggering analysis after call for client ${clientId}`);
 
@@ -1229,6 +1229,21 @@ const triggerAnalysisAfterCall = async (clientId) => {
         );
 
         scheduleClientAnalysisUpdated(clientId, 'fraudAbuse');
+
+        try {
+          const { createSignificantDollarFraudAlertIfNeeded } = require('./alert.service');
+          await createSignificantDollarFraudAlertIfNeeded({
+            clientId,
+            conversationId,
+            maxEstimatedUsd: analysisResult.financialRisk && analysisResult.financialRisk.maxEstimatedUsd,
+            financialRiskScore: analysisResult.financialRisk && analysisResult.financialRisk.riskScore,
+          });
+        } catch (alertErr) {
+          logger.error(
+            `[Analysis Trigger] Significant-dollar fraud alert for client ${clientId}: ${alertErr.message}`,
+            alertErr
+          );
+        }
 
         logger.info(`[Analysis Trigger] Fraud/abuse month record upserted for client ${clientId}`, {
           conversationCount: monthConversations.length,

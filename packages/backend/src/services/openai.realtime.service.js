@@ -767,6 +767,21 @@ class OpenAIRealtimeService {
     }
   }
 
+  _clearResponseStuckRecoveryTimers(conn) {
+    if (conn._responseStuckRecoveryTimeout) {
+      clearTimeout(conn._responseStuckRecoveryTimeout);
+      conn._responseStuckRecoveryTimeout = null;
+    }
+    if (conn._responseStuckRecoveryInnerTimeout) {
+      clearTimeout(conn._responseStuckRecoveryInnerTimeout);
+      conn._responseStuckRecoveryInnerTimeout = null;
+    }
+    if (conn._responseAggressiveInterval) {
+      clearInterval(conn._responseAggressiveInterval);
+      conn._responseAggressiveInterval = null;
+    }
+  }
+
   /**
    * Send response.create to trigger OpenAI to generate responses - ENHANCED with diagnostics
    */
@@ -831,6 +846,8 @@ class OpenAIRealtimeService {
       );
       return false;
     }
+    this._clearResponseStuckRecoveryTimers(connection);
+    connection._stuckResponseRecoveryStartSnapshot = null;
     connection._responseCreateInFlight = true;
 
     try {
@@ -851,6 +868,7 @@ class OpenAIRealtimeService {
       logger.info(`[RealtimeRC] sendResponseCreate:SENT callId=${callId}`);
       // Don't set _responseCreated for initial greeting - allow commits
       connection._responseStartTime = Date.now(); // Track when response was created
+      const responseStartSnapshot = connection._responseStartTime;
       logger.info(`[OpenAI Realtime] SUCCESS: Sent response.create for ${callId}`);
       logger.debug(`[OpenAI Realtime] Response.create payload: ${messageStr}`);
 
@@ -862,35 +880,45 @@ class OpenAIRealtimeService {
         this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'ai_response_triggered');
       }
 
-      // Add timeout to reset response flag if it gets stuck
-      setTimeout(() => {
+      // Stuck-response recovery: only applies to the same response.create (snapshot of _responseStartTime).
+      // A prior bug compared currentConn._responseStartTime to connection._responseStartTime; both are the
+      // same object field, so the check was always true and a greeting 20s timer could fire during the next user turn.
+      connection._responseStuckRecoveryTimeout = setTimeout(() => {
         const currentConn = this.connections.get(callId);
-        if (currentConn && currentConn._responseCreated && currentConn._responseStartTime === connection._responseStartTime) {
-          logger.warn(`[OpenAI Realtime] Response timeout for ${callId} - resetting response flag after 10 seconds`);
+        if (
+          currentConn &&
+          currentConn._responseCreated &&
+          currentConn._responseStartTime === responseStartSnapshot
+        ) {
+          logger.warn(`[OpenAI Realtime] Response timeout for ${callId} - resetting response flag after 20 seconds`);
+          currentConn._stuckResponseRecoveryStartSnapshot = responseStartSnapshot;
           currentConn._responseCreated = false;
           currentConn._responseCreateInFlight = false;
           currentConn._responseStartTime = null;
 
           // Force a new response generation after timeout
-          setTimeout(async () => {
+          currentConn._responseStuckRecoveryInnerTimeout = setTimeout(async () => {
             try {
-              // Check grace period to prevent dual responses after initial greeting
-              const currentConn = this.connections.get(callId);
-              if (currentConn) {
-                const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
-                  ? Date.now() - currentConn._initialGreetingCompletedAt 
-                  : Infinity;
-                const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
-
-                if (timeSinceGreeting < GRACE_PERIOD_MS) {
-                  logger.info(
-                    `[OpenAI Realtime] Skipping timeout recovery for ${callId} - in grace period ` +
-                    `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
-                  );
-                  return;
-                }
+              const c = this.connections.get(callId);
+              if (!c || c._stuckResponseRecoveryStartSnapshot !== responseStartSnapshot) {
+                return;
               }
-              
+              c._stuckResponseRecoveryStartSnapshot = null;
+
+              // Check grace period to prevent dual responses after initial greeting
+              const timeSinceGreeting = c._initialGreetingCompletedAt
+                ? Date.now() - c._initialGreetingCompletedAt
+                : Infinity;
+              const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+              if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                logger.info(
+                  `[OpenAI Realtime] Skipping timeout recovery for ${callId} - in grace period ` +
+                    `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                );
+                return;
+              }
+
               logger.info(`[OpenAI Realtime] Attempting to generate new response after timeout for ${callId}`);
               await this.sendResponseCreate(callId);
             } catch (err) {
@@ -900,47 +928,63 @@ class OpenAIRealtimeService {
         }
       }, 20000); // 20 second timeout
 
-      // Add a more aggressive timeout check every 5 seconds
-      const aggressiveTimeout = setInterval(() => {
+      // A more aggressive timeout check every 5 seconds (same response only)
+      connection._responseAggressiveInterval = setInterval(() => {
         const currentConn = this.connections.get(callId);
+        if (currentConn && currentConn._responseStartTime !== responseStartSnapshot) {
+          if (currentConn._responseAggressiveInterval) {
+            clearInterval(currentConn._responseAggressiveInterval);
+            currentConn._responseAggressiveInterval = null;
+          }
+          return;
+        }
         if (currentConn && currentConn._responseCreated && currentConn._responseStartTime) {
           const responseAge = Date.now() - currentConn._responseStartTime;
-          if (responseAge > 30000) { // 30 seconds
-            logger.warn(`[OpenAI Realtime] Aggressive timeout for ${callId} - response stuck for ${responseAge}ms, forcing reset`);
+          if (responseAge > 30000) {
+            // 30 seconds
+            logger.warn(
+              `[OpenAI Realtime] Aggressive timeout for ${callId} - response stuck for ${responseAge}ms, forcing reset`
+            );
+            currentConn._stuckResponseRecoveryStartSnapshot = responseStartSnapshot;
             currentConn._responseCreated = false;
             currentConn._responseCreateInFlight = false;
             currentConn._responseStartTime = null;
-            clearInterval(aggressiveTimeout);
+            if (currentConn._responseAggressiveInterval) {
+              clearInterval(currentConn._responseAggressiveInterval);
+              currentConn._responseAggressiveInterval = null;
+            }
 
             // Force a new response generation
-            setTimeout(async () => {
+            currentConn._responseStuckRecoveryInnerTimeout = setTimeout(async () => {
               try {
-                // Check grace period to prevent dual responses after initial greeting
-                const currentConn = this.connections.get(callId);
-                if (currentConn) {
-                  const timeSinceGreeting = currentConn._initialGreetingCompletedAt 
-                    ? Date.now() - currentConn._initialGreetingCompletedAt 
-                    : Infinity;
-                  const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
-
-                  if (timeSinceGreeting < GRACE_PERIOD_MS) {
-                    logger.info(
-                      `[OpenAI Realtime] Skipping aggressive timeout recovery for ${callId} - in grace period ` +
-                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
-                    );
-                    return;
-                  }
+                const c = this.connections.get(callId);
+                if (!c || c._stuckResponseRecoveryStartSnapshot !== responseStartSnapshot) {
+                  return;
                 }
-                
+                c._stuckResponseRecoveryStartSnapshot = null;
+
+                const timeSinceGreeting = c._initialGreetingCompletedAt
+                  ? Date.now() - c._initialGreetingCompletedAt
+                  : Infinity;
+                const GRACE_PERIOD_MS = 3000; // 3 seconds to clear lingering audio from connection/transfer
+
+                if (timeSinceGreeting < GRACE_PERIOD_MS) {
+                  logger.info(
+                    `[OpenAI Realtime] Skipping aggressive timeout recovery for ${callId} - in grace period ` +
+                      `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${GRACE_PERIOD_MS}ms)`
+                  );
+                  return;
+                }
+
                 logger.info(`[OpenAI Realtime] Attempting to generate new response after aggressive timeout for ${callId}`);
                 await this.sendResponseCreate(callId);
               } catch (err) {
-                logger.error(`[OpenAI Realtime] Failed to generate new response after aggressive timeout for ${callId}: ${err.message}`);
+                logger.error(
+                  `[OpenAI Realtime] Failed to generate new response after aggressive timeout for ${callId}: ${err.message}`
+                );
               }
             }, 1000);
           }
-        } else {
-          clearInterval(aggressiveTimeout);
         }
       }, 5000);
 
@@ -2146,8 +2190,10 @@ class OpenAIRealtimeService {
           await this.handleSessionExpired(callId);
           break;
 
-        default:
+        default: {
           // Unhandled message type - log for debugging and track for migration monitoring
+          // Block scope: `const apiVersion` in default must not share the switch lexenv with other cases
+          // (else it hoists and shadows outer `const apiVersion`, causing TDZ in response.output_audio.delta).
           const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
           const apiVersion = useGA ? 'GA' : 'Beta';
           logger.warn(`[OpenAI Realtime] Unhandled message type ${message.type} for ${callId} (${apiVersion})`);
@@ -2166,6 +2212,7 @@ class OpenAIRealtimeService {
             });
           }
           logger.debug(`[OpenAI Realtime] Unhandled message structure (${apiVersion}): ${JSON.stringify(message, null, 2).substring(0, 500)}`);
+        }
       }
     } catch (err) {
       const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
@@ -2608,6 +2655,8 @@ class OpenAIRealtimeService {
       conn._responseCreated = false;
       conn._responseCreateInFlight = false;
       conn._responseStartTime = null;
+      conn._stuckResponseRecoveryStartSnapshot = null;
+      this._clearResponseStuckRecoveryTimers(conn);
       logger.info(`[RealtimeRC] response.done(canceled) ${callId}: cleared _responseCreateInFlight and related guards`);
 
       const currentState = this.getConversationState(callId);
@@ -2649,6 +2698,8 @@ class OpenAIRealtimeService {
     conn._responseCreated = false;
     conn._responseCreateInFlight = false;
     conn._responseStartTime = null; // Clear timeout tracking
+    conn._stuckResponseRecoveryStartSnapshot = null;
+    this._clearResponseStuckRecoveryTimers(conn);
     logger.info(`[RealtimeRC] response.done ${callId}: cleared _aiIsSpeaking, _responseCreated, _responseCreateInFlight`, {
       transitionFrom: stateBeforeResponseDoneTransition,
       willTransitionTo:
@@ -4589,6 +4640,7 @@ class OpenAIRealtimeService {
     const connPreDelete = this.connections.get(callId);
     if (connPreDelete) {
       connPreDelete._responseCreateInFlight = false;
+      this._clearResponseStuckRecoveryTimers(connPreDelete);
       this._clearAiAudioCompleteDebounceTimer(connPreDelete);
       if (connPreDelete._speechStoppedFinalizeTimer) {
         clearTimeout(connPreDelete._speechStoppedFinalizeTimer);

@@ -514,6 +514,7 @@ export interface FinancialRiskMetrics {
     severity: "low" | "medium" | "high"
     message: string
   }>
+  maxEstimatedUsd?: number
   largeAmountMentions: number
   transferMethodMentions: number
   scamIndicatorMentions: number
