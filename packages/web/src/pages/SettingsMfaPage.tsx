@@ -7,6 +7,7 @@ import {
   useRegenerateBackupCodesMutation,
   useVerifyAndEnableMFAMutation,
 } from "../services/api/mfaApi"
+import { ConfirmModal } from "../components/ConfirmModal"
 import "../app.css"
 
 export function SettingsMfaPage() {
@@ -25,6 +26,8 @@ export function SettingsMfaPage() {
   const [regenOtp, setRegenOtp] = useState("")
   const [error, setError] = useState("")
   const [info, setInfo] = useState("")
+  const [showDisableConfirm, setShowDisableConfirm] = useState(false)
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false)
 
   useEffect(() => {
     if (!mfaStatus) return
@@ -68,38 +71,48 @@ export function SettingsMfaPage() {
     }
   }
 
-  const submitDisable = async (e: FormEvent) => {
+  const submitDisable = (e: FormEvent) => {
     e.preventDefault()
     setError("")
     if (disableOtp.trim().length !== 6) {
       setError("Enter your current 6-digit code to disable MFA.")
       return
     }
-    if (!window.confirm("Disable multi-factor authentication? Your account will be less protected.")) return
+    setShowDisableConfirm(true)
+  }
+
+  const performDisable = async () => {
+    setError("")
     try {
       await disableMFA({ token: disableOtp.trim() }).unwrap()
       setDisableOtp("")
       setInfo("MFA has been disabled.")
       setStep("intro")
+      setShowDisableConfirm(false)
       void refetch()
     } catch (e: unknown) {
       setError((e as { data?: { message?: string } })?.data?.message || "Could not disable MFA.")
     }
   }
 
-  const submitRegen = async (e: FormEvent) => {
+  const submitRegen = (e: FormEvent) => {
     e.preventDefault()
     setError("")
     if (regenOtp.trim().length !== 6) {
       setError("Enter your 6-digit code to regenerate backup codes.")
       return
     }
-    if (!window.confirm("Old backup codes will stop working. Continue?")) return
+    setShowRegenConfirm(true)
+  }
+
+  const performRegen = async () => {
+    setError("")
     try {
       const r = await regenCodes({ token: regenOtp.trim() }).unwrap()
       setBackupCodes(r.backupCodes || [])
       setRegenOtp("")
       setInfo("New backup codes generated — save them in a safe place.")
+      setShowRegenConfirm(false)
     } catch (e: unknown) {
       setError((e as { data?: { message?: string } })?.data?.message || "Could not regenerate codes.")
     }
@@ -248,6 +261,28 @@ export function SettingsMfaPage() {
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={showDisableConfirm}
+        title="Disable multi-factor authentication?"
+        onClose={() => setShowDisableConfirm(false)}
+        onConfirm={() => void performDisable()}
+        confirmLabel={disabling ? "Disabling…" : "Disable MFA"}
+        confirmDisabled={disabling}
+      >
+        <p style={{ margin: 0 }}>Your account will be less protected.</p>
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={showRegenConfirm}
+        title="Regenerate backup codes?"
+        onClose={() => setShowRegenConfirm(false)}
+        onConfirm={() => void performRegen()}
+        confirmLabel={regening ? "Working…" : "Continue"}
+        confirmDisabled={regening}
+      >
+        <p style={{ margin: 0 }}>Old backup codes will stop working.</p>
+      </ConfirmModal>
     </div>
   )
 }

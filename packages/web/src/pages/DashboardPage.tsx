@@ -53,7 +53,12 @@ export function DashboardPage() {
     skipRecentActivity ? skipToken : superAdminNeedsOrg && org?.id ? { orgId: org.id, limit: RECENT_ACTIVITY_LIMIT, sinceDays: 30 } : { limit: RECENT_ACTIVITY_LIMIT, sinceDays: 30 },
   )
 
-  const { data: clientPages } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
+  const {
+    data: clientPages,
+    isLoading: clientsListLoading,
+    isError: clientsListError,
+    refetch: refetchClientsList,
+  } = useGetAllClientsQuery(authed ? { limit: 500, page: 1 } : skipToken)
   const {
     data: onboardingRollupsRes,
     isLoading: onbRollLoading,
@@ -75,7 +80,7 @@ export function DashboardPage() {
     return () => clearInterval(id)
   }, [tick])
 
-  const c = totalFromApi != null ? totalFromApi : clients.length || residents.length || 146
+  const c = totalFromApi != null ? totalFromApi : clients.length || (!authed ? residents.length || 146 : 0)
   const activeToday = useMemo(
     () => (clients.length ? clients.filter((cl) => withinMs(cl.lastCallAttemptAt, MS_DAY)).length : Math.max(c - 4, 142)),
     [clients, c],
@@ -150,6 +155,37 @@ export function DashboardPage() {
     }
     return { complete, active, notStarted, total: vals.length }
   }, [onboardingRollupsRes])
+
+  if (authed && clientPages === undefined && clientsListLoading) {
+    return (
+      <div
+        data-testid="dashboard-loading"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "4rem 1.5rem",
+          gap: "1rem",
+          minHeight: 320,
+        }}
+      >
+        <div className="va-spinner" role="status" aria-busy="true" aria-label="Loading dashboard" />
+        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", margin: 0 }}>Loading dashboard…</p>
+      </div>
+    )
+  }
+
+  if (authed && clientPages === undefined && clientsListError) {
+    return (
+      <div style={{ padding: "3rem 1.5rem", textAlign: "center", maxWidth: 420, margin: "0 auto" }}>
+        <p style={{ color: "var(--va-slate-600)", margin: "0 0 1rem" }}>Could not load dashboard data.</p>
+        <button type="button" className="va-btn-primary" onClick={() => void refetchClientsList()}>
+          Try again
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div data-testid="home-header" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>

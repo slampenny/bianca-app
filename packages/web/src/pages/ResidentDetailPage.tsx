@@ -20,6 +20,7 @@ import { useGetSentimentSummaryQuery, useGetSentimentTrendQuery } from "../servi
 import { useGetMedicalAnalysisResultsQuery, useGetMedicalAnalysisSummaryQuery } from "../services/api/medicalAnalysisApi"
 import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdateScheduleMutation } from "../services/api/scheduleApi"
 import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
+import { ConfirmModal } from "../components/ConfirmModal"
 import { AvatarPicker } from "../components/AvatarPicker"
 import { NewScheduleFormFields } from "../components/NewScheduleFormFields"
 import { ClientOnboardingSection } from "../components/ClientOnboardingSection"
@@ -95,6 +96,8 @@ export function ResidentDetailPage() {
   const [editScheduleMonthlyDaysRaw, setEditScheduleMonthlyDaysRaw] = useState("")
   const [editScheduleActive, setEditScheduleActive] = useState(true)
   const [expandedConversationId, setExpandedConversationId] = useState<string | null>(null)
+  const [confirmDeleteResidentOpen, setConfirmDeleteResidentOpen] = useState(false)
+  const [scheduleDeleteConfirmId, setScheduleDeleteConfirmId] = useState<string | null>(null)
 
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const user = useAppSelector(getCurrentUser)
@@ -398,12 +401,11 @@ export function ResidentDetailPage() {
     }
   }
 
-  const onDeleteResident = async () => {
+  const performDeleteResident = async () => {
     if (!apiClient?.id || deletingResident) return
-    const ok = window.confirm(`Delete ${displayName || "this resident"}? This cannot be undone.`)
-    if (!ok) return
     try {
       await deleteClient({ clientId: apiClient.id }).unwrap()
+      setConfirmDeleteResidentOpen(false)
       navigate("/residents", { replace: true })
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
@@ -486,15 +488,14 @@ export function ResidentDetailPage() {
     }
   }
 
-  const onDeleteSchedule = async (scheduleId: string) => {
-    const ok = window.confirm("Delete this schedule?")
-    if (!ok) return
+  const performDeleteSchedule = async (scheduleId: string) => {
     setScheduleError("")
     setScheduleNotice("")
     try {
       await deleteSchedule({ scheduleId }).unwrap()
       if (editingScheduleId === scheduleId) setEditingScheduleId(null)
       setScheduleNotice("Schedule deleted.")
+      setScheduleDeleteConfirmId(null)
       await refetch()
     } catch (err: unknown) {
       const status = (err as { status?: number })?.status
@@ -516,6 +517,7 @@ export function ResidentDetailPage() {
           }).unwrap()
           if (editingScheduleId === scheduleId) setEditingScheduleId(null)
           setScheduleNotice("Schedule deleted.")
+          setScheduleDeleteConfirmId(null)
           await refetch()
           return
         } catch {
@@ -550,7 +552,7 @@ export function ResidentDetailPage() {
           <button
             type="button"
             className="va-btn-ghost"
-            onClick={() => void onDeleteResident()}
+            onClick={() => setConfirmDeleteResidentOpen(true)}
             disabled={deletingResident}
             style={{ color: "var(--va-red-600)", borderColor: "var(--va-red-200)" }}
             data-testid="resident-delete"
@@ -923,7 +925,7 @@ export function ResidentDetailPage() {
                     className="va-btn-ghost"
                     data-testid={`resident-schedule-delete-${String(primarySchedule.id)}`}
                     style={{ color: "var(--va-red-600)", borderColor: "var(--va-red-200)" }}
-                    onClick={() => void onDeleteSchedule(String(primarySchedule.id))}
+                    onClick={() => setScheduleDeleteConfirmId(String(primarySchedule.id))}
                     disabled={deletingSchedule}
                   >
                     Delete
@@ -1490,6 +1492,26 @@ export function ResidentDetailPage() {
       {consentOpen && (
         <ConsentModal client={apiClient} displayName={displayName} onClose={() => setConsentOpen(false)} />
       )}
+
+      <ConfirmModal
+        open={confirmDeleteResidentOpen}
+        title={`Delete ${displayName || "this resident"}?`}
+        onClose={() => setConfirmDeleteResidentOpen(false)}
+        onConfirm={() => void performDeleteResident()}
+        confirmLabel={deletingResident ? "Deleting..." : "Delete"}
+        confirmDisabled={deletingResident}
+      >
+        <p style={{ margin: 0 }}>This cannot be undone.</p>
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={scheduleDeleteConfirmId !== null}
+        title="Delete this schedule?"
+        onClose={() => setScheduleDeleteConfirmId(null)}
+        onConfirm={() => (scheduleDeleteConfirmId ? void performDeleteSchedule(scheduleDeleteConfirmId) : undefined)}
+        confirmLabel={deletingSchedule ? "Deleting..." : "Delete"}
+        confirmDisabled={deletingSchedule}
+      />
 
       <style>{`
         @media (min-width: 768px) {

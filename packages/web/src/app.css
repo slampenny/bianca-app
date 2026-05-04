@@ -240,6 +240,20 @@
     opacity: 0;
   }
 }
+@keyframes va-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.va-spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--va-slate-200);
+  border-top-color: var(--va-teal);
+  border-radius: 50%;
+  animation: va-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
 .va-header-meta {
   display: flex;
   align-items: center;

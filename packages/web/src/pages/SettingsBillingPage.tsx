@@ -9,6 +9,7 @@ import {
 } from "../services/api/paymentMethodApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
+import { ConfirmModal } from "../components/ConfirmModal"
 import "../app.css"
 
 function methodLabel(type?: string, brand?: string) {
@@ -32,6 +33,7 @@ export function SettingsBillingPage() {
   const [newPaymentMethodId, setNewPaymentMethodId] = useState("")
   const [message, setMessage] = useState("")
   const [errorMessage, setErrorMessage] = useState("")
+  const [removePaymentMethodId, setRemovePaymentMethodId] = useState<string | null>(null)
 
   if (!canManage) {
     return (
@@ -77,14 +79,15 @@ export function SettingsBillingPage() {
     }
   }
 
-  const onRemove = async (paymentMethodId: string) => {
-    const ok = window.confirm("Remove this payment method?")
-    if (!ok) return
+  const performRemovePaymentMethod = async () => {
+    if (!removePaymentMethodId) return
+    const paymentMethodId = removePaymentMethodId
     setMessage("")
     setErrorMessage("")
     try {
       await detachPaymentMethod({ orgId, paymentMethodId }).unwrap()
       setMessage("Payment method removed.")
+      setRemovePaymentMethodId(null)
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
@@ -150,7 +153,7 @@ export function SettingsBillingPage() {
                         className="va-btn-ghost"
                         data-testid={`billing-remove-${id}`}
                         style={{ color: "var(--va-red-600)", borderColor: "var(--va-red-200)" }}
-                        onClick={() => void onRemove(id)}
+                        onClick={() => setRemovePaymentMethodId(id)}
                         disabled={detaching}
                       >
                         Remove
@@ -196,6 +199,15 @@ export function SettingsBillingPage() {
           </div>
         ) : null}
       </div>
+
+      <ConfirmModal
+        open={removePaymentMethodId !== null}
+        title="Remove this payment method?"
+        onClose={() => setRemovePaymentMethodId(null)}
+        onConfirm={() => void performRemovePaymentMethod()}
+        confirmLabel={detaching ? "Removing…" : "Remove"}
+        confirmDisabled={detaching}
+      />
     </div>
   )
 }
