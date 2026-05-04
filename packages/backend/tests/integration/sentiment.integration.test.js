@@ -304,6 +304,82 @@ describe('Sentiment Analysis Integration', () => {
       expect(trend.dataPoints[0].analyzedData.sentiment).toHaveProperty('sentimentScore');
     });
 
+    it('should exclude non-Bianca sessions (e.g. voicemail) from sentiment trend data points', async () => {
+      await Conversation.deleteMany({ clientId: client._id });
+      await Call.deleteMany({ clientId: client._id });
+
+      const now = new Date();
+      const endGood = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+      const startGood = new Date(endGood.getTime() - 60000);
+
+      const goodCall = new Call({
+        clientId: client._id,
+        callSid: 'good-call',
+        status: 'completed',
+        callOutcome: 'answered',
+        startTime: startGood,
+        endTime: endGood,
+        duration: 120,
+      });
+      await goodCall.save();
+
+      const goodConv = new Conversation({
+        clientId: client._id,
+        callId: goodCall._id,
+        callSid: 'good-call',
+        messages: [],
+        history: '',
+        analyzedData: {
+          sentiment: {
+            overallSentiment: 'positive',
+            sentimentScore: 0.5,
+            confidence: 0.9,
+            concernLevel: 'low',
+            summary: 'ok',
+          },
+          sentimentAnalyzedAt: endGood,
+        },
+        metadata: {},
+      });
+      await goodConv.save();
+
+      const endVm = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+      const vmCall = new Call({
+        clientId: client._id,
+        callSid: 'vm-call',
+        status: 'failed',
+        callOutcome: 'voicemail',
+        startTime: new Date(endVm.getTime() - 60000),
+        endTime: endVm,
+        duration: 30,
+      });
+      await vmCall.save();
+
+      const vmConv = new Conversation({
+        clientId: client._id,
+        callId: vmCall._id,
+        callSid: 'vm-call',
+        messages: [],
+        history: '',
+        analyzedData: {
+          sentiment: {
+            overallSentiment: 'neutral',
+            sentimentScore: 0,
+            confidence: 0.5,
+            concernLevel: 'low',
+            summary: 'vm',
+          },
+          sentimentAnalyzedAt: endVm,
+        },
+        metadata: {},
+      });
+      await vmConv.save();
+
+      const trend = await sentimentAnalysisService.getSentimentTrend(client._id, 'month');
+      expect(trend.dataPoints.length).toBe(1);
+      expect(String(trend.dataPoints[0]._id)).toBe(String(goodConv._id));
+    });
+
     it('should get sentiment summary for client', async () => {
       // Verify conversations were created
       const createdConversations = await Conversation.find({ clientId: client._id });

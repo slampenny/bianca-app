@@ -3,6 +3,19 @@ const { Conversation, Call } = require('../models');
 const logger = require('../config/logger');
 
 /**
+ * True when the call represents a live session with Bianca (not voicemail / no-answer).
+ * Aligns with family/caregiver digest logic: answered outcome, or completed call with duration.
+ */
+const callHadClientConnectedWithBianca = (call) => {
+  if (!call) return false;
+  if (call.callOutcome === 'voicemail' || call.callOutcome === 'no_answer') return false;
+  const duration = Number(call.duration ?? call.callDuration ?? 0);
+  if (call.callOutcome === 'answered') return true;
+  if (call.status === 'completed' && duration > 0) return true;
+  return false;
+};
+
+/**
  * Calculate linear trend from sentiment scores
  * @param {Array<number>} scores - Array of sentiment scores
  * @returns {string} - 'improving', 'declining', or 'stable'
@@ -60,22 +73,28 @@ const getSentimentTrend = async (clientId, timeRange = 'lastCall') => {
     let startDate;
 
     switch (timeRange) {
-      case 'lastCall':
-        const lastConversation = await Conversation.findOne({
+      case 'lastCall': {
+        const forLastCall = await Conversation.find({
           clientId,
-          'analyzedData.sentiment': { $exists: true }
+          'analyzedData.sentiment': { $exists: true },
         })
-        .populate('callId', 'endTime')
-        .select('callId')
-        .lean();
-        
-        if (lastConversation?.callId?.endTime) {
-          // Get conversations from the last call date to now
-          startDate = lastConversation.callId.endTime;
+          .populate('callId', 'endTime startTime duration status callDuration callOutcome')
+          .select('callId')
+          .lean();
+
+        const qualifying = forLastCall
+          .filter((c) => callHadClientConnectedWithBianca(c.callId))
+          .sort((a, b) => {
+            const tb = b.callId?.endTime ? new Date(b.callId.endTime).getTime() : 0;
+            const ta = a.callId?.endTime ? new Date(a.callId.endTime).getTime() : 0;
+            return tb - ta;
+          });
+
+        const latest = qualifying[0];
+        if (latest?.callId?.endTime) {
+          startDate = latest.callId.endTime;
         } else {
-          // No conversations with sentiment analysis, return empty data
           return {
-            clientId,
             clientId,
             timeRange,
             startDate: now.toISOString(),
@@ -88,11 +107,12 @@ const getSentimentTrend = async (clientId, timeRange = 'lastCall') => {
               sentimentDistribution: {},
               trendDirection: 'stable',
               confidence: 0,
-              keyInsights: []
-            }
+              keyInsights: [],
+            },
           };
         }
         break;
+      }
       case 'month':
         startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
         break;
@@ -107,18 +127,20 @@ const getSentimentTrend = async (clientId, timeRange = 'lastCall') => {
     // Use Call's endTime by populating callId
     let conversations = await Conversation.find({
       clientId,
-      clientId,
-      'analyzedData.sentiment': { $exists: true }
+      'analyzedData.sentiment': { $exists: true },
     })
-      .populate('callId', 'endTime startTime duration status')
+      .populate('callId', 'endTime startTime duration status callDuration callOutcome')
       .select('_id analyzedData callId')
       .lean();
-    
+
     // Filter by Call's endTime
-    conversations = conversations.filter(conv => {
+    conversations = conversations.filter((conv) => {
       const callEndTime = conv.callId?.endTime;
       return callEndTime && callEndTime >= startDate && callEndTime <= now;
     });
+
+    // Trend chart: only sessions where the client connected with Bianca (exclude voicemail, etc.)
+    conversations = conversations.filter((conv) => callHadClientConnectedWithBianca(conv.callId));
     
     // Sort by Call's endTime
     conversations.sort((a, b) => {

@@ -75,7 +75,7 @@ function DigestTable({
                   ? formatSentimentLine(entry.sentiment)
                   : "—"}
               </td>
-              <td style={{ fontSize: "0.875rem", lineHeight: 1.45, maxWidth: "22rem" }}>{entryNotes(entry, labels)}</td>
+              <td style={{ fontSize: "0.875rem", lineHeight: 1.45 }}>{entryNotes(entry, labels)}</td>
             </tr>
           ))}
         </tbody>
@@ -133,7 +133,11 @@ export function DailyDigestPage() {
   }, [digest?.id, sendDigest])
 
   return (
-    <div data-testid="daily-digest-page" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: 960 }}>
+    <div
+      data-testid="daily-digest-page"
+      className="va-page-wrap"
+      style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+    >
       <div>
         <Link
           to="/reports"

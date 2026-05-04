@@ -466,6 +466,54 @@ const saveRealtimeMessage = async (conversationId, role, content, messageType = 
   }
 };
 
+/** UTC label like "2026-05-04 17:28 UTC" so summaries can reference real times (not `{Date}` placeholders). */
+const formatUtcTimestampLabel = (d) => {
+  if (!d || Number.isNaN(d.getTime())) return null;
+  const iso = d.toISOString();
+  return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+};
+
+const firstValidDate = (...candidates) => {
+  for (const c of candidates) {
+    if (c == null) continue;
+    const t = c instanceof Date ? c : new Date(c);
+    if (!Number.isNaN(t.getTime())) return t;
+  }
+  return null;
+};
+
+const messageInstant = (msg, callStart) =>
+  firstValidDate(msg.timestamp, msg.createdAt, msg.updatedAt) ||
+  (callStart && !Number.isNaN(callStart.getTime()) ? callStart : null);
+
+/** Transcript for summarization / sentiment: each line includes a UTC timestamp from the message or call start. */
+const buildTranscriptForSummarization = (messages, callStart, conversationCreatedAt) => {
+  if (!messages || messages.length === 0) return 'No conversation content recorded.';
+  const anchor = firstValidDate(callStart, conversationCreatedAt) || new Date();
+  const anchorLabel = formatUtcTimestampLabel(anchor);
+  let lastLabel = anchorLabel;
+  return messages
+    .map((msg) => {
+      const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
+      const instant = messageInstant(msg, callStart);
+      const label = instant ? formatUtcTimestampLabel(instant) : lastLabel;
+      lastLabel = label;
+      return `[${label}] ${speaker}: ${msg.content}`;
+    })
+    .join('\n');
+};
+
+/** Strip template tokens the model sometimes emits when dates were missing from the raw transcript. */
+const sanitizeSummaryDatePlaceholders = (summaryText, callStart, conversationCreatedAt) => {
+  if (!summaryText || typeof summaryText !== 'string') return summaryText;
+  const replacement =
+    formatUtcTimestampLabel(firstValidDate(callStart, conversationCreatedAt) || new Date()) || '';
+  return summaryText
+    .replace(/\{Date\}/gi, replacement)
+    .replace(/\{date\}/g, replacement)
+    .replace(/Date:\s*\[Not specified\]/gi, replacement ? `Date: ${replacement}` : '');
+};
+
 /**
  * Enhanced conversation finalization using your LangChain templates
  */
@@ -478,12 +526,19 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       return;
     }
 
+    const callLean = conversation.callId ? await Call.findById(conversation.callId).select('startTime').lean() : null;
+    const callStart = callLean?.startTime ? new Date(callLean.startTime) : null;
+    const conversationCreatedAt = conversation.createdAt ? new Date(conversation.createdAt) : null;
+
     let messages;
     let conversationText;
 
     if (useRealtimeMessages) {
       // Get messages from Message collection (realtime calls) - same conversationId the UI uses
-      messages = await Message.find({ conversationId }).sort({ createdAt: 1 }).select('role content timestamp').lean();
+      messages = await Message.find({ conversationId })
+        .sort({ createdAt: 1 })
+        .select('role content timestamp createdAt')
+        .lean();
 
       // Fallback: if Message.find returned nothing but conversation has messages (split/call vs conversation),
       // use conversation.messages (same source as live call UI) so sentiment always sees what the UI sees
@@ -505,12 +560,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
         messages = [];
         conversationText = 'No conversation content recorded.';
       } else {
-        conversationText = messages
-          .map((msg) => {
-            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
-            return `${speaker}: ${msg.content}`;
-          })
-          .join('\n');
+        conversationText = buildTranscriptForSummarization(messages, callStart, conversationCreatedAt);
       }
     } else {
       // Use existing conversation.messages array
@@ -521,12 +571,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
         // No messages: still run summary + sentiment on fallback so every call has sentiment
         conversationText = 'No conversation content recorded.';
       } else {
-        conversationText = messages
-          .map((msg) => {
-            const speaker = msg.role === 'assistant' ? 'Bianca' : 'Client';
-            return `${speaker}: ${msg.content}`;
-          })
-          .join('\n');
+        conversationText = buildTranscriptForSummarization(messages, callStart, conversationCreatedAt);
       }
     }
 
@@ -552,6 +597,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
 
     try {
       summary = await langChainAPI.summarizeConversation(summaryPrompt, conversationText, userDomain);
+      summary = sanitizeSummaryDatePlaceholders(summary, callStart, conversationCreatedAt);
     } catch (summaryErr) {
       logger.error(`[Finalize] Error generating summary for conversation ${conversationId}: ${summaryErr.message}`);
     }
@@ -581,9 +627,10 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
       );
     }
 
-    // Update conversation with summary and sentiment analysis
+    // Update conversation with summary and sentiment analysis (summary + history: digest UI prefers summary)
     const updateData = {
-      history: summary, // Store summary in your existing history field
+      history: summary,
+      summary,
     };
 
     // Add sentiment analysis to analyzedData if successful
@@ -602,7 +649,6 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     await Conversation.findByIdAndUpdate(conversationId, updateData);
 
     // Update the associated Call's endTime instead of Conversation
-    const { Call } = require('../models');
     const convWithCall = await Conversation.findById(conversationId).populate('callId');
     if (convWithCall && convWithCall.callId) {
       await Call.findByIdAndUpdate(convWithCall.callId, {
@@ -652,6 +698,7 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
     try {
       await Conversation.findByIdAndUpdate(conversationId, {
         history: 'Summary generation failed - manual review needed',
+        summary: 'Summary generation failed - manual review needed',
         endTime: new Date(),
         status: 'completed',
       });
