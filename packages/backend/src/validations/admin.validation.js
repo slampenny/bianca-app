@@ -108,6 +108,21 @@ const embeddingAnchorUpdate = {
     .min(1),
 };
 
+const saveCorpEmailForwards = {
+  body: Joi.object().keys({
+    forwards: Joi.array()
+      .items(
+        Joi.object().keys({
+          caregiverId: Joi.string().custom(objectId).optional().allow(null),
+          corpEmail: Joi.string().required().email(),
+          forwardToEmail: Joi.string().email().allow(null, '').optional(),
+        }),
+      )
+      .min(1)
+      .required(),
+  }),
+};
+
 module.exports = {
   searchCaregivers,
   impersonate,
@@ -119,4 +134,5 @@ module.exports = {
   embeddingAnchorCreate,
   embeddingAnchorIdParam,
   embeddingAnchorUpdate,
+  saveCorpEmailForwards,
 };

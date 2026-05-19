@@ -127,3 +127,32 @@ export interface EmbeddingAnchorPhraseRow {
 export interface EmbeddingAnchorMergeResponse {
   merged: number
 }
+
+export interface CorpEmailForwardStaffRow {
+  caregiverId: string | null
+  name: string
+  loginEmail: string | null
+  corpEmail: string
+  forwardToEmail: string | null
+  updatedAt?: string | null
+}
+
+export interface CorpEmailForwardsListResponse {
+  domain: string
+  zohoConfigured: boolean
+  staff: CorpEmailForwardStaffRow[]
+}
+
+export interface SaveCorpEmailForwardsResult {
+  corpEmail: string
+  forwardToEmail?: string | null
+  forwardChanged?: boolean
+  notificationSent?: boolean
+  zoho?: { synced: boolean; reason?: string }
+  ok: boolean
+  error?: string
+}
+
+export interface SaveCorpEmailForwardsResponse {
+  results: SaveCorpEmailForwardsResult[]
+}

@@ -9,6 +9,7 @@ const { AlertDTO, CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall } = require('.
 const { AuditLog, Caregiver } = require('../models');
 const logger = require('../config/logger');
 const embeddingAnchorPhraseService = require('../services/embeddingAnchorPhrase.service');
+const corpEmailForwardService = require('../services/corpEmailForward.service');
 
 function assertSuperAdmin(req) {
   if (req.caregiver.role !== 'superAdmin') {
@@ -325,6 +326,22 @@ const mergeDefaultEmbeddingAnchorPhrases = catchAsync(async (req, res) => {
   res.send(out);
 });
 
+const listCorpEmailForwards = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  res.send(await corpEmailForwardService.listStaffForwards());
+});
+
+const saveCorpEmailForwards = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const forwards = (req.body.forwards || []).map((row) => ({
+    caregiverId: row.caregiverId || null,
+    corpEmail: row.corpEmail,
+    forwardToEmail: row.forwardToEmail || null,
+  }));
+  const out = await corpEmailForwardService.saveStaffForwards(forwards, String(req.caregiver._id));
+  res.send(out);
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -340,4 +357,6 @@ module.exports = {
   updateEmbeddingAnchorPhrase,
   deleteEmbeddingAnchorPhrase,
   mergeDefaultEmbeddingAnchorPhrases,
+  listCorpEmailForwards,
+  saveCorpEmailForwards,
 };

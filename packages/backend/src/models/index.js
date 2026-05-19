@@ -25,6 +25,7 @@ module.exports.CaregiverDailyDigest = require('./caregiverDailyDigest.model');
 module.exports.Schedule = require('./schedule.model');
 module.exports.ClientMemory = require('./clientMemory.model').ClientMemory;
 module.exports.EmbeddingAnchorPhrase = require('./embeddingAnchorPhrase.model').EmbeddingAnchorPhrase;
+module.exports.CorpEmailForward = require('./corpEmailForward.model');
 
 // HIPAA Compliance
 module.exports.AuditLog = require('./auditLog.model');

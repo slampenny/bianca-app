@@ -95,4 +95,13 @@ router.delete(
   adminController.deleteEmbeddingAnchorPhrase,
 );
 
+router.get('/corp-email-forwards', auth(), adminController.listCorpEmailForwards);
+
+router.put(
+  '/corp-email-forwards',
+  auth(),
+  validate(adminValidation.saveCorpEmailForwards),
+  adminController.saveCorpEmailForwards,
+);
+
 module.exports = router;

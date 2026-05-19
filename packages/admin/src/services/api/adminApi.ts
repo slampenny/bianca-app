@@ -4,10 +4,12 @@ import type {
   AdminCaregiverSearchRow,
   AdminOrgSearchResponse,
   AdminOrgDetail,
+  CorpEmailForwardsListResponse,
   EmbeddingAnchorMergeResponse,
   EmbeddingAnchorPhraseRow,
   ImpersonateResponse,
   ObservabilityPayload,
+  SaveCorpEmailForwardsResponse,
   ScimAdminStatus,
   ScimTokenIssueResponse,
 } from "./api.types"
@@ -16,7 +18,7 @@ import baseQueryWithAuth from "./baseQueryWithAuth"
 export const adminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: baseQueryWithAuth(),
-  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail"],
+  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards"],
   endpoints: (builder) => ({
     getObservability: builder.query<ObservabilityPayload, void>({
       query: () => ({
@@ -143,6 +145,30 @@ export const adminApi = createApi({
       }),
       invalidatesTags: ["EmbeddingAnchors"],
     }),
+    getCorpEmailForwards: builder.query<CorpEmailForwardsListResponse, void>({
+      query: () => ({
+        url: "/admin/corp-email-forwards",
+        method: "GET",
+      }),
+      providesTags: ["CorpEmailForwards"],
+    }),
+    saveCorpEmailForwards: builder.mutation<
+      SaveCorpEmailForwardsResponse,
+      {
+        forwards: Array<{
+          caregiverId?: string
+          corpEmail: string
+          forwardToEmail: string | null
+        }>
+      }
+    >({
+      query: (body) => ({
+        url: "/admin/corp-email-forwards",
+        method: "PUT",
+        body,
+      }),
+      invalidatesTags: ["CorpEmailForwards"],
+    }),
   }),
 })
 
@@ -164,4 +190,6 @@ export const {
   useMergeEmbeddingAnchorDefaultsMutation,
   useGetOrgQuery,
   usePatchOrgMutation,
+  useGetCorpEmailForwardsQuery,
+  useSaveCorpEmailForwardsMutation,
 } = adminApi
