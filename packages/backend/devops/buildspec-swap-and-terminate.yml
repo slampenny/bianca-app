@@ -389,36 +389,11 @@ phases:
             fi
             echo "     If status was Pending/Delayed: EC2 role needs AmazonSSMManagedInstanceCore (terraform: production_ssm_managed_core on bianca-production-role)."
             echo "     Or fix mount/docker on green via SSH, then re-run SwapAndTerminate."
+            bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/rollback-mongodb-volume-to-blue.sh" staging || \
+              echo "  ⚠️  MongoDB rollback to blue failed (non-fatal)"
             exit 1
           fi
-          echo "  Verifying MongoDB data dir + live ping on green (refuse swap on empty or dead DB)..."
-          MONGOVERIFY_CMD_ID=$(aws ssm send-command \
-            --instance-ids "$GREEN_INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters "{\"commands\":[\"cd $DEPLOY_DIR && if ! ( sudo test -f /opt/mongodb-data/WiredTiger 2>/dev/null || sudo test -d /opt/mongodb-data/diagnostic.data 2>/dev/null ); then echo FATAL_mongodb_data_dir_empty; exit 1; fi\",\"cd $DEPLOY_DIR && PREFIX=\\$(basename $DEPLOY_DIR | sed 's/^bianca-//') && ( docker exec \\${PREFIX}_mongodb mongo --eval \\\"db.adminCommand('ping')\\\" --quiet 2>&1 | grep -q 1 ) || ( docker exec \\${PREFIX}_mongodb mongosh --quiet --eval \\\"db.adminCommand('ping')\\\" 2>&1 | grep -q 1 )\"]}" \
-            --timeout-seconds 120 \
-            --query 'Command.CommandId' \
-            --output text 2>/dev/null || echo "")
-          MONGOVERIFY_OK=false
-          if [ -n "$MONGOVERIFY_CMD_ID" ]; then
-            for i in $(seq 1 30); do
-              MVST=$(aws ssm get-command-invocation --command-id "$MONGOVERIFY_CMD_ID" --instance-id "$GREEN_INSTANCE_ID" --query 'Status' --output text 2>/dev/null || echo "Pending")
-              if [ "$MVST" = "Success" ]; then
-                MONGOVERIFY_OK=true
-                break
-              fi
-              if [ "$MVST" = "Failed" ] || [ "$MVST" = "TimedOut" ] || [ "$MVST" = "Cancelled" ]; then
-                aws ssm get-command-invocation --command-id "$MONGOVERIFY_CMD_ID" --instance-id "$GREEN_INSTANCE_ID" --query '{StdOut:StandardOutputContent,StdErr:StandardErrorContent}' --output text 2>/dev/null | head -c 8000 || true
-                break
-              fi
-              sleep 5
-            done
-          fi
-          if [ "$MONGOVERIFY_OK" != "true" ]; then
-            echo "  ❌ CRITICAL: MongoDB verification SSM did not succeed — refusing to swap to prevent traffic to a non-working database."
-            exit 1
-          fi
-          echo "  ✅ MongoDB verification passed"
+          echo "  ✅ Step 0 complete (mount script verified WiredTiger + mongo ping on green)"
         fi
         
         # Verify green instance is healthy before swapping
@@ -723,8 +698,15 @@ phases:
     commands:
       - |
         if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
-          echo "Swap failed — terminating leftover green instance(s)..."
+          echo "Swap failed — rolling MongoDB volume back to blue if needed..."
           export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+          case "${CODEPIPELINE_NAME}" in
+            bianca-production-pipeline) ROLLBACK_ENV=production ;;
+            *) ROLLBACK_ENV=staging ;;
+          esac
+          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/rollback-mongodb-volume-to-blue.sh" "$ROLLBACK_ENV" || \
+            echo "⚠️  MongoDB rollback failed (non-fatal)"
+          echo "Swap failed — terminating leftover green instance(s)..."
           bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \
             echo "⚠️  Green cleanup failed (non-fatal in post_build)"
         fi
