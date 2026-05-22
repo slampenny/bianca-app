@@ -371,6 +371,10 @@ resource "aws_codebuild_project" "staging_post_deploy_validation" {
       value = "https://staging-api.biancawellness.com"
     }
     environment_variable {
+      name  = "ADMIN_URL"
+      value = "https://staging-admin.biancawellness.com"
+    }
+    environment_variable {
       name  = "MAX_RETRIES"
       value = "20"
     }
@@ -506,6 +510,10 @@ resource "aws_codebuild_project" "staging_swap_and_terminate" {
     environment_variable {
       name  = "MONGODB_DATA_VOLUME_TAG"
       value = aws_ebs_volume.staging_mongodb.tags["Name"]
+    }
+    environment_variable {
+      name  = "ADMIN_URL"
+      value = "https://staging-admin.biancawellness.com"
     }
   }
 

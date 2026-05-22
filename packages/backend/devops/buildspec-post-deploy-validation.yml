@@ -299,6 +299,37 @@ phases:
             fi
           fi
           
+          # Super-admin console: nginx must route admin host to admin container (not facility frontend)
+          if [ -n "${ADMIN_URL:-}" ]; then
+            ADMIN_HOST="${ADMIN_URL#https://}"
+            ADMIN_HOST="${ADMIN_HOST#http://}"
+            ADMIN_HOST="${ADMIN_HOST%%/*}"
+            echo ""
+            echo "Validating super-admin host on green (Host: $ADMIN_HOST)..."
+            ADMIN_HTML=$(curl -s --max-time 30 --connect-timeout 10 -H "Host: $ADMIN_HOST" "http://${GREEN_INSTANCE_IP}/" 2>/dev/null || echo "")
+            if ! echo "$ADMIN_HTML" | grep -q "Bianca Admin"; then
+              echo "❌ Admin host returned wrong app (expected <title>Bianca Admin</title>)"
+              echo "$ADMIN_HTML" | grep -E '<title>|index-' | head -5 || true
+              echo "   Green may be missing nginx admin server block or production_admin container."
+              VALIDATION_FAILED=true
+            else
+              ADMIN_CSS=$(echo "$ADMIN_HTML" | grep -oE 'href="[^"]+\.css"' | head -1 | sed 's/^href="//;s/"$//')
+              ADMIN_JS=$(echo "$ADMIN_HTML" | grep -oE 'src="[^"]+\.js"' | head -1 | sed 's/^src="//;s/"$//')
+              for rel in "$ADMIN_CSS" "$ADMIN_JS"; do
+                [ -z "$rel" ] && continue
+                case "$rel" in /*) asset="http://${GREEN_INSTANCE_IP}${rel}" ;; *) asset="http://${GREEN_INSTANCE_IP}/${rel}" ;; esac
+                code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 -H "Host: $ADMIN_HOST" "$asset" 2>/dev/null || echo "000")
+                if [ "$code" != "200" ]; then
+                  echo "❌ Admin asset $rel returned HTTP $code on green"
+                  VALIDATION_FAILED=true
+                fi
+              done
+              if [ "$VALIDATION_FAILED" != "true" ]; then
+                echo "✅ Admin host serves Bianca Admin with assets on green"
+              fi
+            fi
+          fi
+
           echo ""
           echo "✅ Green instance validation complete"
           echo "   If validation passed, pipeline will proceed to swap traffic"

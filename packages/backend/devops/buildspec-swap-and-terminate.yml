@@ -519,6 +519,26 @@ print(ids[-1][1] if ids else "")')
           echo "   Please investigate why green instance is not healthy."
           exit 1
         fi
+
+        # Verify super-admin vhost on green (Host header) before cutting traffic
+        if [ -n "${ADMIN_URL:-}" ] && [ -n "$GREEN_INSTANCE_ID" ]; then
+          ADMIN_HOST="${ADMIN_URL#https://}"
+          ADMIN_HOST="${ADMIN_HOST#http://}"
+          ADMIN_HOST="${ADMIN_HOST%%/*}"
+          GREEN_IP=$(aws ec2 describe-instances --instance-ids "$GREEN_INSTANCE_ID" \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' --output text 2>/dev/null || echo "")
+          if [ -n "$GREEN_IP" ] && [ "$GREEN_IP" != "None" ]; then
+            echo ""
+            echo "Step 2.25: Verifying admin console on green (Host: $ADMIN_HOST)..."
+            ADMIN_HTML=$(curl -s --max-time 30 -H "Host: $ADMIN_HOST" "http://${GREEN_IP}/" 2>/dev/null || echo "")
+            if ! echo "$ADMIN_HTML" | grep -q "Bianca Admin"; then
+              echo "❌ FATAL: admin host on green serves wrong app (missing nginx admin block or admin container)"
+              echo "$ADMIN_HTML" | grep -E '<title>|index-' | head -5 || true
+              exit 1
+            fi
+            echo "  ✅ Green serves Bianca Admin for $ADMIN_HOST"
+          fi
+        fi
         
         # Step 2.5: Move Elastic IP to green BEFORE terminating blue.
         # If blue held the EIP, terminating blue disassociates it — a failed late association

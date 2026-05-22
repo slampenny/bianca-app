@@ -214,6 +214,10 @@ resource "aws_codebuild_project" "production_post_deploy_validation" {
       value = "https://api.biancawellness.com"
     }
     environment_variable {
+      name  = "ADMIN_URL"
+      value = "https://admin.biancawellness.com"
+    }
+    environment_variable {
       name  = "MAX_RETRIES"
       value = "20"
     }

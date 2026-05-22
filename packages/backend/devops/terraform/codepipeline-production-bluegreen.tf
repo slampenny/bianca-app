@@ -126,6 +126,10 @@ resource "aws_codebuild_project" "production_swap_and_terminate" {
       name  = "MONGODB_DATA_VOLUME_TAG"
       value = aws_ebs_volume.production_mongodb.tags["Name"]
     }
+    environment_variable {
+      name  = "ADMIN_URL"
+      value = "https://admin.biancawellness.com"
+    }
   }
 
   source {
