@@ -5,11 +5,14 @@ import { onboardingCopy } from "../../lib/onboardingCopy"
 import type { OnboardingOrgInfoState, OnboardingRegisterState } from "../../lib/onboardingTypes"
 import { REGISTRATION_COUNTRY_OPTIONS } from "../../lib/registrationCountries"
 import { ORG_TIMEZONE_OPTIONS } from "../../lib/orgTimezones"
+import { isAuthenticated } from "../../store/authSlice"
+import { useAppSelector } from "../../store/store"
 import "../../app.css"
 
 export function OnboardingOrgInfoPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const authed = useAppSelector(isAuthenticated)
   const state = location.state as OnboardingOrgInfoState | null
 
   if (!state || state.persona !== "organization") {
@@ -31,7 +34,7 @@ export function OnboardingOrgInfoPage() {
       orgCountry: country,
       orgTimezone: timezone,
     }
-    navigate("/register", { state: next })
+    navigate(authed ? "/onboarding/register" : "/register", { state: next })
   }
 
   return (

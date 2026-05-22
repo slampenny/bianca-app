@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
+import { needsOnboarding } from "../lib/postAuthNavigation"
 import { authApi } from "../services/api/authApi"
 import { caregiverApi } from "../services/api/caregiverApi"
 import type { AuthTokens, Caregiver } from "../services/api/api.types"
@@ -50,7 +51,7 @@ export const authSlice = createSlice({
       if ("caregiver" in payload && "tokens" in payload) {
         state.currentUser = payload.caregiver
         state.tokens = payload.tokens
-        state.pendingOnboarding = false
+        state.pendingOnboarding = needsOnboarding(payload.caregiver)
       }
     })
     builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
@@ -91,6 +92,20 @@ export const authSlice = createSlice({
     })
     builder.addMatcher(authApi.endpoints.refreshTokens.matchRejected, () => {
       // Keep session; next 401 will send user to login (same as mobile).
+    })
+    builder.addMatcher(authApi.endpoints.verifyEmail.matchFulfilled, (state, { payload }) => {
+      if (payload?.tokens && payload?.caregiver) {
+        state.tokens = payload.tokens
+        state.currentUser = payload.caregiver
+        if (payload.caregiver.email) state.authEmail = payload.caregiver.email
+        state.pendingOnboarding = needsOnboarding(payload.caregiver)
+      }
+    })
+    builder.addMatcher(authApi.endpoints.completeOnboarding.matchFulfilled, (state, { payload }) => {
+      if (payload?.caregiver) {
+        state.currentUser = payload.caregiver
+      }
+      state.pendingOnboarding = false
     })
   },
 })

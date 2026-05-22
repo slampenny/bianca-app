@@ -1,10 +1,12 @@
 import { FormEvent, useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useLoginMutation } from "../services/api/authApi"
+import { needsOnboarding, resolvePostAuthPath } from "../lib/postAuthNavigation"
 import {
   setAuthEmail,
   setAuthTokens,
   setCurrentUser,
+  setPendingOnboarding,
   getValidationError,
   getAuthEmail,
 } from "../store/authSlice"
@@ -80,13 +82,10 @@ export function LoginPage() {
       if ("tokens" in result) {
         dispatch(setAuthTokens(result.tokens))
         dispatch(setCurrentUser(result.caregiver))
+        dispatch(setPendingOnboarding(needsOnboarding(result.caregiver)))
         if (result.org) dispatch(setOrg(result.org))
         notifyAuthSuccess()
-        const to =
-          state.from && typeof state.from.pathname === "string"
-            ? `${state.from.pathname}${state.from.search || ""}`
-            : "/"
-        navigate(to, { replace: true })
+        navigate(resolvePostAuthPath(result.caregiver, state.from), { replace: true })
       }
     } catch (err) {
       const { message, requiresSSOLinking, emailVerificationRequired } = parseLoginError(err)
@@ -181,16 +180,14 @@ export function LoginPage() {
           }}
           onSsoSuccess={(user) => {
             if (!user.tokens || !user.backendUser) return
+            const caregiver = user.backendUser as Caregiver
             dispatch(setAuthTokens(user.tokens as AuthTokens))
             dispatch(setAuthEmail(user.email))
-            dispatch(setCurrentUser(user.backendUser as Caregiver))
+            dispatch(setCurrentUser(caregiver))
+            dispatch(setPendingOnboarding(needsOnboarding(caregiver)))
             if (user.backendOrg) dispatch(setOrg(user.backendOrg as Org))
             notifyAuthSuccess()
-            const to =
-              state.from && typeof state.from.pathname === "string"
-                ? `${state.from.pathname}${state.from.search || ""}`
-                : "/"
-            navigate(to, { replace: true })
+            navigate(resolvePostAuthPath(caregiver, state.from), { replace: true })
           }}
         />
 

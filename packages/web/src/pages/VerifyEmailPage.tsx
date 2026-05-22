@@ -3,7 +3,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useVerifyEmailQuery } from "../services/api/authApi"
 import { normalizeOrgForStore } from "../lib/normalizeOrg"
-import { setAuthEmail, setAuthTokens, setCurrentUser } from "../store/authSlice"
+import { needsOnboarding, resolvePostAuthPath } from "../lib/postAuthNavigation"
+import { setAuthEmail, setAuthTokens, setCurrentUser, setPendingOnboarding } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
@@ -33,12 +34,13 @@ export function VerifyEmailPage() {
     appliedSession.current = true
     dispatch(setAuthTokens(data.tokens))
     dispatch(setCurrentUser(data.caregiver))
+    dispatch(setPendingOnboarding(needsOnboarding(data.caregiver)))
     dispatch(setAuthEmail(data.caregiver.email))
     const org = normalizeOrgForStore(data.org)
     if (org) dispatch(setOrg(org))
     else dispatch(setOrg(null))
     notifyAuthSuccess()
-    navigate("/", { replace: true })
+    navigate(resolvePostAuthPath(data.caregiver), { replace: true })
   }, [isSuccess, data, dispatch, navigate])
 
   return (

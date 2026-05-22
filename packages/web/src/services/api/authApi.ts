@@ -1,4 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
+import type { OnboardingPersona } from "../../lib/onboardingTypes"
 import type {
   ApiAlertRecord,
   AuthTokens,
@@ -89,6 +90,17 @@ export const authApi = createApi({
       }),
     }),
 
+    completeOnboarding: builder.mutation<
+      { caregiver: Caregiver; message: string },
+      { persona: OnboardingPersona; acceptTerms: boolean; singleConsentState?: boolean }
+    >({
+      query: (body) => ({
+        url: "/auth/onboarding/complete",
+        method: "POST",
+        body,
+      }),
+    }),
+
     logout: builder.mutation<void, { refreshToken: string }>({
       query: ({ refreshToken }) => ({
         url: "/auth/logout",
@@ -115,6 +127,7 @@ export const {
   useResetPasswordMutation,
   useResendVerificationEmailMutation,
   useVerifyEmailQuery,
+  useCompleteOnboardingMutation,
   useLogoutMutation,
   useRefreshTokensMutation,
 } = authApi

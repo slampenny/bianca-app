@@ -2,11 +2,14 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom"
 import { AuthPageShell } from "../../auth/AuthPageShell"
 import { onboardingCopy } from "../../lib/onboardingCopy"
 import type { OnboardingHowItWorksState } from "../../lib/onboardingTypes"
+import { isAuthenticated } from "../../store/authSlice"
+import { useAppSelector } from "../../store/store"
 import "../../app.css"
 
 export function OnboardingHowItWorksPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const authed = useAppSelector(isAuthenticated)
   const state = location.state as OnboardingHowItWorksState | null
   const persona = state?.persona
 
@@ -24,7 +27,7 @@ export function OnboardingHowItWorksPage() {
       navigate("/onboarding/org", { state: { persona: "organization" as const } })
       return
     }
-    navigate("/register", { state: { persona } })
+    navigate(authed ? "/onboarding/register" : "/register", { state: { persona } })
   }
 
   return (

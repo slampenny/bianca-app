@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AdminSessionHandoffBridge } from "./auth/AdminSessionHandoffBridge"
 import { AuthSessionBridge } from "./auth/AuthSessionBridge"
 import { RequireAuth } from "./auth/RequireAuth"
+import { RequireOnboardingComplete } from "./auth/RequireOnboardingComplete"
 import { RequireRole } from "./auth/RequireRole"
 import { SSOCallbackGate } from "./auth/SSOCallbackGate"
 import { DemoProvider } from "./state/DemoContext"
@@ -12,6 +13,7 @@ import { RegisterPage } from "./pages/RegisterPage"
 import { OnboardingAboutYouPage } from "./pages/onboarding/OnboardingAboutYouPage"
 import { OnboardingHowItWorksPage } from "./pages/onboarding/OnboardingHowItWorksPage"
 import { OnboardingOrgInfoPage } from "./pages/onboarding/OnboardingOrgInfoPage"
+import { OnboardingRegistrationPage } from "./pages/onboarding/OnboardingRegistrationPage"
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/ResetPasswordPage"
 import { CheckEmailPage } from "./pages/CheckEmailPage"
@@ -52,14 +54,18 @@ export default function App() {
             <Route path="/onboarding" element={<OnboardingAboutYouPage />} />
             <Route path="/onboarding/how-it-works" element={<OnboardingHowItWorksPage />} />
             <Route path="/onboarding/org" element={<OnboardingOrgInfoPage />} />
+            <Route path="/onboarding/register" element={<OnboardingRegistrationPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/check-email" element={<CheckEmailPage />} />
             <Route path="/signup" element={<InviteSignupPage />} />
+            {/* Email links use /auth/verify-email (mobile deep link path); keep /verify-email as alias */}
+            <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/client/consent" element={<ClientConsentPage />} />
             <Route element={<RequireAuth />}>
+              <Route element={<RequireOnboardingComplete />}>
               <Route element={<AppShell />}>
                 <Route index element={<DashboardPage />} />
                 <Route path="alerts" element={<AlertsPage />} />
@@ -96,6 +102,7 @@ export default function App() {
                 </Route>
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
               </Route>
             </Route>
           </Routes>

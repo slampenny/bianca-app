@@ -7,7 +7,8 @@ import {
   tryCompleteRedirectAuth,
   SSO_REDIRECT_ERROR_KEY,
 } from "../services/webSsoService"
-import { setAuthEmail, setAuthTokens, setCurrentUser } from "../store/authSlice"
+import { needsOnboarding, resolvePostAuthPath } from "../lib/postAuthNavigation"
+import { setAuthEmail, setAuthTokens, setCurrentUser, setPendingOnboarding } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
 
@@ -50,12 +51,14 @@ export function SSOCallbackGate({ children }: { children: ReactNode }) {
         backendOrg?: Org
       }
       if (user.tokens && user.backendUser) {
+        const caregiver = user.backendUser as Caregiver
         dispatch(setAuthTokens(user.tokens))
         dispatch(setAuthEmail(user.email))
-        dispatch(setCurrentUser(user.backendUser))
+        dispatch(setCurrentUser(caregiver))
+        dispatch(setPendingOnboarding(needsOnboarding(caregiver)))
         if (user.backendOrg) dispatch(setOrg(user.backendOrg))
         notifyAuthSuccess()
-        navigate("/", { replace: true })
+        navigate(resolvePostAuthPath(caregiver), { replace: true })
       }
       setStatus("done")
     })
