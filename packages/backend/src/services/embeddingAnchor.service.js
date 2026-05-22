@@ -18,6 +18,10 @@ const {
 
 const EMBEDDING_MODEL = 'text-embedding-3-large';
 
+function hasEmbeddingsApi(client) {
+  return Boolean(client?.embeddings?.create);
+}
+
 /** Stricter similarity for high-FP neglect buckets (embedding similarity) */
 const ABUSE_HIGH_FP_BUCKETS = {
   basicNeeds: 0.82,
@@ -80,7 +84,7 @@ class EmbeddingAnchorService {
    */
   async embedText(text) {
     const client = this.getOpenAI();
-    if (!client || !text?.trim()) return null;
+    if (!hasEmbeddingsApi(client) || !text?.trim()) return null;
     const res = await client.embeddings.create({
       model: EMBEDDING_MODEL,
       input: text.trim().slice(0, 8000),
@@ -90,15 +94,6 @@ class EmbeddingAnchorService {
 
   async initialize() {
     if (this.initialized) return;
-    const client = this.getOpenAI();
-    if (!client) {
-      logger.warn('[EmbeddingAnchor] OpenAI not configured; anchor embeddings unavailable');
-      this._runtimeTree = ANCHOR_TREE;
-      this._flatList = flattenListFromTree(this._runtimeTree);
-      this.totalUniquePhrases = countUniquePhrasesInTree(this._runtimeTree);
-      this.initialized = true;
-      return;
-    }
 
     const phraseMod = require('./embeddingAnchorPhrase.service');
     if (mongoose.connection.readyState === 1) {
@@ -114,6 +109,18 @@ class EmbeddingAnchorService {
     }
 
     this._flatList = flattenListFromTree(this._runtimeTree);
+
+    const client = this.getOpenAI();
+    if (!hasEmbeddingsApi(client)) {
+      const reason = client
+        ? 'OpenAI client missing embeddings API'
+        : 'OpenAI not configured';
+      logger.warn(`[EmbeddingAnchor] ${reason}; anchor embeddings unavailable`);
+      this.totalUniquePhrases = countUniquePhrasesInTree(this._runtimeTree);
+      this.initialized = true;
+      return;
+    }
+
     const unique = [...new Set(this._flatList.map((x) => x.phrase))];
     for (const phrase of unique) {
       const res = await client.embeddings.create({

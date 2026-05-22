@@ -16,6 +16,11 @@ const {
 describe('EmbeddingAnchorService', () => {
   let mockCreate;
 
+  afterAll(() => {
+    jest.unmock('openai');
+    jest.resetModules();
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreate = jest.fn();
