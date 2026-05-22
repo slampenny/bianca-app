@@ -14,7 +14,14 @@ const getAlertAuditTrail = catchAsync(async (req, res) => {
   res.send(data);
 });
 
+const getReportsSummary = catchAsync(async (req, res) => {
+  const query = pick(req.query, ['orgId']);
+  const data = await facilityReportsService.getReportsSummary(req.caregiver, query);
+  res.send(data);
+});
+
 module.exports = {
   getCallCompletionLog,
   getAlertAuditTrail,
+  getReportsSummary,
 };

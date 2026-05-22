@@ -100,6 +100,7 @@ const PHI_ROUTES = {
 
   'GET /facility-reports/call-completion-log': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
   'GET /facility-reports/alert-audit-trail': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
+  'GET /facility-reports/summary': { action: 'READ', resource: 'facilityReport', phiAccessed: true },
   'GET /activity/recent': { action: 'READ', resource: 'activityFeed', phiAccessed: true },
 
   // Export/Download operations (high risk)

@@ -20,7 +20,14 @@ const alertAuditTrailQuery = {
   }),
 };
 
+const reportsSummaryQuery = {
+  query: Joi.object().keys({
+    orgId: Joi.string().custom(objectId).optional(),
+  }),
+};
+
 module.exports = {
   callCompletionLogQuery,
   alertAuditTrailQuery,
+  reportsSummaryQuery,
 };

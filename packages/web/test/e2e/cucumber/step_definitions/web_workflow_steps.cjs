@@ -140,6 +140,24 @@ Then("I should see the resident schedules section", async function () {
   await expect(this.page.getByRole("heading", { name: "Call schedule" })).toBeVisible()
 })
 
+/** App uses ConfirmModal (not window.confirm) for schedule delete. */
+async function dismissOpenConfirmModalIfAny(page) {
+  const dialog = page.getByRole("dialog")
+  if (!(await dialog.isVisible().catch(() => false))) return
+  const cancel = dialog.getByRole("button", { name: "Cancel" })
+  if (await cancel.isVisible().catch(() => false)) {
+    await cancel.click()
+    await expect(dialog).toBeHidden({ timeout: 10000 })
+  }
+}
+
+async function confirmScheduleDeleteModal(page) {
+  const dialog = page.getByRole("dialog").filter({ hasText: "Delete this schedule" })
+  await expect(dialog).toBeVisible({ timeout: 10000 })
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click()
+  await expect(dialog).toBeHidden({ timeout: 20000 })
+}
+
 /**
  * Detail page only shows the "add schedule" form when the resident has no active schedule.
  * Seeded residents often already have schedules — delete until the add form is visible.
@@ -147,6 +165,7 @@ Then("I should see the resident schedules section", async function () {
 async function ensureResidentAddScheduleFormVisible(page) {
   const card = page.getByTestId("resident-schedules-card")
   await expect(card).toBeVisible({ timeout: 30000 })
+  await dismissOpenConfirmModalIfAny(page)
   const cancelEdit = page.getByTestId("resident-schedule-cancel-edit")
   if (await cancelEdit.isVisible().catch(() => false)) {
     await cancelEdit.click()
@@ -160,9 +179,9 @@ async function ensureResidentAddScheduleFormVisible(page) {
     if ((await deleteBtn.count()) === 0) {
       break
     }
-    page.once("dialog", (dialog) => dialog.accept())
     await deleteBtn.first().click()
-    await page.waitForTimeout(800)
+    await confirmScheduleDeleteModal(page)
+    await page.waitForTimeout(500)
   }
   await expect(newFrequency).toBeVisible({ timeout: 20000 })
 }
@@ -209,15 +228,13 @@ When("I delete the matching resident schedule", async function () {
     ? this.page.getByTestId(this.currentResidentScheduleRowTestId)
     : this.page.getByTestId(/^resident-schedule-[a-z0-9]+$/).filter({ hasText: this.currentResidentScheduleNeedle }).first()
   await expect(row).toBeVisible({ timeout: 15000 })
-  this.page.once("dialog", async (dialog) => {
-    await dialog.accept()
-  })
   if (this.currentResidentScheduleRowTestId) {
     const scheduleId = this.currentResidentScheduleRowTestId.replace("resident-schedule-", "")
     await this.page.getByTestId(`resident-schedule-delete-${scheduleId}`).click()
-    return
+  } else {
+    await row.getByRole("button", { name: "Delete" }).click()
   }
-  await row.getByRole("button", { name: "Delete" }).click()
+  await confirmScheduleDeleteModal(this.page)
 })
 
 Then("I should not see a resident schedule containing {string}", async function (needle) {

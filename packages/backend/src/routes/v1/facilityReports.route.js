@@ -22,4 +22,12 @@ router
     facilityReportsController.getAlertAuditTrail
   );
 
+router
+  .route('/summary')
+  .get(
+    auth('readOwn:facilityReport', 'readAny:facilityReport'),
+    validate(facilityReportsValidation.reportsSummaryQuery),
+    facilityReportsController.getReportsSummary
+  );
+
 module.exports = router;

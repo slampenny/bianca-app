@@ -1,6 +1,7 @@
 const httpStatus = require('http-status');
 const mongoose = require('mongoose');
-const { Client, Call, Alert, Caregiver } = require('../models');
+const moment = require('moment-timezone');
+const { Client, Call, Alert, Caregiver, CaregiverDailyDigest, Schedule, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
 
 const resolveOrgId = (caregiver, queryOrgId) => {
@@ -289,10 +290,126 @@ const getAlertAuditTrail = async (caregiver, { dateFrom, dateTo, orgId: queryOrg
   };
 };
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const startOfUtcMonth = (d = new Date()) => {
+  const x = new Date(d);
+  x.setUTCDate(1);
+  x.setUTCHours(0, 0, 0, 0);
+  return x;
+};
+
+const complianceLabelFromConsentRate = (rate) => {
+  if (rate >= 0.9) return 'Strong';
+  if (rate >= 0.7) return 'Moderate';
+  return 'Needs attention';
+};
+
+/**
+ * Rollup metrics for the facility Reports screen (stat cards + weekly volume chart).
+ */
+const getReportsSummary = async (caregiver, { orgId: queryOrgId } = {}) => {
+  const orgObjectId = resolveOrgId(caregiver, queryOrgId);
+  const accessibleIds = await getAccessibleClientIds(caregiver, orgObjectId);
+
+  const orgDoc = await Org.findById(orgObjectId).select('name timezone').lean();
+  const tz = orgDoc?.timezone && String(orgDoc.timezone).trim() ? orgDoc.timezone : 'America/New_York';
+
+  const monthStart = startOfUtcMonth();
+  const weekStart = moment.tz(tz).startOf('day').subtract(6, 'days').toDate();
+
+  const [
+    generatedThisMonth,
+    scheduledDeliveries,
+    residentsWithOpenFollowUps,
+    lastDigest,
+    consentClients,
+    weeklyDigests,
+  ] = await Promise.all([
+    CaregiverDailyDigest.countDocuments({
+      org: orgObjectId,
+      createdAt: { $gte: monthStart },
+    }),
+    accessibleIds.length
+      ? Schedule.countDocuments({ client: { $in: accessibleIds }, isActive: true })
+      : Promise.resolve(0),
+    accessibleIds.length
+      ? Alert.distinct('relatedClient', {
+          relatedClient: { $in: accessibleIds },
+          readBy: { $size: 0 },
+          $or: [{ relevanceUntil: { $gte: new Date() } }, { relevanceUntil: null }],
+        }).then((ids) => ids.filter(Boolean).length)
+      : Promise.resolve(0),
+    CaregiverDailyDigest.findOne({ org: orgObjectId })
+      .sort({ updatedAt: -1 })
+      .select('updatedAt digestDate')
+      .lean(),
+    accessibleIds.length
+      ? Client.find({ _id: { $in: accessibleIds } })
+          .select('consented')
+          .lean()
+      : Promise.resolve([]),
+    CaregiverDailyDigest.find({
+      org: orgObjectId,
+      digestDate: { $gte: weekStart },
+    })
+      .select('digestDate')
+      .lean(),
+  ]);
+
+  const consentTotal = consentClients.length;
+  const consentOnFile = consentClients.filter((c) => c.consented === true).length;
+  const consentRate = consentTotal > 0 ? consentOnFile / consentTotal : 1;
+  const complianceScoreLabel = consentTotal > 0 ? complianceLabelFromConsentRate(consentRate) : '—';
+
+  let lastFacilityReportLabel = '—';
+  let lastFacilityReportAt = null;
+  if (lastDigest?.updatedAt) {
+    lastFacilityReportAt = new Date(lastDigest.updatedAt).toISOString();
+    lastFacilityReportLabel = moment(lastDigest.updatedAt).tz(tz).format('MMM D, YYYY · HH:mm');
+  }
+
+  const runsByDayIndex = new Map();
+  for (let i = 0; i < 7; i += 1) {
+    const d = moment.tz(tz).startOf('day').subtract(6 - i, 'days');
+    runsByDayIndex.set(d.day(), 0);
+  }
+  for (const doc of weeklyDigests) {
+    if (!doc.digestDate) continue;
+    const idx = moment(doc.digestDate).tz(tz).day();
+    runsByDayIndex.set(idx, (runsByDayIndex.get(idx) || 0) + 1);
+  }
+  const weeklyReportRuns = [];
+  for (let i = 0; i < 7; i += 1) {
+    const d = moment.tz(tz).startOf('day').subtract(6 - i, 'days');
+    const dayIdx = d.day();
+    weeklyReportRuns.push({
+      day: DAY_NAMES[dayIdx],
+      runs: runsByDayIndex.get(dayIdx) || 0,
+    });
+  }
+
+  return {
+    reportType: 'reports_summary',
+    generatedAt: new Date().toISOString(),
+    orgId: orgObjectId.toString(),
+    generatedThisMonth,
+    scheduledDeliveries,
+    residentsWithOpenFollowUps,
+    lastFacilityReportAt,
+    lastFacilityReportLabel,
+    complianceScoreLabel,
+    weeklyReportRuns,
+  };
+};
+
 module.exports = {
   getCallCompletionLog,
   getAlertAuditTrail,
+  getReportsSummary,
   parseDateRange,
   resolveOrgId,
   getAccessibleClientIds,
+  startOfUtcMonth,
+  complianceLabelFromConsentRate,
 };

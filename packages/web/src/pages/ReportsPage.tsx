@@ -1,3 +1,4 @@
+import { skipToken } from "@reduxjs/toolkit/query"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
@@ -5,18 +6,22 @@ import { ReportDocumentBody } from "../components/ReportDocumentBody"
 import {
   downloadFacilitySnapshotCsv,
   downloadResidentDigestCsv,
-  facilityReportStats,
   getResidentDigestPayload,
   printResidentDigest,
-  recentReportActivity,
   reportTemplates,
   residentReportSnapshots,
   staffVersusFamilyDigestCopy,
-  weeklyReportRuns,
   type ReportDeliveryChannel,
+  type RecentReportActivityRow,
   type ReportTemplateId,
   type ResidentReportSnapshot,
 } from "../data/reportsMock"
+import { formatActivityRowTime } from "../lib/timeFormat"
+import { useGetRecentActivityQuery } from "../services/api/activityApi"
+import type { ActivityFeedItem } from "../services/api/activityApi"
+import { useGetReportsSummaryQuery } from "../services/api/facilityReportsApi"
+import { isAuthenticated, getCurrentUser } from "../store/authSlice"
+import { useAppSelector } from "../store/store"
 import { BellIcon, ChartBarIcon, DownloadIcon, FileTextIcon, PhoneIcon, PrintIcon, UsersIcon } from "../icons"
 import "../app.css"
 
@@ -181,6 +186,31 @@ function sentimentStyles(label: ResidentReportSnapshot["sentimentLabel"]): { bg:
   }
 }
 
+function mapActivityToReportRow(item: ActivityFeedItem): RecentReportActivityRow {
+  const whenLabel = formatActivityRowTime(new Date(item.occurredAt))
+  if (item.type === "alert") {
+    return {
+      id: item.id,
+      reportName: "Facility alert",
+      scope: item.residentName || "—",
+      whenLabel,
+      lastDelivery: "Viewed",
+      requestedBy: "System",
+      status: "Ready",
+    }
+  }
+  const callLabel = item.callType ? String(item.callType).replace(/_/g, " ") : "Check-in"
+  return {
+    id: item.id,
+    reportName: `${callLabel} call`,
+    scope: item.residentName || "—",
+    whenLabel,
+    lastDelivery: "Viewed",
+    requestedBy: "System",
+    status: "Ready",
+  }
+}
+
 function deliveryChipStyle(kind: ReportDeliveryChannel): { bg: string; color: string } {
   switch (kind) {
     case "Printed":
@@ -195,6 +225,25 @@ function deliveryChipStyle(kind: ReportDeliveryChannel): { bg: string; color: st
 }
 
 export function ReportsPage() {
+  const authed = useAppSelector(isAuthenticated)
+  const org = useAppSelector((s) => s.org)
+  const currentUser = useAppSelector(getCurrentUser)
+  const superAdminNeedsOrg = currentUser?.role === "superAdmin"
+  const skipLive = !authed || (superAdminNeedsOrg && !org?.id)
+
+  const { data: summary, isLoading: summaryLoading } = useGetReportsSummaryQuery(
+    skipLive ? skipToken : superAdminNeedsOrg && org?.id ? { orgId: org.id } : undefined,
+  )
+  const { data: recentActivity } = useGetRecentActivityQuery(
+    skipLive ? skipToken : superAdminNeedsOrg && org?.id ? { orgId: org.id, limit: 12, sinceDays: 30 } : { limit: 12, sinceDays: 30 },
+  )
+
+  const weeklyReportRuns = summary?.weeklyReportRuns ?? []
+  const recentReportRows = useMemo(
+    () => (recentActivity?.results ?? []).map(mapActivityToReportRow),
+    [recentActivity?.results],
+  )
+
   const [tab, setTab] = useState<ReportsTab>("library")
   const [residentId, setResidentId] = useState(residentReportSnapshots[0]?.id ?? "")
 
@@ -224,7 +273,7 @@ export function ReportsPage() {
             <h1 className="va-page-title">Reports</h1>
             <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 6, maxWidth: 600, lineHeight: 1.55 }}>
               Read each report on screen first. Print and CSV use the same underlying content. The weekly family digest is
-              scoped to one authorized recipient; the care-team daily digest stays in the facility boundary. Sample data only.
+              scoped to one authorized recipient; the care-team daily digest stays in the facility boundary.
             </p>
           </div>
           <button type="button" className="va-btn-secondary" onClick={() => downloadFacilitySnapshotCsv()}>
@@ -232,7 +281,9 @@ export function ReportsPage() {
             Combined facility data (CSV)
           </button>
         </div>
-        <p className="va-reports-muted" style={{ margin: 0 }}>Figures and narratives below are sample content for layout review.</p>
+        <p className="va-reports-muted" style={{ margin: 0 }}>
+          Summary metrics and activity below use live facility data. Some report previews still use sample narratives until opened.
+        </p>
       </div>
 
       <div
@@ -254,24 +305,26 @@ export function ReportsPage() {
         </ul>
       </div>
 
-      <div className="va-reports-stat-grid">
+      <div className="va-reports-stat-grid" aria-busy={summaryLoading}>
         <div className="va-reports-stat">
-          <div className="va-reports-stat-value">{facilityReportStats.generatedThisMonth}</div>
-          <div className="va-reports-stat-label">Report views generated this month</div>
+          <div className="va-reports-stat-value">{summaryLoading ? "—" : (summary?.generatedThisMonth ?? 0)}</div>
+          <div className="va-reports-stat-label">Daily digests generated this month</div>
         </div>
         <div className="va-reports-stat">
-          <div className="va-reports-stat-value">{facilityReportStats.scheduledDeliveries}</div>
-          <div className="va-reports-stat-label">Scheduled report deliveries</div>
+          <div className="va-reports-stat-value">{summaryLoading ? "—" : (summary?.scheduledDeliveries ?? 0)}</div>
+          <div className="va-reports-stat-label">Active call schedules</div>
         </div>
         <div className="va-reports-stat">
-          <div className="va-reports-stat-value">{facilityReportStats.residentsFlaggedInReports}</div>
+          <div className="va-reports-stat-value">{summaryLoading ? "—" : (summary?.residentsWithOpenFollowUps ?? 0)}</div>
           <div className="va-reports-stat-label">Residents with open follow-ups</div>
         </div>
         <div className="va-reports-stat">
           <div className="va-reports-stat-value" style={{ fontSize: "1.125rem", paddingTop: 4 }}>
-            {facilityReportStats.lastFacilityReportLabel}
+            {summaryLoading ? "—" : (summary?.lastFacilityReportLabel ?? "—")}
           </div>
-          <div className="va-reports-stat-label">Last facility report run · {facilityReportStats.complianceScoreLabel} posture</div>
+          <div className="va-reports-stat-label">
+            Last daily digest · {summaryLoading ? "—" : (summary?.complianceScoreLabel ?? "—")} consent posture
+          </div>
         </div>
       </div>
 
@@ -366,7 +419,7 @@ export function ReportsPage() {
           <div>
             <h2 style={{ fontSize: "1.0625rem", fontWeight: 600, color: "var(--va-navy)", margin: 0 }}>Automated report volume</h2>
             <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>
-              How often report jobs ran this week (sample). Helps you plan before turning on daily digests for every wing.
+              Daily wellness digests generated in your facility over the last seven days.
             </p>
           </div>
           <div style={{ width: "100%", height: 260 }}>
@@ -503,42 +556,50 @@ export function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {recentReportActivity.map((row) => (
-                <tr key={row.id} className="va-table-row--static">
-                  <td style={{ fontWeight: 500, color: "var(--va-navy)" }}>{row.reportName}</td>
-                  <td style={{ color: "var(--va-slate-600)" }}>{row.scope}</td>
-                  <td style={{ color: "var(--va-slate-500)", fontSize: "0.8125rem" }}>{row.whenLabel}</td>
-                  <td>
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        padding: "0.2rem 0.55rem",
-                        borderRadius: 999,
-                        ...deliveryChipStyle(row.lastDelivery),
-                      }}
-                    >
-                      {row.lastDelivery}
-                    </span>
-                  </td>
-                  <td style={{ color: "var(--va-slate-600)" }}>{row.requestedBy}</td>
-                  <td>
-                    <span
-                      style={{
-                        fontSize: "0.75rem",
-                        fontWeight: 600,
-                        padding: "0.25rem 0.6rem",
-                        borderRadius: 999,
-                        ...(row.status === "Ready"
-                          ? { background: "var(--va-emerald-100)", color: "var(--va-emerald-700)" }
-                          : { background: "var(--va-slate-100)", color: "var(--va-slate-600)" }),
-                      }}
-                    >
-                      {row.status}
-                    </span>
+              {recentReportRows.length === 0 ? (
+                <tr className="va-table-row--static">
+                  <td colSpan={6} style={{ color: "var(--va-slate-500)", fontSize: "0.875rem", padding: "1.25rem 1rem" }}>
+                    No recent calls or alerts in the last 30 days.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                recentReportRows.map((row) => (
+                  <tr key={row.id} className="va-table-row--static">
+                    <td style={{ fontWeight: 500, color: "var(--va-navy)" }}>{row.reportName}</td>
+                    <td style={{ color: "var(--va-slate-600)" }}>{row.scope}</td>
+                    <td style={{ color: "var(--va-slate-500)", fontSize: "0.8125rem" }}>{row.whenLabel}</td>
+                    <td>
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          padding: "0.2rem 0.55rem",
+                          borderRadius: 999,
+                          ...deliveryChipStyle(row.lastDelivery),
+                        }}
+                      >
+                        {row.lastDelivery}
+                      </span>
+                    </td>
+                    <td style={{ color: "var(--va-slate-600)" }}>{row.requestedBy}</td>
+                    <td>
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          padding: "0.25rem 0.6rem",
+                          borderRadius: 999,
+                          ...(row.status === "Ready"
+                            ? { background: "var(--va-emerald-100)", color: "var(--va-emerald-700)" }
+                            : { background: "var(--va-slate-100)", color: "var(--va-slate-600)" }),
+                        }}
+                      >
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

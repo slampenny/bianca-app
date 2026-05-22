@@ -68,10 +68,32 @@ export interface AlertAuditTrailQueryArgs {
   orgId?: string
 }
 
+export interface WeeklyReportRunBucket {
+  day: string
+  runs: number
+}
+
+export interface ReportsSummaryResponse {
+  reportType: string
+  generatedAt: string
+  orgId: string
+  generatedThisMonth: number
+  scheduledDeliveries: number
+  residentsWithOpenFollowUps: number
+  lastFacilityReportAt: string | null
+  lastFacilityReportLabel: string
+  complianceScoreLabel: string
+  weeklyReportRuns: WeeklyReportRunBucket[]
+}
+
+export interface ReportsSummaryQueryArgs {
+  orgId?: string
+}
+
 export const facilityReportsApi = createApi({
   reducerPath: "facilityReportsApi",
   baseQuery: baseQueryWithReauth(),
-  tagTypes: ["CallCompletionLog", "AlertAuditTrail"],
+  tagTypes: ["CallCompletionLog", "AlertAuditTrail", "ReportsSummary"],
   endpoints: (builder) => ({
     getCallCompletionLog: builder.query<CallCompletionLogResponse, CallCompletionLogQueryArgs | void>({
       query: (arg) => {
@@ -102,7 +124,20 @@ export const facilityReportsApi = createApi({
       },
       providesTags: ["AlertAuditTrail"],
     }),
+    getReportsSummary: builder.query<ReportsSummaryResponse, ReportsSummaryQueryArgs | void>({
+      query: (arg) => {
+        const params = new URLSearchParams()
+        if (arg && typeof arg === "object" && arg.orgId) params.set("orgId", arg.orgId)
+        const q = params.toString()
+        return { url: `/facility-reports/summary${q ? `?${q}` : ""}`, method: "GET" }
+      },
+      providesTags: ["ReportsSummary"],
+    }),
   }),
 })
 
-export const { useGetCallCompletionLogQuery, useGetAlertAuditTrailQuery } = facilityReportsApi
+export const {
+  useGetCallCompletionLogQuery,
+  useGetAlertAuditTrailQuery,
+  useGetReportsSummaryQuery,
+} = facilityReportsApi
