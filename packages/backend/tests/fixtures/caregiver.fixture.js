@@ -21,6 +21,7 @@ const caregiverOne = {
   phone: '+16045624263',
   role: 'staff',
   clients: [],
+  onboardingComplete: true,
 };
 
 const caregiverOneWithPassword = {
@@ -43,6 +44,7 @@ const admin = {
   role: 'orgAdmin',
   clients: [],
   isPhoneVerified: true, // Admin user's phone is verified
+  onboardingComplete: true,
 };
 
 const superAdmin = {
@@ -59,6 +61,7 @@ const playwrightTestUser = {
   phone: '+16045624263',
   role: 'orgAdmin',
   clients: [],
+  onboardingComplete: true,
 };
 
 const insertCaregivers = async (caregivers, org = null) => {

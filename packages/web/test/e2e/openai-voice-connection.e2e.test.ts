@@ -31,7 +31,7 @@ test.describe("OpenAI Voice Connection", () => {
     const authToken = loginBody.tokens?.access?.token
     expect(authToken).toBeTruthy()
 
-    await page.getByTestId("home-header").waitFor({ state: "visible", timeout: 15_000 })
+    // Realtime check uses the login JWT only — no need to wait for home (onboarding may redirect first).
 
     const response = await page.request.post(`${API_URL}/test/openai-connection`, {
       headers: {
