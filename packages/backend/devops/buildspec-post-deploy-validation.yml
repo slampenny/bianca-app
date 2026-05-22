@@ -440,6 +440,14 @@ phases:
 
   post_build:
     commands:
-      - echo "✅ Post-deployment validation completed successfully"
-      - echo "The deployed site is accessible and working correctly"
+      - |
+        if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
+          echo "Post-deploy validation failed — terminating leftover green instance(s)..."
+          export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \
+            echo "⚠️  Green cleanup failed (non-fatal in post_build)"
+        else
+          echo "✅ Post-deployment validation completed successfully"
+          echo "The deployed site is accessible and working correctly"
+        fi
 

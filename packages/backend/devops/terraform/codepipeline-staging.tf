@@ -382,6 +382,10 @@ resource "aws_codebuild_project" "staging_post_deploy_validation" {
       name  = "RETRY_DELAY"
       value = "10"
     }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-staging-pipeline"
+    }
   }
 
   source {
@@ -514,6 +518,10 @@ resource "aws_codebuild_project" "staging_swap_and_terminate" {
     environment_variable {
       name  = "ADMIN_URL"
       value = "https://staging-admin.biancawellness.com"
+    }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-staging-pipeline"
     }
   }
 

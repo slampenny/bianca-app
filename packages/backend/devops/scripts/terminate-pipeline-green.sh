@@ -13,7 +13,7 @@ case "$PIPELINE" in
     exit 0
     ;;
 esac
-echo "Terminating green instances (Name=$GREEN_TAG) after failed production pipeline step..."
+echo "Terminating green instances (Name=$GREEN_TAG) after failed pipeline step..."
 
 IDS=$(aws ec2 describe-instances \
   --region "$REGION" \

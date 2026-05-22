@@ -39,17 +39,19 @@ phases:
           G_ST=$(aws ec2 describe-instances --instance-ids "$GREEN_INSTANCE_ID" \
             --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo "")
           if [ "$G_ST" != "running" ]; then
-            echo "⚠️  GREEN_INSTANCE_ID from artifact ($GREEN_INSTANCE_ID) is not running (state=$G_ST); discovering from tags..."
+            echo "⚠️  GREEN_INSTANCE_ID from artifact ${GREEN_INSTANCE_ID} is not running [state=${G_ST}]; discovering from tags..."
             GREEN_INSTANCE_ID=""
           fi
         fi
         # Newest running instance wins if duplicates exist (Reservations[0] order is undefined).
         if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
           echo "Finding green instance (DeploymentType=green, newest by LaunchTime)..."
-          GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=tag:Name,Values=$GREEN_TAG" \
-                      "Name=instance-state-name,Values=running" \
-            --output json | python3 "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/pick-newest-green-instance.py"
+          GREEN_DISCOVERY_JSON=$(mktemp)
+          aws ec2 describe-instances \
+            --filters "Name=tag:Name,Values=$GREEN_TAG" "Name=instance-state-name,Values=running" \
+            --output json > "$GREEN_DISCOVERY_JSON"
+          GREEN_INSTANCE_ID=$(python3 "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/pick-newest-green-instance.py" < "$GREEN_DISCOVERY_JSON")
+          rm -f "$GREEN_DISCOVERY_JSON"
         fi
         
         if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
@@ -286,7 +288,7 @@ phases:
             fi
             if [ -n "$V_ON_GREEN" ]; then
               VOLUME_ID="$V_ON_GREEN"
-              echo "  MongoDB volume already on green ($VOLUME_ID) — skip detach/attach; mount/restart only."
+              echo "  MongoDB volume already on green ${VOLUME_ID} — skip detach/attach; mount/restart only."
             else
               echo "  No MongoDB volume attached to blue; looking for detached volume (tag Name=$MONGODB_DATA_VOLUME_TAG, state=available)..."
               AVAIL_IDS=$(aws ec2 describe-volumes \
@@ -329,7 +331,7 @@ phases:
                 echo "     Refusing to swap — green would run with an empty database."
                 exit 1
               else
-                echo "  ❌ CRITICAL: Multiple ($AVAIL_COUNT) available volumes with tag $MONGODB_DATA_VOLUME_TAG; resolve in AWS before swap."
+                echo "  ❌ CRITICAL: Multiple ${AVAIL_COUNT} available volumes with tag $MONGODB_DATA_VOLUME_TAG; resolve in AWS before swap."
                 exit 1
               fi
             fi
@@ -680,7 +682,7 @@ phases:
         elif [ "$BLUE_TAG" = "bianca-production" ]; then
           TF_INSTANCE_RESOURCE="aws_instance.production"
         else
-          echo "  ⚠️  Unknown BLUE_TAG ($BLUE_TAG), skipping Terraform state update"
+          echo "  ⚠️  Unknown BLUE_TAG ${BLUE_TAG}, skipping Terraform state update"
           TF_INSTANCE_RESOURCE=""
         fi
         if [ -n "$TF_INSTANCE_RESOURCE" ]; then
@@ -719,4 +721,11 @@ phases:
 
   post_build:
     commands:
+      - |
+        if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
+          echo "Swap failed — terminating leftover green instance(s)..."
+          export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \
+            echo "⚠️  Green cleanup failed (non-fatal in post_build)"
+        fi
       - echo "Blue-green deployment swap completed"
