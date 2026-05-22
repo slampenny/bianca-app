@@ -1,39 +1,34 @@
 ################################################################################
-# DOMAIN REDIRECTS - Point biancatechnologies.com and biancawellness.com to myphonefriend.com
-# 
-# This file creates DNS records to point both domains to the same WordPress ALB
-# that serves myphonefriend.com. This allows both domains to resolve to the same website.
+# DOMAIN REDIRECTS — biancatechnologies.com → shared ALB
+#
+# biancawellness.com apex + www are managed by terraform-marketing-wordpress
+# (Lightsail static A records). Do not define them here — avoids Route53 drift.
+#
+# biancatechnologies.com / www ALIAS to bianca-shared-alb; HTTPS uses an extra ACM
+# cert (SNI) + listener rule in shared-alb-biancatechnologies.tf to redirect to
+# primary_domain (public marketing site).
 #
 # IMPORTANT: This does NOT affect email (MX records remain unchanged)
 # - biancatechnologies.com email continues to work via Zoho Mail
-# - biancawellness.com email (if configured) remains unchanged
 ################################################################################
 
-# Data source to find the WordPress ALB (same one used by myphonefriend.com)
-# The ALB name is "bianca-wordpress-alb"
-# Note: This assumes the ALB exists. If it doesn't, you may need to:
-# Data source to find the WordPress ALB
-# Note: WordPress ALB exists but is not managed by Terraform (create_wordpress=false)
-# We reference it by name to restore DNS records
-data "aws_lb" "wordpress" {
-  name = "bianca-wordpress-alb"
+data "aws_lb" "shared_public_alb" {
+  name = "bianca-shared-alb"
 }
 
 ################################################################################
-# BIANCATECHNOLOGIES.COM - Point to myphonefriend.com (WordPress ALB)
+# BIANCATECHNOLOGIES.COM — ALIAS to shared ALB
 ################################################################################
 
-# Root domain A record (ALIAS) pointing to WordPress ALB
-# This makes biancatechnologies.com resolve to the same site as myphonefriend.com
 resource "aws_route53_record" "biancatechnologies_root" {
   zone_id         = data.aws_route53_zone.biancatechnologies.zone_id
   name            = "biancatechnologies.com"
   type            = "A"
-  allow_overwrite = true # Allow overwriting existing A record
+  allow_overwrite = true
 
   alias {
-    name                   = data.aws_lb.wordpress.dns_name
-    zone_id                = data.aws_lb.wordpress.zone_id
+    name                   = data.aws_lb.shared_public_alb.dns_name
+    zone_id                = data.aws_lb.shared_public_alb.zone_id
     evaluate_target_health = true
   }
 
@@ -42,55 +37,15 @@ resource "aws_route53_record" "biancatechnologies_root" {
   }
 }
 
-# www subdomain A record (ALIAS) pointing to WordPress ALB
 resource "aws_route53_record" "biancatechnologies_www" {
   zone_id         = data.aws_route53_zone.biancatechnologies.zone_id
   name            = "www.biancatechnologies.com"
   type            = "A"
-  allow_overwrite = true # Allow overwriting existing A record
+  allow_overwrite = true
 
   alias {
-    name                   = data.aws_lb.wordpress.dns_name
-    zone_id                = data.aws_lb.wordpress.zone_id
-    evaluate_target_health = true
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-################################################################################
-# BIANCAWELLNESS.COM - Point to myphonefriend.com (WordPress ALB)
-################################################################################
-
-# Root domain A record (ALIAS) pointing to WordPress ALB
-# This makes biancawellness.com resolve to the same site as myphonefriend.com
-resource "aws_route53_record" "biancawellness_root" {
-  zone_id = data.aws_route53_zone.biancawellness.zone_id
-  name    = "biancawellness.com"
-  type    = "A"
-
-  alias {
-    name                   = data.aws_lb.wordpress.dns_name
-    zone_id                = data.aws_lb.wordpress.zone_id
-    evaluate_target_health = true
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# www subdomain A record (ALIAS) pointing to WordPress ALB
-resource "aws_route53_record" "biancawellness_www" {
-  zone_id = data.aws_route53_zone.biancawellness.zone_id
-  name    = "www.biancawellness.com"
-  type    = "A"
-
-  alias {
-    name                   = data.aws_lb.wordpress.dns_name
-    zone_id                = data.aws_lb.wordpress.zone_id
+    name                   = data.aws_lb.shared_public_alb.dns_name
+    zone_id                = data.aws_lb.shared_public_alb.zone_id
     evaluate_target_health = true
   }
 
@@ -134,4 +89,3 @@ resource "aws_route53_record" "biancawellness_www" {
 # These DNS records will NOT be affected by the domain redirects above.
 #
 ################################################################################
-

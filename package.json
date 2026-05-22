@@ -40,7 +40,10 @@
     "demo:down": "yarn workspace @bianca-app/backend demo:down",
     "demo:seed": "yarn workspace @bianca-app/backend demo:seed",
     "demo:update": "yarn workspace @bianca-app/backend demo:update",
-    "demo:deploy": "yarn workspace @bianca-app/backend demo:deploy"
+    "demo:deploy": "yarn workspace @bianca-app/backend demo:deploy",
+    "staging:up": "bash packages/backend/scripts/staging-control.sh start",
+    "staging:down": "bash packages/backend/scripts/staging-control.sh stop",
+    "staging:status": "bash packages/backend/scripts/staging-control.sh status"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

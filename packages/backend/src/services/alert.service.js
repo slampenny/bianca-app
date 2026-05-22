@@ -71,8 +71,23 @@ function formatAlertForResponse(doc) {
   if (!doc || typeof doc !== 'object') {
     return doc;
   }
+  // Mongoose toJSON plugin strips createdAt/updatedAt; capture from the doc before serializing.
+  let createdStamp = doc.createdAt;
+  let updatedStamp = doc.updatedAt;
+  if ((createdStamp == null || updatedStamp == null) && typeof doc.get === 'function') {
+    if (createdStamp == null) createdStamp = doc.get('createdAt');
+    if (updatedStamp == null) updatedStamp = doc.get('updatedAt');
+  }
+
   const obj = typeof doc.toJSON === 'function' ? doc.toJSON() : { ...doc };
   const out = { ...obj };
+
+  if (createdStamp != null && out.createdAt == null) {
+    out.createdAt = createdStamp instanceof Date ? createdStamp.toISOString() : String(createdStamp);
+  }
+  if (updatedStamp != null && out.updatedAt == null) {
+    out.updatedAt = updatedStamp instanceof Date ? updatedStamp.toISOString() : String(updatedStamp);
+  }
   if (out.relatedClient && typeof out.relatedClient === 'object') {
     const rid = out.relatedClient._id || out.relatedClient.id;
     if (rid) {
@@ -271,6 +286,11 @@ const getAlerts = async (caregiverId, showRead = false) => {
   const caregiverLanguage = caregiver.preferredLanguage || 'en';
 
   alerts = alerts.map((alert) => {
+    const createdAtIso =
+      alert.createdAt instanceof Date ? alert.createdAt.toISOString() : alert.createdAt;
+    const updatedAtIso =
+      alert.updatedAt instanceof Date ? alert.updatedAt.toISOString() : alert.updatedAt;
+
     let plain = alert.toJSON();
     if (caregiverLanguage !== 'en') {
       const parsed = parseAlertMessage(alert.message);
@@ -287,7 +307,11 @@ const getAlerts = async (caregiverId, showRead = false) => {
         };
       }
     }
-    return formatAlertForResponse(plain);
+    return formatAlertForResponse({
+      ...plain,
+      ...(createdAtIso ? { createdAt: createdAtIso } : {}),
+      ...(updatedAtIso ? { updatedAt: updatedAtIso } : {}),
+    });
   });
 
   return alerts;

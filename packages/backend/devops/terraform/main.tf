@@ -843,11 +843,8 @@ resource "aws_security_group" "efs_sg" {
 # ASTERISK EC2 INSTANCE - BACK IN PUBLIC SUBNET
 ################################################################################
 
-# Elastic IP for Asterisk (still needed for Twilio SIP signaling)
-resource "aws_eip" "asterisk_eip" {
-  domain = "vpc"
-  tags   = { Name = "asterisk-permanent-eip" }
-}
+# COST: Idle EIP charges when not attached to a running ENI. Main-VPC Asterisk EC2 is
+# commented out below; production SIP uses aws_eip.production in production.tf — do not remove that.
 
 # IAM Role for EC2 Instance
 resource "aws_iam_role" "asterisk_ec2_role" {
@@ -1065,7 +1062,7 @@ resource "aws_efs_file_system_policy" "mongodb_policy" {
 }
 
 ################################################################################
-# SHARED APPLICATION LOAD BALANCER - For Demo and WordPress
+# SHARED APPLICATION LOAD BALANCER — demo + optional HTTPS redirects
 ################################################################################
 
 # Shared ALB Security Group for Demo and WordPress
@@ -1101,11 +1098,11 @@ resource "aws_security_group" "shared_alb" {
   tags = {
     Name        = "bianca-shared-alb-sg"
     Environment = "shared"
-    Purpose     = "Demo and WordPress ALB"
+    Purpose     = "Shared public ALB demo and legacy redirects"
   }
 }
 
-# Shared ALB for Demo and WordPress (consolidation to reduce costs)
+# Shared ALB (demo.biancawellness.com + biancatechnologies.com redirect)
 resource "aws_lb" "shared" {
   name               = "bianca-shared-alb"
   internal           = false
@@ -1120,7 +1117,7 @@ resource "aws_lb" "shared" {
   tags = {
     Name        = "bianca-shared-alb"
     Environment = "shared"
-    Purpose     = "Demo and WordPress"
+    Purpose     = "Shared demo subdomain and HTTPS redirects"
   }
 }
 
@@ -1154,8 +1151,8 @@ resource "aws_lb_listener" "shared_https" {
     type = "fixed-response"
     fixed_response {
       content_type = "text/plain"
-      message_body   = "No matching host header"
-      status_code   = "404"
+      message_body = "No matching host header"
+      status_code  = "404"
     }
   }
 }
@@ -1233,9 +1230,10 @@ resource "aws_lb_listener" "shared_https" {
 
 resource "aws_ecs_cluster" "cluster" {
   name = var.cluster_name
+  # ECS services in this root are currently disabled; Insights charges for metrics with no tasks.
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = "disabled"
   }
   tags = { Name = var.cluster_name }
 }
@@ -1854,8 +1852,8 @@ resource "aws_iam_policy" "codebuild_secrets_manager_policy" {
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
-      Effect   = "Allow",
-      Action   = "secretsmanager:GetSecretValue",
+      Effect = "Allow",
+      Action = "secretsmanager:GetSecretValue",
       Resource = [
         "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-*",
         "arn:aws:secretsmanager:${var.aws_region}:${var.aws_account_id}:secret:MySecretsManagerSecret-Staging-*"
@@ -2619,8 +2617,8 @@ output "forwarded_email_addresses" {
 }
 
 output "asterisk_public_ip" {
-  description = "Public IP for Twilio/external SIP traffic"
-  value       = aws_eip.asterisk_eip.public_ip
+  description = "Legacy main-VPC Asterisk EIP removed for cost. Use production_sip / aws_eip.production for SIP."
+  value       = null
 }
 
 # COST MINIMIZATION: Asterisk private IP output - STOPPED (asterisk instance commented out)
@@ -2653,7 +2651,7 @@ output "private_subnet_cidrs" {
 
 output "network_architecture" {
   description = "Network architecture summary"
-  value       = "Hybrid: Asterisk in public subnet with EIP for Twilio, App in private subnet. RTP uses private IPs within VPC."
+  value       = "Production SIP uses bianca-production EIP (production.tf). Main-VPC Asterisk EC2 is disabled; app edge uses staging/production ALBs in their modules."
 }
 
 output "nat_gateway_ip" {

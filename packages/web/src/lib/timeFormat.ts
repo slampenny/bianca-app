@@ -24,12 +24,22 @@ export function formatHeaderLastActivity(d: Date): string {
   return `${Math.floor(hr / 24)}d ago`
 }
 
+function detectedInstant(iso: string): Date | null {
+  if (!iso?.trim()) return null
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 export function formatDetectedTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
+  const d = detectedInstant(iso)
+  if (!d) return "—"
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
 }
 
 export function formatDetectedDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+  const d = detectedInstant(iso)
+  if (!d) return "—"
+  return d.toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
     month: "long",

@@ -305,14 +305,14 @@ resource "aws_eip" "demo" {
   # This avoids hitting the EIP limit
   # If you need to use a different EIP, update the allocation_id below
   # To find unassociated EIPs: aws ec2 describe-addresses --filters "Name=domain,Values=vpc" --query 'Addresses[?AssociationId==`null`]'
-  
+
   # For now, we'll create a new one and handle limit separately if needed
   domain = "vpc"
   tags = {
     Name        = "bianca-demo-eip"
     Environment = "demo"
   }
-  
+
   # If EIP limit is hit, you can import an existing unassociated EIP:
   # terraform import aws_eip.demo eipalloc-0ce9b38740bc14595
 }
@@ -434,7 +434,8 @@ resource "aws_s3_bucket_public_access_block" "demo_frontend" {
 resource "aws_s3_bucket_versioning" "demo_frontend" {
   bucket = aws_s3_bucket.demo_frontend.id
   versioning_configuration {
-    status = "Enabled"
+    # Demo artifacts are disposable; avoid accumulating version storage costs.
+    status = "Suspended"
   }
 }
 

@@ -10,12 +10,22 @@ phases:
   build:
     commands:
       - |
-        # Read instance info from previous stages (use . for POSIX sh)
-        if [ -f instance-info.txt ]; then
-          . instance-info.txt
-        elif [ -f ../CreateGreenInstance/instance-info.txt ]; then
-          . ../CreateGreenInstance/instance-info.txt
-        else
+        # Read instance info from CreateGreenInstance artifact (try all CodePipeline paths)
+        INSTANCE_INFO_LOADED=false
+        for path in instance-info.txt ../CreateGreenInstance/instance-info.txt GreenInstanceOutput/instance-info.txt; do
+          if [ -f "$path" ]; then
+            . "$path"
+            echo "Loaded instance-info from $path"
+            INSTANCE_INFO_LOADED=true
+            break
+          fi
+        done
+        if [ -n "${CODEBUILD_SRC_DIR_GreenInstanceOutput:-}" ] && [ -f "${CODEBUILD_SRC_DIR_GreenInstanceOutput}/instance-info.txt" ]; then
+          . "${CODEBUILD_SRC_DIR_GreenInstanceOutput}/instance-info.txt"
+          echo "Loaded instance-info from GreenInstanceOutput artifact"
+          INSTANCE_INFO_LOADED=true
+        fi
+        if [ "$INSTANCE_INFO_LOADED" = "false" ]; then
           echo "⚠️  Warning: instance-info.txt not found, attempting to discover instances..."
         fi
         
@@ -35,11 +45,20 @@ phases:
         fi
         # Newest running instance wins if duplicates exist (Reservations[0] order is undefined).
         if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
-          echo "Finding green instance (newest running by LaunchTime)..."
+          echo "Finding green instance (DeploymentType=green, newest by LaunchTime)..."
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
-            --output json | python3 -c 'import json,sys;d=json.load(sys.stdin);ids=[(i.get("LaunchTime") or "",i.get("InstanceId")) for r in d.get("Reservations") or [] for i in r.get("Instances") or []];ids.sort();print(ids[-1][1] if ids else "")')
+            --output json | python3 -c 'import json,sys
+d=json.load(sys.stdin)
+def is_green(i):
+  tags=i.get("Tags") or []
+  return any(t.get("Key")=="DeploymentType" and t.get("Value")=="green" for t in tags)
+ids=[(i.get("LaunchTime") or "",i.get("InstanceId")) for r in d.get("Reservations") or [] for i in r.get("Instances") or [] if is_green(i)]
+if not ids:
+  ids=[(i.get("LaunchTime") or "",i.get("InstanceId")) for r in d.get("Reservations") or [] for i in r.get("Instances") or []]
+ids.sort()
+print(ids[-1][1] if ids else "")')
         fi
         
         if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
@@ -257,6 +276,8 @@ phases:
               echo "  ❌ CRITICAL: Volume did not attach to green $GREEN_INSTANCE_ID. Aborting swap."
               exit 1
             fi
+            echo "  Waiting 20s for block device to appear on green OS..."
+            sleep 20
           else
             # Volume may already be on green after a failed swap (attach succeeded; later step failed).
             V_ON_GREEN=""
@@ -310,6 +331,8 @@ phases:
                   echo "  ❌ CRITICAL: Orphan volume did not attach to green $GREEN_INSTANCE_ID"
                   exit 1
                 fi
+                echo "  Waiting 20s for block device to appear on green OS..."
+                sleep 20
               elif [ "$AVAIL_COUNT" -eq 0 ]; then
                 echo "  ❌ CRITICAL: No MongoDB data volume on blue, not on green, and none available with tag $MONGODB_DATA_VOLUME_TAG."
                 echo "     Refusing to swap — green would run with an empty database."
@@ -325,11 +348,21 @@ phases:
             exit 1
           fi
           echo "  Mounting volume on green and restarting MongoDB..."
-          # Long timeout: first boot after volume attach + docker compose up -d (full stack) often exceeds 120s on production.
+          MOUNT_SCRIPT_PATH=""
+          for _srcdir in "${CODEBUILD_SRC_DIR_SourceOutput:-}" "${CODEBUILD_SRC_DIR}" "${CODEBUILD_SRC_DIR_GreenInstanceOutput:-}"; do
+            [ -z "$_srcdir" ] && continue
+            _cand="${_srcdir}/packages/backend/devops/scripts/swap-step0-mount-mongodb.sh"
+            if [ -f "$_cand" ]; then MOUNT_SCRIPT_PATH="$_cand"; break; fi
+          done
+          if [ -z "$MOUNT_SCRIPT_PATH" ]; then
+            echo "  ❌ CRITICAL: swap-step0-mount-mongodb.sh not found in pipeline source artifact"
+            exit 1
+          fi
+          SCRIPT_B64=$(base64 -w0 "$MOUNT_SCRIPT_PATH")
           GREEN_CMD_ID=$(aws ssm send-command \
             --instance-ids "$GREEN_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters "{\"commands\":[\"cd $DEPLOY_DIR && (docker compose stop 2>/dev/null || docker-compose stop 2>/dev/null || true)\",\"sleep 5\",\"sudo umount /opt/mongodb-data 2>/dev/null || true\",\"sleep 2\",\"sudo mkdir -p /opt/mongodb-data\",\"sudo mount /opt/mongodb-data 2>/dev/null || sudo mount /dev/sdf /opt/mongodb-data 2>/dev/null || sudo mount /dev/nvme1n1 /opt/mongodb-data 2>/dev/null || sudo mount /dev/xvdf /opt/mongodb-data\",\"sudo chown -R 999:999 /opt/mongodb-data 2>/dev/null || true\",\"cd $DEPLOY_DIR && (docker compose up -d mongodb 2>/dev/null || docker-compose up -d mongodb)\",\"sleep 5\",\"cd $DEPLOY_DIR && (docker compose up -d 2>/dev/null || docker-compose up -d)\"]}" \
+            --parameters "{\"commands\":[\"echo $SCRIPT_B64 | base64 -d > /tmp/swap-step0.sh\",\"chmod +x /tmp/swap-step0.sh\",\"DEPLOY_DIR=$DEPLOY_DIR bash /tmp/swap-step0.sh\"]}" \
             --timeout-seconds 600 \
             --query 'Command.CommandId' \
             --output text 2>/dev/null || echo "")
@@ -602,15 +635,30 @@ phases:
         }
         
         # Step 6: Verify EIP stayed on the live instance (belt-and-suspenders)
+        LIVE_INSTANCE_ID="$GREEN_INSTANCE_ID"
         if [ -n "$EIP_ALLOCATION_ID" ]; then
           echo ""
           echo "Step 6: Verifying Elastic IP association..."
           EIP_ON=$(aws ec2 describe-addresses --allocation-ids "$EIP_ALLOCATION_ID" --query 'Addresses[0].InstanceId' --output text 2>/dev/null || echo "")
-          if [ "$EIP_ON" != "$GREEN_INSTANCE_ID" ]; then
-            echo "  ❌ FATAL: EIP $EIP_ALLOCATION_ID is on '$EIP_ON', expected green/live instance $GREEN_INSTANCE_ID"
-            exit 1
+          if [ "$EIP_ON" = "None" ]; then EIP_ON=""; fi
+          if [ "$EIP_ON" != "$LIVE_INSTANCE_ID" ]; then
+            echo "  ⚠️  EIP on '$EIP_ON', expected $LIVE_INSTANCE_ID — re-associating..."
+            if ! aws ec2 associate-address \
+              --instance-id "$LIVE_INSTANCE_ID" \
+              --allocation-id "$EIP_ALLOCATION_ID" \
+              --allow-reassociation; then
+              echo "  ❌ FATAL: EIP $EIP_ALLOCATION_ID is not on live instance and re-association failed"
+              exit 1
+            fi
+            sleep 10
+            EIP_ON=$(aws ec2 describe-addresses --allocation-ids "$EIP_ALLOCATION_ID" --query 'Addresses[0].InstanceId' --output text 2>/dev/null || echo "")
+            if [ "$EIP_ON" = "None" ]; then EIP_ON=""; fi
+            if [ "$EIP_ON" != "$LIVE_INSTANCE_ID" ]; then
+              echo "  ❌ FATAL: EIP $EIP_ALLOCATION_ID is on '$EIP_ON', expected live instance $LIVE_INSTANCE_ID"
+              exit 1
+            fi
           fi
-          echo "  ✅ EIP verified on instance $GREEN_INSTANCE_ID"
+          echo "  ✅ EIP verified on instance $LIVE_INSTANCE_ID"
         fi
         
         # Step 7: Update Terraform state so it points at the new blue instance (avoids drift on next terraform apply)

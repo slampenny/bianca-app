@@ -189,7 +189,7 @@ export function mapApiAlertToFacilityAlert(
         ? evidenceConfidenceToDisplayPercent(a.evidence.confidence)
         : importanceConfidence(a.importance || "medium"),
     status: read ? "acknowledged" : "new",
-    detectedAt: a.createdAt ?? new Date().toISOString(),
+    detectedAt: a.createdAt ?? a.updatedAt ?? "",
     summary: a.message,
     riskIndicators: indicators.length ? indicators : ["See alert message for details"],
     baselineComparison: { baseline: {}, current: {} },

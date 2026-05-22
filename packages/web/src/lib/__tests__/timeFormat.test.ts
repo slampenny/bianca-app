@@ -49,6 +49,13 @@ describe("formatDetectedTime / formatDetectedDate", () => {
     expect(formatDetectedTime(iso)).toBeTruthy()
     expect(formatDetectedDate(iso)).toMatch(/March/)
   })
+
+  it("returns em dash when timestamp is missing or invalid", () => {
+    expect(formatDetectedTime("")).toBe("—")
+    expect(formatDetectedDate("")).toBe("—")
+    expect(formatDetectedTime("not-a-date")).toBe("—")
+    expect(formatDetectedDate("not-a-date")).toBe("—")
+  })
 })
 
 describe("formatAlertType", () => {

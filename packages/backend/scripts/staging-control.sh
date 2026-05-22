@@ -12,15 +12,15 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# AWS Profile
-AWS_PROFILE="jordan"
-REGION="us-east-2"
+# AWS (override with env: AWS_PROFILE, AWS_REGION)
+AWS_PROFILE="${AWS_PROFILE:-jordan}"
+REGION="${AWS_REGION:-us-east-2}"
 
-# Get staging instance ID
+# Get staging instance ID (newest launch wins if multiple share Name=bianca-staging)
 get_staging_instance_id() {
     aws ec2 describe-instances \
-        --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running,stopped" \
-        --query 'Reservations[0].Instances[0].InstanceId' \
+        --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running,stopped,pending,stopping" \
+        --query 'sort_by(Reservations[].Instances[], &LaunchTime)[-1].InstanceId' \
         --output text \
         --profile $AWS_PROFILE \
         --region $REGION
@@ -74,6 +74,39 @@ show_status() {
         --region $REGION 2>/dev/null || echo "false")
     
     echo -e "Always-on mode: ${YELLOW}$always_on${NC}"
+
+    local hourly=$(aws ssm get-parameter \
+        --name "/bianca/staging/hourly-ec2-schedule-enabled" \
+        --query 'Parameter.Value' \
+        --output text \
+        --profile $AWS_PROFILE \
+        --region $REGION 2>/dev/null || echo "(unset)")
+    echo -e "Hourly EC2 schedule (SSM): ${YELLOW}$hourly${NC}  (true=Lambda may start/stop; false=manual)"
+}
+
+# Enable hourly Lambda start/stop for staging (Terraform also manages this parameter when applied)
+enable_hourly_ec2_schedule() {
+    echo -e "${BLUE}Enabling staging hourly EC2 schedule (SSM)...${NC}"
+    aws ssm put-parameter \
+        --name "/bianca/staging/hourly-ec2-schedule-enabled" \
+        --value "true" \
+        --type "String" \
+        --overwrite \
+        --profile $AWS_PROFILE \
+        --region $REGION
+    echo -e "${GREEN}✅ Hourly schedule enabled${NC}"
+}
+
+disable_hourly_ec2_schedule() {
+    echo -e "${BLUE}Disabling staging hourly EC2 schedule (SSM)...${NC}"
+    aws ssm put-parameter \
+        --name "/bianca/staging/hourly-ec2-schedule-enabled" \
+        --value "false" \
+        --type "String" \
+        --overwrite \
+        --profile $AWS_PROFILE \
+        --region $REGION
+    echo -e "${GREEN}✅ Hourly schedule disabled — use ./scripts/staging-control.sh start/stop manually${NC}"
 }
 
 # Start staging instance
@@ -91,6 +124,22 @@ start_staging() {
     if [ "$status" = "running" ]; then
         echo -e "${YELLOW}⚠️  Instance is already running${NC}"
         return 0
+    fi
+
+    if [ "$status" = "pending" ]; then
+        echo -e "${YELLOW}⚠️  Instance is already starting (pending)${NC}"
+        aws ec2 wait instance-running \
+            --instance-ids $instance_id \
+            --profile $AWS_PROFILE \
+            --region $REGION
+        local ip=$(get_staging_ip $instance_id)
+        echo -e "${GREEN}✅ Instance is running at $ip${NC}"
+        return 0
+    fi
+
+    if [ "$status" = "stopping" ] || [ "$status" = "shutting-down" ]; then
+        echo -e "${RED}❌ Instance is $status — wait until it is fully stopped, then run staging:up again${NC}"
+        return 1
     fi
     
     aws ec2 start-instances \
@@ -199,6 +248,8 @@ show_usage() {
     echo "  deploy     - Deploy to staging (starts instance if needed)"
     echo "  always-on  - Enable always-on mode (24/7)"
     echo "  schedule   - Disable always-on mode (business hours only)"
+    echo "  hourly-on  - Allow hourly Lambda to start/stop staging EC2 (SSM)"
+    echo "  hourly-off - Block hourly Lambda from changing staging EC2 (default after Terraform apply)"
     echo "  help       - Show this help message"
     echo ""
     echo "Examples:"
@@ -227,6 +278,12 @@ case "${1:-help}" in
         ;;
     schedule)
         disable_always_on
+        ;;
+    hourly-on)
+        enable_hourly_ec2_schedule
+        ;;
+    hourly-off)
+        disable_hourly_ec2_schedule
         ;;
     help|--help|-h)
         show_usage

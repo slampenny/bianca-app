@@ -57,3 +57,39 @@ Requires instance IAM permission for `ecr:GetAuthorizationToken` and ECR pull (n
 ## After blue-green: SIP / Asterisk external IP
 
 If SIP breaks after a swap, `EXTERNAL_ADDRESS` in `docker-compose.yml` may still point at an old public IP. See `devops/docs/ASTERISK_PRODUCTION_DEBUG.md` section 5.
+
+## EC2 cost schedules (Terraform)
+
+### Production — daily window (default 07:00–13:00 Pacific)
+
+Defined in `devops/terraform/production-schedule.tf`:
+
+- **EventBridge Scheduler** invokes Lambda `bianca-production-ec2-scheduler` to **start** then **stop** the primary instance (`aws_instance.production`, tag `Name=bianca-production`).
+- **Timezone** defaults to **`America/Los_Angeles`** (PST/PDT).
+- **Times** default to **07:00** start and **13:00** stop (7am–1pm local Pacific). Override with `production_schedule_*` variables.
+- **Disable** the schedules entirely: set `production_ec2_cost_schedule_enabled = false` and `terraform apply`.
+
+After apply, `terraform output production_ec2_schedule_summary` shows the resolved cron + timezone.
+
+**Caveats:** Only the **primary** blue instance is controlled; a transient **`bianca-production-green`** instance during CodeDeploy is not stopped by this Lambda. Stopping production drops ALB health until the instance is started again—plan for the scheduled off-hours window only if that is acceptable for your users.
+
+### Marketing WordPress (apex site)
+
+Lightsail + separate Terraform state: **`packages/backend/devops/terraform-marketing-wordpress/`** (not the main `devops/terraform/` stack). SSH uses the same **`~/.ssh/bianca-key-pair.pem`** as EC2 (imported into Lightsail by Terraform). WordPress source and `deploy-to-lightsail.sh` remain in **`~/code/wp-dev`** — see `sites/biancawellness/LIGHTSAIL.md` there.
+
+### Staging — hourly Lambda (off by default)
+
+`devops/terraform/staging-schedule.tf` + `staging.tf`: the hourly `bianca-staging-scheduler` Lambda checks SSM **`/bianca/staging/hourly-ec2-schedule-enabled`**.
+
+- Terraform creates this parameter as **`false`**, so the Lambda **no-ops** (no automatic starts/stops) after apply.
+- To re-enable automatic hourly start/stop: set the parameter to **`true`** (e.g. `packages/backend/scripts/staging-control.sh hourly-on`, or SSM console).
+- If the parameter **does not exist** (legacy account before this change), the Lambda keeps the **old** behavior (may start/stop by UTC hour) until you create the parameter.
+
+Start/stop the staging box manually when needed:
+
+```bash
+bash packages/backend/scripts/staging-control.sh start
+bash packages/backend/scripts/staging-control.sh stop
+```
+
+Root `yarn staging:down` / `yarn staging:status` still work; **`yarn staging:up` was removed** so staging is not started from a root script by accident.

@@ -56,6 +56,8 @@ describe('alertService', () => {
     expect(alertNew).toHaveProperty('id');
     expect(alertNew).toHaveProperty('message', alertOne.message);
     expect(alertNew).toHaveProperty('importance', alertOne.importance);
+    expect(alertNew.createdAt).toEqual(expect.any(String));
+    expect(alertNew.updatedAt).toEqual(expect.any(String));
   });
 
   it('should get an alert by id', async () => {
@@ -157,6 +159,7 @@ describe('alertService', () => {
       expect.arrayContaining([expect.objectContaining({ id: alert2.id }), expect.objectContaining({ id: alert3.id })])
     );
     expect(alerts).toHaveLength(2);
+    expect(alerts.every((a) => typeof a.createdAt === 'string' && typeof a.updatedAt === 'string')).toBe(true);
   });
 
   it('should filter alerts based on caregiver role', async () => {
