@@ -1,5 +1,6 @@
 #!/bin/bash
-# Run on green via SSM during SwapAndTerminate Step 0 (DEPLOY_DIR must be set).
+# Remount bianca MongoDB EBS on the current instance (blue recovery or post-attach).
+# Usage: DEPLOY_DIR=/opt/bianca-staging bash remount-mongodb-on-instance.sh
 set -eu
 
 DEPLOY_DIR="${DEPLOY_DIR:?DEPLOY_DIR is required}"
@@ -12,7 +13,9 @@ case "$DEPLOY_DIR" in
     CONTAINER_PREFIX="${base#bianca-}"
     ;;
 esac
+
 MONGO_CONTAINER="${CONTAINER_PREFIX}_mongodb"
+echo "Remount MongoDB on $(hostname) DEPLOY_DIR=$DEPLOY_DIR container=$MONGO_CONTAINER"
 
 cd "$DEPLOY_DIR"
 (docker compose stop 2>/dev/null || docker-compose stop 2>/dev/null || true)
@@ -29,12 +32,11 @@ for i in $(seq 1 30); do
     fi
   done
   echo "waiting for MongoDB block device ($i/30)..."
-  lsblk || true
-  sleep 5
+  sleep 3
 done
 
 if [ -z "$MONGO_DEV" ]; then
-  echo "FATAL: MongoDB EBS block device not found after attach"
+  echo "FATAL: MongoDB EBS block device not found"
   lsblk -f || true
   exit 1
 fi
@@ -49,19 +51,13 @@ sudo chown -R 999:999 /opt/mongodb-data
 if ! sudo test -f /opt/mongodb-data/WiredTiger 2>/dev/null \
   && ! sudo test -d /opt/mongodb-data/diagnostic.data 2>/dev/null; then
   echo "FATAL_mongodb_data_dir_empty"
-  sudo ls -la /opt/mongodb-data || true
   exit 1
 fi
 
 cd "$DEPLOY_DIR"
-if ! (docker compose up -d mongodb 2>/dev/null || docker-compose up -d mongodb); then
-  echo "FATAL: mongodb service failed to start"
-  docker logs "$MONGO_CONTAINER" 2>&1 | tail -80 || true
-  exit 1
-fi
-
-echo "Waiting for MongoDB to accept connections (WiredTiger recovery after volume move)..."
-sleep 25
+(docker compose up -d mongodb 2>/dev/null || docker-compose up -d mongodb)
+echo "Waiting for WiredTiger recovery..."
+sleep 20
 
 MONGO_OK=false
 for i in $(seq 1 72); do
@@ -83,14 +79,9 @@ done
 
 if [ "$MONGO_OK" != "true" ]; then
   echo "FATAL: mongodb ping timeout"
-  docker logs "$MONGO_CONTAINER" 2>&1 | tail -80 || true
+  docker logs "$MONGO_CONTAINER" 2>&1 | tail -60 || true
   exit 1
 fi
 
-if ! (docker compose up -d 2>/dev/null || docker-compose up -d); then
-  echo "FATAL: docker compose up -d failed"
-  docker compose ps 2>&1 || docker-compose ps 2>&1 || true
-  exit 1
-fi
-
-echo "Step 0: MongoDB volume mounted and stack started"
+(docker compose up -d 2>/dev/null || docker-compose up -d)
+echo "Remount complete — stack started"

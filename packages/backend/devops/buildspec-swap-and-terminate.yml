@@ -395,7 +395,7 @@ phases:
           MONGOVERIFY_CMD_ID=$(aws ssm send-command \
             --instance-ids "$GREEN_INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters "{\"commands\":[\"cd $DEPLOY_DIR && if ! ( sudo test -f /opt/mongodb-data/WiredTiger 2>/dev/null || sudo test -d /opt/mongodb-data/diagnostic.data 2>/dev/null ); then echo FATAL_mongodb_data_dir_empty; exit 1; fi\",\"cd $DEPLOY_DIR && ( docker compose exec -T mongodb mongosh --quiet --eval \\\"db.runCommand({ping:1}).ok\\\" 2>&1 | grep -q 1 ) || ( docker compose exec -T mongodb mongo --eval \\\"db.runCommand({ping:1}).ok\\\" --quiet 2>&1 | grep -q 1 )\"]}" \
+            --parameters "{\"commands\":[\"cd $DEPLOY_DIR && if ! ( sudo test -f /opt/mongodb-data/WiredTiger 2>/dev/null || sudo test -d /opt/mongodb-data/diagnostic.data 2>/dev/null ); then echo FATAL_mongodb_data_dir_empty; exit 1; fi\",\"cd $DEPLOY_DIR && PREFIX=\\$(basename $DEPLOY_DIR | sed 's/^bianca-//') && ( docker exec \\${PREFIX}_mongodb mongo --eval \\\"db.adminCommand('ping')\\\" --quiet 2>&1 | grep -q 1 ) || ( docker exec \\${PREFIX}_mongodb mongosh --quiet --eval \\\"db.adminCommand('ping')\\\" 2>&1 | grep -q 1 )\"]}" \
             --timeout-seconds 120 \
             --query 'Command.CommandId' \
             --output text 2>/dev/null || echo "")
