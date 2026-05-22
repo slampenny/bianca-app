@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Terminate leftover green EC2 instances after a failed production pipeline (e.g. RunTests).
-# Staging runs RunTests after swap; production runs RunTests before swap — only production auto-cleans here.
+# Terminate leftover green EC2 instances after a failed RunTests stage (before SwapAndTerminate).
 set -euo pipefail
 
 PIPELINE="${CODEPIPELINE_NAME:-}"
 REGION="${AWS_DEFAULT_REGION:-${AWS_REGION:-us-east-2}}"
 
-if [ "$PIPELINE" != "bianca-production-pipeline" ]; then
-  echo "Skipping green termination (pipeline=$PIPELINE; production-only cleanup)"
-  exit 0
-fi
-
-GREEN_TAG="${GREEN_TAG:-bianca-production-green}"
+case "$PIPELINE" in
+  bianca-production-pipeline) GREEN_TAG="${GREEN_TAG:-bianca-production-green}" ;;
+  bianca-staging-pipeline)    GREEN_TAG="${GREEN_TAG:-bianca-staging-green}" ;;
+  *)
+    echo "Skipping green termination (pipeline=$PIPELINE)"
+    exit 0
+    ;;
+esac
 echo "Terminating green instances (Name=$GREEN_TAG) after failed production pipeline step..."
 
 IDS=$(aws ec2 describe-instances \

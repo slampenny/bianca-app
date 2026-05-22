@@ -2,6 +2,12 @@
 
 Use this when **staging works but production doesn’t** and you need to compare behavior.
 
+## CodePipeline stage order (same for both)
+
+`Source → Build → CreateGreenInstance → Deploy → RunTests → PostDeployValidation → SwapAndTerminate`
+
+Failed **RunTests** or **PostDeployValidation** stops the pipeline before swap. Pipelines use **V2 + QUEUED** execution mode so only one run is active at a time (avoids the console showing a failed swap on one run while tests from an older run still appear in progress).
+
 ## Deployment model (same for both)
 
 - Code is **not** deployed via `git pull` on the server.

@@ -527,8 +527,10 @@ resource "aws_iam_role_policy" "codepipeline_production_policy" {
 ################################################################################
 
 resource "aws_codepipeline" "production" {
-  name     = "bianca-production-pipeline"
-  role_arn = aws_iam_role.codepipeline_production_role.arn
+  name           = "bianca-production-pipeline"
+  role_arn       = aws_iam_role.codepipeline_production_role.arn
+  pipeline_type  = "V2"
+  execution_mode = "QUEUED"
 
   artifact_store {
     type     = "S3"

@@ -49,16 +49,7 @@ phases:
           GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
             --filters "Name=tag:Name,Values=$GREEN_TAG" \
                       "Name=instance-state-name,Values=running" \
-            --output json | python3 -c 'import json,sys
-d=json.load(sys.stdin)
-def is_green(i):
-  tags=i.get("Tags") or []
-  return any(t.get("Key")=="DeploymentType" and t.get("Value")=="green" for t in tags)
-ids=[(i.get("LaunchTime") or "",i.get("InstanceId")) for r in d.get("Reservations") or [] for i in r.get("Instances") or [] if is_green(i)]
-if not ids:
-  ids=[(i.get("LaunchTime") or "",i.get("InstanceId")) for r in d.get("Reservations") or [] for i in r.get("Instances") or []]
-ids.sort()
-print(ids[-1][1] if ids else "")')
+            --output json | python3 "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/pick-newest-green-instance.py"
         fi
         
         if [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then

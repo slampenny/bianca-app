@@ -460,7 +460,7 @@ phases:
   post_build:
     commands:
       - |
-        # Production: RunTests runs before SwapAndTerminate — terminate green so failed deploys do not linger.
+        # RunTests runs before SwapAndTerminate — terminate green so failed test runs do not linger.
         if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
           echo "Build failed — cleaning up pipeline green instance(s) if production..."
           bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \

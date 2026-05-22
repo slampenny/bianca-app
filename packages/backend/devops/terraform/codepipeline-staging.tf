@@ -653,9 +653,14 @@ resource "aws_codebuild_project" "staging_tests" {
 # CODEPIPELINE FOR STAGING
 ################################################################################
 
+# Staging order matches production: RunTests + PostDeployValidation before SwapAndTerminate.
+# pipeline_type V2 + QUEUED: one execution at a time (avoids overlapping runs where swap fails
+# on execution B while RunTests from execution A still appears "in progress" in the console).
 resource "aws_codepipeline" "staging" {
-  name     = "bianca-staging-pipeline"
-  role_arn = aws_iam_role.codepipeline_staging_role.arn
+  name            = "bianca-staging-pipeline"
+  role_arn        = aws_iam_role.codepipeline_staging_role.arn
+  pipeline_type   = "V2"
+  execution_mode  = "QUEUED"
 
   artifact_store {
     type     = "S3"
@@ -735,6 +740,24 @@ resource "aws_codepipeline" "staging" {
   }
 
   stage {
+    name = "RunTests"
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_tests.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
+    }
+  }
+
+  stage {
     name = "PostDeployValidation"
     action {
       name             = "ValidateDeployment"
@@ -752,8 +775,6 @@ resource "aws_codepipeline" "staging" {
     }
   }
 
-  # Swap proceeds as soon as Deploy and PostDeployValidation pass
-  # This keeps staging deployments fast for rapid iteration
   stage {
     name = "SwapAndTerminate"
     action {
@@ -766,27 +787,6 @@ resource "aws_codepipeline" "staging" {
       output_artifacts = ["SwapOutput"]
       configuration = {
         ProjectName   = aws_codebuild_project.staging_swap_and_terminate.name
-        PrimarySource = "SourceOutput"
-      }
-      run_order = 1
-    }
-  }
-
-  # Staging: RunTests runs after swap for monitoring/feedback, but does NOT block deployment.
-  # This allows fast iterations in staging while still getting test feedback.
-  # Production pipeline runs tests BEFORE swap to ensure safety.
-  stage {
-    name = "RunTests"
-    action {
-      name             = "RunTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput", "BuildOutput"]
-      output_artifacts = ["TestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.staging_tests.name
         PrimarySource = "SourceOutput"
       }
       run_order = 1
