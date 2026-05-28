@@ -79,7 +79,7 @@ class TwilioVoiceProvider {
         statusCallback: statusCallbackUrl,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
         statusCallbackMethod: 'POST',
-        // answerOnBridge: true, // REMOVED: This was causing Twilio to skip the initial TwiML "Connecting you to Bianca" message
+        // answerOnBridge: true, // REMOVED: This was causing initial audio cutoff
         machineDetection: 'DetectMessageEnd', // Detect answering machines
         machineDetectionTimeout: 5000, // Wait up to 5s (milliseconds) for detection
         asyncAmd: true, // Continue AMD in background; don't delay handoff
@@ -207,11 +207,6 @@ class TwilioVoiceProvider {
       }
 
       // For human answer, connect to Asterisk SIP endpoint
-      // Say "Connecting you to Bianca" to cover the delay while connecting to Asterisk and setting up Bianca
-      twiml.say({
-        voice: 'Polly.Joanna', // Most human-sounding voice for US English
-        language: 'en-US'
-      }, "Connecting you to Bianca");
       
       // Determine SIP endpoint based on environment
       // Use config.primaryDomain to construct SIP host (single source of truth)

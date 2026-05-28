@@ -134,6 +134,21 @@ describe('OpenAI Realtime user transcript (mocked server events)', () => {
     expect(conn.pendingUserTranscript).toBe('Live update text.');
   });
 
+  it('createPlaceholderUserMessage does not duplicate rows when active turn already has transcript', async () => {
+    const conn = baseConn();
+    service.connections.set(callId, conn);
+    await service.createPlaceholderUserMessage(callId);
+    const mid = conn.activeUserMessageId;
+
+    await Message.findByIdAndUpdate(mid, { content: 'Everything has been going well.' });
+    await service.createPlaceholderUserMessage(callId);
+
+    const clientMessages = await Message.find({ conversationId, role: 'client' }).lean();
+    expect(clientMessages).toHaveLength(1);
+    expect(clientMessages[0].content).toBe('Everything has been going well.');
+    expect(conn.activeUserMessageId.toString()).toBe(mid.toString());
+  });
+
   it('handleInputAudioTranscriptionCompleted runs notify + DB persist before emergencyProcessor.processUtterance', async () => {
     const conn = baseConn();
     service.connections.set(callId, conn);

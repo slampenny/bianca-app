@@ -615,10 +615,8 @@ describe('OpenAI Realtime Service', () => {
     });
 
     it('should cancel AI response when user interrupts', async () => {
-      // True barge-in: output audio was streaming (delta seen) and not yet complete.
       connection._aiIsSpeaking = true;
-      connection._aiOutputAudioDeltaSeen = true;
-      connection._aiAudioComplete = false;
+      connection._aiAudioPlaybackComplete = false;
 
       // Simulate user starting to speak (interruption)
       const speechStartedMessage = {

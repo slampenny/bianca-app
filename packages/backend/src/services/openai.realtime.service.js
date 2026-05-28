@@ -236,6 +236,17 @@ class OpenAIRealtimeService {
     this._clearAiAudioCompleteDebounceTimer(conn);
   }
 
+  _markAssistantPlaybackActive(conn) {
+    if (!conn) return;
+    conn._aiAudioPlaybackComplete = false;
+  }
+
+  _syncAiAudioPlaybackCompleteFromRtp(callId, conn) {
+    if (!conn) return;
+    const rtpSenderService = require('./rtp.sender.service');
+    conn._aiAudioPlaybackComplete = rtpSenderService.isPlaybackComplete(callId);
+  }
+
   /**
    * OPTIMIZATION: Start global commit timer that processes ALL pending commits in batches
    */
@@ -564,6 +575,8 @@ class OpenAIRealtimeService {
       // True when output audio stream finished (response.output_audio.done or debounce after last delta); still before response.done.
       _aiAudioComplete: false,
       _aiAudioCompleteDebounceTimer: null,
+      // True only when RTP outbound queue is drained (see rtp.sender isPlaybackComplete); used for barge-in cancel.
+      _aiAudioPlaybackComplete: true,
       // One 500ms speech_stopped finalize pass per utterance; duplicate VAD speech_stopped must not stack timers.
       _speechStoppedFinalizePending: false,
       _speechStoppedFinalizeTimer: null,
@@ -860,6 +873,7 @@ class OpenAIRealtimeService {
     this._clearResponseStuckRecoveryTimers(connection);
     connection._stuckResponseRecoveryStartSnapshot = null;
     connection._responseCreateInFlight = true;
+    this._markAssistantPlaybackActive(connection);
 
     try {
       const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
@@ -1447,6 +1461,7 @@ class OpenAIRealtimeService {
             // Track that AI is speaking
             if (conn && !conn._aiIsSpeaking) {
               this._resetAssistantOutputAudioLifecycle(conn);
+              this._markAssistantPlaybackActive(conn);
               conn._aiIsSpeaking = true;
               conn._lastAiSpeechStart = Date.now();
               logger.info(`[OpenAI Realtime] AI STARTED SPEAKING for ${callId} (${apiVersion})`);
@@ -1573,16 +1588,23 @@ class OpenAIRealtimeService {
               conn._userTranscriptFlushTimer = null;
             }
 
-            // CRITICAL: Cancel AI audio ONLY during true barge-in (output audio still streaming).
-            // After the last output_audio.delta (or output_audio.done), _aiAudioComplete is true until response.done;
-            // user speech there is post-audio tail, not barge-in — do not cancel (would drop a nearly-finished turn).
-            // Before first delta, _aiOutputAudioDeltaSeen is false — do not cancel (optimistic _aiIsSpeaking from our timer).
+            if (conn._aiIsSpeaking || conn._responseCreateInFlight || conn._responseCreated) {
+              this._markAssistantPlaybackActive(conn);
+            } else {
+              this._syncAiAudioPlaybackCompleteFromRtp(callId, conn);
+            }
+
             const shouldCancelAiForBargeIn =
-              conn._aiIsSpeaking && conn._aiOutputAudioDeltaSeen && !conn._aiAudioComplete;
+              !conn._aiAudioPlaybackComplete &&
+              (conn._aiIsSpeaking || conn._responseCreateInFlight || conn._responseCreated);
+
             if (shouldCancelAiForBargeIn) {
               logger.info(`[OpenAI Realtime] USER INTERRUPTING AI - canceling AI response for ${callId}`);
               try {
                 await this.sendJsonMessage(callId, { type: 'response.cancel' });
+                const rtpSenderService = require('./rtp.sender.service');
+                rtpSenderService.clearBuffer(callId);
+                conn._aiAudioPlaybackComplete = true;
                 conn._aiIsSpeaking = false;
                 this._resetAssistantOutputAudioLifecycle(conn);
                 conn._responseCanceled = true;
@@ -1599,10 +1621,16 @@ class OpenAIRealtimeService {
               } catch (err) {
                 logger.error(`[OpenAI Realtime] Failed to cancel AI response: ${err.message}`);
               }
-            } else if (conn._aiIsSpeaking && conn._aiAudioComplete) {
-              logger.info(
-                `[OpenAI Realtime] User speech during assistant tail (audio complete, response.done pending) for ${callId} — skipping response.cancel`
-              );
+            } else {
+              logger.info(`[OpenAI Realtime] speech_started barge-in cancel skipped for ${callId}`, {
+                _aiIsSpeaking: conn._aiIsSpeaking,
+                _responseCreateInFlight: conn._responseCreateInFlight,
+                _responseCreated: conn._responseCreated,
+                _aiAudioPlaybackComplete: conn._aiAudioPlaybackComplete,
+                _aiOutputAudioDeltaSeen: conn._aiOutputAudioDeltaSeen,
+                _aiAudioComplete: conn._aiAudioComplete,
+                conversationState: this.getConversationState(callId),
+              });
             }
 
             // STATE MACHINE: USER_SPEAKING when allowed. AI_RESPONDING→USER_SPEAKING covers barge-in / post-audio tail.
@@ -1632,8 +1660,13 @@ class OpenAIRealtimeService {
 
             // Placeholder once the greeting is done — before that, user audio exists but transcripts are ignored,
             // which would otherwise leave permanent "[Speaking...]" rows.
-            if (!conn._waitingForInitialGreeting) {
+            // Duplicate VAD speech_started while still USER_SPEAKING must not create another row (same utterance).
+            if (!conn._waitingForInitialGreeting && !alreadyUserSpeaking) {
               await this.createPlaceholderUserMessage(callId);
+            } else if (alreadyUserSpeaking) {
+              logger.debug(
+                `[OpenAI Realtime] Skipping user placeholder for ${callId} — duplicate speech_started (same utterance)`
+              );
             } else {
               logger.debug(
                 `[OpenAI Realtime] Skipping user placeholder for ${callId} — waiting for initial greeting (transcripts ignored until then)`
@@ -1938,6 +1971,7 @@ class OpenAIRealtimeService {
                           return;
                         }
                         this._resetAssistantOutputAudioLifecycle(finalConn);
+                        this._markAssistantPlaybackActive(finalConn);
                         finalConn._aiIsSpeaking = true;
                         logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking (post-cancel) for ${callId}`);
                       } catch (err) {
@@ -2096,6 +2130,7 @@ class OpenAIRealtimeService {
                       return;
                     }
                     this._resetAssistantOutputAudioLifecycle(currentConn);
+                    this._markAssistantPlaybackActive(currentConn);
                     currentConn._aiIsSpeaking = true;
                     logger.info(`[OpenAI Realtime] Triggered AI response after user finished speaking for ${callId}`);
                   } catch (err) {
@@ -2748,6 +2783,7 @@ class OpenAIRealtimeService {
 
       conn._aiIsSpeaking = false;
       this._resetAssistantOutputAudioLifecycle(conn);
+      this._syncAiAudioPlaybackCompleteFromRtp(callId, conn);
       conn._responseCreated = false;
       conn._responseCreateInFlight = false;
       conn._responseStartTime = null;
@@ -2793,6 +2829,7 @@ class OpenAIRealtimeService {
     conn._aiIsSpeaking = false;
     conn._speechStoppedCommittedAiResponding = false;
     this._resetAssistantOutputAudioLifecycle(conn);
+    this._syncAiAudioPlaybackCompleteFromRtp(callId, conn);
     // 3) OpenAI response.create ack / stuck guards
     conn._responseCreated = false;
     conn._responseCreateInFlight = false;
@@ -3083,6 +3120,11 @@ class OpenAIRealtimeService {
         const prev = await Message.findById(conn.activeUserMessageId).select('content').lean();
         if (prev?.content === SPEAKING_PLACEHOLDER_TEXT) {
           await this.removeUserSpeakingPlaceholder(callId, 'superseded by new speech_started');
+        } else if (prev?.content?.trim()) {
+          logger.info(
+            `[OpenAI Realtime] Skipping new user placeholder for ${callId} — active row ${conn.activeUserMessageId} already has transcript`
+          );
+          return;
         }
       } catch (e) {
         logger.warn(`[OpenAI Realtime] Could not supersede prior user placeholder for ${callId}: ${e.message}`);
@@ -3638,6 +3680,16 @@ class OpenAIRealtimeService {
     if (!audioBase64) {
       logger.warn(`[OpenAI Realtime] processAudioResponse called with empty audioBase64 for ${callId}`);
       return;
+    }
+
+    const rtpSenderService = require('./rtp.sender.service');
+    if (rtpSenderService.isFlushInProgress(callId)) {
+      return;
+    }
+
+    const conn = this.connections.get(callId);
+    if (conn) {
+      this._markAssistantPlaybackActive(conn);
     }
 
     try {

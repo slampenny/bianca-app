@@ -28,6 +28,8 @@ class RtpSenderService extends EventEmitter {
         
         // Audio buffering and timing
         this.audioBuffers = new Map(); // callId -> buffered audio
+        /** callId -> { flushing: boolean, flushTimer: NodeJS.Timeout | null } */
+        this.flushState = new Map();
         this.activeCallsForTimer = new Set(); // callIds that need timer processing
         
         // OPTIMIZATION: Single global timer instead of per-call timers
@@ -307,9 +309,50 @@ class RtpSenderService extends EventEmitter {
     /**
      * FIXED: Buffer audio instead of sending immediately
      */
+    /**
+     * Drop outbound audio buffered for this call and discard chunks for ~200ms (barge-in / response.cancel).
+     */
+    clearBuffer(callId) {
+        logger.info(`[RTP Sender] clearBuffer called for ${callId}`);
+        this.audioBuffers.set(callId, Buffer.alloc(0));
+
+        const prev = this.flushState.get(callId);
+        if (prev?.flushTimer) {
+            clearTimeout(prev.flushTimer);
+        }
+
+        const flushTimer = setTimeout(() => {
+            const state = this.flushState.get(callId);
+            if (state) {
+                state.flushing = false;
+                state.flushTimer = null;
+                this.flushState.set(callId, state);
+            }
+        }, 200);
+
+        this.flushState.set(callId, { flushing: true, flushTimer });
+    }
+
+    isFlushInProgress(callId) {
+        return this.flushState.get(callId)?.flushing === true;
+    }
+
+    /** True when no outbound μ-law is queued and we are not in a post-clear discard window. */
+    isPlaybackComplete(callId) {
+        if (this.isFlushInProgress(callId)) {
+            return false;
+        }
+        const buffer = this.audioBuffers.get(callId);
+        return !buffer || buffer.length === 0;
+    }
+
     async sendAudio(callId, audioBase64Ulaw) {
         if (this.isShuttingDown) {
             logger.debug(`[RTP Sender] Service shutting down, ignoring audio for ${callId}`);
+            return;
+        }
+
+        if (this.isFlushInProgress(callId)) {
             return;
         }
         
@@ -521,6 +564,11 @@ class RtpSenderService extends EventEmitter {
 
         // Clear audio buffer
         this.audioBuffers.delete(callId);
+        const flushEntry = this.flushState.get(callId);
+        if (flushEntry?.flushTimer) {
+            clearTimeout(flushEntry.flushTimer);
+        }
+        this.flushState.delete(callId);
         this.adaptiveBuffering.delete(callId);
         this.debugCounters.delete(callId);
         
