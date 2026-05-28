@@ -164,15 +164,41 @@ export const clientApi = createApi({
         body: { caregiverId, clientIds },
       }),
     }),
-    verifyConsent: builder.mutation<
-      { success: boolean; message: string; alreadyConsented: boolean; client: Client },
+    validateConsentToken: builder.query<
+      {
+        success: boolean
+        valid: boolean
+        clientName?: string
+        orgName?: string
+        consentedPurposes?: Record<string, boolean>
+        purposes?: string[]
+      },
       { token: string }
     >({
       query: ({ token }) => ({
         url: `/clients/consent/verify?token=${encodeURIComponent(token)}`,
         method: "GET",
         headers: {
-          'Accept': 'application/json',
+          Accept: "application/json",
+        },
+      }),
+    }),
+    submitClientConsent: builder.mutation<
+      {
+        success: boolean
+        message: string
+        alreadyConsented?: boolean
+        fullyConsented?: boolean
+        grantedPurposes?: string[]
+      },
+      { token: string; purposes: string[] }
+    >({
+      query: ({ token, purposes }) => ({
+        url: `/clients/consent/verify?token=${encodeURIComponent(token)}`,
+        method: "POST",
+        body: { purposes },
+        headers: {
+          Accept: "application/json",
         },
       }),
     }),
@@ -192,5 +218,6 @@ export const {
   useGetCaregiversQuery,
   useGetUnassignedClientsQuery,
   useAssignUnassignedClientsMutation,
-  useVerifyConsentMutation,
+  useLazyValidateConsentTokenQuery,
+  useSubmitClientConsentMutation,
 } = clientApi

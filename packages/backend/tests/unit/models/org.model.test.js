@@ -50,6 +50,11 @@ describe('Org Model', () => {
     await expect(new Org(newOrg).validate()).resolves.toBeUndefined();
   });
 
+  test('should accept EU member country HU', async () => {
+    newOrg.country = 'HU';
+    await expect(new Org(newOrg).validate()).resolves.toBeUndefined();
+  });
+
   test('should throw a validation error if country is invalid', async () => {
     newOrg.country = 'INVALID';
     await expect(new Org(newOrg).validate()).rejects.toThrow();

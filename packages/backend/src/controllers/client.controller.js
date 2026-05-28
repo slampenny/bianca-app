@@ -141,7 +141,7 @@ const updateClient = catchAsync(async (req, res) => {
       await scheduleService.updateSchedule(schedule.id, { ...schedule });
     }
   }
-  if (clientData.email || clientData.consented === undefined) {
+  if (clientData.email || clientData.consentedPurposes === undefined) {
     clientService
       .sendConsentEmailIfRequired(client)
       .catch((err) => logger.error('Failed to send consent email after client update:', err));
@@ -364,13 +364,39 @@ const verifyConsent = catchAsync(async (req, res) => {
     if (wantsJson) return res.status(httpStatus.BAD_REQUEST).json({ success: false, error: 'Consent token is required' });
     return res.status(httpStatus.BAD_REQUEST).send('Consent token is required');
   }
+
+  const isGetValidationOnly = req.method === 'GET';
+
   try {
-    const result = await clientService.verifyConsentToken(token);
+    if (isGetValidationOnly) {
+      const preview = await clientService.validateConsentToken(token);
+      if (wantsJson) {
+        return res.status(httpStatus.OK).json({ success: true, ...preview });
+      }
+      const html = `<!DOCTYPE html><html><head><title>Consent Required</title></head><body><h1>Consent Required</h1><p>Please open this link in your browser to review and select your consent preferences.</p></body></html>`;
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      return res.status(httpStatus.OK).send(html);
+    }
+
+    const purposes = req.body.purposes || req.query.purposes;
+    const parsedPurposes = Array.isArray(purposes)
+      ? purposes
+      : typeof purposes === 'string'
+        ? purposes.split(',').map((p) => p.trim())
+        : [];
+
+    const result = await clientService.verifyConsentToken(token, {
+      purposes: parsedPurposes,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
     if (wantsJson) {
       return res.status(httpStatus.OK).json({
         success: true,
         message: result.message,
         alreadyConsented: result.alreadyConsented,
+        fullyConsented: result.fullyConsented,
+        grantedPurposes: result.grantedPurposes,
         client: ClientDTO(result.client),
       });
     }

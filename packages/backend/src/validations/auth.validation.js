@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const { password } = require('./custom.validation');
+const { ORG_COUNTRY_CODES } = require('./countryCodes');
 
 const register = {
   body: Joi.object().keys({
@@ -7,7 +8,7 @@ const register = {
     password: Joi.string().required().custom(password),
     name: Joi.string().required(),
     phone: Joi.string().required(),
-    country: Joi.string().valid('US', 'CA', 'GB', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'CH', 'JP', 'CN', 'HK', 'SG', 'AE', 'IN', 'MX', 'BR', 'OTHER').optional().uppercase(),
+    country: Joi.string().valid(...ORG_COUNTRY_CODES).optional().uppercase(),
   }),
 };
 

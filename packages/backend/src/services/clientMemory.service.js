@@ -221,10 +221,40 @@ const writeUrgentFact = async (clientId, fact, conversationId = null) => {
  * Retrieve ranked facts for a client to inject into buildEnhancedPrompt.
  * Returns recency-sorted facts, with urgent/concern/health/mood categories prioritized.
  */
+const activeFactsFilter = { deletedAt: null };
+
+const suppressFactsForClient = async (clientId, reason) => {
+  const result = await ClientMemory.updateMany(
+    { clientId, ...activeFactsFilter },
+    { $set: { deletedAt: new Date(), deletedReason: reason } }
+  );
+  logger.info(
+    `[ClientMemory] Suppressed ${result.modifiedCount} facts for client ${clientId} (${reason})`
+  );
+  return result.modifiedCount;
+};
+
+const suppressFactsForConversation = async (conversationId, reason) => {
+  const result = await ClientMemory.updateMany(
+    { conversationId, ...activeFactsFilter },
+    { $set: { deletedAt: new Date(), deletedReason: reason } }
+  );
+  logger.info(
+    `[ClientMemory] Suppressed ${result.modifiedCount} facts for conversation ${conversationId} (${reason})`
+  );
+  return result.modifiedCount;
+};
+
+const hardDeleteFactsForClient = async (clientId) => {
+  const result = await ClientMemory.deleteMany({ clientId });
+  logger.info(`[ClientMemory] Hard-deleted ${result.deletedCount} facts for client ${clientId}`);
+  return result.deletedCount;
+};
+
 const getClientFacts = async (clientId, limit = 25) => {
   try {
     // Pull urgent/high-priority facts first (always surface these)
-    const urgentFacts = await ClientMemory.find({ clientId, priority: 'urgent' })
+    const urgentFacts = await ClientMemory.find({ clientId, priority: 'urgent', ...activeFactsFilter })
       .sort({ extractedAt: -1 })
       .limit(5)
       .lean();
@@ -234,6 +264,7 @@ const getClientFacts = async (clientId, limit = 25) => {
       clientId,
       priority: 'normal',
       category: { $in: ['concern', 'health', 'mood', 'cognitive', 'safety'] },
+      ...activeFactsFilter,
     })
       .sort({ extractedAt: -1 })
       .limit(10)
@@ -244,6 +275,7 @@ const getClientFacts = async (clientId, limit = 25) => {
       clientId,
       priority: 'normal',
       category: { $in: ['preference', 'relationship', 'life_event', 'general'] },
+      ...activeFactsFilter,
     })
       .sort({ extractedAt: -1 })
       .limit(10)
@@ -295,9 +327,19 @@ const formatFactsForPrompt = (facts, clientName) => {
   return lines.join('\n');
 };
 
+const getAllActiveFactsForClient = async (clientId) => {
+  return ClientMemory.find({ clientId, ...activeFactsFilter })
+    .sort({ extractedAt: -1 })
+    .lean();
+};
+
 module.exports = {
   extractAndStoreFacts,
   writeUrgentFact,
   getClientFacts,
+  getAllActiveFactsForClient,
   formatFactsForPrompt,
+  suppressFactsForClient,
+  suppressFactsForConversation,
+  hardDeleteFactsForClient,
 };

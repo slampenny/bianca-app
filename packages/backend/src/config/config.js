@@ -155,6 +155,15 @@ const envVarsSchema = Joi.object({
 
   /** "true" = use legacy keyword/DB phrase/regex detectors; "false" (default) = embedding-first for fraud + emergency */
   USE_KEYWORD_BASED_DETECTORS: Joi.string().valid('true', 'false').optional(),
+
+  /** Data residency: US (default) | EU (GDPR → EU when provisioned) | AUTO (route GDPR to EU when provisioned) */
+  DATA_RESIDENCY_MODE: Joi.string().valid('US', 'EU', 'AUTO').default('US'),
+  /** Target AWS region for EU-resident storage (S3, etc.) */
+  AWS_EU_REGION: Joi.string().default('eu-central-1'),
+  /** EU MongoDB connection string — empty until EU cluster is provisioned */
+  EU_MONGODB_URI: Joi.string().allow('').optional(),
+  /** EU S3 bucket for GDPR-regulated object storage — empty until provisioned */
+  EU_S3_BUCKET: Joi.string().allow('').optional(),
   
 }).unknown();
 
@@ -301,6 +310,38 @@ const baselineConfig = {
   detection: {
     useKeywordBasedDetectors: envVars.USE_KEYWORD_BASED_DETECTORS === 'true',
   },
+  residency: {
+    mode: envVars.DATA_RESIDENCY_MODE || 'US',
+    awsEuRegion: envVars.AWS_EU_REGION || 'eu-central-1',
+    euMongoDbUri: envVars.EU_MONGODB_URI || '',
+    euS3Bucket: envVars.EU_S3_BUCKET || '',
+  },
+};
+
+/**
+ * Select AWS storage region/bucket based on data jurisdiction and residency mode.
+ * EU config is returned when jurisdiction is GDPR and DATA_RESIDENCY_MODE is not US.
+ * @param {string} [jurisdiction] - Jurisdiction label (e.g. 'GDPR', 'HIPAA', 'PIPEDA')
+ * @returns {{ region: string, bucketName: string }}
+ */
+baselineConfig.getStorageRegion = function getStorageRegion(jurisdiction) {
+  const usRegion = envVars.AWS_REGION || 'us-east-2';
+  const usBucket = baselineConfig.aws.s3.bucketName;
+
+  const useEuStorage =
+    jurisdiction === 'GDPR' && baselineConfig.residency.mode !== 'US';
+
+  if (useEuStorage) {
+    return {
+      region: baselineConfig.residency.awsEuRegion,
+      bucketName: baselineConfig.residency.euS3Bucket,
+    };
+  }
+
+  return {
+    region: usRegion,
+    bucketName: usBucket,
+  };
 };
 
 // CRITICAL: Ensure config.env always matches runtime NODE_ENV immediately after creation

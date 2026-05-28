@@ -296,8 +296,9 @@ class BreachDetectionService {
 
       // Determine notification requirements based on jurisdiction
       const requiresHHSNotification = jurisdiction.jurisdiction === 'HIPAA' && data.affectedCount >= 500;
-      const requiresPrivacyCommissionerNotification = jurisdiction.jurisdiction === 'PIPEDA' && 
+      const requiresPrivacyCommissionerNotification = jurisdiction.jurisdiction === 'PIPEDA' &&
         (data.severity === 'CRITICAL' || data.severity === 'HIGH' || data.affectedCount > 0);
+      const requiresSupervisoryAuthorityNotification = jurisdiction.jurisdiction === 'GDPR';
 
       // Create breach log with jurisdiction-aware settings
       const breachData = {
@@ -312,12 +313,12 @@ class BreachDetectionService {
         affectedCount: data.affectedCount || 0,
         status: 'INVESTIGATING',
         organizationCountry: organizationCountry || 'US',
-        // Jurisdiction-aware notification settings
         requiresHHSNotification: requiresHHSNotification,
         requiresPrivacyCommissionerNotification: requiresPrivacyCommissionerNotification,
+        requiresSupervisoryAuthorityNotification: requiresSupervisoryAuthorityNotification,
+        supervisoryAuthority: requiresSupervisoryAuthorityNotification ? 'NAIH' : undefined,
         notificationDeadline: notificationDeadline,
-        // PIPEDA-specific: assess significant harm for high/critical breaches
-        significantHarmAssessment: jurisdiction.jurisdiction === 'PIPEDA' && 
+        significantHarmAssessment: jurisdiction.jurisdiction === 'PIPEDA' &&
           (data.severity === 'CRITICAL' || data.severity === 'HIGH') ? 'PENDING' : 'NOT_ASSESSED'
       };
 
@@ -396,11 +397,12 @@ class BreachDetectionService {
         try {
           // Determine jurisdiction for notification message
           const jurisdiction = getJurisdiction(breach.organizationCountry);
-          const jurisdictionName = jurisdiction.jurisdiction === 'HIPAA' ? 'HIPAA' : 
-                                   jurisdiction.jurisdiction === 'PIPEDA' ? 'PIPEDA' : 'Privacy';
+          const jurisdictionName = jurisdiction.jurisdiction === 'HIPAA' ? 'HIPAA' :
+                                   jurisdiction.jurisdiction === 'PIPEDA' ? 'PIPEDA' :
+                                   jurisdiction.jurisdiction === 'GDPR' ? 'GDPR' : 'Privacy';
           
           const notificationRequirement = breach.notificationDeadline 
-            ? `Notification deadline: ${breach.notificationDeadline.toISOString()} (${jurisdiction.breachNotificationRequirement === 'within_60_days' ? 'within 60 days' : 'as soon as feasible'})`
+            ? `Notification deadline: ${breach.notificationDeadline.toISOString()} (${jurisdiction.breachNotificationRequirement === 'within_60_days' ? 'within 60 days' : jurisdiction.breachNotificationRequirement === 'within_72_hours' ? 'within 72 hours' : 'as soon as feasible'})`
             : `Notification required: ${jurisdiction.breachNotificationRequirement === 'as_soon_as_feasible' ? 'AS SOON AS FEASIBLE (PIPEDA)' : 'within 60 days (HIPAA)'}`;
           
           const regulatorInfo = jurisdiction.regulator 
@@ -429,6 +431,7 @@ ${regulatorInfo}
 
 ${breach.requiresHHSNotification ? '⚠️ HHS NOTIFICATION REQUIRED (500+ individuals)' : ''}
 ${breach.requiresPrivacyCommissionerNotification ? '⚠️ PRIVACY COMMISSIONER NOTIFICATION REQUIRED (significant harm)' : ''}
+${breach.requiresSupervisoryAuthorityNotification ? '⚠️ NAIH SUPERVISORY AUTHORITY NOTIFICATION REQUIRED (within 72 hours — GDPR Art. 33)' : ''}
 
 ACTION REQUIRED: Investigate immediately per SOP_Breach_Response.md
 

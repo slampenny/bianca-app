@@ -57,15 +57,41 @@ export const clientApi = createApi({
       query: () => "/clients/onboarding-rollups",
       providesTags: ["OnboardingRollup"],
     }),
-    /** Public — used from /client-consent (email link). GET does not require auth. */
-    verifyConsent: builder.mutation<
-      { success: boolean; message: string; alreadyConsented?: boolean },
+    /** Public — validate token and load consent form (GET, no grant). */
+    validateConsentToken: builder.query<
+      {
+        success: boolean
+        valid: boolean
+        clientName?: string
+        orgName?: string
+        consentedPurposes?: Record<string, boolean>
+        purposes?: string[]
+      },
       { token: string }
     >({
       query: ({ token }) => ({
         url: `/clients/consent/verify`,
         method: "GET",
         params: { token },
+        headers: { Accept: "application/json" },
+      }),
+    }),
+    /** Public — grant consent for selected purposes only (POST). */
+    submitClientConsent: builder.mutation<
+      {
+        success: boolean
+        message: string
+        alreadyConsented?: boolean
+        fullyConsented?: boolean
+        grantedPurposes?: string[]
+      },
+      { token: string; purposes: string[] }
+    >({
+      query: ({ token, purposes }) => ({
+        url: `/clients/consent/verify`,
+        method: "POST",
+        params: { token },
+        body: { purposes },
         headers: { Accept: "application/json" },
       }),
     }),
@@ -181,7 +207,8 @@ export const {
   useGetCallsByClientQuery,
   useGetClientOnboardingQuery,
   useGetClientsOnboardingRollupsQuery,
-  useVerifyConsentMutation,
+  useLazyValidateConsentTokenQuery,
+  useSubmitClientConsentMutation,
   useCreateClientMutation,
   usePatchClientMutation,
   useUploadClientAvatarMutation,

@@ -22,7 +22,7 @@ const privacyComplaintSchema = new mongoose.Schema(
     complaintType: {
       type: String,
       required: true,
-      enum: ['PIPEDA', 'HIPAA', 'GENERAL'],
+      enum: ['PIPEDA', 'HIPAA', 'GDPR', 'NAIH', 'GENERAL'],
       index: true
     },
     
@@ -149,10 +149,16 @@ const privacyComplaintSchema = new mongoose.Schema(
     },
     regulatorType: {
       type: String,
-      enum: ['HHS', 'PrivacyCommissioner', 'OTHER']
+      enum: ['HHS', 'PrivacyCommissioner', 'NAIH', 'OTHER']
     },
     escalatedAt: Date,
     regulatorComplaintNumber: String,
+
+    // GDPR supervisory authority (e.g. NAIH for Hungary)
+    supervisoryAuthority: {
+      type: String,
+      enum: ['NAIH', 'OTHER'],
+    },
     
     // Organization country for jurisdiction
     organizationCountry: {

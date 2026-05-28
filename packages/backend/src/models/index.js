@@ -35,3 +35,4 @@ module.exports.BreachLog = require('./breachLog.model');
 module.exports.PrivacyComplaint = require('./privacyComplaint.model');
 module.exports.PrivacyRequest = require('./privacyRequest.model');
 module.exports.ConsentRecord = require('./consentRecord.model');
+module.exports.ErasureCompletionRecord = require('./erasureCompletionRecord.model');

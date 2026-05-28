@@ -100,7 +100,8 @@ jest.mock('../../src/services/s3.service', () => ({
     ETag: '"mock-etag"',
     Location: 'https://mock-bucket.s3.amazonaws.com/mock-key'
   }),
-  getPresignedUrl: jest.fn().mockResolvedValue('https://mock-presigned-url.com/file')
+  getPresignedUrl: jest.fn().mockResolvedValue('https://mock-presigned-url.com/file'),
+  deleteFile: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock LangChain API to prevent OpenAI API calls

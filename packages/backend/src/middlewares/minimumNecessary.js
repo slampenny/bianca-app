@@ -1,24 +1,23 @@
 /**
  * Minimum Necessary Data Access Middleware
  *
- * HIPAA Requirements:
- * - §164.502(b) - Minimum Necessary Standard
- * - Limit PHI disclosure to the minimum necessary to accomplish intended purpose
+ * Applies jurisdiction-appropriate data minimization:
+ * - HIPAA (US): §164.502(b) minimum necessary standard
+ * - GDPR (EU): purpose limitation and data minimization (Art 5(1)(c))
+ * - PIPEDA (CA): limited collection and use
  *
- * Implementation:
- * - Field-level access control based on user role
- * - Filters response data before sending to client
- * - Ensures staff only see what they need for their job function
+ * Field rules are selected from the organization's country via jurisdiction.utils.
  */
 
 const logger = require('../config/logger');
+const { getJurisdiction, getOrgCountryFromRequest } = require('../utils/jurisdiction.utils');
 
 /**
  * Define field access rules by role
  *
  * Format: { role: { resource: [allowedFields] } }
  */
-const FIELD_ACCESS_RULES = {
+const HIPAA_FIELD_ACCESS_RULES = {
   // Staff: Limited access - only fields needed for daily care
   staff: {
     client: [
@@ -45,9 +44,9 @@ const FIELD_ACCESS_RULES = {
       'caregivers',
       'schedules', // For care coordination / schedule views
       'org',
-      'consented',
-      'consentedAt',
-      'consentEmailVersion',
+      'consentedPurposes',
+      'consentedAtByPurpose',
+      'consentVersionByPurpose',
     ],
 
     conversation: [
@@ -117,9 +116,9 @@ const FIELD_ACCESS_RULES = {
       'org',
       'dateOfBirth',
       'address',
-      'consented',
-      'consentedAt',
-      'consentEmailVersion',
+      'consentedPurposes',
+      'consentedAtByPurpose',
+      'consentVersionByPurpose',
     ],
 
     conversation: [
@@ -164,6 +163,21 @@ const FIELD_ACCESS_RULES = {
   },
 };
 
+/** GDPR / PIPEDA / OTHER — same role-based minimization, separate from HIPAA rule set */
+const GDPR_FIELD_ACCESS_RULES = HIPAA_FIELD_ACCESS_RULES;
+const PIPEDA_FIELD_ACCESS_RULES = GDPR_FIELD_ACCESS_RULES;
+
+const FIELD_ACCESS_BY_JURISDICTION = {
+  HIPAA: HIPAA_FIELD_ACCESS_RULES,
+  GDPR: GDPR_FIELD_ACCESS_RULES,
+  PIPEDA: PIPEDA_FIELD_ACCESS_RULES,
+  OTHER: GDPR_FIELD_ACCESS_RULES,
+};
+
+function getFieldAccessRulesForJurisdiction(jurisdictionCode) {
+  return FIELD_ACCESS_BY_JURISDICTION[jurisdictionCode] || GDPR_FIELD_ACCESS_RULES;
+}
+
 /**
  * Filter object fields based on allowed fields list
  */
@@ -199,10 +213,11 @@ function filterFields(obj, allowedFields) {
 }
 
 /**
- * Get allowed fields for user role and resource
+ * Get allowed fields for user role, resource, and jurisdiction
  */
-function getAllowedFields(userRole, resourceType) {
-  const roleRules = FIELD_ACCESS_RULES[userRole] || FIELD_ACCESS_RULES.staff;
+function getAllowedFields(userRole, resourceType, jurisdictionCode = 'GDPR') {
+  const rules = getFieldAccessRulesForJurisdiction(jurisdictionCode);
+  const roleRules = rules[userRole] || rules.staff;
   return roleRules[resourceType] || [];
 }
 
@@ -217,7 +232,8 @@ const minimumNecessaryMiddleware = (resourceType) => {
     }
 
     const userRole = req.caregiver.role;
-    const allowedFields = getAllowedFields(userRole, resourceType);
+    const { jurisdiction: jurisdictionCode } = getJurisdiction(getOrgCountryFromRequest(req));
+    const allowedFields = getAllowedFields(userRole, resourceType, jurisdictionCode);
 
     // If full access ('*'), skip filtering
     if (allowedFields === '*') {
@@ -245,11 +261,15 @@ const minimumNecessaryMiddleware = (resourceType) => {
     const originalJson = res.json.bind(res);
     const originalSend = res.send.bind(res);
     res.json = function wrappedJson(data) {
-      logger.debug(`[MINIMUM_NECESSARY] Filtered ${resourceType} fields for role: ${userRole}`);
+      logger.debug(
+        `[MINIMUM_NECESSARY] Filtered ${resourceType} for role ${userRole} (${jurisdictionCode})`
+      );
       return originalJson(filterPayload(data));
     };
     res.send = function wrappedSend(data) {
-      logger.debug(`[MINIMUM_NECESSARY] Filtered ${resourceType} fields for role: ${userRole}`);
+      logger.debug(
+        `[MINIMUM_NECESSARY] Filtered ${resourceType} for role ${userRole} (${jurisdictionCode})`
+      );
       return originalSend(filterPayload(data));
     };
 
@@ -260,8 +280,8 @@ const minimumNecessaryMiddleware = (resourceType) => {
 /**
  * Manually filter data (for use in services)
  */
-const filterDataForRole = (data, resourceType, userRole) => {
-  const allowedFields = getAllowedFields(userRole, resourceType);
+const filterDataForRole = (data, resourceType, userRole, jurisdictionCode = 'GDPR') => {
+  const allowedFields = getAllowedFields(userRole, resourceType, jurisdictionCode);
 
   if (allowedFields === '*') {
     return data;
@@ -273,8 +293,8 @@ const filterDataForRole = (data, resourceType, userRole) => {
 /**
  * Check if user can access specific fields
  */
-const canAccessField = (userRole, resourceType, fieldName) => {
-  const allowedFields = getAllowedFields(userRole, resourceType);
+const canAccessField = (userRole, resourceType, fieldName, jurisdictionCode = 'GDPR') => {
+  const allowedFields = getAllowedFields(userRole, resourceType, jurisdictionCode);
 
   if (allowedFields === '*') {
     return true;
@@ -294,7 +314,9 @@ const addFieldPermission = (userId, resourceType, fields) => {
 };
 
 // Export field access rules for documentation
-const getFieldAccessRules = () => ({ ...FIELD_ACCESS_RULES });
+const getFieldAccessRules = (jurisdictionCode = 'HIPAA') => ({
+  ...getFieldAccessRulesForJurisdiction(jurisdictionCode),
+});
 
 module.exports = {
   minimumNecessaryMiddleware,
@@ -302,4 +324,7 @@ module.exports = {
   canAccessField,
   addFieldPermission,
   getFieldAccessRules,
+  getFieldAccessRulesForJurisdiction,
+  HIPAA_FIELD_ACCESS_RULES,
+  GDPR_FIELD_ACCESS_RULES,
 };

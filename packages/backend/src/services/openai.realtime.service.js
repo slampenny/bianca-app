@@ -1198,6 +1198,10 @@ class OpenAIRealtimeService {
     this.clearConnectionTimeout(callId);
 
     try {
+      /*
+       * EU/GDPR: OpenAI processes audio at US endpoints. SCC with OpenAI required
+       * before processing GDPR-regulated health data. See docs/legal/SUBPROCESSORS.md
+       */
       // Create WebSocket using ConnectionManager
       const ws = ConnectionManager.createConnection(
         connectionState,

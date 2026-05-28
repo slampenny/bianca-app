@@ -18,8 +18,15 @@ const privacyRequestSchema = new mongoose.Schema(
     requestType: {
       type: String,
       required: true,
-      enum: ['access', 'correction'],
+      enum: ['access', 'correction', 'object', 'restrict', 'erasure'],
       index: true
+    },
+
+    // Jurisdiction at time of request (from org country)
+    jurisdiction: {
+      type: String,
+      enum: ['HIPAA', 'PIPEDA', 'GDPR', 'OTHER'],
+      index: true,
     },
     
     // Requestor Information
@@ -91,11 +98,6 @@ const privacyRequestSchema = new mongoose.Schema(
     responseDeadline: {
       type: Date,
       required: true,
-      default: function() {
-        const deadline = new Date(this.requestDate);
-        deadline.setDate(deadline.getDate() + 30);
-        return deadline;
-      },
       index: true
     },
     
@@ -106,7 +108,7 @@ const privacyRequestSchema = new mongoose.Schema(
     
     extensionReason: String,
     
-    extendedDeadline: Date, // Can extend to 60 days with notice
+    extendedDeadline: Date, // GDPR: up to +60 days with notice; PIPEDA: +30 days
     
     // Response Information
     responseDate: Date,
@@ -211,7 +213,14 @@ const privacyRequestSchema = new mongoose.Schema(
   }
 );
 
-// Indexes for efficient querying
+privacyRequestSchema.pre('validate', function (next) {
+  if (!this.responseDeadline && this.requestDate) {
+    const { computePrivacyResponseDeadline } = require('../utils/jurisdiction.utils');
+    const jurisdictionKey = this.jurisdiction || 'PIPEDA';
+    this.responseDeadline = computePrivacyResponseDeadline(this.requestDate, jurisdictionKey);
+  }
+  next();
+});
 privacyRequestSchema.index({ requestDate: -1 });
 privacyRequestSchema.index({ status: 1, responseDeadline: 1 });
 privacyRequestSchema.index({ requestorId: 1, requestDate: -1 });

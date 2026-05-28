@@ -877,21 +877,21 @@ const sendClientConsentRequestEmail = async (to, clientName, orgName, consentLin
     // Fallback to English
     greeting = `Dear ${clientName || 'Client'},`;
     intro = `Your healthcare organization, ${orgName}, uses Bianca Wellness to conduct wellness check calls. In accordance with applicable laws in your jurisdiction, we need your consent before we can record these calls.`;
-    whyConsent = 'Some jurisdictions require consent from all parties before a call can be recorded. Your organization has enabled the "Require Client Consent" setting, which means we need your explicit consent before recording any calls.';
-    consentBenefit1 = 'Your wellness check calls may be recorded for quality assurance and care coordination purposes';
-    consentBenefit2 = 'Recordings will be used to provide summaries and insights to your caregivers';
-    consentBenefit3 = 'Recordings will be stored securely and in compliance with applicable privacy laws';
-    noConsent1 = 'Calls will still be made, but they will not be recorded';
-    noConsent2 = 'You may still receive wellness check calls from your organization';
-    buttonText = 'Provide Consent';
+    whyConsent = 'Some jurisdictions require consent from all parties before a call can be recorded. Your organization has enabled the "Require Client Consent" setting, which means we need your explicit consent before processing calls.';
+    consentBenefit1 = 'Call recording — record wellness check calls for quality assurance and care coordination';
+    consentBenefit2 = 'Transcription — convert call audio to text for caregiver review';
+    consentBenefit3 = 'AI analysis — generate wellness insights from call content';
+    noConsent1 = 'Family reports — share weekly summaries with an authorized emergency contact';
+    noConsent2 = 'You choose each purpose independently on the consent page — nothing is pre-selected';
+    buttonText = 'Review Consent Options';
     expiryNote = 'This consent link will expire in 30 days for security purposes.';
     contactInfo = 'If you have any questions or concerns, please contact your organization or email us at privacy@biancawellness.com.';
     versionLabel = 'Consent Email Version:';
     closing = 'Best regards,\nThe Bianca Wellness Team';
-    title = 'Consent Required for Call Recording';
+    title = 'Consent Required for Wellness Call Processing';
     whyConsentTitle = 'Why we need your consent:';
-    consentTitle = 'What happens if you consent:';
-    noConsentTitle = 'What happens if you don\'t consent:';
+    consentTitle = 'You may consent to each purpose separately:';
+    noConsentTitle = 'Important:';
   }
   
   const text = `${greeting}
@@ -905,12 +905,13 @@ ${whyConsent}
 - ${consentBenefit1}
 - ${consentBenefit2}
 - ${consentBenefit3}
+- ${noConsent1}
 
 **${noConsentTitle}**
-- ${noConsent1}
 - ${noConsent2}
+- Calls may still occur for purposes you have not consented to, but related processing will not proceed without your explicit selection
 
-**To provide your consent, please click the link below:**
+**To review and select your consent preferences, please click the link below:**
 ${consentLink}
 
 ${expiryNote}
@@ -936,12 +937,13 @@ ${closing}`;
           <li>${consentBenefit1}</li>
           <li>${consentBenefit2}</li>
           <li>${consentBenefit3}</li>
+          <li>${noConsent1}</li>
         </ul>
         
         <h3 style="color: #2c3e50; margin-top: 25px;">${noConsentTitle}</h3>
         <ul style="color: #555; line-height: 1.8;">
-          <li>${noConsent1}</li>
           <li>${noConsent2}</li>
+          <li>Calls may still occur for purposes you have not consented to, but related processing will not proceed without your explicit selection</li>
         </ul>
         
         <div style="text-align: center; margin: 30px 0;">

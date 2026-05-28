@@ -33,6 +33,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -62,6 +64,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'use',
         purpose: 'Service delivery',
         granted: true,
@@ -83,6 +87,8 @@ describe('ConsentRecord Model', () => {
           userType: 'caregiver',
           userId: caregiverId,
           userModel: 'Caregiver',
+          jurisdiction: 'HIPAA',
+          legalBasis: 'consent',
           consentType: 'invalid',
           purpose: 'Test',
           granted: true,
@@ -96,6 +102,8 @@ describe('ConsentRecord Model', () => {
           userType: 'caregiver',
           userId: caregiverId,
           userModel: 'Caregiver',
+          jurisdiction: 'HIPAA',
+          legalBasis: 'consent',
           consentType: 'collection',
           purpose: 'Test',
           granted: true,
@@ -111,6 +119,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -121,6 +131,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'Wellness calls',
         granted: true,
@@ -136,6 +148,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -146,6 +160,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'Wellness calls',
         granted: true,
@@ -162,6 +178,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -172,6 +190,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'Wellness calls',
         granted: true,
@@ -192,6 +212,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -208,6 +230,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'wellness_calls',
         granted: true,
@@ -240,6 +264,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -250,6 +276,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'Wellness calls',
         granted: true,
@@ -272,6 +300,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -288,6 +318,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -298,6 +330,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'Wellness calls',
         granted: true,
@@ -321,6 +355,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -345,6 +381,75 @@ describe('ConsentRecord Model', () => {
     });
   });
 
+  describe('GDPR jurisdiction', () => {
+    it('should accept GDPR record with vital_interests basis', async () => {
+      const consent = await ConsentRecord.create({
+        userType: 'client',
+        userId: clientId,
+        userModel: 'Client',
+        jurisdiction: 'GDPR',
+        legalBasis: 'vital_interests',
+        consentType: 'use',
+        purpose: 'Emergency wellness monitoring',
+        granted: true,
+        method: 'implied',
+      });
+
+      expect(consent.jurisdiction).toBe('GDPR');
+      expect(consent.legalBasis).toBe('vital_interests');
+    });
+
+    it('should accept GDPR consent basis when explicit consent is documented', async () => {
+      const consent = await ConsentRecord.create({
+        userType: 'client',
+        userId: clientId,
+        userModel: 'Client',
+        jurisdiction: 'GDPR',
+        legalBasis: 'consent',
+        consentType: 'recording',
+        purpose: 'Wellness calls',
+        granted: true,
+        method: 'explicit',
+        explicitConsent: { provided: true, providedAt: new Date(), providedVia: 'checkbox' },
+      });
+
+      expect(consent.legalBasis).toBe('consent');
+    });
+
+    it('should reject GDPR consent basis without explicit consent', async () => {
+      await expect(
+        ConsentRecord.create({
+          userType: 'client',
+          userId: clientId,
+          userModel: 'Client',
+          jurisdiction: 'GDPR',
+          legalBasis: 'consent',
+          consentType: 'recording',
+          purpose: 'Wellness calls',
+          granted: true,
+          method: 'implied',
+        })
+      ).rejects.toThrow(/explicit consent/i);
+    });
+
+    it('should reject invalid GDPR legal basis', async () => {
+      await expect(
+        ConsentRecord.create({
+          userType: 'client',
+          userId: clientId,
+          userModel: 'Client',
+          jurisdiction: 'GDPR',
+          legalBasis: 'contract',
+          consentType: 'collection',
+          purpose: 'Account creation',
+          granted: true,
+          method: 'explicit',
+          explicitConsent: { provided: true },
+        })
+      ).rejects.toThrow(/legal basis/i);
+    });
+  });
+
   describe('Expiration', () => {
     it('should handle consent with expiration date', async () => {
       const futureDate = new Date();
@@ -354,6 +459,8 @@ describe('ConsentRecord Model', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,

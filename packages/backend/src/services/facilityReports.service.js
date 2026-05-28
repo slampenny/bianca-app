@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const moment = require('moment-timezone');
 const { Client, Call, Alert, Caregiver, CaregiverDailyDigest, Schedule, Org } = require('../models');
 const ApiError = require('../utils/ApiError');
+const { isFullyConsented } = require('../constants/clientConsent.constants');
 
 const resolveOrgId = (caregiver, queryOrgId) => {
   if (caregiver.role === 'superAdmin') {
@@ -346,7 +347,7 @@ const getReportsSummary = async (caregiver, { orgId: queryOrgId } = {}) => {
       .lean(),
     accessibleIds.length
       ? Client.find({ _id: { $in: accessibleIds } })
-          .select('consented')
+          .select('consentedPurposes')
           .lean()
       : Promise.resolve([]),
     CaregiverDailyDigest.find({
@@ -358,7 +359,7 @@ const getReportsSummary = async (caregiver, { orgId: queryOrgId } = {}) => {
   ]);
 
   const consentTotal = consentClients.length;
-  const consentOnFile = consentClients.filter((c) => c.consented === true).length;
+  const consentOnFile = consentClients.filter((c) => isFullyConsented(c.consentedPurposes)).length;
   const consentRate = consentTotal > 0 ? consentOnFile / consentTotal : 1;
   const complianceScoreLabel = consentTotal > 0 ? complianceLabelFromConsentRate(consentRate) : '—';
 

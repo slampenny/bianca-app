@@ -6,6 +6,7 @@ const tokenService = require('./token.service');
 const { tokenTypes } = require('../config/tokens');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
+const { suppressFactsForClient } = require('./clientMemory.service');
 
 /**
  * Create a org and a caregiver
@@ -105,6 +106,7 @@ const deleteOrgById = async (orgId) => {
   // Soft delete all clients that belong to the org
   const clients = await Client.find({ org: orgId });
   for (const client of clients) {
+    await suppressFactsForClient(client.id, 'org_deleted');
     await client.delete();
 
     // Soft delete all schedules that belong to the client

@@ -3,6 +3,11 @@ const mongooseDelete = require('mongoose-delete');
 const validator = require('validator');
 const { toJSON, paginate } = require('./plugins');
 const { splitFullName, fullNameFromParts } = require('../utils/clientName.util');
+const {
+  REQUIRED_CLIENT_CONSENT_PURPOSES,
+  defaultConsentedPurposes,
+  isFullyConsented,
+} = require('../constants/clientConsent.constants');
 
 const emergencyContactSchema = new mongoose.Schema(
   {
@@ -90,18 +95,27 @@ const clientSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    consented: {
-      type: Boolean,
-      default: true,
+    /** Per-purpose GDPR consent flags — no presumed consent (all default false). */
+    consentedPurposes: {
+      type: {
+        recording: { type: Boolean, default: false },
+        transcription: { type: Boolean, default: false },
+        aiAnalysis: { type: Boolean, default: false },
+        familyReports: { type: Boolean, default: false },
+      },
+      default: defaultConsentedPurposes,
     },
-    consentedAt: {
-      type: Date,
-      required: false,
+    consentedAtByPurpose: {
+      recording: { type: Date },
+      transcription: { type: Date },
+      aiAnalysis: { type: Date },
+      familyReports: { type: Date },
     },
-    consentEmailVersion: {
-      type: String,
-      required: false,
-      trim: true,
+    consentVersionByPurpose: {
+      recording: { type: String, trim: true },
+      transcription: { type: String, trim: true },
+      aiAnalysis: { type: String, trim: true },
+      familyReports: { type: String, trim: true },
     },
     room: {
       type: String,
@@ -147,6 +161,26 @@ const clientSchema = mongoose.Schema(
 clientSchema.index({ org: 1 });
 clientSchema.index({ caregivers: 1 });
 clientSchema.index({ org: 1, createdAt: -1 });
+
+/** True only when every required purpose has been explicitly granted. */
+clientSchema.virtual('consented').get(function consentedVirtual() {
+  return isFullyConsented(this.consentedPurposes);
+});
+
+/** Latest grant timestamp across all required purposes (null until fully consented). */
+clientSchema.virtual('consentedAt').get(function consentedAtVirtual() {
+  if (!isFullyConsented(this.consentedPurposes)) return null;
+  const atByPurpose = this.consentedAtByPurpose || {};
+  const dates = REQUIRED_CLIENT_CONSENT_PURPOSES.map((p) => atByPurpose[p]).filter(Boolean);
+  if (dates.length === 0) return null;
+  return new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
+});
+
+/** Consent policy version from the recording purpose (primary auditable version). */
+clientSchema.virtual('consentEmailVersion').get(function consentEmailVersionVirtual() {
+  const versions = this.consentVersionByPurpose || {};
+  return versions.recording || versions.transcription || null;
+});
 
 clientSchema.plugin(toJSON);
 clientSchema.plugin(paginate);

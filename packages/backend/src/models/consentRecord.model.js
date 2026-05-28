@@ -39,15 +39,51 @@ const consentRecordSchema = new mongoose.Schema(
     // Consent Type
     consentType: {
       type: String,
-      required: true,
-      enum: ['collection', 'use', 'disclosure', 'recording', 'transcription', 'analysis', 'marketing'],
+      required: function requiredConsentType() {
+        return !this.recordType;
+      },
+      enum: ['collection', 'use', 'disclosure', 'recording', 'transcription', 'analysis', 'marketing', 'familyReports'],
       index: true
     },
     
     // Purpose
     purpose: {
       type: String,
-      required: true
+      required: function requiredPurpose() {
+        return !this.recordType;
+      }
+    },
+
+    /** GDPR client consent: grant or withdrawal event (append-only). */
+    recordType: {
+      type: String,
+      enum: ['grant', 'withdrawal'],
+      index: true,
+    },
+
+    /** Denormalized client reference for GDPR audit queries. */
+    clientId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Client',
+      index: true,
+    },
+
+    /** ISO country / jurisdiction at time of consent (from org). */
+    jurisdiction: {
+      type: String,
+      trim: true,
+    },
+
+    /** Purposes included in this grant or withdrawal event. */
+    purposes: [{
+      type: String,
+      enum: ['recording', 'transcription', 'aiAnalysis', 'familyReports'],
+    }],
+
+    /** Consent policy version accepted at time of event. */
+    consentVersion: {
+      type: String,
+      trim: true,
     },
     
     // Consent Status
@@ -121,11 +157,18 @@ const consentRecordSchema = new mongoose.Schema(
     
     expiresAt: Date, // If consent has expiration
     
-    // Legal Basis
+    jurisdiction: {
+      type: String,
+      enum: ['HIPAA', 'PIPEDA', 'GDPR', 'OTHER'],
+      required: true,
+      index: true,
+    },
+
+    // Legal Basis (Article 6 GDPR bases validated in pre-validate hook)
     legalBasis: {
       type: String,
       enum: ['consent', 'contract', 'legal_obligation', 'vital_interests', 'public_task', 'legitimate_interests'],
-      default: 'consent'
+      required: true,
     },
     
     // Documentation
@@ -165,12 +208,51 @@ const consentRecordSchema = new mongoose.Schema(
   }
 );
 
+const GDPR_LEGAL_BASES = new Set(['consent', 'vital_interests', 'legitimate_interests', 'legal_obligation']);
+
+consentRecordSchema.pre('validate', function validateLegalBasis(next) {
+  if (!this.legalBasis && this.jurisdiction !== 'GDPR') {
+    this.legalBasis = 'consent';
+  }
+
+  if (this.jurisdiction === 'GDPR') {
+    if (!this.legalBasis) {
+      return next(new Error('GDPR consent records require an explicit legal basis'));
+    }
+    if (!GDPR_LEGAL_BASES.has(this.legalBasis)) {
+      return next(
+        new Error(
+          'GDPR legal basis must be one of: consent, vital_interests, legitimate_interests, legal_obligation'
+        )
+      );
+    }
+    const hasExplicitConsent =
+      this.legalBasis !== 'consent' ||
+      this.method === 'explicit' ||
+      this.explicitConsent?.provided === true;
+    if (!hasExplicitConsent) {
+      return next(new Error('GDPR records with consent legal basis require explicit consent'));
+    }
+  }
+
+  next();
+});
+
 // Indexes for efficient querying
 consentRecordSchema.index({ userId: 1, userModel: 1, consentType: 1 });
 consentRecordSchema.index({ granted: 1, withdrawn: 1 });
 consentRecordSchema.index({ consentType: 1, granted: 1 });
 consentRecordSchema.index({ expiresAt: 1 }); // For expired consent tracking
 consentRecordSchema.index({ createdAt: -1 });
+consentRecordSchema.index({ clientId: 1, recordType: 1, createdAt: -1 });
+
+/** GDPR client consent records are append-only — never mutate after creation. */
+consentRecordSchema.pre('save', function preventGdprConsentMutation(next) {
+  if (!this.isNew && this.recordType) {
+    return next(new Error('GDPR consent records are append-only and cannot be modified'));
+  }
+  next();
+});
 
 // Plugin to convert mongoose to JSON and paginate
 consentRecordSchema.plugin(toJSON);

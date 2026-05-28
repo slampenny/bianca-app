@@ -3,14 +3,16 @@ const { AuditLog } = require('../models');
 const logger = require('../config/logger');
 
 /**
- * HIPAA Audit Logging Middleware
+ * Jurisdiction-aware access audit middleware
  *
- * HIPAA Requirements:
- * - §164.312(b) - Audit Controls
- * - §164.308(a)(1)(ii)(D) - Information System Activity Review
+ * - HIPAA (US): §164.312(b) audit controls for ePHI access
+ * - GDPR (EU): Article 30 accountability / access logging for personal data
+ * - PIPEDA (CA): security safeguards including access monitoring
  *
- * This middleware automatically logs all PHI access and modifications
+ * Route coverage is shared; compliance flags and metadata reflect org jurisdiction.
  */
+
+const { getJurisdiction, getOrgCountryFromRequest } = require('../utils/jurisdiction.utils');
 
 // Define which routes contain PHI and should be audited
 const PHI_ROUTES = {
@@ -202,8 +204,12 @@ const auditMiddleware = async (req, res, next) => {
   const auditConfig = getAuditConfigForRequest(req.method, routePath);
 
   if (!auditConfig) {
-    return next(); // Not a PHI-related or auth endpoint
+    return next(); // Not a sensitive-data or auth endpoint
   }
+
+  const orgCountry = getOrgCountryFromRequest(req);
+  const { jurisdiction: jurisdictionCode } = getJurisdiction(orgCountry);
+  const isHipaaOrg = jurisdictionCode === 'HIPAA';
 
   // Capture original response methods
   const originalJson = res.json;
@@ -234,7 +240,7 @@ const auditMiddleware = async (req, res, next) => {
         requestPath: req.path,
         statusCode: res.statusCode,
         complianceFlags: {
-          phiAccessed: auditConfig.phiAccessed || false,
+          phiAccessed: isHipaaOrg && (auditConfig.phiAccessed || false),
           highRiskAction: auditConfig.highRisk || false,
           requiresReview: auditConfig.highRisk || outcome === 'FAILURE',
         },
@@ -245,14 +251,16 @@ const auditMiddleware = async (req, res, next) => {
         auditData.errorMessage = errorMessage;
       }
 
-      // Add metadata for specific routes
-      const metadata = {};
+      // Add metadata for specific routes and jurisdiction
+      const metadata = {
+        jurisdiction: jurisdictionCode,
+        orgCountry: orgCountry || 'unknown',
+        personalDataAccessed: auditConfig.phiAccessed || false,
+      };
       if (req.query.timeRange) metadata.timeRange = req.query.timeRange;
       if (req.query.startDate) metadata.startDate = req.query.startDate;
       if (req.query.endDate) metadata.endDate = req.query.endDate;
-      if (Object.keys(metadata).length > 0) {
-        auditData.metadata = metadata;
-      }
+      auditData.metadata = metadata;
 
       // Create audit log
       await AuditLog.createLog(auditData);

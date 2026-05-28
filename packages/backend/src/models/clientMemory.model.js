@@ -53,12 +53,25 @@ const clientMemorySchema = mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedReason: {
+      type: String,
+      enum: ['erasure_request', 'client_deleted', 'org_deleted', 'retention_expired'],
+      default: null,
+    },
   },
   {
     timestamps: true,
   }
 );
 
+clientMemorySchema.index(
+  { deletedAt: 1 },
+  { partialFilterExpression: { deletedAt: { $exists: true, $ne: null } } }
+);
 clientMemorySchema.index({ clientId: 1, extractedAt: -1 });
 clientMemorySchema.index({ clientId: 1, category: 1, extractedAt: -1 });
 clientMemorySchema.index({ clientId: 1, priority: 1, extractedAt: -1 });

@@ -110,7 +110,8 @@ const getRecipientFromClient = (client) => {
 const buildEligibility = (client, recipient) => {
   const reasons = [];
   const warnings = [];
-  if (client.consented === false) {
+  const { hasPurposeConsent } = require('../constants/clientConsent.constants');
+  if (!hasPurposeConsent(client.consentedPurposes, 'familyReports')) {
     reasons.push('Client consent is required before family communications.');
   }
   if (!recipient.email || !validator.isEmail(recipient.email)) {

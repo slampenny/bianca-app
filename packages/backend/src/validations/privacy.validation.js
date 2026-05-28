@@ -99,6 +99,23 @@ const withdrawConsent = {
   }),
 };
 
+const clientConsentClientIdParam = {
+  params: Joi.object().keys({
+    clientId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const withdrawClientConsent = {
+  body: Joi.object().keys({
+    clientId: Joi.string().custom(objectId).required(),
+    purposes: Joi.array()
+      .items(Joi.string().valid('recording', 'transcription', 'aiAnalysis', 'familyReports'))
+      .min(1)
+      .required(),
+    withdrawalReason: Joi.string().allow('', null).optional(),
+  }),
+};
+
 const createComplaint = {
   body: Joi.object()
     .keys({
@@ -124,8 +141,41 @@ const updateComplaint = {
 
 const requestDeletion = {
   body: Joi.object().keys({
-    dataType: Joi.string().valid('all', 'profile', 'conversations', 'medical').optional(),
+    dataType: Joi.string()
+      .valid('all', 'calls', 'conversations', 'medicalAnalysis', 'clientMemory')
+      .optional(),
   }),
+};
+
+const requestObject = {
+  body: Joi.object().keys({
+    informationRequested: Joi.string().max(5000).optional(),
+    objectionDetails: Joi.string().max(5000).optional(),
+  }),
+};
+
+const requestRestrict = {
+  body: Joi.object().keys({
+    informationRequested: Joi.string().max(5000).optional(),
+    restrictionDetails: Joi.string().max(5000).optional(),
+  }),
+};
+
+const requestErasure = {
+  body: Joi.object().keys({
+    informationRequested: Joi.string().max(5000).optional(),
+  }),
+};
+
+const createGdprComplaint = {
+  body: Joi.object()
+    .keys({
+      subject: Joi.string().required(),
+      description: Joi.string().optional(),
+      complaint: Joi.string().optional(),
+      violationType: Joi.string().optional(),
+    })
+    .or('complaint', 'description'),
 };
 
 module.exports = {
@@ -139,7 +189,13 @@ module.exports = {
   processCorrection,
   createConsent,
   withdrawConsent,
+  withdrawClientConsent,
+  clientConsentClientIdParam,
   createComplaint,
+  createGdprComplaint,
   updateComplaint,
   requestDeletion,
+  requestObject,
+  requestRestrict,
+  requestErasure,
 };

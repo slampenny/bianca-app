@@ -5,8 +5,9 @@ const FinancialExploitationDetector = require('./ai/financialExploitationDetecto
 const ApiError = require('../utils/ApiError');
 const { translateAlertMessage, parseAlertMessage } = require('../utils/alertTranslations');
 const { scheduleBroadcastAfterAlertChange } = require('./alertBroadcast.service');
+const { isFullyConsented, REQUIRED_CLIENT_CONSENT_PURPOSES } = require('../constants/clientConsent.constants');
 
-const RELATED_CLIENT_SELECT = 'name preferredName consented consentedAt';
+const RELATED_CLIENT_SELECT = 'name preferredName consentedPurposes consentedAtByPurpose';
 
 const populateRelatedClient = {
   path: 'relatedClient',
@@ -92,8 +93,14 @@ function formatAlertForResponse(doc) {
     const rid = out.relatedClient._id || out.relatedClient.id;
     if (rid) {
       out.relatedResidentConsent = {
-        onFile: !!out.relatedClient.consented,
-        recordedAt: out.relatedClient.consentedAt || null,
+        onFile: isFullyConsented(out.relatedClient.consentedPurposes),
+        recordedAt: (() => {
+          if (!isFullyConsented(out.relatedClient.consentedPurposes)) return null;
+          const atByPurpose = out.relatedClient.consentedAtByPurpose || {};
+          const dates = REQUIRED_CLIENT_CONSENT_PURPOSES.map((p) => atByPurpose[p]).filter(Boolean);
+          if (dates.length === 0) return null;
+          return new Date(Math.max(...dates.map((d) => new Date(d).getTime())));
+        })(),
       };
       out.relatedClient = rid.toString();
     }

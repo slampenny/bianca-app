@@ -2,6 +2,7 @@ const ScheduleDTO = require('./schedule.dto');
 const callService = require('../services/call.service');
 const clientHomeSnapshotService = require('../services/clientHomeSnapshot.service');
 const { splitFullName, fullNameFromParts } = require('../utils/clientName.util');
+const { isFullyConsented, REQUIRED_CLIENT_CONSENT_PURPOSES } = require('../constants/clientConsent.constants');
 
 const toIsoOrNull = (d) => {
   if (d == null) return null;
@@ -25,9 +26,9 @@ const ClientDTO = (client) => {
     phone,
     preferredLanguage,
     isEmailVerified,
-    consented,
-    consentedAt,
-    consentEmailVersion,
+    consentedPurposes,
+    consentedAtByPurpose,
+    consentVersionByPurpose,
     org,
     caregivers,
     lastCallAttemptAt,
@@ -74,9 +75,19 @@ const ClientDTO = (client) => {
     phone,
     preferredLanguage,
     isEmailVerified,
-    consented,
-    consentedAt,
-    consentEmailVersion,
+    consented: isFullyConsented(consentedPurposes),
+    consentedPurposes: consentedPurposes || {},
+    consentedAtByPurpose: consentedAtByPurpose || {},
+    consentVersionByPurpose: consentVersionByPurpose || {},
+    consentedAt:
+      isFullyConsented(consentedPurposes) && consentedAtByPurpose
+        ? toIsoOrNull(
+            REQUIRED_CLIENT_CONSENT_PURPOSES.map((p) => consentedAtByPurpose[p])
+              .filter(Boolean)
+              .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
+          )
+        : null,
+    consentEmailVersion: consentVersionByPurpose?.recording || consentVersionByPurpose?.transcription || null,
     org: orgId,
     caregivers: caregiverIds,
     schedules: scheduleDTOs,

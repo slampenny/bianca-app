@@ -1,13 +1,26 @@
 const httpStatus = require('http-status');
+const mongoose = require('mongoose');
 const { Caregiver, Client, Org, Token } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
 const tokenService = require('./token.service');
+const privacyService = require('./privacy.service');
 const config = require('../config/config');
 const { tokenTypes } = require('../config/tokens');
 const { toIdString, assertCaregiverOrgAccess } = require('../utils/accessControl');
+const {
+  CLIENT_CONSENT_VERSION,
+  REQUIRED_CLIENT_CONSENT_PURPOSES,
+  normalizePurposes,
+  isFullyConsented,
+  hasPurposeConsent,
+} = require('../constants/clientConsent.constants');
+const { hardDeleteFactsForClient } = require('./clientMemory.service');
+const { createManualAuditLog } = require('../middlewares/auditLog');
+
+const SYSTEM_AUDIT_USER_ID = new mongoose.Types.ObjectId('000000000000000000000000');
 
 const createClient = async (clientBody) => {
   return Client.create(clientBody);
@@ -50,6 +63,32 @@ const deleteClientById = async (clientId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
   await client.deleteOne();
+
+  const factsDeleted = await hardDeleteFactsForClient(clientId);
+  try {
+    await createManualAuditLog({
+      timestamp: new Date(),
+      userId: SYSTEM_AUDIT_USER_ID,
+      userRole: 'system',
+      action: 'DELETE',
+      resource: 'client',
+      resourceId: clientId.toString(),
+      outcome: 'SUCCESS',
+      ipAddress: 'internal',
+      metadata: {
+        cascade: 'clientMemory',
+        factsDeleted: String(factsDeleted),
+      },
+      complianceFlags: {
+        phiAccessed: true,
+        highRiskAction: true,
+        requiresReview: false,
+      },
+    });
+  } catch (auditError) {
+    logger.error('[Client Service] Failed to audit clientMemory cascade delete:', auditError);
+  }
+
   return client;
 };
 
@@ -174,7 +213,9 @@ const assignUnassignedClients = async (caregiverId, clientIds, requestingCaregiv
 const sendConsentEmailIfRequired = async (client) => {
   try {
     const clientId = client._id || client.id;
-    const clientFresh = await Client.findById(clientId).select('email name consented preferredLanguage org').lean();
+    const clientFresh = await Client.findById(clientId)
+      .select('email name consentedPurposes preferredLanguage org')
+      .lean();
     if (!clientFresh || !clientFresh.org) {
       logger.warn(`[Client Service] Cannot send consent email: client ${clientId} has no org`);
       return;
@@ -183,7 +224,6 @@ const sendConsentEmailIfRequired = async (client) => {
       logger.warn(`[Client Service] Cannot send consent email: client ${clientId} has no email`);
       return;
     }
-    // Fresh read — populated org can be stale right after PATCH requireClientConsent (E2E / org settings).
     const orgId = clientFresh.org;
     const orgFresh = await Org.findById(orgId).lean();
     if (!orgFresh || !orgFresh.requireClientConsent) {
@@ -194,19 +234,18 @@ const sendConsentEmailIfRequired = async (client) => {
       );
       return;
     }
-    if (clientFresh.consented === true) {
+    if (isFullyConsented(clientFresh.consentedPurposes)) {
       return;
     }
     const consentToken = await tokenService.generateClientConsentToken(await Client.findById(clientId));
     const consentLink = `${config.frontendUrl}/client/consent?token=${consentToken}`;
-    const consentEmailVersion = '1.0';
     await emailService.sendClientConsentRequestEmail(
       clientFresh.email,
       clientFresh.name,
       orgFresh.name,
       consentLink,
       clientFresh.preferredLanguage || 'en',
-      consentEmailVersion
+      CLIENT_CONSENT_VERSION
     );
     logger.info(`[Client Service] Consent request email sent to client ${client._id} (${client.email})`);
   } catch (error) {
@@ -214,7 +253,7 @@ const sendConsentEmailIfRequired = async (client) => {
   }
 };
 
-const checkClientConsent = async (clientId) => {
+const checkClientConsent = async (clientId, purpose = 'recording') => {
   try {
     const client = await Client.findById(clientId).populate('org');
     if (!client || !client.org) {
@@ -224,14 +263,28 @@ const checkClientConsent = async (clientId) => {
     if (!org.requireClientConsent) {
       return true;
     }
-    return client.consented === true;
+    return hasPurposeConsent(client.consentedPurposes, purpose);
   } catch (error) {
     logger.error(`[Client Service] Error checking client consent for ${clientId}:`, error);
     return false;
   }
 };
 
-const verifyConsentToken = async (consentToken) => {
+const applyClientPurposeGrants = async (client, purposes, consentVersion) => {
+  const now = new Date();
+  for (const purpose of purposes) {
+    client.consentedPurposes[purpose] = true;
+    client.consentedAtByPurpose[purpose] = now;
+    client.consentVersionByPurpose[purpose] = consentVersion;
+  }
+  client.markModified('consentedPurposes');
+  client.markModified('consentedAtByPurpose');
+  client.markModified('consentVersionByPurpose');
+  await client.save();
+  return client;
+};
+
+const verifyConsentToken = async (consentToken, { purposes = [], ipAddress, userAgent } = {}) => {
   try {
     const consentTokenDoc = await tokenService.verifyToken(consentToken, tokenTypes.CLIENT_CONSENT);
     const clientRef = consentTokenDoc.client;
@@ -243,32 +296,82 @@ const verifyConsentToken = async (consentToken) => {
     if (!client) {
       throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
     }
-    if (client.consented === true) {
+
+    const normalizedPurposes = normalizePurposes(purposes);
+    if (normalizedPurposes.length === 0) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'At least one consent purpose must be selected');
+    }
+
+    const alreadyGranted = normalizedPurposes.filter((purpose) => hasPurposeConsent(client.consentedPurposes, purpose));
+    if (alreadyGranted.length === normalizedPurposes.length && isFullyConsented(client.consentedPurposes)) {
       await Token.deleteMany({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
       return {
         success: true,
         alreadyConsented: true,
-        message: 'You have already provided consent for call recording.',
+        message: 'You have already provided consent for all selected purposes.',
         client,
+        grantedPurposes: normalizedPurposes,
       };
     }
-    const idForFetch = client._id.toString ? client._id.toString() : client._id;
-    await Token.deleteMany({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
-    await updateClientById(idForFetch, {
-      consented: true,
-      consentedAt: new Date(),
-      consentEmailVersion: client.consentEmailVersion || '1.0',
+
+    const purposesToGrant = normalizedPurposes.filter((purpose) => !hasPurposeConsent(client.consentedPurposes, purpose));
+    const consentVersion = CLIENT_CONSENT_VERSION;
+
+    await privacyService.createClientGdprConsentRecord({
+      clientId: client._id,
+      org: client.org,
+      recordType: 'grant',
+      purposes: purposesToGrant.length > 0 ? purposesToGrant : normalizedPurposes,
+      ipAddress,
+      userAgent,
+      consentVersion,
     });
+
+    if (purposesToGrant.length > 0) {
+      await applyClientPurposeGrants(client, purposesToGrant, consentVersion);
+    }
+
+    await Token.deleteMany({ client: client._id, type: tokenTypes.CLIENT_CONSENT });
+
+    const idForFetch = client._id.toString ? client._id.toString() : client._id;
+    const updatedClient = await getClientById(idForFetch);
+    const fullyConsented = isFullyConsented(updatedClient.consentedPurposes);
+
     return {
       success: true,
       alreadyConsented: false,
-      message: 'Thank you for providing your consent. Your wellness check calls may now be recorded.',
-      client: await getClientById(idForFetch),
+      message: fullyConsented
+        ? 'Thank you for providing your consent. Your wellness check calls may now be recorded and processed as selected.'
+        : 'Your selected consents have been recorded. Some purposes still require consent before all services can proceed.',
+      client: updatedClient,
+      grantedPurposes: purposesToGrant.length > 0 ? purposesToGrant : normalizedPurposes,
+      fullyConsented,
     };
   } catch (error) {
     logger.error(`[Client Service] Consent verification failed:`, error);
     throw error;
   }
+};
+
+/** Validate token without granting consent — used to render the consent form. */
+const validateConsentToken = async (consentToken) => {
+  const consentTokenDoc = await tokenService.verifyToken(consentToken, tokenTypes.CLIENT_CONSENT);
+  const clientRef = consentTokenDoc.client;
+  const clientId = clientRef && clientRef._id ? clientRef._id : clientRef;
+  if (!clientId) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid consent token');
+  }
+  const client = await Client.findById(clientId).populate('org', 'name country requireClientConsent');
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  }
+  return {
+    valid: true,
+    clientName: client.name,
+    orgName: client.org?.name || 'Your care organization',
+    consentedPurposes: client.consentedPurposes,
+    purposes: REQUIRED_CLIENT_CONSENT_PURPOSES,
+  };
 };
 
 module.exports = {
@@ -287,4 +390,5 @@ module.exports = {
   sendConsentEmailIfRequired,
   checkClientConsent,
   verifyConsentToken,
+  validateConsentToken,
 };

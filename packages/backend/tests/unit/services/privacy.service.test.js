@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const privacyService = require('../../../src/services/privacy.service');
-const { PrivacyRequest, ConsentRecord, Caregiver, Client, Org, Conversation, MedicalAnalysis, Call } = require('../../../src/models');
+const { PrivacyRequest, ConsentRecord, Caregiver, Client, Org, Conversation, MedicalAnalysis, Call, Message } = require('../../../src/models');
+const { ClientMemory } = require('../../../src/models/clientMemory.model');
 const ApiError = require('../../../src/utils/ApiError');
 const emailService = require('../../../src/services/email.service');
 
@@ -38,6 +39,8 @@ describe('Privacy Service', () => {
     await Conversation.deleteMany({});
     await Call.deleteMany({});
     await MedicalAnalysis.deleteMany({});
+    await ClientMemory.deleteMany({});
+    await Message.deleteMany({});
 
     // Create org first (required for caregiver)
     const org = await Org.create({
@@ -102,17 +105,42 @@ describe('Privacy Service', () => {
       expect(daysDiff).toBeGreaterThanOrEqual(29);
       expect(daysDiff).toBeLessThanOrEqual(30);
     });
-
-    it('should set default informationRequested if not provided', async () => {
-      const request = await privacyService.createAccessRequest(
-        {},
-        caregiverId,
-        'Caregiver'
-      );
-
-      expect(request.informationRequested).toBe('All personal information');
-    });
   });
+
+  /** Seed conversation + message body and ClientMemory facts for export tests. */
+  async function seedClientExportData(targetClientId, messageContent) {
+    await ClientMemory.create({
+      clientId: targetClientId,
+      fact: 'Prefers to be called Rose',
+      category: 'preference',
+      confidence: 'high',
+      source: 'post_call_extraction',
+    });
+
+    const call = await Call.create({
+      clientId: targetClientId,
+      callSid: `export-${Date.now()}`,
+      status: 'completed',
+      duration: 60,
+      caregiverId,
+    });
+    const conversation = await Conversation.create({
+      clientId: targetClientId,
+      callId: call._id,
+      status: 'completed',
+      startTime: new Date(),
+      messages: [],
+    });
+    const message = await Message.create({
+      conversationId: conversation._id,
+      role: 'client',
+      content: messageContent,
+      messageType: 'user_message',
+    });
+    conversation.messages.push(message._id);
+    await conversation.save();
+    return { conversation, message };
+  }
 
   describe('createCorrectionRequest', () => {
     it('should create a correction request', async () => {
@@ -302,18 +330,72 @@ describe('Privacy Service', () => {
       }
     });
 
-    it('should only process caregiver requests', async () => {
+    it('should include ClientMemory facts and message bodies in access export', async () => {
+      const org = await Org.findOne({ email: 'testorg@example.com' });
+      org.country = 'DE';
+      await org.save();
+
+      const messageContent = 'Hello Bianca, export my full transcript please';
+      await seedClientExportData(clientId, messageContent);
+
+      const request = await privacyService.createAccessRequest({}, caregiverId, 'Caregiver');
+      expect(request.jurisdiction).toBe('GDPR');
+
+      const sendSpy = jest.spyOn(emailService, 'sendPrivacyDataEmail').mockResolvedValue(undefined);
+      await privacyService.processAccessRequest(request._id, caregiverId);
+
+      expect(sendSpy).toHaveBeenCalled();
+      const exported = JSON.parse(sendSpy.mock.calls[0][2]);
+      expect(exported.clientMemory).toEqual(
+        expect.arrayContaining([expect.objectContaining({ fact: 'Prefers to be called Rose' })])
+      );
+      expect(
+        exported.conversations.some((c) => c.messages.some((m) => m.content === messageContent))
+      ).toBe(true);
+
+      sendSpy.mockRestore();
+    });
+
+    it('should process client/resident access requests with full export', async () => {
+      const messageContent = 'Resident message for my data export';
+      await seedClientExportData(clientId, messageContent);
+
+      const client = await Client.findById(clientId);
       const request = await PrivacyRequest.create({
         requestType: 'access',
         requestorType: 'client',
         requestorId: clientId,
         requestorModel: 'Client',
-        informationRequested: 'Test',
+        jurisdiction: 'HIPAA',
+        informationRequested: 'All my personal data',
+        requestDate: new Date(),
+        responseDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await expect(
-        privacyService.processAccessRequest(request._id, caregiverId)
-      ).rejects.toThrow(ApiError);
+      const sendSpy = jest.spyOn(emailService, 'sendPrivacyDataEmail').mockResolvedValue(undefined);
+      const result = await privacyService.processAccessRequest(request._id, caregiverId);
+
+      expect(result.status).toBe('completed');
+      expect(result.informationProvided).toEqual(
+        expect.arrayContaining([expect.objectContaining({ dataType: 'complete_data_export' })])
+      );
+      expect(sendSpy).toHaveBeenCalledWith(
+        client.email,
+        client.name,
+        expect.any(String),
+        request._id.toString(),
+        expect.any(String)
+      );
+
+      const exported = JSON.parse(sendSpy.mock.calls[0][2]);
+      expect(exported.profile.email).toBe(client.email);
+      expect(exported.profile.name).toBe(client.name);
+      expect(exported.clientMemory).toEqual(
+        expect.arrayContaining([expect.objectContaining({ fact: 'Prefers to be called Rose' })])
+      );
+      expect(exported.conversations[0].messages[0].content).toBe(messageContent);
+
+      sendSpy.mockRestore();
     });
   });
 
@@ -367,6 +449,8 @@ describe('Privacy Service', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'wellness_calls',
         granted: true,
@@ -388,6 +472,8 @@ describe('Privacy Service', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'wellness_calls',
         granted: true,
@@ -413,6 +499,8 @@ describe('Privacy Service', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'wellness_calls',
         granted: true,
@@ -437,6 +525,8 @@ describe('Privacy Service', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -467,6 +557,8 @@ describe('Privacy Service', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'recording',
         purpose: 'wellness_calls',
         granted: true,
@@ -502,6 +594,8 @@ describe('Privacy Service', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Account creation',
         granted: true,
@@ -568,6 +662,8 @@ describe('Privacy Service', () => {
         userType: 'caregiver',
         userId: caregiverId,
         userModel: 'Caregiver',
+        jurisdiction: 'HIPAA',
+        legalBasis: 'consent',
         consentType: 'collection',
         purpose: 'Test',
         granted: true,

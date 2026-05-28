@@ -38,6 +38,50 @@ const createAccessRequest = catchAsync(async (req, res) => {
 });
 
 /**
+ * Create object-to-processing request (GDPR Art. 21)
+ */
+const createObjectRequest = catchAsync(async (req, res) => {
+  const request = await privacyService.createObjectRequest(
+    req.body,
+    req.caregiver.id,
+    'Caregiver'
+  );
+  res.status(httpStatus.CREATED).send(request);
+});
+
+/**
+ * Create restrict-processing request (GDPR Art. 18)
+ */
+const createRestrictRequest = catchAsync(async (req, res) => {
+  const request = await privacyService.createRestrictRequest(
+    req.body,
+    req.caregiver.id,
+    'Caregiver'
+  );
+  res.status(httpStatus.CREATED).send(request);
+});
+
+/**
+ * Create erasure request (GDPR Art. 17)
+ */
+const createErasureRequest = catchAsync(async (req, res) => {
+  const request = await privacyService.createErasureRequest(
+    req.body,
+    req.caregiver.id,
+    'Caregiver'
+  );
+  res.status(httpStatus.CREATED).send(request);
+});
+
+/**
+ * Get privacy request status (tracking)
+ */
+const getRequestStatus = catchAsync(async (req, res) => {
+  const status = await privacyService.getRequestStatus(req.params.requestId, req.caregiver.id);
+  res.send(status);
+});
+
+/**
  * Create correction request
  */
 const createCorrectionRequest = catchAsync(async (req, res) => {
@@ -103,14 +147,21 @@ const processCorrectionRequest = catchAsync(async (req, res) => {
 });
 
 /**
+ * Resolve consent subject from request — supports caregiver (app) or explicit client id in body.
+ */
+const resolveConsentSubject = (req) => {
+  if (req.body?.userModel === 'Client' && req.body?.userId) {
+    return { userId: req.body.userId, userModel: 'Client' };
+  }
+  return { userId: req.caregiver.id, userModel: 'Caregiver' };
+};
+
+/**
  * Create consent record
  */
 const createConsent = catchAsync(async (req, res) => {
-  const consent = await privacyService.createConsentRecord(
-    req.body,
-    req.caregiver.id,
-    'Caregiver'
-  );
+  const { userId, userModel } = resolveConsentSubject(req);
+  const consent = await privacyService.createConsentRecord(req.body, userId, userModel);
   res.status(httpStatus.CREATED).send(consent);
 });
 
@@ -118,11 +169,9 @@ const createConsent = catchAsync(async (req, res) => {
  * Get active consent
  */
 const getActiveConsent = catchAsync(async (req, res) => {
-  const consent = await privacyService.getActiveConsent(
-    req.caregiver.id,
-    'Caregiver',
-    req.query.consentType
-  );
+  const userModel = req.query.userModel === 'Client' && req.query.userId ? 'Client' : 'Caregiver';
+  const userId = userModel === 'Client' ? req.query.userId : req.caregiver.id;
+  const consent = await privacyService.getActiveConsent(userId, userModel, req.query.consentType);
   res.send(consent);
 });
 
@@ -130,12 +179,9 @@ const getActiveConsent = catchAsync(async (req, res) => {
  * Check consent
  */
 const checkConsent = catchAsync(async (req, res) => {
-  const hasConsent = await privacyService.hasConsent(
-    req.caregiver.id,
-    'Caregiver',
-    req.query.consentType,
-    req.query.purpose
-  );
+  const userModel = req.query.userModel === 'Client' && req.query.userId ? 'Client' : 'Caregiver';
+  const userId = userModel === 'Client' ? req.query.userId : req.caregiver.id;
+  const hasConsent = await privacyService.hasConsent(userId, userModel, req.query.consentType, req.query.purpose);
   res.send({ hasConsent });
 });
 
@@ -143,11 +189,7 @@ const checkConsent = catchAsync(async (req, res) => {
  * Withdraw consent
  */
 const withdrawConsent = catchAsync(async (req, res) => {
-  const consent = await privacyService.withdrawConsent(
-    req.params.consentId,
-    req.body,
-    req.caregiver.id
-  );
+  const consent = await privacyService.withdrawConsent(req.params.consentId, req.body, req.caregiver.id);
   res.send(consent);
 });
 
@@ -155,8 +197,34 @@ const withdrawConsent = catchAsync(async (req, res) => {
  * Get consent history
  */
 const getConsentHistory = catchAsync(async (req, res) => {
-  const history = await privacyService.getConsentHistory(req.caregiver.id, 'Caregiver');
+  const userModel = req.query.userModel === 'Client' && req.query.userId ? 'Client' : 'Caregiver';
+  const userId = userModel === 'Client' ? req.query.userId : req.caregiver.id;
+  const history = await privacyService.getConsentHistory(userId, userModel);
   res.send(history);
+});
+
+/**
+ * Withdraw client/resident consent for specific purposes (append-only audit).
+ */
+const withdrawClientConsent = catchAsync(async (req, res) => {
+  const result = await privacyService.withdrawClientConsent(req.body, req.caregiver, req.ip, req.get('user-agent'));
+  res.status(httpStatus.CREATED).send(result);
+});
+
+/**
+ * Per-purpose consent status for a client/resident.
+ */
+const getClientConsentStatus = catchAsync(async (req, res) => {
+  const status = await privacyService.getClientConsentStatus(req.params.clientId, req.caregiver);
+  res.send(status);
+});
+
+/**
+ * Append-only GDPR consent audit trail for a client/resident.
+ */
+const getClientConsentAudit = catchAsync(async (req, res) => {
+  const audit = await privacyService.getClientConsentAudit(req.params.clientId, req.caregiver);
+  res.send(audit);
 });
 
 /**
@@ -226,6 +294,18 @@ const updateComplaint = catchAsync(async (req, res) => {
 });
 
 /**
+ * Create GDPR complaint via NAIH pathway
+ */
+const createGdprComplaint = catchAsync(async (req, res) => {
+  const complaint = await privacyService.createGdprComplaint(
+    req.body,
+    req.caregiver.id,
+    'Caregiver'
+  );
+  res.status(httpStatus.CREATED).send(complaint);
+});
+
+/**
  * Request data deletion
  */
 const requestDataDeletion = catchAsync(async (req, res) => {
@@ -243,6 +323,10 @@ const requestDataDeletion = catchAsync(async (req, res) => {
 module.exports = {
   createAccessRequest,
   createCorrectionRequest,
+  createObjectRequest,
+  createRestrictRequest,
+  createErasureRequest,
+  getRequestStatus,
   getPrivacyRequest,
   getPrivacyRequests,
   updatePrivacyRequest,
@@ -253,10 +337,14 @@ module.exports = {
   checkConsent,
   withdrawConsent,
   getConsentHistory,
+  withdrawClientConsent,
+  getClientConsentStatus,
+  getClientConsentAudit,
   getApproachingDeadline,
   getOverdueRequests,
   getPrivacyStatistics,
   createComplaint,
+  createGdprComplaint,
   getComplaint,
   getComplaints,
   updateComplaint,

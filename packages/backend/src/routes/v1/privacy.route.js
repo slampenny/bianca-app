@@ -28,6 +28,18 @@ router
   .route('/requests/correction')
   .post(auth(), validate(privacyValidation.requestCorrection), privacyController.createCorrectionRequest);
 
+router
+  .route('/requests/object')
+  .post(auth(), validate(privacyValidation.requestObject), privacyController.createObjectRequest);
+
+router
+  .route('/requests/restrict')
+  .post(auth(), validate(privacyValidation.requestRestrict), privacyController.createRestrictRequest);
+
+router
+  .route('/requests/erasure')
+  .post(auth(), validate(privacyValidation.requestErasure), privacyController.createErasureRequest);
+
 router.route('/requests/approaching-deadline').get(
   auth('readAny:privacy'), // Admin only
   validate(privacyValidation.getRequests),
@@ -65,6 +77,12 @@ router.route('/requests/:requestId/process-correction').post(
   privacyController.processCorrectionRequest
 );
 
+router.route('/requests/:requestId/status').get(
+  auth(),
+  validate(privacyValidation.privacyRequestIdParam),
+  privacyController.getRequestStatus
+);
+
 // Consent Management
 router
   .route('/consent')
@@ -78,6 +96,19 @@ router.route('/consent/history').get(auth(), validate(privacyValidation.getReque
 router
   .route('/consent/:consentId/withdraw')
   .post(auth(), validate(privacyValidation.withdrawConsent), privacyController.withdrawConsent);
+
+// Client/resident GDPR consent (per-purpose, append-only audit)
+router
+  .route('/client-consent/withdraw')
+  .post(auth(), validate(privacyValidation.withdrawClientConsent), privacyController.withdrawClientConsent);
+
+router
+  .route('/client-consent/status/:clientId')
+  .get(auth(), validate(privacyValidation.clientConsentClientIdParam), privacyController.getClientConsentStatus);
+
+router
+  .route('/client-consent/audit/:clientId')
+  .get(auth(), validate(privacyValidation.clientConsentClientIdParam), privacyController.getClientConsentAudit);
 
 // Statistics (Admin only)
 router.route('/statistics').get(
@@ -99,6 +130,12 @@ router
     validate(privacyValidation.getRequests),
     privacyController.getComplaints
   );
+
+router.route('/complaints/gdpr').post(
+  auth(),
+  validate(privacyValidation.createGdprComplaint),
+  privacyController.createGdprComplaint
+);
 
 router
   .route('/complaints/:complaintId')

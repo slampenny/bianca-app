@@ -147,7 +147,27 @@ const breachLogSchema = new mongoose.Schema(
     privacyCommissionerNotifiedAt: {
       type: Date,
     },
-    
+
+    // GDPR supervisory authority notification (72-hour deadline)
+    requiresSupervisoryAuthorityNotification: {
+      type: Boolean,
+      default: false,
+    },
+
+    supervisoryAuthority: {
+      type: String,
+      enum: ['NAIH', 'OTHER'],
+    },
+
+    supervisoryAuthorityNotified: {
+      type: Boolean,
+      default: false,
+    },
+
+    supervisoryAuthorityNotifiedAt: {
+      type: Date,
+    },
+
     significantHarmAssessment: {
       type: String, // Assessment of whether breach involves significant harm (PIPEDA)
       enum: ['NOT_ASSESSED', 'NO_SIGNIFICANT_HARM', 'SIGNIFICANT_HARM', 'PENDING'],
@@ -204,7 +224,7 @@ breachLogSchema.index({ detectedAt: -1 });
 breachLogSchema.index({ status: 1, severity: 1 });
 breachLogSchema.index({ userId: 1, detectedAt: -1 });
 breachLogSchema.index({ requiresHHSNotification: 1, hhsNotified: 1 });
-breachLogSchema.index({ requiresPrivacyCommissionerNotification: 1, privacyCommissionerNotified: 1 });
+breachLogSchema.index({ requiresSupervisoryAuthorityNotification: 1, supervisoryAuthorityNotified: 1 });
 breachLogSchema.index({ organizationCountry: 1, detectedAt: -1 });
 
 // Plugin to convert mongoose to JSON
@@ -216,9 +236,10 @@ breachLogSchema.plugin(toJSON);
 breachLogSchema.statics.getNotificationRequired = async function() {
   return this.find({
     status: 'CONFIRMED',
-    $or: [
+      $or: [
       { requiresHHSNotification: true, hhsNotified: false },
       { requiresPrivacyCommissionerNotification: true, privacyCommissionerNotified: false },
+      { requiresSupervisoryAuthorityNotification: true, supervisoryAuthorityNotified: false },
       { individualsNotified: false }
     ]
   }).sort({ detectedAt: 1 });

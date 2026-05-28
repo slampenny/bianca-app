@@ -15,7 +15,7 @@ if [ -f "/opt/bianca-deployment/devops/maintenance/enable-maintenance.sh" ]; the
 fi
 
 # Detect environment - check environment variables first, then directories, then instance tags
-AWS_REGION="us-east-2"
+AWS_REGION="${AWS_REGION:-us-east-2}"
 
 echo "   Detecting environment..."
 

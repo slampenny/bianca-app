@@ -7,8 +7,28 @@
  * HIPAA: Never auto-deletes (legal requirement - 7 year retention)
  */
 
-const { getJurisdiction, getDataRetentionPeriod, shouldAutoDeleteData } = require('../utils/jurisdiction.utils');
-const { Org, Client, Call, Conversation, Message, MedicalAnalysis, ConsentRecord } = require('../models');
+const {
+  getJurisdiction,
+  getDataRetentionPeriod,
+  shouldAutoDeleteData,
+  allowsErasureRequest,
+  getErasureDenialLegalBasis,
+} = require('../utils/jurisdiction.utils');
+const {
+  Org,
+  Client,
+  Call,
+  Conversation,
+  Message,
+  MedicalAnalysis,
+  ConsentRecord,
+  AuditLog,
+  ErasureCompletionRecord,
+  PrivacyRequest,
+} = require('../models');
+const { ClientMemory } = require('../models/clientMemory.model');
+const clientMemoryService = require('./clientMemory.service');
+const s3Service = require('./s3.service');
 const logger = require('../config/logger');
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
@@ -31,7 +51,7 @@ async function getOrganizationCountry(clientId = null, userId = null) {
     org = caregiver?.org;
   }
   
-  return org?.country || 'US'; // Default to US if not found
+  return org?.country ?? null;
 }
 
 /**
@@ -80,6 +100,7 @@ async function deleteExpiredCallRecordings(country) {
       if (call.conversationId) {
         const conversation = await Conversation.findById(call.conversationId);
         if (conversation) {
+          await clientMemoryService.suppressFactsForConversation(conversation._id, 'retention_expired');
           // Delete associated messages
           await Message.deleteMany({ conversationId: conversation._id });
           await conversation.deleteOne();
@@ -137,6 +158,8 @@ async function deleteExpiredConversations(country) {
   let deletedCount = 0;
   for (const conversation of expiredConversations) {
     try {
+      await clientMemoryService.suppressFactsForConversation(conversation._id, 'retention_expired');
+
       // Delete associated messages
       await Message.deleteMany({ conversationId: conversation._id });
       
@@ -196,6 +219,48 @@ async function deleteExpiredMedicalAnalysis(country) {
   
   logger.info(`[Data Deletion] Deleted ${deletedCount.deletedCount} expired medical analyses (older than ${retention.years} years) for ${jurisdiction.jurisdiction}`);
   return deletedCount.deletedCount;
+}
+
+/**
+ * Suppress expired client memory facts based on jurisdiction
+ * @param {string} country - Organization country
+ * @returns {Promise<number>} - Number of facts suppressed
+ */
+async function deleteExpiredClientMemory(country) {
+  const jurisdiction = getJurisdiction(country);
+  const retention = getDataRetentionPeriod(country, 'clientMemory');
+
+  if (!retention.autoDelete) {
+    logger.info(`[Data Deletion] Skipping client memory suppression for ${jurisdiction.jurisdiction} (retention required)`);
+    return 0;
+  }
+
+  const cutoffDate = new Date();
+  cutoffDate.setFullYear(cutoffDate.getFullYear() - retention.years);
+
+  const orgs = await Org.find({ country });
+  const orgIds = orgs.map((o) => o._id);
+
+  const patients = await Client.find({ org: { $in: orgIds } });
+  const clientIds = patients.map((p) => p._id);
+
+  if (clientIds.length === 0) {
+    return 0;
+  }
+
+  const result = await ClientMemory.updateMany(
+    {
+      clientId: { $in: clientIds },
+      extractedAt: { $lt: cutoffDate },
+      deletedAt: null,
+    },
+    { $set: { deletedAt: new Date(), deletedReason: 'retention_expired' } }
+  );
+
+  logger.info(
+    `[Data Deletion] Suppressed ${result.modifiedCount} expired client memory facts (older than ${retention.years} years) for ${jurisdiction.jurisdiction}`
+  );
+  return result.modifiedCount;
 }
 
 /**
@@ -273,6 +338,7 @@ async function processDataDeletionForOrg(country) {
     conversations: 0,
     medicalAnalysis: 0,
     consentRecords: 0,
+    clientMemory: 0,
     total: 0
   };
   
@@ -281,8 +347,9 @@ async function processDataDeletionForOrg(country) {
     stats.conversations = await deleteExpiredConversations(country);
     stats.medicalAnalysis = await deleteExpiredMedicalAnalysis(country);
     stats.consentRecords = await deleteExpiredConsentRecords(country);
+    stats.clientMemory = await deleteExpiredClientMemory(country);
     
-    stats.total = stats.calls + stats.conversations + stats.medicalAnalysis + stats.consentRecords;
+    stats.total = stats.calls + stats.conversations + stats.medicalAnalysis + stats.consentRecords + stats.clientMemory;
     
     logger.info(`[Data Deletion] Completed deletion for ${jurisdiction.jurisdiction}:`, stats);
   } catch (error) {
@@ -339,85 +406,301 @@ async function processDataDeletion() {
 }
 
 /**
+ * Resolve client IDs subject to erasure/deletion for a user.
+ */
+async function resolveSubjectClientIds(userId, userModel = 'Caregiver') {
+  if (userModel === 'Client') {
+    return [userId];
+  }
+  const patients = await Client.find({ caregivers: userId });
+  return patients.map((p) => p._id);
+}
+
+/**
+ * Delete S3 debug audio objects referenced on conversations.
+ */
+async function deleteS3AudioForConversations(conversations) {
+  let deleted = 0;
+  for (const conversation of conversations) {
+    const urls = conversation.debugAudioUrls || [];
+    for (const audio of urls) {
+      if (!audio.key) continue;
+      try {
+        await s3Service.deleteFile(audio.key);
+        deleted += 1;
+      } catch (error) {
+        logger.warn(`[Data Deletion] Failed to delete S3 object ${audio.key}: ${error.message}`);
+      }
+    }
+  }
+  return deleted;
+}
+
+/**
+ * Anonymize consent records while retaining legal proof of consent.
+ */
+async function anonymizeConsentRecords(userIds, userModel) {
+  const result = await ConsentRecord.updateMany(
+    { userId: { $in: userIds }, userModel },
+    {
+      $set: {
+        purpose: '[ANONYMIZED]',
+        'explicitConsent.consentText': '[REDACTED]',
+        'explicitConsent.ipAddress': '[REDACTED]',
+        'explicitConsent.userAgent': '[REDACTED]',
+      },
+    }
+  );
+  return result.modifiedCount;
+}
+
+/**
+ * Suppress PHI references in audit logs for a data subject (retain event structure).
+ * Uses native collection update to bypass immutability hooks.
+ */
+async function suppressAuditLogsForSubject(subjectIds) {
+  const idStrings = subjectIds.map((id) => id.toString());
+  const result = await AuditLog.collection.updateMany(
+    {
+      $or: [
+        { resource: 'client', resourceId: { $in: idStrings } },
+        { userId: { $in: subjectIds } },
+      ],
+    },
+    {
+      $set: {
+        'metadata.phiSuppressed': 'true',
+        resourceId: '[ERASED]',
+      },
+    }
+  );
+  return result.modifiedCount;
+}
+
+/**
+ * Cascade erasure for a set of client IDs.
+ */
+async function cascadeErasureForClients(clientIds, country) {
+  const scope = {
+    clientRecord: 0,
+    conversations: 0,
+    messages: 0,
+    clientMemory: 0,
+    s3AudioObjects: 0,
+    consentRecordsAnonymized: 0,
+    auditLogsSuppressed: 0,
+    calls: 0,
+    medicalAnalysis: 0,
+  };
+
+  const conversations = await Conversation.find({ clientId: { $in: clientIds } });
+  scope.s3AudioObjects = await deleteS3AudioForConversations(conversations);
+
+  const conversationIds = conversations.map((c) => c._id);
+  const msgResult = await Message.deleteMany({ conversationId: { $in: conversationIds } });
+  scope.messages = msgResult.deletedCount;
+
+  const convResult = await Conversation.deleteMany({ clientId: { $in: clientIds } });
+  scope.conversations = convResult.deletedCount;
+
+  const callResult = await Call.deleteMany({ clientId: { $in: clientIds } });
+  scope.calls = callResult.deletedCount;
+
+  const analysisResult = await MedicalAnalysis.deleteMany({ clientId: { $in: clientIds } });
+  scope.medicalAnalysis = analysisResult.deletedCount;
+
+  let memoryDeleted = 0;
+  for (const clientId of clientIds) {
+    memoryDeleted += await clientMemoryService.hardDeleteFactsForClient(clientId);
+  }
+  scope.clientMemory = memoryDeleted;
+
+  scope.consentRecordsAnonymized = await anonymizeConsentRecords(clientIds, 'Client');
+  scope.auditLogsSuppressed = await suppressAuditLogsForSubject(clientIds);
+
+  for (const clientId of clientIds) {
+    const client = await Client.findById(clientId);
+    if (client) {
+      await client.delete();
+      scope.clientRecord += 1;
+    }
+  }
+
+  return scope;
+}
+
+/**
+ * Process a formal erasure privacy request (GDPR Art. 17 / PIPEDA).
+ * @param {ObjectId} requestId
+ * @param {ObjectId} processedBy
+ * @returns {Promise<Object>}
+ */
+async function processErasureRequest(requestId, processedBy) {
+  const request = await PrivacyRequest.findById(requestId);
+  if (!request) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Privacy request not found');
+  }
+  if (request.requestType !== 'erasure') {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'This is not an erasure request');
+  }
+
+  const Caregiver = require('../models/caregiver.model');
+  let country = 'US';
+  let jurisdictionKey = request.jurisdiction || 'HIPAA';
+
+  if (request.requestorModel === 'Caregiver') {
+    const caregiver = await Caregiver.findById(request.requestorId).populate('org');
+    country = caregiver?.org?.country ?? null;
+    jurisdictionKey = getJurisdiction(country).jurisdiction;
+  } else {
+    const client = await Client.findById(request.requestorId).populate('org');
+    country = client?.org?.country ?? null;
+    jurisdictionKey = getJurisdiction(country).jurisdiction;
+  }
+
+  if (!allowsErasureRequest(jurisdictionKey)) {
+    request.status = 'denied';
+    request.denialDate = new Date();
+    request.denialReason = getErasureDenialLegalBasis(jurisdictionKey);
+    request.updatedBy = processedBy;
+    await request.save();
+
+    return {
+      requestId,
+      jurisdiction: jurisdictionKey,
+      erasurePerformed: false,
+      legalBasis: request.denialReason,
+    };
+  }
+
+  const clientIds = await resolveSubjectClientIds(request.requestorId, request.requestorModel);
+  const scope = await cascadeErasureForClients(clientIds, country);
+
+  const completionRecord = await ErasureCompletionRecord.create({
+    requestId,
+    completedAt: new Date(),
+    jurisdiction: jurisdictionKey,
+    subjectId: request.requestorId,
+    subjectModel: request.requestorModel,
+    scope,
+    processedBy,
+  });
+
+  request.status = 'completed';
+  request.responseDate = new Date();
+  request.updatedBy = processedBy;
+  request.informationProvided = [{
+    dataType: 'erasure_completion',
+    dataId: completionRecord._id,
+    format: 'record',
+    providedAt: new Date(),
+  }];
+  await request.save();
+
+  logger.info(`[Data Deletion] Erasure request ${requestId} completed`, scope);
+
+  return {
+    requestId,
+    jurisdiction: jurisdictionKey,
+    erasurePerformed: true,
+    scope,
+    completionRecordId: completionRecord._id,
+  };
+}
+
+/**
  * Handle user-initiated deletion request
  * @param {ObjectId} userId - User ID requesting deletion
  * @param {string} dataType - Type of data to delete ('all', 'calls', 'conversations', 'medicalAnalysis')
+ * @param {string} [userModel='Caregiver']
  * @returns {Promise<Object>} - Deletion result
  */
-async function handleDeletionRequest(userId, dataType = 'all') {
+async function handleDeletionRequest(userId, dataType = 'all', userModel = 'Caregiver') {
   const Caregiver = require('../models/caregiver.model');
-  const caregiver = await Caregiver.findById(userId).populate('org');
-  
-  if (!caregiver || !caregiver.org) {
-    throw new ApiError(httpStatus.NOT_FOUND, 'User or organization not found');
+  let country = 'US';
+  let jurisdictionKey = 'HIPAA';
+
+  if (userModel === 'Caregiver') {
+    const caregiver = await Caregiver.findById(userId).populate('org');
+    if (!caregiver || !caregiver.org) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'User or organization not found');
+    }
+    country = caregiver.org.country ?? null;
+    jurisdictionKey = getJurisdiction(country).jurisdiction;
+  } else {
+    const client = await Client.findById(userId).populate('org');
+    if (!client || !client.org) {
+      throw new ApiError(httpStatus.NOT_FOUND, 'User or organization not found');
+    }
+    country = client.org.country ?? null;
+    jurisdictionKey = getJurisdiction(country).jurisdiction;
   }
-  
-  const country = caregiver.org.country || 'US';
-  const jurisdiction = getJurisdiction(country);
-  
-  // Check if deletion is allowed for this jurisdiction
-  if (!shouldAutoDeleteData(country)) {
+
+  if (!allowsErasureRequest(jurisdictionKey)) {
     throw new ApiError(
       httpStatus.BAD_REQUEST,
-      `Data deletion is not permitted for ${jurisdiction.jurisdiction} jurisdiction due to legal retention requirements. Please contact privacy@biancawellness.com for assistance.`
+      getErasureDenialLegalBasis(jurisdictionKey)
     );
   }
-  
-  logger.info(`[Data Deletion] User ${userId} requested deletion of ${dataType} data`);
-  
+
+  logger.info(`[Data Deletion] User ${userId} (${userModel}) requested deletion of ${dataType} data`);
+
   const result = {
     userId,
+    userModel,
     country,
-    jurisdiction: jurisdiction.jurisdiction,
+    jurisdiction: jurisdictionKey,
     dataType,
-    deleted: {}
+    deleted: {},
   };
-  
-  // Get client IDs associated with this caregiver
-  const patients = await Client.find({ caregivers: userId });
-  const clientIds = patients.map(p => p._id);
-  
-  if (dataType === 'all' || dataType === 'calls') {
-    // Delete calls for user's patients
-    const deletedCalls = await Call.deleteMany({
-      clientId: { $in: clientIds }
-    });
-    result.deleted.calls = deletedCalls.deletedCount;
-    
-    // Delete associated conversations
-    const conversations = await Conversation.find({
-      clientId: { $in: clientIds }
-    });
-    const conversationIds = conversations.map(c => c._id);
-    
-    await Message.deleteMany({ conversationId: { $in: conversationIds } });
-    await Conversation.deleteMany({ clientId: { $in: clientIds } });
+
+  const clientIds = await resolveSubjectClientIds(userId, userModel);
+
+  if (dataType === 'all') {
+    const scope = await cascadeErasureForClients(clientIds, country);
+    result.deleted = scope;
+    result.deleted.total = Object.values(scope).reduce(
+      (sum, count) => sum + (typeof count === 'number' ? count : 0),
+      0
+    );
+    logger.info('[Data Deletion] User deletion request completed:', result);
+    return result;
   }
-  
-  if (dataType === 'all' || dataType === 'conversations') {
-    const conversations = await Conversation.find({
-      clientId: { $in: clientIds }
-    });
-    const conversationIds = conversations.map(c => c._id);
-    
-    await Message.deleteMany({ conversationId: { $in: conversationIds } });
-    const deletedConversations = await Conversation.deleteMany({
-      clientId: { $in: clientIds }
-    });
+
+  if (dataType === 'calls') {
+    const deletedCalls = await Call.deleteMany({ clientId: { $in: clientIds } });
+    result.deleted.calls = deletedCalls.deletedCount;
+  }
+
+  if (dataType === 'conversations') {
+    const conversations = await Conversation.find({ clientId: { $in: clientIds } });
+    const conversationIds = conversations.map((c) => c._id);
+    result.deleted.s3AudioObjects = await deleteS3AudioForConversations(conversations);
+    const msgResult = await Message.deleteMany({ conversationId: { $in: conversationIds } });
+    result.deleted.messages = msgResult.deletedCount;
+    const deletedConversations = await Conversation.deleteMany({ clientId: { $in: clientIds } });
     result.deleted.conversations = deletedConversations.deletedCount;
   }
-  
-  if (dataType === 'all' || dataType === 'medicalAnalysis') {
-    const deletedAnalysis = await MedicalAnalysis.deleteMany({
-      clientId: { $in: clientIds }
-    });
+
+  if (dataType === 'medicalAnalysis') {
+    const deletedAnalysis = await MedicalAnalysis.deleteMany({ clientId: { $in: clientIds } });
     result.deleted.medicalAnalysis = deletedAnalysis.deletedCount;
   }
-  
-  result.deleted.total = Object.values(result.deleted).reduce((sum, count) => sum + (typeof count === 'number' ? count : 0), 0);
-  
-  logger.info(`[Data Deletion] User deletion request completed:`, result);
-  
+
+  if (dataType === 'clientMemory') {
+    let clientMemoryDeleted = 0;
+    for (const clientId of clientIds) {
+      clientMemoryDeleted += await clientMemoryService.hardDeleteFactsForClient(clientId);
+    }
+    result.deleted.clientMemory = clientMemoryDeleted;
+  }
+
+  result.deleted.total = Object.values(result.deleted).reduce(
+    (sum, count) => sum + (typeof count === 'number' ? count : 0),
+    0
+  );
+
+  logger.info('[Data Deletion] User deletion request completed:', result);
   return result;
 }
 
@@ -425,8 +708,11 @@ module.exports = {
   processDataDeletion,
   processDataDeletionForOrg,
   handleDeletionRequest,
+  processErasureRequest,
   deleteExpiredCallRecordings,
   deleteExpiredConversations,
   deleteExpiredMedicalAnalysis,
   deleteExpiredConsentRecords,
+  deleteExpiredClientMemory,
+  cascadeErasureForClients,
 };
