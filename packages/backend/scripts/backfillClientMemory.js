@@ -5,15 +5,16 @@
  * Processes conversations that have a non-empty history (summary) field,
  * oldest-first, with a delay between each to avoid rate limits.
  * Skips conversations that already have at least one ClientMemory row tied to that conversationId.
+ * Respects aiAnalysis consent per client.
  */
 const mongoose = require('mongoose');
 const config = require('../src/config/config');
-const { Conversation } = require('../src/models');
+const { Conversation, Client } = require('../src/models');
 const { ClientMemory } = require('../src/models/clientMemory.model');
-const { extractAndStoreFacts } = require('../src/services/clientMemory.service');
+const { extractAndStoreFacts, hasAiAnalysisConsent } = require('../src/services/clientMemory.service');
 const logger = require('../src/config/logger');
 
-const DELAY_MS = 2000; // 2s between calls to stay within OpenAI rate limits
+const DELAY_MS = 2000;
 const BATCH_SIZE = 50;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -41,17 +42,28 @@ const run = async () => {
 
   logger.info(`[Backfill] Found ${conversations.length} conversations to process`);
 
+  let skippedConsent = 0;
+  let processed = 0;
+
   for (const conv of conversations) {
     try {
+      const allowed = await hasAiAnalysisConsent(conv.clientId);
+      if (!allowed) {
+        logger.info(`[Backfill] Skipping conversation ${conv._id} — aiAnalysis consent not granted for client ${conv.clientId}`);
+        skippedConsent += 1;
+        continue;
+      }
+
       logger.info(`[Backfill] Processing conversation ${conv._id} for client ${conv.clientId}`);
-      await extractAndStoreFacts(conv.clientId.toString(), conv._id.toString(), conv.history);
+      await extractAndStoreFacts(conv.clientId.toString(), conv._id.toString(), conv.history, { skipConsentCheck: true });
+      processed += 1;
       await sleep(DELAY_MS);
     } catch (err) {
       logger.error(`[Backfill] Failed for conversation ${conv._id}: ${err.message}`);
     }
   }
 
-  logger.info('[Backfill] Done');
+  logger.info(`[Backfill] Done — processed=${processed}, skippedConsent=${skippedConsent}`);
   await mongoose.disconnect();
 };
 

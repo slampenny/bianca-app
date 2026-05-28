@@ -214,7 +214,7 @@ const sendConsentEmailIfRequired = async (client) => {
   }
 };
 
-const checkClientConsent = async (clientId) => {
+const checkClientConsent = async (clientId, purpose = 'recording') => {
   try {
     const client = await Client.findById(clientId).populate('org');
     if (!client || !client.org) {
@@ -223,6 +223,12 @@ const checkClientConsent = async (clientId) => {
     const { org } = client;
     if (!org.requireClientConsent) {
       return true;
+    }
+    if (purpose === 'aiAnalysis') {
+      if (client.consentedPurposes && typeof client.consentedPurposes.aiAnalysis === 'boolean') {
+        return client.consentedPurposes.aiAnalysis === true;
+      }
+      return client.consented === true;
     }
     return client.consented === true;
   } catch (error) {

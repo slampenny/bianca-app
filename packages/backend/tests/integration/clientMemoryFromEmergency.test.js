@@ -108,6 +108,10 @@ describe('ClientMemory from emergency (integration)', () => {
     expect(fact.priority).toBe('urgent');
     expect(fact.source).toBe('mid_call_emergency');
     expect(fact.category).toBe('safety');
+    expect(fact.status).toBe('provisional');
+    expect(fact.sensitivity).toBe('high');
+    expect(fact.confidenceScore).toBeLessThanOrEqual(0.55);
+    expect(fact.fact).not.toContain(testCase.text.substring(0, 20));
     expect(fact.conversationId.toString()).toBe(conversationId);
   });
 
