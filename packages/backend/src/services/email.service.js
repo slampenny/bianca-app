@@ -9,7 +9,7 @@ const logger = require('../config/logger'); // Your application's logger
 // Configure i18n for email service
 // Support all languages that frontend supports
 i18n.configure({
-  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
+  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar', 'hu'],
   directory: `${__dirname}/../locales`,
   objectNotation: true,
   defaultLocale: 'en',

@@ -8,8 +8,6 @@ import { useTheme } from "app/theme/ThemeContext"
 import { translate, type TxKeyPath } from "../i18n"
 import type { OnboardingResponseRow } from "../services/api/api.types"
 
-const DAYS = [1, 2, 3, 4] as const
-
 type DayFlagKey = "safety" | "memory" | "mood" | "distress" | "confusion"
 
 const FLAG_KEYS_ORDER: DayFlagKey[] = ["safety", "memory", "mood", "distress", "confusion"]
@@ -53,6 +51,11 @@ export function ClientOnboardingScreen() {
     const rowsForDay = data.responses.filter((r) => r.dayNumber === filterDay)
     return aggregateFlagsForDay(rowsForDay)
   }, [filterDay, data?.responses])
+
+  const dayNumbers = useMemo(
+    () => data?.journey?.days?.map((d) => d.dayNumber) ?? [1, 2, 3, 4],
+    [data?.journey?.days],
+  )
 
   const renderRow = ({ item }: { item: OnboardingResponseRow }) => (
     <Card
@@ -116,7 +119,7 @@ export function ClientOnboardingScreen() {
         >
           <Text size="xs">{translate("clientOnboardingScreen.allDays")}</Text>
         </Pressable>
-        {DAYS.map((d) => (
+        {dayNumbers.map((d) => (
           <Pressable
             key={d}
             onPress={() => setFilterDay(d)}

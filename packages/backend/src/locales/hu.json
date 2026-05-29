@@ -1,0 +1,76 @@
+{
+	"sendResetPasswordEmail": {
+		"subject": "Bianca Wellness - Jelszó-visszaállítási kérelem",
+		"text": "Kedves gondozó,\n\nKérés érkezett Bianca Wellness fiókja jelszavának visszaállítására.\n\nA jelszó visszaállításához kattintson az alábbi linkre:\n\n%s\n\nBiztonsági okokból ez a link 1 óra múlva lejár.\n\nHa nem kért jelszó-visszaállítást, hagyja figyelmen kívül ezt az e-mailt. Fiókja biztonságban marad.\n\nÜdvözlettel,\nA Bianca Wellness csapata\n\n---\nBianca Wellness - Biztonságos egészségügyi kommunikáció\nEz az e-mail ellenőrzött domainről érkezett: biancawellness.com"
+	},
+	"sendVerificationEmail": {
+		"subject": "Bianca Wellness - Kérjük, erősítse meg e-mail címét",
+		"text": "Kedves gondozó,\n\nKöszönjük, hogy létrehozta Bianca Wellness fiókját! A regisztráció befejezéséhez és a fiók biztonságához kérjük, erősítse meg e-mail címét.\n\nAz e-mail megerősítéséhez kattintson az alábbi linkre:\n\n%s\n\nBiztonsági okokból ez a megerősítő link 24 óra múlva lejár.\n\nHa nem hozott létre Bianca Wellness fiókot, hagyja figyelmen kívül ezt az e-mailt.\n\nÜdvözöljük a biztonságos egészségügyi kommunikációban!\n\nÜdvözlettel,\nA Bianca Wellness csapata\n\n---\nBianca Wellness - Biztonságos egészségügyi kommunikáció\nEz az e-mail ellenőrzött domainről érkezett: biancawellness.com"
+	},
+	"inviteEmail": {
+		"subject": "Üdvözöljük a Bianca Wellnessben - Meghívó a csatlakozásra",
+		"text": "Kedves gondozó,\n\nMeghívást kapott a Bianca Wellnesshez, egy biztonságos egészségügyi kommunikációs platformhoz.\n\nA meghívó elfogadásához és fiókja beállításához kattintson az alábbi linkre:\n\n%s\n\nBiztonsági okokból ez a meghívó 7 nap múlva lejár.\n\nHa nem számított erre a meghívóra, hagyja figyelmen kívül ezt az e-mailt.\n\nÜdvözlettel,\nA Bianca Wellness csapata\n\n---\nBianca Wellness - Biztonságos egészségügyi kommunikáció\nEz az e-mail ellenőrzött domainről érkezett: biancawellness.com"
+	},
+	"emailVerifiedPage": {
+		"title": "E-mail megerősítve!",
+		"titleAlreadyVerified": "Már megerősítve",
+		"message": "Bianca Wellness fiókja sikeresen megerősítésre került.",
+		"messageAlreadyVerified": "E-mail címe már megerősítve van. Bejelentkezhet.",
+		"redirecting": "Átirányítás az alkalmazásba...",
+		"continueButton": "Tovább az alkalmazásba"
+	},
+	"emailVerificationFailedPage": {
+		"title": "Megerősítés sikertelen",
+		"messageInvalid": "Ez a megerősítő link érvénytelen vagy lejárt.",
+		"messageExpired": "Ez a megerősítő link lejárt.",
+		"helpExpired": "Kérjen új megerősítő e-mailt a bejelentkezési képernyőről.",
+		"helpGeneric": "Ha úgy gondolja, hogy ez hiba, lépjen kapcsolatba az ügyfélszolgálattal.",
+		"loginButton": "Ugrás a bejelentkezéshez"
+	},
+	"smsVerification": {
+		"message": "Bianca megerősítő kódja: %s. A kód 10 perc múlva lejár."
+	},
+	"emergencyAlert": {
+		"CRITICAL": "🚨 KRITIKUS VÉSZHELYZET: %s - %s: %s",
+		"HIGH": "⚠️ MAGAS PRIORITÁS: %s - %s: %s",
+		"MEDIUM": "📢 RIASZTÁS: %s - %s: %s"
+	},
+	"clientConsentEmail": {
+		"subject": "Bianca Wellness - Hozzájárulás szükséges a hívásrögzítéshez",
+		"title": "Hozzájárulás szükséges a hívásrögzítéshez",
+		"greeting": "Kedves %s!",
+		"intro": "Egészségügyi szervezete, %s, a Bianca Wellnesst használja jólétellenőrző hívások lebonyolítására. Az Ön joghatóságában érvényes jogszabályoknak megfelelően hozzájárulására van szükségünk, mielőtt rögzíthetnénk ezeket a hívásokat.",
+		"whyConsentTitle": "Miért van szükségünk hozzájárulására:",
+		"whyConsent": "Egyes joghatóságokban minden fél hozzájárulása szükséges a hívás rögzítéséhez. Szervezete bekapcsolta a „Beteg hozzájárulás szükséges” beállítást, ezért kifejezett hozzájárulására van szükségünk a rögzítés előtt.",
+		"consentTitle": "Mi történik, ha hozzájárul:",
+		"consentBenefit1": "Jólétellenőrző hívásai minőségbiztosítási és ellátáskoordinációs célból rögzíthetők",
+		"consentBenefit2": "A felvételek összefoglalókat és betekintéseket biztosítanak gondozóinak",
+		"consentBenefit3": "A felvételek biztonságosan, az adatvédelmi jogszabályoknak megfelelően tárolódnak",
+		"noConsentTitle": "Mi történik, ha nem járul hozzá:",
+		"noConsent1": "A hívások továbbra is történnek, de nem lesznek rögzítve",
+		"noConsent2": "Továbbra is kaphat jólétellenőrző hívásokat szervezetétől",
+		"buttonText": "Hozzájárulás megadása",
+		"expiryNote": "Biztonsági okokból ez a hozzájárulási link 30 nap múlva lejár.",
+		"contactInfo": "Kérdés vagy aggály esetén lépjen kapcsolatba szervezetével, vagy írjon a privacy@biancawellness.com címre.",
+		"versionLabel": "Hozzájárulási e-mail verzió:",
+		"closing": "Üdvözlettel,\nA Bianca Wellness csapata"
+	},
+	"caregiverDailyDigest": {
+		"title": "Napi gondozási összefoglaló",
+		"subtitle": "Jólétellenőrzések az Önhöz rendelt lakóknál",
+		"subtitleWithOrg": "Jólétellenőrzések — %s",
+		"labelConversationSummary": "Beszélgetés összefoglalója",
+		"labelSentiment": "Hangulat",
+		"labelCallsToday": "Mai hívások",
+		"noActivity": "Erre a napra nincs ütemezett hívás.",
+		"noAnswerToday": "Hívás történt; nincs beszélgetés-összefoglaló (nem vették fel, vagy túl rövid volt).",
+		"completedMinutes": "Ellenőrzés kész (kb. %s perc).",
+		"completedNoTranscript": "Ellenőrzés kész; még nincs írott összefoglaló.",
+		"languageMismatchExplanation": "A beszélgetés szövege kimarad, mert a lakó előnyben részesített nyelve (%s) eltér az Önéől (%s). Csak hangulat-összefoglaló.",
+		"languageMismatchExplanationNoSentiment": "A beszélgetés szövege kimarad, mert a lakó előnyben részesített nyelve (%s) eltér az Önéől (%s). Ezekhez a hívásokhoz nincs hangulatelemzés.",
+		"emailScreenHint": "Az „E-mail összefoglaló” gombbal küldhet másolatot a megerősített fiók e-mailjére, vagy jelölje be az „E-mail, ha elkészítem” opciót az összefoglaló készítésekor.",
+		"emailSubject": "Napi gondozási összefoglaló — %s",
+		"emailPlainIntro": "Ez az üzenet az Önhöz rendelt lakók jólétellenőrzéseit foglalja össze. A teljes elrendezéshez nyissa meg a HTML változatot.",
+		"emailConfidentialFooter": "Bizalmas — csak a címzett gondozó számára. Ne továbbítsa."
+	}
+}

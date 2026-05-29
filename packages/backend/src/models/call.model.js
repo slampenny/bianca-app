@@ -129,11 +129,11 @@ const callSchema = mongoose.Schema(
       ref: 'Conversation',
       default: null,
     },
-    // Resident onboarding (4-day PRD): set on outbound onboarding calls; completion set when voice session ends (or legacy tool)
+    // Resident voice onboarding: set on outbound onboarding calls; completion set when voice session ends
     onboardingDay: {
       type: Number,
       min: 1,
-      max: 4,
+      max: 14,
     },
     onboardingCompletedAt: {
       type: Date,

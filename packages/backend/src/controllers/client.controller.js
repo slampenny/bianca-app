@@ -247,7 +247,7 @@ const getClientOnboarding = catchAsync(async (req, res) => {
   }
 
   const payload = await onboardingService.getDashboardForClient(clientId, {
-    dayNumber: dayNumber >= 1 && dayNumber <= 4 ? dayNumber : undefined,
+    dayNumber: dayNumber >= 1 ? dayNumber : undefined,
   });
 
   res.status(httpStatus.OK).send({

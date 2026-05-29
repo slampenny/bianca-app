@@ -12,6 +12,9 @@ import type {
   SaveCorpEmailForwardsResponse,
   ScimAdminStatus,
   ScimTokenIssueResponse,
+  VoiceOnboardingConfig,
+  VoiceOnboardingDay,
+  VoiceOnboardingPlan,
 } from "./api.types"
 import baseQueryWithAuth from "./baseQueryWithAuth"
 
@@ -48,7 +51,22 @@ export const adminApi = createApi({
       }),
       providesTags: (_r, _e, orgId) => [{ type: "OrgDetail", id: orgId }],
     }),
-    patchOrg: builder.mutation<AdminOrgDetail, { orgId: string; body: { debugAudioUploadEnabled: boolean } }>({
+    getDefaultVoiceOnboardingPlan: builder.query<{ plan: VoiceOnboardingPlan }, void>({
+      query: () => ({
+        url: "/admin/onboarding/default-plan",
+        method: "GET",
+      }),
+    }),
+    patchOrg: builder.mutation<
+      AdminOrgDetail,
+      {
+        orgId: string
+        body: {
+          debugAudioUploadEnabled?: boolean
+          voiceOnboarding?: VoiceOnboardingConfig
+        }
+      }
+    >({
       query: ({ orgId, body }) => ({
         url: `/orgs/${orgId}`,
         method: "PATCH",
@@ -189,6 +207,7 @@ export const {
   useDeleteEmbeddingAnchorPhraseMutation,
   useMergeEmbeddingAnchorDefaultsMutation,
   useGetOrgQuery,
+  useGetDefaultVoiceOnboardingPlanQuery,
   usePatchOrgMutation,
   useGetCorpEmailForwardsQuery,
   useSaveCorpEmailForwardsMutation,

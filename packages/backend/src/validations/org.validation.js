@@ -1,6 +1,29 @@
 const Joi = require('joi');
 const validator = require('validator');
 const { objectId } = require('./custom.validation');
+const { MAX_ONBOARDING_DAYS } = require('../services/onboardingPlan.service');
+
+const voiceOnboardingQuestionSchema = Joi.object().keys({
+  id: Joi.string().trim().min(1).max(100).required(),
+  prompt: Joi.string().trim().min(1).max(1000).required(),
+  compressionPriority: Joi.boolean().optional(),
+});
+
+const voiceOnboardingDaySchema = Joi.object().keys({
+  dayNumber: Joi.number().integer().min(1).max(MAX_ONBOARDING_DAYS).optional(),
+  theme: Joi.string().trim().max(200).allow('').optional(),
+  opening: Joi.string().trim().max(2000).allow('').optional(),
+  questions: Joi.array().items(voiceOnboardingQuestionSchema).min(1).required(),
+});
+
+const voiceOnboardingSchema = Joi.object().keys({
+  useDefault: Joi.boolean().required(),
+  days: Joi.when('useDefault', {
+    is: false,
+    then: Joi.array().items(voiceOnboardingDaySchema).max(MAX_ONBOARDING_DAYS).required(),
+    otherwise: Joi.array().items(voiceOnboardingDaySchema).max(MAX_ONBOARDING_DAYS).optional(),
+  }),
+});
 
 const createOrg = {
   body: Joi.object().keys({
@@ -75,6 +98,8 @@ const updateOrg = {
       requireClientConsent: Joi.boolean().optional(),
       /** Super admin / org admin: allow S3 debug audio for this org's Realtime calls */
       debugAudioUploadEnabled: Joi.boolean().optional(),
+      /** Super admin: per-org resident voice onboarding plan */
+      voiceOnboarding: voiceOnboardingSchema.optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

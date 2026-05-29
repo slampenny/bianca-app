@@ -13,7 +13,7 @@ const onboardingResponseSchema = mongoose.Schema(
       type: Number,
       required: true,
       min: 1,
-      max: 4,
+      max: 14,
       index: true,
     },
     questionId: {

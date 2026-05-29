@@ -194,6 +194,7 @@ export function HomeScreen() {
         callStatus: response.callStatus,
         callType: response.callType,
         onboardingDay: response.onboardingDay,
+        onboardingTotalDays: response.onboardingTotalDays,
         onboardingJourneyComplete: response.onboardingJourneyComplete,
         onboardingSessionsCompleted: response.onboardingSessionsCompleted,
         onboardingCurrentStageDay: response.onboardingCurrentStageDay,

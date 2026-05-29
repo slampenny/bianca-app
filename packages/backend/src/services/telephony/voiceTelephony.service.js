@@ -21,7 +21,7 @@ function getImplementation() {
   if (providerId === 'telnyx') {
     const TelnyxVoiceProvider = require('./providers/telnyx.voice.provider');
     cachedImpl = new TelnyxVoiceProvider();
-    logger.info('[VoiceTelephony] Active provider: telnyx (stub)');
+    logger.info('[VoiceTelephony] Active provider: telnyx');
     return cachedImpl;
   }
 

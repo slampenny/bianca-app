@@ -11,6 +11,7 @@ const emailConfig = require('./email.config');
 const asteriskConfig = require('./asterisk.config');
 const openaiConfig = require('./openai.config');
 const twilioConfig = require('./twilio.config');
+const telnyxConfig = require('./telnyx.config');
 const telephonyConfig = require('./telephony.config');
 const smsConfig = require('./sms.config');
 const stripeConfig = require('./stripe.config');
@@ -27,6 +28,7 @@ const buildAllConfigs = (envVars) => {
     ...asteriskConfig.buildAsteriskConfig(envVars),
     ...openaiConfig.buildOpenAIConfig(envVars),
     ...twilioConfig.buildTwilioConfig(envVars),
+    ...telnyxConfig.buildTelnyxConfig(envVars),
     ...telephonyConfig.buildTelephonyConfig(envVars),
     ...smsConfig.buildSmsConfig(envVars),
     ...stripeConfig.buildStripeConfig(envVars),
@@ -44,6 +46,7 @@ const applyAllSecrets = (config, secrets) => {
   asteriskConfig.applyAsteriskSecrets(config, secrets);
   openaiConfig.applyOpenAISecrets(config, secrets);
   twilioConfig.applyTwilioSecrets(config, secrets);
+  telnyxConfig.applyTelnyxSecrets(config, secrets);
   telephonyConfig.applyTelephonySecrets(config, secrets);
   smsConfig.applySmsSecrets(config, secrets);
   stripeConfig.applyStripeSecrets(config, secrets);
@@ -61,6 +64,7 @@ module.exports = {
   asteriskConfig,
   openaiConfig,
   twilioConfig,
+  telnyxConfig,
   telephonyConfig,
   smsConfig,
   stripeConfig,

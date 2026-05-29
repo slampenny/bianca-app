@@ -10,7 +10,7 @@ const emergencyPhraseSchema = new mongoose.Schema({
   language: {
     type: String,
     required: true,
-    enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn'],
+    enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn', 'hu'],
     default: 'en',
     index: true
   },

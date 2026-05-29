@@ -9,6 +9,7 @@ import { ObservabilityPage } from "./pages/ObservabilityPage"
 import { ScimProvisioningPage } from "./pages/ScimProvisioningPage"
 import { EmbeddingAnchorsPage } from "./pages/EmbeddingAnchorsPage"
 import { OrgFlagsPage } from "./pages/OrgFlagsPage"
+import { OrgVoiceOnboardingPage } from "./pages/OrgVoiceOnboardingPage"
 import { CorpEmailForwardsPage } from "./pages/CorpEmailForwardsPage"
 import { InviteSignupPage } from "./pages/InviteSignupPage"
 
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="impersonate" element={<ImpersonatePage />} />
           <Route path="scim" element={<ScimProvisioningPage />} />
           <Route path="org-flags" element={<OrgFlagsPage />} />
+          <Route path="voice-onboarding" element={<OrgVoiceOnboardingPage />} />
           <Route path="embedding-anchors" element={<EmbeddingAnchorsPage />} />
           <Route path="corp-email" element={<CorpEmailForwardsPage />} />
         </Route>

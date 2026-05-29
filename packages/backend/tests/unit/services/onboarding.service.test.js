@@ -40,6 +40,19 @@ describe('onboarding.service getDashboardForClient', () => {
     expect(payload.journey.days.map((d) => d.dayNumber)).toEqual([1, 2, 3, 4]);
   });
 
+  it('returns journeyComplete when org onboarding is disabled', async () => {
+    const [org] = await insertOrgs([{ ...orgOne, voiceOnboarding: { useDefault: false, days: [] } }]);
+    const [client] = await insertClientsWithOrg([clientOne], org._id);
+
+    const payload = await onboardingService.getDashboardForClient(client.id);
+
+    expect(payload.journey.enabled).toBe(false);
+    expect(payload.journey.totalDays).toBe(0);
+    expect(payload.journey.journeyComplete).toBe(true);
+    expect(payload.journey.currentDay).toBeNull();
+    expect(payload.journey.days).toHaveLength(0);
+  });
+
   it('aggregates flags and per-day captured counts', async () => {
     const [org] = await insertOrgs([orgOne]);
     const [client] = await insertClientsWithOrg([clientOne], org._id);

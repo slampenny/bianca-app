@@ -17,4 +17,5 @@ export const LANGUAGE_OPTIONS: LanguageOption[] = [
   { code: "ru", label: "Russian", nativeName: "Русский" },
   { code: "ar", label: "Arabic", nativeName: "العربية" },
   { code: "ko", label: "Korean", nativeName: "한국어" },
+  { code: "hu", label: "Hungarian", nativeName: "Magyar" },
 ]

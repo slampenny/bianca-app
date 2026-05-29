@@ -290,6 +290,8 @@ const getLanguageName = (languageCode) => {
     it: 'Italian (Italiano)',
     ru: 'Russian (Русский)',
     ar: 'Arabic (العربية)',
+    ko: 'Korean (한국어)',
+    hu: 'Hungarian (Magyar)',
   };
   return languageMap[languageCode] || 'English';
 };
@@ -302,7 +304,12 @@ const getLanguageName = (languageCode) => {
  */
 const buildEnhancedPrompt = async (clientId, callType = 'inbound', options = {}) => {
   try {
-    const onboardingDay = options.onboardingDay >= 1 && options.onboardingDay <= 4 ? options.onboardingDay : null;
+    const onboardingPlanService = require('./onboardingPlan.service');
+    const plan = await onboardingPlanService.getPlanForClientId(clientId);
+    const onboardingDay =
+      options.onboardingDay >= 1 && onboardingPlanService.isValidOnboardingDay(plan, options.onboardingDay)
+        ? options.onboardingDay
+        : null;
 
     // Get client info
     const client = await Client.findById(clientId)
@@ -315,7 +322,7 @@ const buildEnhancedPrompt = async (clientId, callType = 'inbound', options = {})
     }
 
     if (onboardingDay) {
-      const { buildOnboardingInstructions } = require('../templates/onboardingPrompts');
+      const { buildOnboardingInstructions, buildCustomOnboardingInstructions } = require('../templates/onboardingPrompts');
       const facilityName = (client.org && client.org.name) || 'your care team';
       const residentName = client.preferredName || client.name || '';
       let enhancedPrompt = refinedPrompts.system.content;
@@ -336,9 +343,14 @@ const buildEnhancedPrompt = async (clientId, callType = 'inbound', options = {})
       } else {
         enhancedPrompt += `\n\nLanguage: Communicate in English as usual.`;
       }
-      enhancedPrompt += `\n\n=== ONBOARDING SESSION (step ${onboardingDay} of 4) ===\n`;
-      enhancedPrompt += buildOnboardingInstructions(onboardingDay, { residentName, facilityName });
-      logger.info(`[Enhanced Prompt] Onboarding day ${onboardingDay} for client ${client.name}`);
+      enhancedPrompt += `\n\n=== ONBOARDING SESSION (step ${onboardingDay} of ${plan.totalDays}) ===\n`;
+      const dayPlan = plan.days.find((d) => d.dayNumber === onboardingDay);
+      if (plan.useDefault) {
+        enhancedPrompt += buildOnboardingInstructions(onboardingDay, { residentName, facilityName });
+      } else if (dayPlan) {
+        enhancedPrompt += buildCustomOnboardingInstructions(dayPlan, plan.totalDays, { residentName, facilityName });
+      }
+      logger.info(`[Enhanced Prompt] Onboarding day ${onboardingDay}/${plan.totalDays} for client ${client.name}`);
       return enhancedPrompt;
     }
 

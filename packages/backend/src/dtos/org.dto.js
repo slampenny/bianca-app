@@ -24,7 +24,8 @@ const OrgDTO = (org) => {
     callRetrySettings,
     privacyOfficerId,
     requireClientConsent,
-    debugAudioUploadEnabled
+    debugAudioUploadEnabled,
+    voiceOnboarding,
   } = orgObj;
   
   const id = _id;
@@ -56,6 +57,21 @@ const OrgDTO = (org) => {
     privacyOfficerId: privacyOfficerId ? (privacyOfficerId instanceof ObjectId ? privacyOfficerId.toString() : (privacyOfficerId?._id || privacyOfficerId)) : null,
     requireClientConsent: requireClientConsent === true,
     debugAudioUploadEnabled: debugAudioUploadEnabled === true,
+    voiceOnboarding: voiceOnboarding
+      ? {
+          useDefault: voiceOnboarding.useDefault !== false,
+          days: (voiceOnboarding.days || []).map((day) => ({
+            dayNumber: day.dayNumber,
+            theme: day.theme,
+            opening: day.opening,
+            questions: (day.questions || []).map((q) => ({
+              id: q.id,
+              prompt: q.prompt,
+              compressionPriority: q.compressionPriority === true,
+            })),
+          })),
+        }
+      : { useDefault: true, days: [] },
   };
 };
 

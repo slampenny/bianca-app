@@ -74,6 +74,16 @@ const updateOrgById = async (orgId, updateBody) => {
     // Remove from updateBody so Object.assign doesn't overwrite it
     const { callRetrySettings, ...restUpdateBody } = updateBody;
     Object.assign(org, restUpdateBody);
+  } else if (updateBody.voiceOnboarding) {
+    const { assertValidVoiceOnboardingConfig } = require('./onboardingPlan.service');
+    try {
+      assertValidVoiceOnboardingConfig(updateBody.voiceOnboarding);
+    } catch (err) {
+      throw new ApiError(httpStatus.BAD_REQUEST, err.message);
+    }
+    org.voiceOnboarding = updateBody.voiceOnboarding;
+    const { voiceOnboarding, ...restUpdateBody } = updateBody;
+    Object.assign(org, restUpdateBody);
   } else {
     Object.assign(org, updateBody);
   }

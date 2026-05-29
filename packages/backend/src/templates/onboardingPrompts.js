@@ -111,6 +111,43 @@ COMPRESSION: If tired, wrap gracefully without forcing remaining questions.
 }
 
 /**
+ * Build instructions for an org-specific onboarding day (non-default plan).
+ * @param {{ dayNumber: number, theme?: string, opening?: string, questions: { id: string, prompt: string, compressionPriority?: boolean }[] }} dayPlan
+ * @param {number} totalDays
+ * @param {{ residentName: string, facilityName: string }} ctx
+ */
+function buildCustomOnboardingInstructions(dayPlan, totalDays, ctx) {
+  const { residentName = '', facilityName = '' } = ctx || {};
+  const isFinalDay = dayPlan.dayNumber === totalDays;
+  const defaultOpening = `Hi {resident_name}, it's Bianca from {facility_name}. How are you doing today?`;
+  const opening = dayPlan.opening || defaultOpening;
+  const questionLines = dayPlan.questions
+    .map((q) => `- ${q.id} — ${q.prompt}`)
+    .join('\n');
+  const compressionIds = dayPlan.questions.filter((q) => q.compressionPriority).map((q) => q.id);
+  const compressionLine =
+    compressionIds.length > 0
+      ? `COMPRESSION: If fatigue or ~9 minutes, prioritize ${compressionIds.join(', ')}, then wrap.`
+      : 'COMPRESSION: If tired or ~9 minutes, wrap gracefully without forcing remaining questions.';
+  const closingLine = isFinalDay
+    ? `\nCLOSING when done: "It's been really lovely getting to know you, {resident_name}. I'll still check in with you from time to time — just a friendly call to see how you're doing. Take good care of yourself."`
+    : '';
+
+  const body = `
+TODAY'S SESSION: ${dayPlan.theme || `Day ${dayPlan.dayNumber}`} — onboarding call ${dayPlan.dayNumber} of ${totalDays}.
+
+OPENING (use first): "${opening}"
+If they say they can't talk right now or ask to do this later: acknowledge warmly and end the call.
+
+QUESTIONS (conversational order, one at a time). Internal topic ids (for care alignment only — do not say these aloud):
+${questionLines}
+
+${compressionLine}${closingLine}
+`;
+  return substitute(SHARED_PREAMBLE + body, residentName, facilityName);
+}
+
+/**
  * @param {1|2|3|4} day
  * @param {{ residentName: string, facilityName: string }} ctx
  */
@@ -130,4 +167,4 @@ function buildOnboardingInstructions(day, ctx) {
   }
 }
 
-module.exports = { buildOnboardingInstructions, SHARED_PREAMBLE };
+module.exports = { buildOnboardingInstructions, buildCustomOnboardingInstructions, SHARED_PREAMBLE };

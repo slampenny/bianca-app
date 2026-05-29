@@ -104,6 +104,9 @@ export function OrgFlagsPage() {
           <Link to="/scim" className="admin-btn admin-btn--ghost">
             SCIM
           </Link>
+          <Link to="/voice-onboarding" className="admin-btn admin-btn--ghost">
+            Voice onboarding
+          </Link>
           <Link to="/embedding-anchors" className="admin-btn admin-btn--ghost">
             Embedding anchors
           </Link>

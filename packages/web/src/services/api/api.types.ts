@@ -119,6 +119,7 @@ export interface ClientPages {
 /** GET /clients/:id/onboarding — voice onboarding journey for a client */
 export interface ClientOnboardingJourneyDay {
   dayNumber: number
+  theme?: string | null
   totalQuestions: number
   capturedCount: number
   sessionCompleted: boolean
@@ -128,6 +129,8 @@ export interface ClientOnboardingJourneyDay {
 
 export interface ClientOnboardingJourney {
   days: ClientOnboardingJourneyDay[]
+  totalDays: number
+  enabled?: boolean
   currentDay: number | null
   journeyComplete: boolean
   sessionsCompletedCount: number
@@ -170,6 +173,8 @@ export interface ClientOnboardingDashboard {
 
 /** GET /clients/onboarding-rollups — per-client summary for lists / dashboard */
 export interface ClientOnboardingRollup {
+  totalDays: number
+  enabled?: boolean
   sessionsCompletedCount: number
   journeyComplete: boolean
   currentDay: number | null

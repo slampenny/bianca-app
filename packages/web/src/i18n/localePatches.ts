@@ -465,6 +465,50 @@ const patches: Record<string, Record<string, unknown>> = {
       saved: "تم حفظ اللغة.",
     },
   },
+  hu: {
+    nav: {
+      dashboard: "Kezdőlap",
+      alerts: "Riasztások",
+      residents: "Lakók",
+      reports: "Jelentések",
+      settings: "Beállítások",
+      simulateAlert: "Riasztás szimulálása",
+      expandSidebar: "Oldalsáv kinyitása",
+      collapseSidebar: "Oldalsáv összecsukása",
+    },
+    header: {
+      systemActive: "Rendszer aktív",
+      lastActivity: "Utolsó tevékenység:",
+      noActivity: "Nincs tevékenység",
+    },
+    profile: {
+      title: "Profil",
+      subtitle: "Fiókja, biztonság és az alkalmazás megjelenése ezen az eszközön.",
+      orgSettingsLink: "Szervezeti beállítások →",
+      preferredLanguage: "Előnyben részesített nyelv",
+      preferredLanguageHelper: "Fióküzenetekhez és a jövőbeli alkalmazásfordításokhoz.",
+      saveChangesTitle: "Változások mentése",
+      saveChangesHelper: "Név, e-mail, telefon, fénykép és nyelv mentése.",
+      saveProfile: "Profil mentése",
+      saving: "Mentés…",
+      appearanceTitle: "Megjelenés",
+      securityTitle: "Biztonság",
+      privacyTitle: "Adatvédelem",
+      sessionTitle: "Munkamenet",
+      signOut: "Kijelentkezés",
+      signingOut: "Kijelentkezés…",
+      mfaStateOn: "Bekapcsolva ({{count}} tartalék kód maradt)",
+      mfaStateOff: "Kikapcsolva",
+      manageMfa: "MFA kezelése",
+      setupMfa: "MFA beállítása",
+    },
+    settingsLanguage: {
+      title: "Előnyben részesített nyelv",
+      languageLabel: "Nyelv",
+      saveLanguage: "Nyelv mentése",
+      saved: "Nyelv mentve.",
+    },
+  },
   ko: {
     nav: {
       dashboard: "홈",
@@ -508,7 +552,7 @@ const patches: Record<string, Record<string, unknown>> = {
   },
 }
 
-const LANG_CODES = ["en", "es", "fr", "de", "zh", "ja", "pt", "it", "ru", "ar", "ko"] as const
+const LANG_CODES = ["en", "es", "fr", "de", "zh", "ja", "pt", "it", "ru", "ar", "ko", "hu"] as const
 
 export function buildWebResources(): Record<string, { translation: typeof en }> {
   const out: Record<string, { translation: typeof en }> = {}

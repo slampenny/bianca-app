@@ -4,7 +4,7 @@ const { objectId } = require('./custom.validation');
 const createEmergencyPhrase = {
   body: Joi.object().keys({
     phrase: Joi.string().required().trim().max(200),
-            language: Joi.string().required().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn'),
+            language: Joi.string().required().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn', 'hu'),
     severity: Joi.string().required().valid('CRITICAL', 'HIGH', 'MEDIUM'),
     category: Joi.string().required().valid('Medical', 'Safety', 'Physical', 'Request'),
     pattern: Joi.string().required().trim().max(500),
@@ -82,7 +82,7 @@ const bulkImportPhrases = {
       .items(
         Joi.object().keys({
           phrase: Joi.string().required().trim().max(200),
-            language: Joi.string().required().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn'),
+            language: Joi.string().required().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn', 'hu'),
           severity: Joi.string().required().valid('CRITICAL', 'HIGH', 'MEDIUM'),
           category: Joi.string().required().valid('Medical', 'Safety', 'Physical', 'Request'),
           pattern: Joi.string().required().trim().max(500),
@@ -108,7 +108,7 @@ const exportPhrases = {
 
 const getPhrasesByLanguage = {
   params: Joi.object().keys({
-            language: Joi.string().required().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn'),
+            language: Joi.string().required().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn', 'hu'),
   }),
   query: Joi.object().keys({
     severity: Joi.string().valid('CRITICAL', 'HIGH', 'MEDIUM'),

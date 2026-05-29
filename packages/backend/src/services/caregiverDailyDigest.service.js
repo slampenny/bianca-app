@@ -10,7 +10,7 @@ const logger = require('../config/logger');
 const emailService = require('./email.service');
 
 i18n.configure({
-  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
+  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar', 'hu'],
   directory: path.join(__dirname, '../locales'),
   defaultLocale: 'en',
   updateFiles: false,

@@ -41,7 +41,7 @@ const createClient = {
         }
         return value;
       }),
-    preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar').optional(),
+    preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'ko', 'hu').optional(),
     consented: Joi.boolean().optional(),
     consentedAt: Joi.date().optional(),
     consentEmailVersion: Joi.string().optional(),
@@ -118,7 +118,7 @@ const updateClient = {
           }
           return value;
         }),
-      preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar').optional(),
+      preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'ko', 'hu').optional(),
       isEmailVerified: Joi.boolean().optional(),
       consented: Joi.boolean().optional(),
       consentedAt: Joi.date().optional(),

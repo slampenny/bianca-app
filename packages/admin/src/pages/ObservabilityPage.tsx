@@ -76,6 +76,9 @@ export function ObservabilityPage() {
           <Link to="/org-flags" className="admin-btn admin-btn--ghost">
             Org flags
           </Link>
+          <Link to="/voice-onboarding" className="admin-btn admin-btn--ghost">
+            Voice onboarding
+          </Link>
           <Link to="/embedding-anchors" className="admin-btn admin-btn--ghost">
             Embedding anchors
           </Link>

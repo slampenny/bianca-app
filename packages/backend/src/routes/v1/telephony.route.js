@@ -1,12 +1,14 @@
 const express = require('express');
 const voiceTelephonyController = require('../../controllers/voiceTelephony.controller');
 const bypassTelephonyWebhookValidation = require('../../middlewares/bypassTelephonyWebhookValidation');
+const { captureTelnyxRawBody } = require('../../middlewares/validateTelnyxRequest');
 const validate = require('../../middlewares/validate');
 const telephonyValidation = require('../../validations/telephony.validation');
 
 const router = express.Router();
 
 const webhookBodyParser = express.urlencoded({ extended: false });
+const telnyxJsonParser = express.json({ verify: captureTelnyxRawBody });
 
 /**
  * @swagger
@@ -36,12 +38,14 @@ router.post('/initiate', validate(telephonyValidation.initiate), voiceTelephonyC
  */
 router.get(
   '/start-call/:clientId',
+  telnyxJsonParser,
   webhookBodyParser,
   bypassTelephonyWebhookValidation,
   voiceTelephonyController.handleStartCall
 );
 router.post(
   '/start-call/:clientId',
+  telnyxJsonParser,
   webhookBodyParser,
   bypassTelephonyWebhookValidation,
   voiceTelephonyController.handleStartCall
@@ -56,12 +60,14 @@ router.post(
  */
 router.get(
   '/call-status',
+  telnyxJsonParser,
   webhookBodyParser,
   bypassTelephonyWebhookValidation,
   voiceTelephonyController.handleCallStatus
 );
 router.post(
   '/call-status',
+  telnyxJsonParser,
   webhookBodyParser,
   bypassTelephonyWebhookValidation,
   voiceTelephonyController.handleCallStatus

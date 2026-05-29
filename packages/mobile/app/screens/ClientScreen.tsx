@@ -591,6 +591,7 @@ function ClientScreen() {
                       <Text style={styles.onboardingHint}>
                         {translate("clientScreen.onboardingCallsCompleted", {
                           completed: onboardingData.journey.sessionsCompletedCount,
+                          total: onboardingData.journey.totalDays,
                         })}
                       </Text>
                       <Text style={styles.onboardingHint}>

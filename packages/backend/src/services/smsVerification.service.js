@@ -9,7 +9,7 @@ const i18n = require('i18n');
 
 // Configure i18n for SMS service (same config as email service)
 i18n.configure({
-  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
+  locales: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar', 'hu'],
   directory: `${__dirname}/../locales`,
   objectNotation: true,
   defaultLocale: 'en',

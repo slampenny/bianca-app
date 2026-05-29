@@ -92,8 +92,13 @@ const envVarsSchema = Joi.object({
     otherwise: Joi.string().optional() // Optional in dev/test environments (can use placeholder values)
   }),
   TWILIO_VOICEURL: Joi.string(), // Keep if used elsewhere
-  /** Outbound/inbound voice: twilio (default) | telnyx (stub until implemented) */
+  /** Outbound/inbound voice: twilio (default) | telnyx */
   VOICE_TELEPHONY_PROVIDER: Joi.string().valid('twilio', 'telnyx').optional(),
+  TELNYX_API_KEY: Joi.string().optional(),
+  TELNYX_CONNECTION_ID: Joi.string().optional(),
+  TELNYX_PHONE_NUMBER: Joi.string().optional(),
+  TELNYX_PHONENUMBER: Joi.string().optional(),
+  TELNYX_PUBLIC_KEY: Joi.string().optional(),
   /** Outbound SMS: twilio (default) | sns (Amazon SNS Publish to phone) */
   SMS_PROVIDER: Joi.string().valid('twilio', 'sns').optional(),
   SMS_SNS_REGION: Joi.string().optional(),

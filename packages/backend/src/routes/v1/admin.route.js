@@ -13,6 +13,8 @@ const router = express.Router();
 
 router.get('/observability', auth(), adminController.getObservability);
 
+router.get('/onboarding/default-plan', auth(), adminController.getDefaultVoiceOnboardingPlan);
+
 router.get(
   '/orgs',
   auth(),

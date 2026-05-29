@@ -49,6 +49,30 @@ export interface AdminOrgSearchResponse {
 }
 
 /** GET/PATCH /v1/orgs/:orgId (super admin) */
+export interface VoiceOnboardingQuestion {
+  id: string
+  prompt: string
+  compressionPriority?: boolean
+}
+
+export interface VoiceOnboardingDay {
+  dayNumber?: number
+  theme?: string
+  opening?: string
+  questions: VoiceOnboardingQuestion[]
+}
+
+export interface VoiceOnboardingConfig {
+  useDefault: boolean
+  days?: VoiceOnboardingDay[]
+}
+
+export interface VoiceOnboardingPlan {
+  useDefault: boolean
+  totalDays: number
+  days: VoiceOnboardingDay[]
+}
+
 export interface AdminOrgDetail {
   id?: string
   name: string
@@ -57,6 +81,7 @@ export interface AdminOrgDetail {
   timezone?: string
   country?: string
   requireClientConsent?: boolean
+  voiceOnboarding?: VoiceOnboardingConfig
 }
 
 export interface ScimAdminStatus {

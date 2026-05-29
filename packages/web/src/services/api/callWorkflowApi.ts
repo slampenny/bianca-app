@@ -21,6 +21,7 @@ export interface InitiateCallResponse {
   callStatus?: string
   callType?: string
   onboardingDay?: number | null
+  onboardingTotalDays?: number
   onboardingJourneyComplete?: boolean
   onboardingSessionsCompleted?: number
   onboardingCurrentStageDay?: number | null
@@ -44,6 +45,7 @@ export interface CallStatusResponse {
   onboarding?: {
     isOnboardingCall: boolean
     onboardingDay: number | null
+    totalDays?: number
     journeyComplete: boolean
     sessionsCompleted: number
     currentStageDay: number | null

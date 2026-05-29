@@ -84,8 +84,9 @@ Then("I should not see the resident call workspace", async function () {
 
 Then("I should see resident call controls", async function () {
   await expect(this.page.getByRole("button", { name: "Back to Resident" })).toBeVisible({ timeout: 10000 })
-  await expect(this.page.getByTestId("resident-call-workspace-submit")).toBeVisible({ timeout: 10000 })
-  await expect(this.page.getByText("Call notes (optional)")).toBeVisible({ timeout: 10000 })
+  await expect(
+    this.page.getByTestId("resident-call-initiating").or(this.page.getByText(/Setting up call|Connected with/i)),
+  ).toBeVisible({ timeout: 15000 })
 })
 
 When("I go back to resident detail from resident call workspace", async function () {

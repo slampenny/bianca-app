@@ -176,6 +176,8 @@ export function CallScreen() {
     polledOnboarding?.onboardingDay ?? activeCall?.onboardingDay ?? null
   const sessionsCompleted =
     polledOnboarding?.sessionsCompleted ?? activeCall?.onboardingSessionsCompleted ?? 0
+  const onboardingTotalDays =
+    polledOnboarding?.totalDays ?? activeCall?.onboardingTotalDays ?? 4
   const currentStageDay =
     polledOnboarding?.currentStageDay ?? activeCall?.onboardingCurrentStageDay ?? null
 
@@ -190,11 +192,11 @@ export function CallScreen() {
         <View style={styles.onboardingBanner} accessibilityRole="summary">
           <Text style={styles.onboardingBannerTitle}>{translate("callScreen.onboardingTitle")}</Text>
           <Text style={styles.onboardingBannerBody}>
-            {translate("callScreen.onboardingProgress", { completed: sessionsCompleted })}
+            {translate("callScreen.onboardingProgress", { completed: sessionsCompleted, total: onboardingTotalDays })}
           </Text>
           {isOnboardingCall && onboardingDay != null ? (
             <Text style={styles.onboardingBannerBody}>
-              {translate("callScreen.onboardingThisCall", { day: onboardingDay })}
+              {translate("callScreen.onboardingThisCall", { day: onboardingDay, total: onboardingTotalDays })}
             </Text>
           ) : currentStageDay != null ? (
             <Text style={styles.onboardingBannerBody}>

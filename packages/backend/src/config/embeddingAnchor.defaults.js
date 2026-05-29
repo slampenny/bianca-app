@@ -1,8 +1,12 @@
 /**
  * Default anchor phrases and tree shape for embedding-based detectors.
  * Seeded into Mongo (EmbeddingAnchorPhrase) when the collection is empty; editable via admin API.
+ * English phrases below; non-English phrases merged from embeddingAnchor.i18n.js (all supported patient languages).
  */
-const ANCHOR_TREE = {
+const { I18N_ANCHORS } = require('./embeddingAnchor.i18n');
+const { mergeI18nIntoAnchorTree, SUPPORTED_ANCHOR_LANGUAGES } = require('./embeddingAnchor.mergeI18n');
+
+const ANCHOR_TREE_EN = {
   emergencyDetector: {
     medical_emergency: {
       severity: 'CRITICAL',
@@ -167,6 +171,11 @@ const ANCHOR_TREE = {
   },
 };
 
+const ANCHOR_TREE = mergeI18nIntoAnchorTree(
+  JSON.parse(JSON.stringify(ANCHOR_TREE_EN)),
+  I18N_ANCHORS
+);
+
 function flattenListFromTree(tree) {
   const list = [];
   const emergency = tree.emergencyDetector;
@@ -204,6 +213,9 @@ const countUniquePhrases = () => countUniquePhrasesInTree(ANCHOR_TREE);
 
 module.exports = {
   ANCHOR_TREE,
+  ANCHOR_TREE_EN,
+  I18N_ANCHORS,
+  SUPPORTED_ANCHOR_LANGUAGES,
   flattenListFromTree,
   countUniquePhrasesInTree,
   flattenPhraseList,

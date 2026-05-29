@@ -1,27 +1,21 @@
 const mongoose = require('mongoose');
 const { OnboardingResponse } = require('../models/onboardingResponse.model');
-const { Call } = require('../models');
+const { Call, Client } = require('../models');
 const logger = require('../config/logger');
-const { getQuestionIdsForDay } = require('../templates/onboardingQuestionOrder');
-
-/** Expected capture topics per day (same order as onboardingQuestionOrder.js / transcript capture). */
-const QUESTIONS_PER_DAY = {
-  1: getQuestionIdsForDay(1).length,
-  2: getQuestionIdsForDay(2).length,
-  3: getQuestionIdsForDay(3).length,
-  4: getQuestionIdsForDay(4).length,
-};
+const onboardingPlanService = require('./onboardingPlan.service');
 
 /**
  * Build journey + flags from onboarding responses and onboarding calls for a single client.
  * @param {object[]} allRowsForClient - OnboardingResponse lean docs
- * @param {object[]} onboardingCallsForClient - Call lean docs with onboardingDay 1–4
+ * @param {object[]} onboardingCallsForClient - Call lean docs with onboardingDay set
+ * @param {import('./onboardingPlan.service').ResolvedOnboardingPlan} plan
  */
-const _buildJourneyAndFlags = (allRowsForClient, onboardingCallsForClient) => {
+const _buildJourneyAndFlags = (allRowsForClient, onboardingCallsForClient, plan) => {
+  const validDayNumbers = new Set(plan.days.map((d) => d.dayNumber));
   const latestCallByDay = {};
   for (const c of onboardingCallsForClient) {
     const d = c.onboardingDay;
-    if (!d || d < 1 || d > 4) continue;
+    if (!d || !validDayNumbers.has(d)) continue;
     const t = new Date(c.startTime || c.createdAt || 0).getTime();
     if (!latestCallByDay[d] || t > latestCallByDay[d].t) {
       latestCallByDay[d] = { t, call: c };
@@ -29,7 +23,8 @@ const _buildJourneyAndFlags = (allRowsForClient, onboardingCallsForClient) => {
   }
 
   const sessionByDay = {};
-  for (let d = 1; d <= 4; d += 1) {
+  for (const dayPlan of plan.days) {
+    const d = dayPlan.dayNumber;
     const entry = latestCallByDay[d];
     if (entry?.call?.onboardingCompletedAt) {
       sessionByDay[d] = {
@@ -46,19 +41,24 @@ const _buildJourneyAndFlags = (allRowsForClient, onboardingCallsForClient) => {
     }
   }
 
-  const uniqueQuestionsByDay = { 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set() };
+  const uniqueQuestionsByDay = {};
+  for (const dayPlan of plan.days) {
+    uniqueQuestionsByDay[dayPlan.dayNumber] = new Set();
+  }
   for (const r of allRowsForClient) {
-    if (r.dayNumber >= 1 && r.dayNumber <= 4) {
+    if (uniqueQuestionsByDay[r.dayNumber]) {
       uniqueQuestionsByDay[r.dayNumber].add(r.questionId);
     }
   }
 
-  const days = [1, 2, 3, 4].map((dayNum) => {
+  const days = plan.days.map((dayPlan) => {
+    const dayNum = dayPlan.dayNumber;
     const sess = sessionByDay[dayNum];
     return {
       dayNumber: dayNum,
-      totalQuestions: QUESTIONS_PER_DAY[dayNum],
-      capturedCount: uniqueQuestionsByDay[dayNum].size,
+      theme: dayPlan.theme || null,
+      totalQuestions: dayPlan.questions.length,
+      capturedCount: uniqueQuestionsByDay[dayNum]?.size || 0,
       sessionCompleted: sess.sessionCompleted,
       sessionCompletedAt: sess.sessionCompletedAt,
       sessionEndedReason: sess.sessionEndedReason,
@@ -66,14 +66,17 @@ const _buildJourneyAndFlags = (allRowsForClient, onboardingCallsForClient) => {
   });
 
   let currentDay = null;
-  for (let d = 1; d <= 4; d += 1) {
+  for (const dayPlan of plan.days) {
+    const d = dayPlan.dayNumber;
     if (!sessionByDay[d].sessionCompleted) {
       currentDay = d;
       break;
     }
   }
-  const journeyComplete = [1, 2, 3, 4].every((d) => sessionByDay[d].sessionCompleted);
-  const sessionsCompletedCount = [1, 2, 3, 4].filter((d) => sessionByDay[d].sessionCompleted).length;
+  const enabled = onboardingPlanService.isOnboardingEnabled(plan);
+  const journeyComplete =
+    !enabled || (plan.totalDays > 0 && plan.days.every((d) => sessionByDay[d.dayNumber].sessionCompleted));
+  const sessionsCompletedCount = plan.days.filter((d) => sessionByDay[d.dayNumber].sessionCompleted).length;
   const hasAnyOnboardingActivity = allRowsForClient.length > 0 || onboardingCallsForClient.length > 0;
 
   let anySafety;
@@ -92,6 +95,8 @@ const _buildJourneyAndFlags = (allRowsForClient, onboardingCallsForClient) => {
   return {
     journey: {
       days,
+      totalDays: plan.totalDays,
+      enabled,
       currentDay: journeyComplete ? null : currentDay,
       journeyComplete,
       sessionsCompletedCount,
@@ -169,17 +174,20 @@ const completeSession = async ({ callMongoId, endedEarlyReason, summaryNotes }) 
   return call;
 };
 
-const listByClient = async (clientId, { dayNumber } = {}) => {
+const listByClient = async (clientId, { dayNumber, plan } = {}) => {
   const q = { clientId };
-  if (dayNumber != null && dayNumber >= 1 && dayNumber <= 4) {
+  if (dayNumber != null && plan && onboardingPlanService.isValidOnboardingDay(plan, dayNumber)) {
     q.dayNumber = dayNumber;
   }
   return OnboardingResponse.find(q).sort({ dayNumber: 1, capturedAt: -1 }).lean();
 };
 
-const dashboardSummary = async (clientId) => {
+const dashboardSummary = async (clientId, plan) => {
   const rows = await OnboardingResponse.find({ clientId }).lean();
-  const byDay = { 1: [], 2: [], 3: [], 4: [] };
+  const byDay = {};
+  for (const dayPlan of plan.days) {
+    byDay[dayPlan.dayNumber] = [];
+  }
   let anySafety;
   let anyMemory;
   let anyMood;
@@ -214,19 +222,21 @@ const dashboardSummary = async (clientId) => {
  */
 const getDashboardForClient = async (clientId, { dayNumber } = {}) => {
   const cid = clientId instanceof mongoose.Types.ObjectId ? clientId : new mongoose.Types.ObjectId(String(clientId));
+  const plan = await onboardingPlanService.getPlanForClientId(cid);
 
+  const dayNumbers = plan.days.map((d) => d.dayNumber);
   const [rows, calls] = await Promise.all([
     OnboardingResponse.find({ clientId: cid }).sort({ dayNumber: 1, capturedAt: -1 }).lean(),
-    Call.find({ clientId: cid, onboardingDay: { $gte: 1, $lte: 4 } })
+    Call.find({ clientId: cid, onboardingDay: { $in: dayNumbers } })
       .select('onboardingDay onboardingCompletedAt onboardingEndedEarlyReason startTime createdAt')
       .sort({ startTime: -1 })
       .lean(),
   ]);
 
-  const { journey, flags, questionCount } = _buildJourneyAndFlags(rows, calls);
+  const { journey, flags, questionCount } = _buildJourneyAndFlags(rows, calls, plan);
 
   const filteredRows =
-    dayNumber != null && dayNumber >= 1 && dayNumber <= 4
+    dayNumber != null && onboardingPlanService.isValidOnboardingDay(plan, dayNumber)
       ? rows.filter((r) => r.dayNumber === dayNumber)
       : rows;
 
@@ -251,11 +261,32 @@ const getJourneyRollupsForClientIds = async (clientIds) => {
   const oidList = clientIds.map((id) =>
     id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(String(id))
   );
+
+  const clients = await Client.find({ _id: { $in: oidList } })
+    .select('_id org')
+    .lean();
+  const orgIds = [...new Set(clients.map((c) => (c.org ? c.org.toString() : null)).filter(Boolean))];
+  const planByOrgId = {};
+  await Promise.all(
+    orgIds.map(async (orgId) => {
+      planByOrgId[orgId] = await onboardingPlanService.getPlanForOrgId(orgId);
+    })
+  );
+  const planByClientId = {};
+  for (const c of clients) {
+    const orgKey = c.org ? c.org.toString() : null;
+    planByClientId[c._id.toString()] = orgKey ? planByOrgId[orgKey] : onboardingPlanService.getDefaultPlanTemplate();
+  }
+
   for (const oid of oidList) {
-    rollups[oid.toString()] = {
+    const k = oid.toString();
+    const plan = planByClientId[k] || onboardingPlanService.getDefaultPlanTemplate();
+    rollups[k] = {
+      totalDays: plan.totalDays,
+      enabled: onboardingPlanService.isOnboardingEnabled(plan),
       sessionsCompletedCount: 0,
-      journeyComplete: false,
-      currentDay: 1,
+      journeyComplete: !onboardingPlanService.isOnboardingEnabled(plan),
+      currentDay: onboardingPlanService.isOnboardingEnabled(plan) ? plan.days[0]?.dayNumber ?? 1 : null,
       hasAnyOnboardingActivity: false,
       flags: {
         safety: false,
@@ -268,6 +299,10 @@ const getJourneyRollupsForClientIds = async (clientIds) => {
     };
   }
 
+  const allDayNumbers = [
+    ...new Set(Object.values(planByOrgId).flatMap((p) => p.days.map((d) => d.dayNumber))),
+  ];
+
   const [rows, calls] = await Promise.all([
     OnboardingResponse.find({ clientId: { $in: oidList } })
       .select(
@@ -275,7 +310,7 @@ const getJourneyRollupsForClientIds = async (clientIds) => {
       )
       .sort({ dayNumber: 1, capturedAt: -1 })
       .lean(),
-    Call.find({ clientId: { $in: oidList }, onboardingDay: { $gte: 1, $lte: 4 } })
+    Call.find({ clientId: { $in: oidList }, onboardingDay: { $in: allDayNumbers.length ? allDayNumbers : [1, 2, 3, 4] } })
       .select('clientId onboardingDay onboardingCompletedAt onboardingEndedEarlyReason startTime createdAt')
       .lean(),
   ]);
@@ -298,8 +333,11 @@ const getJourneyRollupsForClientIds = async (clientIds) => {
 
   for (const oid of oidList) {
     const k = oid.toString();
-    const built = _buildJourneyAndFlags(rowsByClient[k], callsByClient[k]);
+    const plan = planByClientId[k] || onboardingPlanService.getDefaultPlanTemplate();
+    const built = _buildJourneyAndFlags(rowsByClient[k], callsByClient[k], plan);
     rollups[k] = {
+      totalDays: built.journey.totalDays,
+      enabled: built.journey.enabled,
       sessionsCompletedCount: built.journey.sessionsCompletedCount,
       journeyComplete: built.journey.journeyComplete,
       currentDay: built.journey.currentDay,

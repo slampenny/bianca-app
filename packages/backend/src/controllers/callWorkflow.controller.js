@@ -3,6 +3,7 @@ const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const { conversationService, voiceTelephonyService, clientService, caregiverService } = require('../services');
 const onboardingService = require('../services/onboarding.service');
+const onboardingPlanService = require('../services/onboardingPlan.service');
 const { ConversationDTO } = require('../dtos');
 const { Call, Conversation } = require('../models');
 const logger = require('../config/logger');
@@ -32,8 +33,11 @@ const initiateCall = catchAsync(async (req, res) => {
 
   try {
     const onboardingDash = await onboardingService.getDashboardForClient(client._id);
+    const onboardingPlan = await onboardingPlanService.getPlanForClientId(client._id);
     const nextOnboardingDay =
-      !onboardingDash.journey.journeyComplete && onboardingDash.journey.currentDay != null
+      onboardingPlanService.isOnboardingEnabled(onboardingPlan) &&
+      !onboardingDash.journey.journeyComplete &&
+      onboardingDash.journey.currentDay != null
         ? onboardingDash.journey.currentDay
         : null;
 
@@ -84,7 +88,9 @@ const initiateCall = catchAsync(async (req, res) => {
 
     logger.info(`[CallWorkflow] Call initiated for client ${client.name}, SID: ${callSid}, Conversation: ${conversation._id}`);
 
-    const isOnboardingCall = !!(call.onboardingDay >= 1 && call.onboardingDay <= 4);
+    const onboardingTotalDays = onboardingPlan.totalDays;
+    const isOnboardingCall =
+      call.onboardingDay != null && onboardingPlanService.isValidOnboardingDay(onboardingPlan, call.onboardingDay);
 
     res.status(httpStatus.CREATED).send({
       callId: call._id.toString(),
@@ -101,6 +107,7 @@ const initiateCall = catchAsync(async (req, res) => {
       callStatus: call.callStatus,
       callType: call.callType,
       onboardingDay: call.onboardingDay ?? null,
+      onboardingTotalDays,
       onboardingJourneyComplete: onboardingDash.journey.journeyComplete,
       onboardingSessionsCompleted: onboardingDash.journey.sessionsCompletedCount,
       onboardingCurrentStageDay: onboardingDash.journey.currentDay,
@@ -241,7 +248,9 @@ const getCallStatus = catchAsync(async (req, res) => {
   
   const clientMongoId = call.clientId?._id || call.clientId;
   const onboardingDash = await onboardingService.getDashboardForClient(clientMongoId);
-  const isOnboardingCall = !!(call.onboardingDay >= 1 && call.onboardingDay <= 4);
+  const onboardingPlan = await onboardingPlanService.getPlanForClientId(clientMongoId);
+  const isOnboardingCall =
+    call.onboardingDay != null && onboardingPlanService.isValidOnboardingDay(onboardingPlan, call.onboardingDay);
 
   let responseStatus = call.status;
   let responseCallStatus = call.callStatus;
@@ -271,6 +280,7 @@ const getCallStatus = catchAsync(async (req, res) => {
     onboarding: {
       isOnboardingCall,
       onboardingDay: call.onboardingDay ?? null,
+      totalDays: onboardingPlan.totalDays,
       journeyComplete: onboardingDash.journey.journeyComplete,
       sessionsCompleted: onboardingDash.journey.sessionsCompletedCount,
       currentStageDay: onboardingDash.journey.currentDay,

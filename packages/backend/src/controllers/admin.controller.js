@@ -342,6 +342,12 @@ const saveCorpEmailForwards = catchAsync(async (req, res) => {
   res.send(out);
 });
 
+const getDefaultVoiceOnboardingPlan = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const onboardingPlanService = require('../services/onboardingPlan.service');
+  res.status(httpStatus.OK).send({ plan: onboardingPlanService.getDefaultPlanTemplate() });
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -359,4 +365,5 @@ module.exports = {
   mergeDefaultEmbeddingAnchorPhrases,
   listCorpEmailForwards,
   saveCorpEmailForwards,
+  getDefaultVoiceOnboardingPlan,
 };

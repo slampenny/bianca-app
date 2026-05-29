@@ -84,7 +84,7 @@ const clientSchema = mongoose.Schema(
     preferredLanguage: {
       type: String,
       default: 'en',
-      enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar'],
+      enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'ko', 'hu'],
     },
     isEmailVerified: {
       type: Boolean,

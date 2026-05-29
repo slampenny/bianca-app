@@ -3,7 +3,7 @@
  * Seeds emergency phrases into the database for all supported languages
  * These phrases are used by the localized emergency detector
  * 
- * Supports: en, es, fr, de, zh, ja, pt, it, ru, ar, hi, zh-cn
+ * Supports: en, es, fr, de, zh, ja, pt, it, ru, ar, hi, zh-cn, hu
  */
 
 const { EmergencyPhrase } = require('../../models');
@@ -69,6 +69,23 @@ function getPhrasesForLanguage(language) {
       // MEDIUM - Request
       { phrase: 'appeler le 911', pattern: "\\b(appeler\\s+le\\s+911|appeler\\s+les\\s+urgences|services\\s+d'urgence)\\b", severity: 'MEDIUM', category: 'Request', description: 'Demande de services d\'urgence' },
       { phrase: 'besoin d\'aide', pattern: "\\b(besoin\\s+d'aide|j'ai\\s+besoin\\s+d'aide|aidez-moi)\\b", severity: 'MEDIUM', category: 'Request', description: 'Demande d\'aide' }
+    ],
+    hu: [
+      // CRITICAL - Medical (Hungarian)
+      { phrase: 'szívroham', pattern: '\\b(szívroham|szívrohamot\\s+kapok|szívrohamom\\s+van)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Szívészeti vészhelyzet - szívroham' },
+      { phrase: 'nem tudok lélegezni', pattern: '\\b(nem\\s+tudok\\s+lélegezni|nem\\s+kapok\\s+levegőt|fulladok)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Légzési vészhelyzet' },
+      { phrase: 'fulladás', pattern: '\\b(fulladás|fulladok|megfulladok)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Fulladásos vészhelyzet' },
+      { phrase: 'agyvérzés', pattern: '\\b(agyvérzés|stroke|görcsroham)\\b', severity: 'CRITICAL', category: 'Medical', description: 'Agyvérzés vészhelyzet' },
+      // CRITICAL - Safety
+      { phrase: 'öngyilkosság', pattern: '\\b(öngyilkosság|megölni\\s+magam|megakarok\\s+halni|véget\\s+vetni\\s+az\\s+életemnek)\\b', severity: 'CRITICAL', category: 'Safety', description: 'Öngyilkossági fenyegetés' },
+      // HIGH - Physical
+      { phrase: 'elesettem', pattern: '\\b(elesettem|leestem|megcsúsztam|elbuktam)\\b', severity: 'HIGH', category: 'Physical', description: 'Esés' },
+      { phrase: 'nem tudok felállni', pattern: '\\b(nem\\s+tudok\\s+felállni|nem\\s+tudok\\s+fellábalni)\\b', severity: 'HIGH', category: 'Physical', description: 'Esés után nem tud felállni' },
+      // HIGH - Medical
+      { phrase: 'mellkasi fájdalom', pattern: '\\b(mellkasi\\s+fájdalom|szúrás\\s+a\\s+mellkasban|nyomás\\s+a\\s+mellkasban)\\b', severity: 'HIGH', category: 'Medical', description: 'Mellkasi fájdalom vagy nyomás' },
+      // MEDIUM - Request
+      { phrase: 'hívja a 112-et', pattern: '\\b(hívja\\s+a\\s+112|112\\s+es\\s+segélyhívó|segélyszolgálat)\\b', severity: 'MEDIUM', category: 'Request', description: 'Segélyszolgálat hívása' },
+      { phrase: 'segítségre van szükségem', pattern: '\\b(segítségre\\s+van\\s+szükségem|segítség|segítsen)\\b', severity: 'MEDIUM', category: 'Request', description: 'Segítségkérés' }
     ],
     de: [
       // CRITICAL - Medical (German)
@@ -250,7 +267,7 @@ async function seedEmergencyPhrases() {
       return;
     }
 
-    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn']; // All supported languages
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ar', 'hi', 'zh-cn', 'hu']; // All supported languages
     const allPhrases = [];
 
     // Build phrases for all languages

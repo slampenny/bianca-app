@@ -157,6 +157,30 @@ const orgSchema = mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    /**
+     * Per-org resident voice onboarding plan. When useDefault is true (default), the built-in 4-day plan applies.
+     * When useDefault is false, days[] defines the org-specific call sequence and questions.
+     */
+    voiceOnboarding: {
+      useDefault: {
+        type: Boolean,
+        default: true,
+      },
+      days: [
+        {
+          dayNumber: { type: Number, min: 1 },
+          theme: { type: String, trim: true },
+          opening: { type: String, trim: true },
+          questions: [
+            {
+              id: { type: String, required: true, trim: true },
+              prompt: { type: String, required: true, trim: true },
+              compressionPriority: { type: Boolean, default: false },
+            },
+          ],
+        },
+      ],
+    },
   },
   {
     timestamps: true,

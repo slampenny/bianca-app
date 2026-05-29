@@ -2056,7 +2056,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
 
             const conversationService = require('./conversation.service');
             const enhancedPrompt = await conversationService.buildEnhancedPrompt(clientId, callType, {
-              onboardingDay: onboardingDay >= 1 && onboardingDay <= 4 ? onboardingDay : undefined,
+              onboardingDay: onboardingDay >= 1 ? onboardingDay : undefined,
             });
             
             logger.info(`[ARI Pipeline] Built enhanced prompt for client ${clientId} (${callType} call)`);
@@ -2069,7 +2069,7 @@ async handleStasisStartForPlayback(channel, channelName, event) {
               callRecord = await Call.findOne({ callSid: twilioCallSid }).select('_id onboardingDay').lean();
             }
             const onboardingRealtimeOpts =
-              callRecord?.onboardingDay >= 1 && callRecord?.onboardingDay <= 4
+              callRecord?.onboardingDay >= 1
                 ? {
                     onboardingDay: callRecord.onboardingDay,
                     onboardingCallMongoId: callRecord._id.toString(),

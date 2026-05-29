@@ -1,5 +1,5 @@
 import { skipToken } from "@reduxjs/toolkit/query"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { ChevronLeftIcon } from "../icons"
 import { useGetClientQuery } from "../services/api/clientApi"
@@ -18,6 +18,7 @@ type ActiveResidentCall = {
   onboardingJourneyComplete?: boolean
   onboardingSessionsCompleted?: number
   onboardingCurrentStageDay?: number | null
+  onboardingTotalDays?: number
   isOnboardingCall?: boolean
 }
 
@@ -30,6 +31,8 @@ export function ResidentCallPage() {
   const [callNotesDraft, setCallNotesDraft] = useState("")
   const [callError, setCallError] = useState("")
   const [activeCall, setActiveCall] = useState<ActiveResidentCall | null>(null)
+  const [hasAutoCalled, setHasAutoCalled] = useState(true)
+  const autoCallAttempted = useRef(false)
 
   const { data: apiClient, isLoading: loadingClient } = useGetClientQuery(residentId ? { id: residentId } : skipToken)
   const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
@@ -71,9 +74,10 @@ export function ResidentCallPage() {
   const liveIsOnboardingCall = liveOnboarding?.isOnboardingCall ?? activeCall?.isOnboardingCall ?? false
   const liveOnboardingDay = liveOnboarding?.onboardingDay ?? activeCall?.onboardingDay ?? null
   const liveSessionsCompleted = liveOnboarding?.sessionsCompleted ?? activeCall?.onboardingSessionsCompleted ?? 0
+  const liveOnboardingTotalDays = liveOnboarding?.totalDays ?? activeCall?.onboardingTotalDays ?? 4
   const liveCurrentStageDay = liveOnboarding?.currentStageDay ?? activeCall?.onboardingCurrentStageDay ?? null
 
-  const onCallNow = async () => {
+  const onCallNow = useCallback(async () => {
     if (!apiClient?.id || isInitiatingCall || !canCallNow) return
     setCallError("")
     try {
@@ -90,13 +94,22 @@ export function ResidentCallPage() {
         onboardingJourneyComplete: resp.onboardingJourneyComplete,
         onboardingSessionsCompleted: resp.onboardingSessionsCompleted,
         onboardingCurrentStageDay: resp.onboardingCurrentStageDay,
+        onboardingTotalDays: resp.onboardingTotalDays,
         isOnboardingCall: resp.isOnboardingCall,
       })
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
       setCallError(typeof msg === "string" ? msg : "Could not initiate call.")
     }
-  }
+  }, [apiClient?.id, callNotesDraft, canCallNow, displayName, initiateCall, isInitiatingCall])
+
+  useEffect(() => {
+    if (loadingClient || !apiClient?.id || !canCallNow || activeCall || isInitiatingCall || autoCallAttempted.current) return
+    autoCallAttempted.current = true
+    void onCallNow()
+  }, [activeCall, apiClient?.id, canCallNow, isInitiatingCall, loadingClient, onCallNow])
+
+  const showAutoInitiating = !activeCall && (loadingClient || isInitiatingCall || (hasAutoCalled && !callError))
 
   const onEndLiveCall = async () => {
     if (!activeCall?.conversationId || isEndingCall) return
@@ -154,29 +167,37 @@ export function ResidentCallPage() {
 
         {!activeCall ? (
           <div style={{ marginTop: "0.75rem", display: "grid", gap: 10 }}>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Call notes (optional)
-              <input
-                className="va-login-input"
-                value={callNotesDraft}
-                onChange={(e) => setCallNotesDraft(e.target.value)}
-                placeholder="Manual call initiated by caregiver"
-              />
-            </label>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                className="va-btn-primary"
-                data-testid="resident-call-workspace-submit"
-                disabled={isInitiatingCall || !apiClient?.id}
-                onClick={() => void onCallNow()}
-              >
-                {isInitiatingCall ? "Calling..." : "Call now"}
-              </button>
-              <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-                Live status + transcript updates every 2s.
-              </span>
-            </div>
+            {showAutoInitiating ? (
+              <p data-testid="resident-call-initiating" style={{ margin: 0, fontSize: "0.85rem", color: "var(--va-slate-600)" }}>
+                {loadingClient ? "Loading resident…" : `Calling ${displayName}…`}
+              </p>
+            ) : (
+              <>
+                <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
+                  Call notes (optional)
+                  <input
+                    className="va-login-input"
+                    value={callNotesDraft}
+                    onChange={(e) => setCallNotesDraft(e.target.value)}
+                    placeholder="Manual call initiated by caregiver"
+                  />
+                </label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="va-btn-primary"
+                    data-testid="resident-call-workspace-submit"
+                    disabled={isInitiatingCall || !apiClient?.id}
+                    onClick={() => void onCallNow()}
+                  >
+                    {isInitiatingCall ? "Calling..." : "Call now"}
+                  </button>
+                  <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
+                    Live status + transcript updates every 2s.
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div style={{ marginTop: "0.75rem", display: "grid", gap: 10 }}>
@@ -184,7 +205,7 @@ export function ResidentCallPage() {
               <div style={{ borderRadius: "0.65rem", border: "1px solid var(--va-amber-200)", background: "var(--va-amber-50)", padding: "0.55rem 0.65rem" }}>
                 <p style={{ margin: 0, fontSize: "0.78rem", fontWeight: 600, color: "var(--va-amber-800)" }}>Onboarding Progress</p>
                 <p style={{ margin: "0.2rem 0 0", fontSize: "0.78rem", color: "var(--va-amber-800)" }}>
-                  {liveSessionsCompleted}/4 completed
+                  {liveSessionsCompleted}/{liveOnboardingTotalDays} completed
                   {liveIsOnboardingCall && liveOnboardingDay != null ? ` · This call: Day ${liveOnboardingDay}` : ""}
                   {!liveIsOnboardingCall && liveCurrentStageDay != null ? ` · Next: Day ${liveCurrentStageDay}` : ""}
                 </p>
@@ -212,7 +233,7 @@ export function ResidentCallPage() {
                 {liveCallStatusError ? " · Status temporarily unavailable" : ""}
               </p>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button type="button" className="va-btn-secondary" onClick={() => setActiveCall(null)}>
+                <button type="button" className="va-btn-secondary" onClick={() => { setActiveCall(null); setHasAutoCalled(false) }}>
                   Dismiss
                 </button>
                 {isLiveCall ? (

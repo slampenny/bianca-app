@@ -28,7 +28,7 @@ void i18n.use(initReactI18next).init({
   resources: buildWebResources(),
   lng: readStoredOrBrowserLang(),
   fallbackLng: "en",
-  supportedLngs: ["en", "es", "fr", "de", "zh", "ja", "pt", "it", "ru", "ar", "ko"],
+  supportedLngs: ["en", "es", "fr", "de", "zh", "ja", "pt", "it", "ru", "ar", "ko", "hu"],
   nonExplicitSupportedLngs: true,
   interpolation: { escapeValue: false },
   react: { useSuspense: false },

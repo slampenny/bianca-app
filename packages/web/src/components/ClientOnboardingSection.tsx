@@ -95,6 +95,29 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
   }
 
   const { journey, flags } = data
+  const onboardingDisabled = journey.enabled === false
+
+  if (onboardingDisabled) {
+    return (
+      <div
+        id="voice-onboarding"
+        className="va-card va-card-pad"
+        style={{
+          padding: "0.55rem 0.75rem",
+          background: "var(--va-slate-50)",
+          border: "1px solid var(--va-slate-200)",
+        }}
+        data-testid="resident-onboarding-section"
+      >
+        <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--va-slate-600)" }}>
+          <span style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>Voice onboarding</span>
+          {" — "}
+          disabled for this organization. Calls use the regular wellness format.
+        </p>
+      </div>
+    )
+  }
+
   const activeFlags = FLAG_LABELS.filter((f) => flags[f.key])
   const callWorkspaceLink = (
     <Link
@@ -122,7 +145,7 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
           <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--va-slate-600)" }}>
             <span style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>Voice onboarding</span>
             {" — "}
-            completed (4/4). Rarely needed after the first week; expand to review captured answers.
+            completed ({journey.totalDays}/{journey.totalDays}). Rarely needed after the first week; expand to review captured answers.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
             {callWorkspaceLink}
@@ -141,7 +164,7 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
         <div>
           <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Voice onboarding</h2>
           <p style={{ marginTop: 4, fontSize: "0.8125rem", color: "var(--va-slate-500)", maxWidth: 520 }}>
-            Four guided call days. Progress is recorded from completed onboarding calls and captured answers.
+            Guided call onboarding ({journey.totalDays} {journey.totalDays === 1 ? "day" : "days"}). Progress is recorded from completed onboarding calls and captured answers.
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
@@ -173,7 +196,7 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
           {journey.journeyComplete ? "Journey complete" : "In progress"}
         </p>
         <p style={{ margin: "0.25rem 0 0", fontSize: "0.78rem", color: journey.journeyComplete ? "var(--va-emerald-800)" : "var(--va-amber-800)" }}>
-          {journey.sessionsCompletedCount}/4 sessions completed
+          {journey.sessionsCompletedCount}/{journey.totalDays} sessions completed
           {!journey.journeyComplete && journey.currentDay != null ? ` · Next focus: Day ${journey.currentDay}` : ""}
         </p>
       </div>

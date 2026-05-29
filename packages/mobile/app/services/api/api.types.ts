@@ -165,6 +165,7 @@ export interface OnboardingResponseRow {
 
 export interface ClientOnboardingJourneyDay {
   dayNumber: number
+  theme?: string | null
   totalQuestions: number
   capturedCount: number
   sessionCompleted: boolean
@@ -174,6 +175,8 @@ export interface ClientOnboardingJourneyDay {
 
 export interface ClientOnboardingJourney {
   days: ClientOnboardingJourneyDay[]
+  totalDays: number
+  enabled?: boolean
   currentDay: number | null
   journeyComplete: boolean
   sessionsCompletedCount: number

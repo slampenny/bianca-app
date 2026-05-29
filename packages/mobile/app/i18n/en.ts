@@ -197,10 +197,10 @@ const en = {
     confirmDelete: "CONFIRM DELETE",
     deleteClient: "DELETE CLIENT",
     onboardingCardTitle: "Resident onboarding",
-    onboardingNotStarted: "Not started — next: Day 1 of 4",
+    onboardingNotStarted: "Not started — next: Day 1 of {{total}}",
     onboardingInProgress: "In progress",
-    onboardingNextDay: "Next: Day {{day}} of 4",
-    onboardingCallsCompleted: "{{completed}} of 4 calls completed",
+    onboardingNextDay: "Next: Day {{day}} of {{total}}",
+    onboardingCallsCompleted: "{{completed}} of {{total}} calls completed",
     onboardingCapturesLine: "{{count}} topic captures recorded",
     onboardingComplete: "Onboarding complete — all 4 calls finished",
     viewOnboardingDetails: "VIEW ONBOARDING RESPONSES",
@@ -213,8 +213,8 @@ const en = {
   callScreen: {
     onboardingTitle: "Resident onboarding",
     onboardingThisCall:
-      "This call is onboarding session {{day}} of 4. The journey advances when the resident answers and the session completes.",
-    onboardingProgress: "{{completed}} of 4 onboarding sessions completed.",
+      "This call is onboarding session {{day}} of {{total}}. The journey advances when the resident answers and the session completes.",
+    onboardingProgress: "{{completed}} of {{total}} onboarding sessions completed.",
     onboardingNextRegular:
       "After onboarding finishes, check-ins will use the usual wellness format.",
     onboardingNextWillBe:

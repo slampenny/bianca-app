@@ -41,6 +41,7 @@ const languageModules = {
   pt: () => import("./pt"),
   it: () => import("./it"),
   ru: () => import("./ru"),
+  hu: () => import("./hu"),
 }
 
 i18n.fallbacks = true

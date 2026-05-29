@@ -21,6 +21,11 @@ describe('filler-words isFiller', () => {
     expect(isFiller('えー', 'ja')).toBe(true);
   });
 
+  it('rejects single filler token (hu)', () => {
+    expect(isFiller('hm', 'hu')).toBe(true);
+    expect(isFiller('ööö', 'hu')).toBe(true);
+  });
+
   it('rejects multi-filler phrase (en)', () => {
     expect(isFiller('um uh yeah', 'en')).toBe(true);
   });

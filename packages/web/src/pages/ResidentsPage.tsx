@@ -35,6 +35,8 @@ const FILTERS = [
 
 function defaultOnboardingRollup(): ClientOnboardingRollup {
   return {
+    totalDays: 4,
+    enabled: true,
     sessionsCompletedCount: 0,
     journeyComplete: false,
     currentDay: 1,
@@ -47,6 +49,11 @@ function defaultOnboardingRollup(): ClientOnboardingRollup {
 function OnboardingStatusCell({ rollup, loading }: { rollup: ClientOnboardingRollup; loading: boolean }) {
   if (loading) {
     return <span style={{ color: "var(--va-slate-400)", fontSize: "0.8125rem" }}>…</span>
+  }
+  if (rollup.enabled === false) {
+    return (
+      <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>Disabled</span>
+    )
   }
   if (rollup.journeyComplete) {
     return (
@@ -72,7 +79,7 @@ function OnboardingStatusCell({ rollup, loading }: { rollup: ClientOnboardingRol
   }
   return (
     <span style={{ fontSize: "0.8125rem", color: "var(--va-amber-800)" }}>
-      {rollup.sessionsCompletedCount}/4
+      {rollup.sessionsCompletedCount}/{rollup.totalDays ?? 4}
       {rollup.currentDay != null ? ` · Next: Day ${rollup.currentDay}` : ""}
     </span>
   )

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { Message } = require('../models');
 const logger = require('../config/logger');
 const onboardingService = require('./onboarding.service');
-const { getQuestionIdsForDay } = require('../templates/onboardingQuestionOrder');
+const onboardingPlanService = require('./onboardingPlan.service');
 
 const SPEAKING_PLACEHOLDER = '[Speaking...]';
 
@@ -62,11 +62,16 @@ function extractClientAnswerBlocks(messages) {
 async function captureFromConversation(params) {
   const { conversationId, clientId, dayNumber, callMongoId } = params;
 
-  if (!conversationId || !clientId || dayNumber < 1 || dayNumber > 4) {
+  if (!conversationId || !clientId) {
     return { recorded: 0, skipped: true };
   }
 
-  const questionIds = getQuestionIdsForDay(dayNumber);
+  const plan = await onboardingPlanService.getPlanForClientId(clientId);
+  if (!onboardingPlanService.isValidOnboardingDay(plan, dayNumber)) {
+    return { recorded: 0, skipped: true };
+  }
+
+  const questionIds = onboardingPlanService.getQuestionIdsForDay(plan, dayNumber);
   if (questionIds.length === 0) {
     return { recorded: 0, skipped: true };
   }

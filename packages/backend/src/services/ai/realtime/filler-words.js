@@ -81,6 +81,8 @@ const jaSet = new Set(['えー', 'あー', 'うーん', 'うん', 'ええ', 'あ
 
 const koSet = new Set(['어', '음', '흠', '응', '어어']);
 
+const huSet = new Set(['öö', 'ööö', 'hm', 'hmm', 'hát', 'na', 'ásza', 'izé', 'ugye', 'áá']);
+
 /** @type {Map<string, Set<string>>} */
 const FILLER_WORDS_BY_LANGUAGE = new Map();
 
@@ -102,6 +104,7 @@ addLangKeys(['ru', 'ru-RU'], ruSet);
 addLangKeys(['zh', 'zh-CN', 'zh-TW', 'zh-HK'], zhSet);
 addLangKeys(['ja', 'ja-JP'], jaSet);
 addLangKeys(['ko', 'ko-KR'], koSet);
+addLangKeys(['hu', 'hu-HU'], huSet);
 
 /**
  * @param {string} [language]

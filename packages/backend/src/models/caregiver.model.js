@@ -169,7 +169,7 @@ const caregiverSchema = mongoose.Schema(
     // Preferred language for UI and alerts
     preferredLanguage: {
       type: String,
-      enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar'],
+      enum: ['en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar', 'hu'],
       default: 'en',
       required: false,
     },

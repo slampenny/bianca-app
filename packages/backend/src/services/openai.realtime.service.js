@@ -503,10 +503,14 @@ class OpenAIRealtimeService {
       }
     }
 
+    const onboardingPlanService = require('./onboardingPlan.service');
+    const plan = clientId ? await onboardingPlanService.getPlanForClientId(clientId) : null;
+    const rawOnboardingDay = realtimeOptions?.onboardingDay;
     const onboardingDay =
-      realtimeOptions && realtimeOptions.onboardingDay >= 1 && realtimeOptions.onboardingDay <= 4
-        ? realtimeOptions.onboardingDay
+      plan && rawOnboardingDay >= 1 && onboardingPlanService.isValidOnboardingDay(plan, rawOnboardingDay)
+        ? rawOnboardingDay
         : null;
+    const onboardingTotalDays = plan?.totalDays ?? null;
     const onboardingCallMongoId = realtimeOptions?.onboardingCallMongoId || null;
 
     let orgId = null;
@@ -536,6 +540,7 @@ class OpenAIRealtimeService {
       orgId,
       debugAudioUploadEnabled,
       onboardingDay,
+      onboardingTotalDays,
       onboardingCallMongoId,
       preferredLanguage,
       webSocket: null,
@@ -5301,7 +5306,7 @@ class OpenAIRealtimeService {
         }
 
         // Onboarding: derive structured answers from saved transcripts (no Realtime tools)
-        if (conn.onboardingDay >= 1 && conn.onboardingDay <= 4 && conversationId && conn.clientId) {
+        if (conn.onboardingDay != null && conversationId && conn.clientId) {
           if (!conn.realtimeSessionEstablished) {
             logger.info(
               `[Onboarding] Skipping transcript capture for ${callId} day ${conn.onboardingDay}: Realtime session never became ready`
@@ -5323,7 +5328,7 @@ class OpenAIRealtimeService {
 
         // Onboarding: mark the onboarding Call complete when the voice session ends — only if Realtime actually connected.
         // Otherwise a failed WS/handshake still ends the phone leg but must not advance journey to the next day.
-        if (conn.onboardingDay >= 1 && conn.onboardingDay <= 4 && conn.onboardingCallMongoId) {
+        if (conn.onboardingDay != null && conn.onboardingCallMongoId) {
           try {
             const { Call } = require('../models');
             const onboardingService = require('./onboarding.service');
