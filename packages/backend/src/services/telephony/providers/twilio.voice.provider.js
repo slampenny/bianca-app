@@ -11,6 +11,10 @@ const ApiError = require('../../../utils/ApiError');
 const chatService = require('../../chat.service');
 const alertService = require('../../alert.service');
 const { agenda } = require('../../../config/agenda');
+const {
+  getStartCallWebhookUrl,
+  getCallStatusWebhookUrl,
+} = require('../telephony.webhooks');
 
 // Create Twilio client (will be validated before use)
 let twilioClient;
@@ -47,8 +51,8 @@ class TwilioVoiceProvider {
       }
       logger.info(`[Twilio Service] Found client ${client.name} with phone ${client.phone}`);
 
-      const initialTwiMLUrl = `${config.twilio.apiUrl}/v1/twilio/start-call/${clientId}`;
-      const statusCallbackUrl = `${config.twilio.apiUrl}/v1/twilio/call-status`;
+      const initialTwiMLUrl = getStartCallWebhookUrl(clientId);
+      const statusCallbackUrl = getCallStatusWebhookUrl();
       
       logger.info(`[Twilio Service] Using TwiML URL: ${initialTwiMLUrl}`);
       logger.info(`[Twilio Service] Using callback URL: ${statusCallbackUrl}`);
@@ -170,11 +174,11 @@ class TwilioVoiceProvider {
   }
 
   /**
-   * Generate TwiML for connecting to Asterisk SIP server
+   * Generate answer markup (TwiML) for connecting to Asterisk SIP server
    * @param {Object} req - Express request object
    * @returns {string} - TwiML markup
    */
-  generateCallTwiML(req) {
+  generateAnswerMarkup(req) {
     const { CallSid, AnsweredBy } = req.body;
     const clientId = req.params.clientId;
     
@@ -268,6 +272,51 @@ class TwilioVoiceProvider {
       
       return errorTwiml.toString();
     }
+  }
+
+  /** @deprecated use generateAnswerMarkup */
+  generateCallTwiML(req) {
+    return this.generateAnswerMarkup(req);
+  }
+
+  getAnswerMarkupContentType() {
+    return 'text/xml';
+  }
+
+  sendStatusWebhookAck(res) {
+    res.type('text/xml').send('<Response/>');
+  }
+
+  /**
+   * Generate TwiML for direct SIP connectivity testing
+   * @param {Object} req - Express request object
+   * @returns {string}
+   */
+  generateTestSipMarkup(req) {
+    const twiml = new VoiceResponse();
+    const testClientId = req.query.testClientId || req.query.testPatientId || 'direct-sip-test';
+    const testCallSid = req.query.testTwilioSid || req.query.testCallSid || `TEST_SIP_${Date.now()}`;
+
+    const primaryDomain = config.primaryDomain || 'biancawellness.com';
+    let sipHost;
+    let sipPort;
+    if (config.env === 'staging') {
+      sipHost = `staging-sip.${primaryDomain}`;
+      sipPort = '5061';
+    } else {
+      sipHost = `sip.${primaryDomain}`;
+      sipPort = String(config.asterisk.externalPort || 5061);
+    }
+
+    twiml.say('Testing SIP connection to Asterisk from telephony provider.');
+    twiml
+      .dial({
+        callerId: config.twilio.phone || '+19786256514',
+        timeout: 15,
+      })
+      .sip(`sip:bianca@${sipHost}:${sipPort}?clientId=${testClientId}&callSid=${testCallSid}`);
+
+    return twiml.toString();
   }
 
   /**

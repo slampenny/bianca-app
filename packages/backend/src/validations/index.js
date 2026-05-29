@@ -6,5 +6,6 @@ module.exports.scheduleValidation = require('./schedule.validation');
 module.exports.sentimentValidation = require('./sentiment.validation');
 module.exports.orgValidation = require('./org.validation');
 module.exports.twilioCallValidation = require('./twilioCall.validation');
+module.exports.telephonyValidation = require('./telephony.validation');
 module.exports.phoneVerificationValidation = require('./phoneVerification.validation');
 module.exports.privacyValidation = require('./privacy.validation');

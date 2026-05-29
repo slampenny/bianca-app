@@ -6,3 +6,4 @@ module.exports.orgController = require('./org.controller');
 module.exports.phoneVerificationController = require('./phoneVerification.controller');
 module.exports.scheduleController = require('./schedule.controller');
 module.exports.twilioCallController = require('./twilioCall.controller');
+module.exports.voiceTelephonyController = require('./voiceTelephony.controller');

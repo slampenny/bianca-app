@@ -1,5 +1,5 @@
 /**
- * Placeholder for Telnyx (or other) voice provider.
+ * Placeholder for Telnyx voice provider.
  * Implement initiateCall, webhooks, and SIP bridging when migrating off Twilio.
  */
 const httpStatus = require('http-status');
@@ -19,8 +19,24 @@ class TelnyxVoiceProvider {
     return this.notImplemented('initiateCall');
   }
 
+  generateAnswerMarkup() {
+    return this.notImplemented('generateAnswerMarkup');
+  }
+
   generateCallTwiML() {
     return this.notImplemented('generateCallTwiML');
+  }
+
+  generateTestSipMarkup() {
+    return this.notImplemented('generateTestSipMarkup');
+  }
+
+  getAnswerMarkupContentType() {
+    return 'application/xml';
+  }
+
+  sendStatusWebhookAck(res) {
+    res.status(200).json({ received: true });
   }
 
   hangupCall() {

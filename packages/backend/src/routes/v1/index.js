@@ -26,6 +26,7 @@ const sentimentRoute = require('./sentiment.route');
 const ssoRoute = require('./sso.route');
 const stripeRoute = require('./stripe.route');
 const testRoute = require('./test.route');
+const telephonyRoute = require('./telephony.route');
 const twilioRoute = require('./twilioCall.route');
 const callWorkflowRoute = require('./callWorkflow.route');
 const demoRoute = require('./demo.route');
@@ -141,6 +142,10 @@ const defaultRoutes = [
   {
     path: '/stripe',
     route: stripeRoute,
+  },
+  {
+    path: '/telephony',
+    route: telephonyRoute,
   },
   {
     path: '/twilio',

@@ -1,7 +1,7 @@
 // src/services/sns.service.js
 
 const { config: emergencyConfig } = require('../config/emergency.config');
-const { twilioSmsService } = require('./twilioSms.service');
+const { smsService } = require('./twilioSms.service');
 const logger = require('../config/logger');
 const i18n = require('i18n');
 
@@ -17,9 +17,8 @@ i18n.configure({
 });
 
 /**
- * Emergency Alert Service (uses Twilio for SMS)
- * NOTE: This service now uses Twilio for SMS sending instead of AWS SNS
- * The name "SNSService" is kept for backward compatibility with existing code
+ * Emergency Alert Service (uses configured SMS provider)
+ * NOTE: The name "SNSService" is kept for backward compatibility with existing code
  */
 class SNSService {
   constructor() {
@@ -28,7 +27,7 @@ class SNSService {
   }
 
   /**
-   * Initialize service (checks Twilio SMS availability)
+   * Initialize service (checks SMS provider availability)
    */
   async initialize() {
     try {
@@ -38,7 +37,7 @@ class SNSService {
       }
 
       // Service is initialized if Twilio SMS is available
-      if (twilioSmsService && twilioSmsService.isInitialized) {
+      if (smsService && smsService.isInitialized) {
         this.isInitialized = true;
         logger.info('Emergency alert service initialized (using Twilio SMS)');
       } else {
@@ -73,16 +72,16 @@ class SNSService {
         return { success: false, reason: 'Emergency notifications disabled in config' };
       }
 
-      if (!twilioSmsService) {
+      if (!smsService) {
         logger.error('[SNS Service] Twilio SMS service not available');
         return { success: false, reason: 'Twilio SMS service not available' };
       }
 
       // Try to initialize Twilio if not already initialized (lazy init)
-      if (!twilioSmsService.isInitialized) {
+      if (!smsService.isInitialized) {
         logger.info('[SNS Service] Twilio SMS not initialized, attempting to reinitialize...');
-        twilioSmsService.reinitialize();
-        if (!twilioSmsService.isInitialized) {
+        smsService.reinitialize();
+        if (!smsService.isInitialized) {
           logger.error('[SNS Service] Twilio SMS service failed to initialize');
           return { success: false, reason: 'Twilio SMS service not initialized' };
         }
@@ -95,7 +94,7 @@ class SNSService {
       }
 
       // Get unique phone numbers from caregivers using Twilio service
-      const phoneNumbers = twilioSmsService.extractPhoneNumbers(caregivers);
+      const phoneNumbers = smsService.extractPhoneNumbers(caregivers);
       logger.info(`[SNS Service] Extracted ${phoneNumbers.length} valid phone number(s) from ${caregivers.length} caregiver(s)`);
       
       if (phoneNumbers.length === 0) {
@@ -109,7 +108,7 @@ class SNSService {
       // Create a map of phone number to caregiver for locale lookup
       const phoneToCaregiver = new Map();
       caregivers.forEach(caregiver => {
-        const phone = twilioSmsService.formatPhoneNumber(caregiver.phone);
+        const phone = smsService.formatPhoneNumber(caregiver.phone);
         if (phone) {
           phoneToCaregiver.set(phone, caregiver);
         }
@@ -126,7 +125,7 @@ class SNSService {
           // Create localized message for this caregiver (createMessage handles locale internally)
           const message = this.createMessage(alertData, locale);
           
-          return twilioSmsService.sendSMS(phoneNumber, message, {
+          return smsService.sendSMS(phoneNumber, message, {
             severity: alertData?.severity,
             category: alertData?.category,
             clientId: alertData?.clientId,
@@ -147,9 +146,9 @@ class SNSService {
       // Log detailed results for debugging
       results.forEach((result, index) => {
         if (result.status === 'fulfilled') {
-          logger.info(`[SNS Service] SMS sent successfully to ${twilioSmsService.maskPhoneNumber(phoneNumbers[index])}, SID: ${result.value.messageSid}`);
+          logger.info(`[SNS Service] SMS sent successfully to ${smsService.maskPhoneNumber(phoneNumbers[index])}, SID: ${result.value.messageSid}`);
         } else {
-          logger.error(`[SNS Service] SMS failed to ${twilioSmsService.maskPhoneNumber(phoneNumbers[index])}: ${result.reason?.message || result.reason}`);
+          logger.error(`[SNS Service] SMS failed to ${smsService.maskPhoneNumber(phoneNumbers[index])}: ${result.reason?.message || result.reason}`);
         }
       });
 
@@ -159,7 +158,7 @@ class SNSService {
         failed,
         total: phoneNumbers.length,
         results: results.map((result, index) => ({
-          phoneNumber: twilioSmsService.maskPhoneNumber(phoneNumbers[index]),
+          phoneNumber: smsService.maskPhoneNumber(phoneNumbers[index]),
           success: result.status === 'fulfilled',
           error: result.status === 'rejected' ? result.reason.message : null,
           messageSid: result.status === 'fulfilled' ? result.value.messageSid : null
@@ -224,18 +223,18 @@ class SNSService {
       return false;
     }
     
-    if (!twilioSmsService) {
+    if (!smsService) {
       logger.error('Twilio SMS service not available for connectivity test.');
       return false;
     }
     
     // Check if testConnectivity method exists (it may not be available in all contexts)
-    if (typeof twilioSmsService.testConnectivity === 'function') {
-      return twilioSmsService.testConnectivity();
+    if (typeof smsService.testConnectivity === 'function') {
+      return smsService.testConnectivity();
     }
     
     // Fallback: just check if service is initialized
-    return twilioSmsService.isInitialized;
+    return smsService.isInitialized;
   }
 
   /**
@@ -247,7 +246,7 @@ class SNSService {
       isInitialized: this.isInitialized,
       isEnabled: emergencyConfig.enableSNSPushNotifications,
       smsProvider: 'Twilio',
-      twilioSmsServiceStatus: twilioSmsService ? twilioSmsService.getStatus() : null
+      smsServiceStatus: smsService ? smsService.getStatus() : null
     };
   }
 }

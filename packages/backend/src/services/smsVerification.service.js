@@ -1,6 +1,6 @@
 // src/services/smsVerification.service.js
 
-const { twilioSmsService } = require('./twilioSms.service');
+const { smsService } = require('./twilioSms.service');
 const logger = require('../config/logger');
 const { Caregiver } = require('../models');
 const ApiError = require('../utils/ApiError');
@@ -20,11 +20,11 @@ i18n.configure({
 
 /**
  * SMS Verification Service
- * Handles phone number verification via Twilio SMS
+ * Handles phone number verification via the configured SMS provider
  */
 class SMSVerificationService {
   constructor() {
-    this.twilioSmsService = twilioSmsService; // Use Twilio SMS service
+    this.smsService = smsService;
   }
 
   /**
@@ -41,7 +41,7 @@ class SMSVerificationService {
    * @returns {string} Masked phone number
    */
   maskPhoneNumber(phone) {
-    return this.twilioSmsService.maskPhoneNumber(phone);
+    return this.smsService.maskPhoneNumber(phone);
   }
 
   /**
@@ -53,7 +53,7 @@ class SMSVerificationService {
   async sendVerificationCode(phoneNumber, caregiverId) {
     try {
       // Validate Twilio SMS service
-      if (!this.twilioSmsService || !this.twilioSmsService.isInitialized) {
+      if (!this.smsService || !this.smsService.isInitialized) {
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'SMS service not configured');
       }
 
@@ -89,12 +89,12 @@ class SMSVerificationService {
       }
 
       // Format phone number using Twilio SMS service
-      const formattedPhone = this.twilioSmsService.formatPhoneNumber(phoneNumber || caregiver.phone);
+      const formattedPhone = this.smsService.formatPhoneNumber(phoneNumber || caregiver.phone);
       if (!formattedPhone) {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Phone number is required');
       }
       
-      if (!this.twilioSmsService.isValidPhoneNumber(formattedPhone)) {
+      if (!this.smsService.isValidPhoneNumber(formattedPhone)) {
         throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid phone number format');
       }
 
@@ -115,7 +115,7 @@ class SMSVerificationService {
       i18n.setLocale(previousLocale);
 
       // Send SMS via Twilio
-      const response = await this.twilioSmsService.sendSMS(formattedPhone, message, {
+      const response = await this.smsService.sendSMS(formattedPhone, message, {
         category: 'phone_verification',
         caregiverId: caregiverId
       });
@@ -133,7 +133,7 @@ class SMSVerificationService {
       return {
         messageId: response.messageSid, // Twilio uses messageSid instead of MessageId
         expiresAt,
-        phoneNumber: this.twilioSmsService.maskPhoneNumber(formattedPhone)
+        phoneNumber: this.smsService.maskPhoneNumber(formattedPhone)
       };
     } catch (error) {
       logger.error(`[SMS Verification] Error sending code: ${error.message}`);
