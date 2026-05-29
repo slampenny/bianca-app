@@ -22,32 +22,44 @@ jest.mock('fs', () => ({
 
 // Mock models to prevent MongoDB path resolution issues
 jest.mock('../../../src/models', () => {
-  const makeFindByIdChain = () => {
+  const makeFindByIdChain = (leanResult = null) => {
     const chain = {};
     chain.populate = jest.fn().mockReturnValue(chain);
-    chain.lean = jest.fn().mockResolvedValue(null);
+    chain.select = jest.fn().mockReturnValue(chain);
+    chain.lean = jest.fn().mockResolvedValue(leanResult);
     return chain;
   };
+  const mockOrgId = '507f1f77bcf86cd799439011';
   return {
-  Conversation: {
-    findById: jest.fn().mockImplementation(makeFindByIdChain),
-    findByIdAndUpdate: jest.fn(),
-    create: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn()
-  },
-  Message: {
-    create: jest.fn(),
-    find: jest.fn(),
-    findById: jest.fn(),
-    findByIdAndUpdate: jest.fn(),
-    findByIdAndDelete: jest.fn()
-  },
-  Client: {
-    findById: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn()
-  }
+    Conversation: {
+      findById: jest.fn().mockImplementation(() => makeFindByIdChain()),
+      findByIdAndUpdate: jest.fn(),
+      create: jest.fn(),
+      find: jest.fn(),
+      findOne: jest.fn(),
+    },
+    Message: {
+      create: jest.fn(),
+      find: jest.fn(),
+      findById: jest.fn(),
+      findByIdAndUpdate: jest.fn(),
+      findByIdAndDelete: jest.fn(),
+    },
+    Client: {
+      findById: jest.fn().mockImplementation(() => makeFindByIdChain({ org: mockOrgId })),
+      find: jest.fn(),
+      findOne: jest.fn(),
+    },
+    Org: {
+      findById: jest.fn().mockImplementation(() => makeFindByIdChain({ debugAudioUploadEnabled: false })),
+      find: jest.fn(),
+      findOne: jest.fn(),
+    },
+    Call: {
+      findById: jest.fn().mockImplementation(() => makeFindByIdChain()),
+      findOne: jest.fn(),
+      create: jest.fn(),
+    },
   };
 });
 
