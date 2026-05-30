@@ -1,5 +1,6 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { clientInitialsFromClient } from "../lib/clientDisplayName"
 import { mapClientToResident } from "../lib/liveData"
@@ -23,15 +24,15 @@ const FILTER_TO_ONBOARDING_PARAM: Record<string, string> = {
   onboarding_not_started: "not_started",
 }
 
-const FILTERS = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "at_risk", label: "At Risk" },
-  { key: "missing_consent", label: "Missing Consent" },
-  { key: "onboarding_in_progress", label: "Onboarding · Active" },
-  { key: "onboarding_complete", label: "Onboarding · Complete" },
-  { key: "onboarding_not_started", label: "Onboarding · Not started" },
-]
+const FILTER_KEYS = [
+  "all",
+  "active",
+  "at_risk",
+  "missing_consent",
+  "onboarding_in_progress",
+  "onboarding_complete",
+  "onboarding_not_started",
+] as const
 
 function defaultOnboardingRollup(): ClientOnboardingRollup {
   return {
@@ -47,12 +48,13 @@ function defaultOnboardingRollup(): ClientOnboardingRollup {
 }
 
 function OnboardingStatusCell({ rollup, loading }: { rollup: ClientOnboardingRollup; loading: boolean }) {
+  const { t } = useTranslation()
   if (loading) {
     return <span style={{ color: "var(--va-slate-400)", fontSize: "0.8125rem" }}>…</span>
   }
   if (rollup.enabled === false) {
     return (
-      <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>Disabled</span>
+      <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>{t("residents.onboardingDisabled")}</span>
     )
   }
   if (rollup.journeyComplete) {
@@ -68,25 +70,52 @@ function OnboardingStatusCell({ rollup, loading }: { rollup: ClientOnboardingRol
           color: "var(--va-emerald-700)",
         }}
       >
-        Complete
+        {t("residents.onboardingComplete")}
       </span>
     )
   }
   if (!rollup.hasAnyOnboardingActivity) {
     return (
-      <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>Not started</span>
+      <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>{t("residents.onboardingNotStarted")}</span>
     )
   }
   return (
     <span style={{ fontSize: "0.8125rem", color: "var(--va-amber-800)" }}>
-      {rollup.sessionsCompletedCount}/{rollup.totalDays ?? 4}
-      {rollup.currentDay != null ? ` · Next: Day ${rollup.currentDay}` : ""}
+      {t("residents.onboardingProgress", {
+        completed: rollup.sessionsCompletedCount,
+        total: rollup.totalDays ?? 4,
+      })}
+      {rollup.currentDay != null
+        ? t("residents.onboardingNextDay", { day: rollup.currentDay })
+        : ""}
     </span>
   )
 }
 
 export function ResidentsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
+
+  const filterLabel = (key: (typeof FILTER_KEYS)[number]) => {
+    switch (key) {
+      case "all":
+        return t("residents.filterAll")
+      case "active":
+        return t("residents.filterActive")
+      case "at_risk":
+        return t("residents.filterAtRisk")
+      case "missing_consent":
+        return t("residents.filterMissingConsent")
+      case "onboarding_in_progress":
+        return t("residents.filterOnboardingInProgress")
+      case "onboarding_complete":
+        return t("residents.filterOnboardingComplete")
+      case "onboarding_not_started":
+        return t("residents.filterOnboardingNotStarted")
+      default:
+        return key
+    }
+  }
   const [searchParams, setSearchParams] = useSearchParams()
   const authed = useAppSelector(isAuthenticated)
   const user = useAppSelector(getCurrentUser)
@@ -197,19 +226,19 @@ export function ResidentsPage() {
 
   if (isLoading) {
     return (
-      <div style={{ padding: "3rem", textAlign: "center", color: "var(--va-slate-500)" }}>Loading residents…</div>
+      <div style={{ padding: "3rem", textAlign: "center", color: "var(--va-slate-500)" }}>{t("residents.loading")}</div>
     )
   }
 
   if (isError) {
     return (
       <div style={{ padding: "2rem", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
-        <p style={{ color: "var(--va-red-600)", marginBottom: 12 }}>Could not load clients.</p>
+        <p style={{ color: "var(--va-red-600)", marginBottom: 12 }}>{t("residents.loadError")}</p>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginBottom: 16 }}>
-          {(error as { data?: { message?: string } })?.data?.message ?? "Check your connection and API URL."}
+          {(error as { data?: { message?: string } })?.data?.message ?? t("residents.loadErrorConnection")}
         </p>
         <button type="button" className="va-btn-primary" onClick={() => void refetch()}>
-          Retry
+          {t("residents.retry")}
         </button>
       </div>
     )
@@ -238,54 +267,58 @@ export function ResidentsPage() {
             }}
           >
             <h1 className="va-page-title" style={{ margin: 0 }}>
-              Residents
+              {t("residents.title")}
             </h1>
             {showAdd ? (
               <Link
                 to="/residents/new"
                 className="va-btn-primary"
-                aria-label="Add resident"
+                aria-label={t("residents.addResident")}
                 data-testid="residents-add"
                 style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", flexShrink: 0 }}
               >
-                Add
+                {t("residents.addShort")}
               </Link>
             ) : null}
           </div>
           <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 4 }}>
-            {rows.length} resident{rows.length === 1 ? "" : "s"}
-            {pages?.totalResults != null ? ` (${pages.totalResults} in directory)` : ""}
+            {rows.length === 1
+              ? t("residents.countOne", { visible: rows.length })
+              : t("residents.countMany", { visible: rows.length })}
+            {pages?.totalResults != null
+              ? t("residents.inDirectory", { total: pages.totalResults })
+              : ""}
           </p>
         </div>
         <div className="va-search">
           <SearchIcon size={16} />
           <input
             type="search"
-            placeholder="Search by name..."
+            placeholder={t("residents.searchPlaceholder")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            aria-label="Search residents"
+            aria-label={t("residents.searchAria")}
             data-testid="residents-search"
           />
         </div>
       </div>
 
       <div className="va-chip-row">
-        {FILTERS.map((f) => (
+        {FILTER_KEYS.map((key) => (
           <button
-            key={f.key}
+            key={key}
             type="button"
-            className={`va-chip ${filter === f.key ? "va-chip--on" : ""}`}
+            className={`va-chip ${filter === key ? "va-chip--on" : ""}`}
             onClick={() => {
-              setFilter(f.key)
-              if (FILTER_TO_ONBOARDING_PARAM[f.key]) {
-                setSearchParams({ onboarding: FILTER_TO_ONBOARDING_PARAM[f.key] })
+              setFilter(key)
+              if (FILTER_TO_ONBOARDING_PARAM[key]) {
+                setSearchParams({ onboarding: FILTER_TO_ONBOARDING_PARAM[key] })
               } else {
                 setSearchParams({})
               }
             }}
           >
-            {f.label}
+            {filterLabel(key)}
           </button>
         ))}
       </div>
@@ -297,7 +330,7 @@ export function ResidentsPage() {
           onClick={() => setOnboardingSortFirst((v) => !v)}
           data-testid="residents-sort-onboarding"
         >
-          Sort: onboarding first
+          {t("residents.sortOnboardingFirst")}
         </button>
       </div>
 
@@ -305,12 +338,12 @@ export function ResidentsPage() {
         <table className="va-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Room</th>
-              <th>Status</th>
-              <th>Onboarding</th>
-              <th>Last Call</th>
-              <th>Risk</th>
+              <th>{t("residents.colName")}</th>
+              <th>{t("residents.colRoom")}</th>
+              <th>{t("residents.colStatus")}</th>
+              <th>{t("residents.colOnboarding")}</th>
+              <th>{t("residents.colLastCall")}</th>
+              <th>{t("residents.colRisk")}</th>
             </tr>
           </thead>
           <tbody>
@@ -349,7 +382,7 @@ export function ResidentsPage() {
                 </td>
                 <td>{r.room}</td>
                 <td>
-                  <StatusPill status={r.status} />
+                  <StatusPill status={r.status} label={statusLabel(r.status, t)} />
                 </td>
                 <td onClick={(e) => e.stopPropagation()}>
                   <OnboardingStatusCell rollup={rollups[r.id] ?? defaultOnboardingRollup()} loading={rollupsLoading} />
@@ -377,11 +410,22 @@ export function ResidentsPage() {
   )
 }
 
-function StatusPill({ status }: { status: Resident["status"] }) {
+function statusLabel(status: Resident["status"], t: (key: string) => string) {
+  switch (status) {
+    case "active":
+      return t("residents.statusActive")
+    case "at_risk":
+      return t("residents.statusAtRisk")
+    default:
+      return t("residents.statusInactive")
+  }
+}
+
+function StatusPill({ status, label }: { status: Resident["status"]; label: string }) {
   const map = {
-    active: { bg: "var(--va-emerald-100)", fg: "var(--va-emerald-700)", label: "Active" },
-    inactive: { bg: "var(--va-slate-100)", fg: "var(--va-slate-600)", label: "Inactive" },
-    at_risk: { bg: "var(--va-red-100)", fg: "var(--va-red-700)", label: "At Risk" },
+    active: { bg: "var(--va-emerald-100)", fg: "var(--va-emerald-700)" },
+    inactive: { bg: "var(--va-slate-100)", fg: "var(--va-slate-600)" },
+    at_risk: { bg: "var(--va-red-100)", fg: "var(--va-red-700)" },
   }
   const s = map[status] ?? map.inactive
   return (
@@ -396,7 +440,7 @@ function StatusPill({ status }: { status: Resident["status"] }) {
         color: s.fg,
       }}
     >
-      {s.label}
+      {label}
     </span>
   )
 }

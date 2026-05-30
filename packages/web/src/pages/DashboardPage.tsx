@@ -1,7 +1,10 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { ChartFigure } from "../components/ChartFigure"
+import { summarizeChartSeries } from "../lib/chartSummary"
 import { isAlertUnreadForCaregiver, mapClientToResident } from "../lib/liveData"
 import { formatActivityRowTime } from "../lib/timeFormat"
 import { useGetCallsByHourTodayQuery, useGetRecentActivityQuery } from "../services/api/activityApi"
@@ -35,6 +38,7 @@ function withinMs(iso: string | null | undefined, ms: number): boolean {
 }
 
 export function DashboardPage() {
+  const { t } = useTranslation()
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const currentUser = useAppSelector(getCurrentUser)
   const org = useAppSelector((s) => s.org)
@@ -143,6 +147,18 @@ export function DashboardPage() {
     return Math.max(7, Math.ceil(m / 7) * 7)
   }, [hourlyChartData])
 
+  const hourlyChartSummary = useMemo(
+    () =>
+      summarizeChartSeries(
+        hourlyChartData,
+        "hour",
+        "calls",
+        (hour, count) => t("dashboard.chartSummaryItem", { hour, count }),
+        t("dashboard.chartSummaryEmpty"),
+      ),
+    [hourlyChartData, t],
+  )
+
   const onboardingCounts = useMemo(() => {
     const vals = Object.values(onboardingRollupsRes?.rollups ?? {})
     let complete = 0
@@ -170,8 +186,8 @@ export function DashboardPage() {
           minHeight: 320,
         }}
       >
-        <div className="va-spinner" role="status" aria-busy="true" aria-label="Loading dashboard" />
-        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", margin: 0 }}>Loading dashboard…</p>
+        <div className="va-spinner" role="status" aria-busy="true" aria-label={t("dashboard.loadingAria")} />
+        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", margin: 0 }}>{t("dashboard.loading")}</p>
       </div>
     )
   }
@@ -179,9 +195,9 @@ export function DashboardPage() {
   if (authed && clientPages === undefined && clientsListError) {
     return (
       <div style={{ padding: "3rem 1.5rem", textAlign: "center", maxWidth: 420, margin: "0 auto" }}>
-        <p style={{ color: "var(--va-slate-600)", margin: "0 0 1rem" }}>Could not load dashboard data.</p>
+        <p style={{ color: "var(--va-slate-600)", margin: "0 0 1rem" }}>{t("dashboard.loadError")}</p>
         <button type="button" className="va-btn-primary" onClick={() => void refetchClientsList()}>
-          Try again
+          {t("dashboard.tryAgain")}
         </button>
       </div>
     )
@@ -189,11 +205,7 @@ export function DashboardPage() {
 
   return (
     <div data-testid="home-header" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-      <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>
-        {/* WEB_API_GAP: No facility dashboard rollup; metrics use GET /clients (+24h call timestamps) and GET /alerts. */}
-        Metrics use live clients/alerts; today&apos;s hourly chart uses{" "}
-        <code style={{ fontSize: "0.7em" }}>GET /activity/calls-by-hour-today</code> (org timezone, 7am–5pm local).
-      </p>
+      <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>{t("dashboard.metricsNoteLive")}</p>
 
       <div
         style={{
@@ -232,8 +244,10 @@ export function DashboardPage() {
             }}
           >
             {showAlertBanner
-              ? `Bianca is monitoring ${c} residents — ${newCount} alert${newCount === 1 ? "" : "s"} need attention`
-              : `Bianca is actively monitoring ${c} residents`}
+              ? newCount === 1
+                ? t("dashboard.monitoringOneAlert", { count: c })
+                : t("dashboard.monitoringManyAlerts", { count: c, alerts: newCount })
+              : t("dashboard.monitoringOk", { count: c })}
           </p>
           <p
             style={{
@@ -243,10 +257,10 @@ export function DashboardPage() {
             }}
           >
             {showAlertBanner
-              ? "Review alerts for open items (API) and any demo simulate alerts"
+              ? t("dashboard.subReviewAlerts")
               : atRiskFromApi > 0
-                ? `${atRiskFromApi} client(s) flagged at-risk from latest scores`
-                : "All systems operational — last check 2 minutes ago"}
+                ? t("dashboard.subAtRisk", { count: atRiskFromApi })
+                : t("dashboard.subAllOk")}
           </p>
         </div>
       </div>
@@ -259,26 +273,26 @@ export function DashboardPage() {
         }}
         className="va-dash-metrics"
       >
-        <MetricCard icon={<UsersGlyph />} value={c} label="Total Residents" accent="rgba(37, 99, 235, 0.12)" iconC="var(--va-blue)" />
-        <MetricCard icon={<ActivityGlyph />} value={activeToday} label="Active Today" accent="var(--va-emerald-100)" iconC="var(--va-emerald-600)" />
-        <MetricCard icon={<PhoneIcon size={20} />} value={callsCompleted} label="Calls Completed (24h)" accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
-        <MetricCard icon={<ChartGlyph />} value={`${successRate}%`} label="Answer rate (24h)" accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
+        <MetricCard icon={<UsersGlyph />} value={c} label={t("dashboard.totalResidents")} accent="rgba(37, 99, 235, 0.12)" iconC="var(--va-blue)" />
+        <MetricCard icon={<ActivityGlyph />} value={activeToday} label={t("dashboard.activeToday")} accent="var(--va-emerald-100)" iconC="var(--va-emerald-600)" />
+        <MetricCard icon={<PhoneIcon size={20} />} value={callsCompleted} label={t("dashboard.callsCompleted24h")} accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
+        <MetricCard icon={<ChartGlyph />} value={`${successRate}%`} label={t("dashboard.answerRate24h")} accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
       </div>
 
       {authed ? (
         <div className="va-card va-card-pad" data-testid="dashboard-onboarding-card">
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
             <div>
-              <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)", margin: 0 }}>Voice onboarding</h2>
+              <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)", margin: 0 }}>{t("dashboard.onboardingTitle")}</h2>
               <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginTop: 4, maxWidth: 520 }}>
-                Four-day call journey per client. Use Residents to filter or drill into a profile for answers.
+                {t("dashboard.onboardingSubtitle")}
               </p>
             </div>
           </div>
           {onbRollError ? (
-            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-red-600)" }}>Could not load onboarding summary.</p>
+            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-red-600)" }}>{t("dashboard.onboardingLoadError")}</p>
           ) : onbRollLoading ? (
-            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>Loading onboarding summary…</p>
+            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>{t("dashboard.onboardingLoading")}</p>
           ) : (
             <>
               <div
@@ -289,27 +303,28 @@ export function DashboardPage() {
                   gap: "0.75rem",
                 }}
               >
-                <OnboardingStat value={onboardingCounts.active} label="In progress" accent="var(--va-amber-50)" border="var(--va-amber-200)" />
-                <OnboardingStat value={onboardingCounts.notStarted} label="Not started" accent="var(--va-slate-50)" border="var(--va-slate-200)" />
-                <OnboardingStat value={onboardingCounts.complete} label="Complete" accent="var(--va-emerald-50)" border="var(--va-emerald-200)" />
+                <OnboardingStat value={onboardingCounts.active} label={t("dashboard.onboardingInProgress")} accent="var(--va-amber-50)" border="var(--va-amber-200)" />
+                <OnboardingStat value={onboardingCounts.notStarted} label={t("dashboard.onboardingNotStarted")} accent="var(--va-slate-50)" border="var(--va-slate-200)" />
+                <OnboardingStat value={onboardingCounts.complete} label={t("dashboard.onboardingComplete")} accent="var(--va-emerald-50)" border="var(--va-emerald-200)" />
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem", marginTop: "1rem" }}>
                 <Link to="/residents?onboarding=in_progress" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  View in progress
+                  {t("dashboard.viewInProgress")}
                 </Link>
                 <Link to="/residents?onboarding=not_started" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  View not started
+                  {t("dashboard.viewNotStarted")}
                 </Link>
                 <Link to="/residents?onboarding=complete" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  View complete
+                  {t("dashboard.viewComplete")}
                 </Link>
                 <Link to="/residents" className="va-btn-ghost" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  All residents
+                  {t("dashboard.allResidents")}
                 </Link>
               </div>
               <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: "0.65rem", marginBottom: 0 }}>
-                Based on {onboardingCounts.total} client{onboardingCounts.total === 1 ? "" : "s"} you can access ·{" "}
-                <code style={{ fontSize: "0.65em" }}>GET /clients/onboarding-rollups</code>
+                {onboardingCounts.total === 1
+                  ? t("dashboard.onboardingMetaOne", { count: onboardingCounts.total })
+                  : t("dashboard.onboardingMetaMany", { count: onboardingCounts.total })}
               </p>
             </>
           )}
@@ -326,15 +341,15 @@ export function DashboardPage() {
       >
         <div className="va-card" style={{ gridColumn: "span 1" }}>
           <div style={{ padding: "1.5rem 1.5rem 0.5rem" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>Recent Activity</h2>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>{t("dashboard.recentActivity")}</h2>
             <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: 4 }}>
               {skipRecentActivity
-                ? "Choose an organization to load activity (super admin)."
+                ? t("dashboard.activityOrgHint")
                 : activityError
-                  ? "Unable to connect."
+                  ? t("dashboard.activityUnable")
                   : activityLoading
-                    ? "Loading live activity…"
-                    : "Live activity feed"}
+                    ? t("dashboard.activityLoadingFeed")
+                    : t("dashboard.activityLiveFeed")}
             </p>
           </div>
           <div
@@ -346,7 +361,11 @@ export function DashboardPage() {
           >
             {recentRows.length === 0 ? (
               <p style={{ textAlign: "center", color: "var(--va-slate-400)", padding: "2rem" }}>
-                {activityLoading ? "Loading recent activity..." : activityError ? "Unable to connect." : "No data available."}
+                {activityLoading
+                  ? t("dashboard.activityLoading")
+                  : activityError
+                    ? t("dashboard.activityUnable")
+                    : t("dashboard.activityNoData")}
               </p>
             ) : (
               recentRows.map((e) => (
@@ -377,7 +396,9 @@ export function DashboardPage() {
                         fontWeight: e.type === "alert" ? 600 : 400,
                       }}
                     >
-                      {e.type === "alert" ? e.message : `Call completed — ${e.residentName}`}
+                      {e.type === "alert"
+                        ? e.message
+                        : t("dashboard.callCompleted", { name: e.residentName })}
                     </p>
                     <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", marginTop: 4 }}>
                       {formatActivityRowTime(e.timestamp)}
@@ -392,24 +413,27 @@ export function DashboardPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div className="va-card">
             <div style={{ padding: "1.5rem 1.5rem 0.5rem" }}>
-              <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>Today&apos;s Summary</h2>
+              <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>{t("dashboard.todaySummary")}</h2>
               <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: 4 }}>
-                {skipHourlyChart ? (
-                  <>Choose an organization to load call volume (super admin).</>
-                ) : hourlyError ? (
-                  <>Could not load today&apos;s call counts.</>
-                ) : hourlyLoading ? (
-                  <>Loading call volume…</>
-                ) : hourlyToday ? (
-                  <>
-                    Calls by hour · {hourlyToday.dateLabel} · <span title="IANA timezone">{hourlyToday.timezone}</span>
-                  </>
-                ) : (
-                  <>No data</>
-                )}
+                {skipHourlyChart
+                  ? t("dashboard.hourlyOrgHint")
+                  : hourlyError
+                    ? t("dashboard.hourlyLoadError")
+                    : hourlyLoading
+                      ? t("dashboard.hourlyLoading")
+                      : hourlyToday
+                        ? t("dashboard.hourlyLabel", {
+                            date: hourlyToday.dateLabel,
+                            timezone: hourlyToday.timezone,
+                          })
+                        : t("dashboard.hourlyNoData")}
               </p>
             </div>
-            <div style={{ height: 192, padding: "0 1rem 1rem" }}>
+            <ChartFigure
+              title={t("dashboard.todaySummary")}
+              summary={t("dashboard.chartSummary", { items: hourlyChartSummary })}
+              chartStyle={{ height: 192, padding: "0 1rem 1rem" }}
+            >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={hourlyChartData} barCategoryGap="20%">
                   <XAxis dataKey="hour" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
@@ -428,12 +452,15 @@ export function DashboardPage() {
                       color: "#fff",
                       fontSize: 12,
                     }}
-                    formatter={(value: number) => [`${value} calls`, "Calls"]}
+                    formatter={(value: number) => [
+                      t("dashboard.chartTooltipCalls", { count: value }),
+                      t("dashboard.chartCallsLabel"),
+                    ]}
                   />
                   <Bar dataKey="calls" fill="#14b8a6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
+            </ChartFigure>
           </div>
 
           <div
@@ -462,13 +489,13 @@ export function DashboardPage() {
               <div>
                 <p style={{ fontSize: "0.875rem", fontWeight: 600, color: showAlertBanner ? "var(--va-red-800)" : "var(--va-navy)" }}>
                   {showAlertBanner
-                    ? `${newCount} open item${newCount === 1 ? "" : "s"} (alerts)`
-                    : "No Concerns Detected"}
+                    ? newCount === 1
+                      ? t("dashboard.openItemsOne")
+                      : t("dashboard.openItems", { count: newCount })
+                    : t("dashboard.noConcerns")}
                 </p>
                 <p style={{ fontSize: "0.75rem", marginTop: 4, color: showAlertBanner ? "var(--va-red-600)" : "var(--va-slate-500)" }}>
-                  {showAlertBanner
-                    ? "Review the Alerts page for API-driven items"
-                    : `${c} residents in directory — no unread alerts for your account`}
+                  {showAlertBanner ? t("dashboard.subOpenAlerts") : t("dashboard.subNoUnread", { count: c })}
                 </p>
               </div>
             </div>

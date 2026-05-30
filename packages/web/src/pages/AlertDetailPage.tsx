@@ -1,7 +1,9 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
 import { useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router-dom"
+import { AuthTextAreaField } from "../components/AuthTextAreaField"
 import { mapConversationToTranscript } from "../lib/mapConversationToTranscript"
 import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
@@ -28,15 +30,19 @@ const SENTIMENT_DOT: Record<string, string> = {
   distressed: "var(--va-red-500)",
 }
 
-const SENTIMENT_LABEL: Record<string, string> = {
-  neutral: "Neutral",
-  positive: "Positive",
-  anxious: "Anxious",
-  confused: "Confused",
-  distressed: "Distressed",
+function sentimentLabel(t: (key: string) => string, key: string): string {
+  const map: Record<string, string> = {
+    neutral: t("alertDetail.sentimentNeutral"),
+    positive: t("alertDetail.sentimentPositive"),
+    anxious: t("alertDetail.sentimentAnxious"),
+    confused: t("alertDetail.sentimentConfused"),
+    distressed: t("alertDetail.sentimentDistressed"),
+  }
+  return map[key] ?? key
 }
 
 export function AlertDetailPage() {
+  const { t } = useTranslation()
   const { alertId } = useParams()
   const navigate = useNavigate()
   const authed = useAppSelector((s) => !!s.auth.tokens)
@@ -122,7 +128,7 @@ export function AlertDetailPage() {
     if (!rawApi || !alertId || apiResolved) return
     const note = resolutionNote.trim()
     if (note.length < 1) {
-      setResolveError("Enter a resolution note.")
+      setResolveError(t("alertDetail.resolveNoteRequired"))
       return
     }
     setResolveError("")
@@ -130,7 +136,7 @@ export function AlertDetailPage() {
       await resolveAlert({ alertId, resolutionNote: note }).unwrap()
       setResolutionNote("")
     } catch {
-      setResolveError("Could not save resolution.")
+      setResolveError(t("alertDetail.resolveSaveError"))
     }
   }
 
@@ -150,9 +156,9 @@ export function AlertDetailPage() {
   if (!alertId || !alert) {
     return (
       <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
-        <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Alert not found.</p>
+        <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("alertDetail.notFound")}</p>
         <button type="button" className="va-btn-ghost" style={{ marginTop: 16, color: "var(--va-blue)" }} onClick={() => navigate("/alerts")}>
-          Back to Alerts
+          {t("alertDetail.back")}
         </button>
       </div>
     )
@@ -167,7 +173,7 @@ export function AlertDetailPage() {
 
       <button type="button" className="va-btn-ghost" data-testid="alert-detail-back" onClick={() => navigate("/alerts")}>
         <ChevronLeftIcon size={16} />
-        Back to Alerts
+        {t("alertDetail.back")}
       </button>
 
       <div className="va-card va-card-pad">
@@ -190,10 +196,15 @@ export function AlertDetailPage() {
                 <AlertOctagonIcon size={20} />
               </div>
               <div>
-                <h1 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--va-navy)" }}>{formatAlertType(alert.type)} Alert</h1>
+                <h1 style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--va-navy)" }}>
+                  {formatAlertType(alert.type)}
+                  {t("alertDetail.alertTitleSuffix")}
+                </h1>
                 <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 4 }}>
                   {alert.residentName}
-                  {fromApi ? ` · Client ${alert.residentId || "—"}` : " · Room 204A"}
+                  {fromApi
+                    ? t("alertDetail.clientIdLine", { id: alert.residentId || "—" })
+                    : t("alertDetail.roomDemo")}
                 </p>
               </div>
             </div>
@@ -210,11 +221,11 @@ export function AlertDetailPage() {
             >
               {acknowledged ? (
                 <>
-                  <CheckIcon size={16} /> Acknowledged
+                  <CheckIcon size={16} /> {t("alertDetail.acknowledged")}
                 </>
               ) : (
                 <>
-                  <CheckIcon size={16} /> Acknowledge
+                  <CheckIcon size={16} /> {t("alertDetail.acknowledge")}
                 </>
               )}
             </button>
@@ -230,14 +241,17 @@ export function AlertDetailPage() {
                 color: acknowledged ? "var(--va-amber-700)" : "var(--va-red-700)",
               }}
             >
-              {acknowledged ? "Acknowledged" : "New"}
+              {acknowledged ? t("alertDetail.statusAck") : t("alertDetail.statusNew")}
             </span>
             <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-              Detected {formatDetectedTime(alert.detectedAt)} · {formatDetectedDate(alert.detectedAt)}
+              {t("alertDetail.detectedLine", {
+                time: formatDetectedTime(alert.detectedAt),
+                date: formatDetectedDate(alert.detectedAt),
+              })}
             </span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>Confidence</span>
+            <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>{t("alertDetail.confidence")}</span>
             <ConfidenceBar value={alert.confidence} />
           </div>
         </div>
@@ -245,7 +259,7 @@ export function AlertDetailPage() {
 
       <div className="va-card va-card-pad">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "var(--va-red-500)" }}>⚠</span> Risk Summary
+          <span style={{ color: "var(--va-red-500)" }}>⚠</span> {t("alertDetail.riskSummary")}
         </h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, marginBottom: 16 }}>{alert.summary}</p>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
@@ -259,11 +273,9 @@ export function AlertDetailPage() {
       </div>
 
       <div className="va-card va-card-pad">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12 }}>Recommended actions</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12 }}>{t("alertDetail.recommended")}</h2>
         <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginBottom: 12 }}>
-          {fromApi
-            ? "Suggested steps from the alerting pipeline; checking boxes is local tracking only."
-            : "Toggle to mark assignment tracking (demo)."}
+          {fromApi ? t("alertDetail.checklistApi") : t("alertDetail.checklistDemo")}
         </p>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {alert.recommendedActions.map((act, i) => (
@@ -285,15 +297,17 @@ export function AlertDetailPage() {
 
       {fromApi && rawApi ? (
         <div className="va-card va-card-pad">
-          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12 }}>Resolution</h2>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12 }}>{t("alertDetail.resolutionTitle")}</h2>
           {apiResolved ? (
             <div style={{ fontSize: "0.875rem", color: "var(--va-slate-700)", lineHeight: 1.5 }}>
               <p style={{ margin: "0 0 8px" }}>
-                <strong>Resolved</strong>
+                <strong>{t("alertDetail.resolutionResolved")}</strong>
                 {rawApi.resolvedAt ? ` · ${new Date(rawApi.resolvedAt).toLocaleString()}` : null}
               </p>
               {typeof rawApi.resolvedBy === "object" && rawApi.resolvedBy?.name ? (
-                <p style={{ margin: "0 0 8px", color: "var(--va-slate-500)" }}>By {rawApi.resolvedBy.name}</p>
+                <p style={{ margin: "0 0 8px", color: "var(--va-slate-500)" }}>
+                  {t("alertDetail.resolutionBy", { name: rawApi.resolvedBy.name })}
+                </p>
               ) : null}
               {rawApi.resolutionNote ? (
                 <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{rawApi.resolutionNote}</p>
@@ -301,15 +315,12 @@ export function AlertDetailPage() {
             </div>
           ) : (
             <>
-              <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginBottom: 8 }}>
-                Record how this alert was addressed (stored for audit; cannot be resolved twice).
-              </p>
-              <textarea
-                className="va-login-input"
+              <AuthTextAreaField
+                label={t("alertDetail.resolutionHint")}
                 rows={4}
                 value={resolutionNote}
                 onChange={(e) => setResolutionNote(e.target.value)}
-                placeholder="Resolution note…"
+                placeholder={t("alertDetail.resolvePlaceholder")}
                 style={{ width: "100%", resize: "vertical", marginBottom: 8 }}
               />
               {resolveError ? (
@@ -318,7 +329,7 @@ export function AlertDetailPage() {
                 </p>
               ) : null}
               <button type="button" className="va-btn-primary" disabled={resolving} onClick={() => void handleResolve()}>
-                {resolving ? "Saving…" : "Mark resolved"}
+                {resolving ? t("alertDetail.saving") : t("alertDetail.markResolved")}
               </button>
             </>
           )}
@@ -326,6 +337,7 @@ export function AlertDetailPage() {
       ) : null}
 
       <AlertTranscriptBlock
+        t={t}
         demoTranscript={demoTranscript}
         fromApi={fromApi}
         linkedConversationId={linkedConversationId}
@@ -338,15 +350,16 @@ export function AlertDetailPage() {
   )
 }
 
-function transcriptErrorMessage(err: unknown): string {
+function transcriptErrorMessage(t: (key: string) => string, err: unknown): string {
   const e = err as FetchBaseQueryError | undefined
   const status = typeof e?.status === "number" ? e.status : null
-  if (status === 403) return "You do not have access to this conversation."
-  if (status === 404) return "That conversation could not be found."
-  return "Could not load the call transcript. Try again later."
+  if (status === 403) return t("alertDetail.transcriptForbidden")
+  if (status === 404) return t("alertDetail.transcriptNotFound")
+  return t("alertDetail.transcriptLoadError")
 }
 
 function AlertTranscriptBlock({
+  t,
   demoTranscript,
   fromApi,
   linkedConversationId,
@@ -355,6 +368,7 @@ function AlertTranscriptBlock({
   transcriptError,
   transcriptFetchError,
 }: {
+  t: (key: string, opts?: Record<string, unknown>) => string
   demoTranscript: Transcript | undefined
   fromApi: boolean
   linkedConversationId: string | undefined
@@ -364,7 +378,7 @@ function AlertTranscriptBlock({
   transcriptFetchError: unknown
 }) {
   if (demoTranscript) {
-    return <TranscriptPanel transcript={demoTranscript} />
+    return <TranscriptPanel transcript={demoTranscript} t={t} />
   }
 
   if (fromApi && linkedConversationId) {
@@ -375,9 +389,9 @@ function AlertTranscriptBlock({
             <span style={{ color: "var(--va-blue)" }}>
               <MessageIcon size={18} />
             </span>
-            Call Transcript
+            {t("alertDetail.transcriptTitle")}
           </h2>
-          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", margin: 0 }}>Loading transcript…</p>
+          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", margin: 0 }}>{t("alertDetail.transcriptLoading")}</p>
         </div>
       )
     }
@@ -388,10 +402,10 @@ function AlertTranscriptBlock({
             <span style={{ color: "var(--va-blue)" }}>
               <MessageIcon size={18} />
             </span>
-            Call Transcript
+            {t("alertDetail.transcriptTitle")}
           </h2>
           <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }} role="alert">
-            {transcriptErrorMessage(transcriptFetchError)}
+            {transcriptErrorMessage(t, transcriptFetchError)}
           </p>
         </div>
       )
@@ -404,15 +418,15 @@ function AlertTranscriptBlock({
               <span style={{ color: "var(--va-blue)" }}>
                 <MessageIcon size={18} />
               </span>
-              Call Transcript
+              {t("alertDetail.transcriptTitle")}
             </h2>
             <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }}>
-              This conversation has no stored messages yet, or only system messages were recorded.
+              {t("alertDetail.transcriptEmpty")}
             </p>
           </div>
         )
       }
-      return <TranscriptPanel transcript={liveTranscript} />
+      return <TranscriptPanel transcript={liveTranscript} t={t} />
     }
 
     return (
@@ -421,39 +435,44 @@ function AlertTranscriptBlock({
           <span style={{ color: "var(--va-blue)" }}>
             <MessageIcon size={18} />
           </span>
-          Call Transcript
+          {t("alertDetail.transcriptTitle")}
         </h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }}>
-          Transcript could not be loaded. Refresh the page or try again shortly.
+          {t("alertDetail.transcriptLoadFailed")}
         </p>
       </div>
     )
   }
 
-  return <TranscriptGapCard linkedConversationId={linkedConversationId} fromApi={fromApi} />
+  return <TranscriptGapCard t={t} linkedConversationId={linkedConversationId} fromApi={fromApi} />
 }
 
-function TranscriptGapCard({ linkedConversationId, fromApi }: { linkedConversationId?: string; fromApi: boolean }) {
+function TranscriptGapCard({
+  t,
+  linkedConversationId,
+  fromApi,
+}: {
+  t: (key: string, opts?: Record<string, unknown>) => string
+  linkedConversationId?: string
+  fromApi: boolean
+}) {
   return (
     <div className="va-card va-card-pad">
       <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ color: "var(--va-blue)" }}>
           <MessageIcon size={18} />
         </span>
-        Call Transcript
+        {t("alertDetail.transcriptTitle")}
       </h2>
       <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, margin: 0 }}>
         {fromApi ? (
           linkedConversationId ? (
-            <>
-              Conversation <code style={{ fontSize: "0.75rem" }}>{linkedConversationId}</code> is linked, but no transcript
-              loaded. Refresh the page or try again shortly.
-            </>
+            t("alertDetail.transcriptLinkedRefresh", { id: linkedConversationId })
           ) : (
-            "This alert is not linked to a call conversation yet. When a conversation is attached on the alert, the transcript will appear here automatically."
+            t("alertDetail.transcriptNoConversation")
           )
         ) : (
-          "No demo transcript is available for this alert."
+          t("alertDetail.transcriptNoDemo")
         )}
       </p>
     </div>
@@ -472,8 +491,14 @@ function ConfidenceBar({ value }: { value: number }) {
   )
 }
 
-function TranscriptPanel({ transcript }: { transcript: { callDate: string; callTime: string; duration: string; lines: TranscriptLine[] } }) {
-  const legend = Object.keys(SENTIMENT_LABEL)
+function TranscriptPanel({
+  transcript,
+  t,
+}: {
+  transcript: { callDate: string; callTime: string; duration: string; lines: TranscriptLine[] }
+  t: (key: string) => string
+}) {
+  const legend = ["neutral", "positive", "anxious", "confused", "distressed"]
 
   return (
     <div className="va-card" style={{ overflow: "hidden" }}>
@@ -483,7 +508,7 @@ function TranscriptPanel({ transcript }: { transcript: { callDate: string; callT
             <span style={{ color: "var(--va-blue)" }}>
               <MessageIcon size={18} />
             </span>
-            Call Transcript
+            {t("alertDetail.transcriptTitle")}
           </h2>
           <div style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", display: "flex", gap: 16 }}>
             <span>{transcript.callDate}</span>
@@ -494,21 +519,21 @@ function TranscriptPanel({ transcript }: { transcript: { callDate: string; callT
           {legend.map((k) => (
             <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 10, color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: SENTIMENT_DOT[k] ?? "var(--va-slate-300)" }} />
-              {SENTIMENT_LABEL[k] ?? k}
+              {sentimentLabel(t, k)}
             </span>
           ))}
         </div>
       </div>
       <div style={{ padding: "1rem 1.5rem", display: "flex", flexDirection: "column", gap: 12 }}>
         {transcript.lines.map((line, idx) => (
-          <TranscriptLineRow key={`${line.timestamp}-${idx}`} line={line} />
+          <TranscriptLineRow key={`${line.timestamp}-${idx}`} line={line} t={t} />
         ))}
       </div>
     </div>
   )
 }
 
-function TranscriptLineRow({ line }: { line: TranscriptLine }) {
+function TranscriptLineRow({ line, t }: { line: TranscriptLine; t: (key: string) => string }) {
   const bianca = line.speaker === "bianca"
   const hasAnn = line.annotations.length > 0
   const critical = line.annotations.some((a) => a.type === "critical")
@@ -540,7 +565,7 @@ function TranscriptLineRow({ line }: { line: TranscriptLine }) {
               borderRadius: "50%",
               background: SENTIMENT_DOT[line.sentiment] ?? "var(--va-slate-300)",
             }}
-            title={SENTIMENT_LABEL[line.sentiment] ?? line.sentiment}
+            title={sentimentLabel(t, line.sentiment)}
           />
           <span style={{ fontSize: "0.65rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>{line.timestamp}</span>
         </div>

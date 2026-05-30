@@ -50,18 +50,18 @@ export const CaregiverInvitedScreen: React.FC<any> = ({ route }) => {
       <View style={styles.container}>
         <View style={styles.content}>
           <Text style={styles.icon}>✅</Text>
-          <Text style={styles.title}>Invitation Sent!</Text>
-          <Text style={styles.message}>
-            An invitation has been sent to {caregiver.name} at {caregiver.email}.
-          </Text>
-          <Text style={styles.subMessage}>
-            They will receive an email with instructions to complete their registration.
-          </Text>
+          <Text style={styles.title} tx="caregiverInvitedScreen.title" />
+          <Text
+            style={styles.message}
+            tx="caregiverInvitedScreen.message"
+            txOptions={{ name: caregiver.name, email: caregiver.email }}
+          />
+          <Text style={styles.subMessage} tx="caregiverInvitedScreen.subMessage" />
         </View>
         
         <View style={styles.buttonContainer}>
           <LoadingButton
-            title="Continue"
+            tx="caregiverInvitedScreen.continue"
             onPress={handleContinue}
             style={styles.button}
           />

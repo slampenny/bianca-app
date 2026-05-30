@@ -681,7 +681,7 @@ function ClientScreen() {
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Select Language</Text>
+                <Text style={styles.modalTitle} tx="profileScreen.selectLanguage" />
                 <FlatList
                   data={LANGUAGE_OPTIONS}
                   keyExtractor={(item) => item.code}

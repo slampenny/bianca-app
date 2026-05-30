@@ -1,66 +1,67 @@
+import type { TFunction } from "i18next"
 import type { Client } from "../services/api/api.types"
 import { clientDisplayName } from "./clientDisplayName"
 import { mapClientToResident } from "./liveData"
 
-function riskLevelLabel(riskLevel: ReturnType<typeof mapClientToResident>["riskLevel"]): string {
+function riskLevelLabel(riskLevel: ReturnType<typeof mapClientToResident>["riskLevel"], t: TFunction): string {
   switch (riskLevel) {
     case "high":
-      return "High"
+      return t("riskSentimentReport.riskHigh")
     case "medium":
-      return "Medium"
+      return t("riskSentimentReport.riskMedium")
     case "low":
-      return "Low"
+      return t("riskSentimentReport.riskLow")
     default:
-      return "None"
+      return t("riskSentimentReport.riskNone")
   }
 }
 
-function sentimentLabel(dir: Client["sentimentTrendDirection"]): string {
-  if (dir === "improving") return "Improving"
-  if (dir === "declining") return "Declining"
-  if (dir === "stable") return "Stable"
-  return "—"
+function sentimentLabel(dir: Client["sentimentTrendDirection"], t: TFunction): string {
+  if (dir === "improving") return t("riskSentimentReport.sentimentImproving")
+  if (dir === "declining") return t("riskSentimentReport.sentimentDeclining")
+  if (dir === "stable") return t("riskSentimentReport.sentimentStable")
+  return t("common.emDash")
 }
 
-export function riskSentimentReportSubtitle(clientCount: number, scopeFullOrganization: boolean): string {
+export function riskSentimentReportSubtitle(clientCount: number, scopeFullOrganization: boolean, t: TFunction): string {
   if (scopeFullOrganization) {
-    return `All residents (${clientCount})`
+    return t("riskSentimentReport.scopeAll", { count: clientCount })
   }
-  return `Your residents (${clientCount})`
+  return t("riskSentimentReport.scopeYours", { count: clientCount })
 }
 
 /** One table row (without per-resident trend series — use the live report for sparklines). */
-export function buildRiskSentimentTableRowStrings(client: Client): [string, string, string, string, string] {
+export function buildRiskSentimentTableRowStrings(client: Client, t: TFunction): [string, string, string, string, string] {
   const r = mapClientToResident(client)
   const name = clientDisplayName(client)
-  const room = (client.room && String(client.room).trim()) || "—"
-  const risk = riskLevelLabel(r.riskLevel)
-  const sentiment = sentimentLabel(client.sentimentTrendDirection)
-  let notes = "—"
+  const room = (client.room && String(client.room).trim()) || t("common.emDash")
+  const risk = riskLevelLabel(r.riskLevel, t)
+  const sentiment = sentimentLabel(client.sentimentTrendDirection, t)
+  let notes = t("common.emDash")
   if (
     (client.sentimentAnalyzedConversations ?? 0) === 0 &&
     client.latestOverallRiskScore == null &&
     !client.sentimentTrendDirection
   ) {
-    notes = "No analysis yet"
+    notes = t("riskSentimentReport.notesNoAnalysis")
   } else if (r.riskType === "sentiment") {
-    notes = "Sentiment-driven risk signal"
+    notes = t("riskSentimentReport.notesSentimentDriven")
   }
   return [name, room, risk, sentiment, notes]
 }
 
-export function buildRiskSentimentCsvExport(clients: Client[]): { headers: string[]; rows: string[][] } {
+export function buildRiskSentimentCsvExport(clients: Client[], t: TFunction): { headers: string[]; rows: string[][] } {
   const headers = [
-    "Resident",
-    "Room",
-    "Risk level",
-    "Sentiment",
-    "Sentiment trend (30d)",
-    "Notes",
+    t("riskSentimentReport.colResident"),
+    t("riskSentimentReport.colRoom"),
+    t("riskSentimentReport.colRisk"),
+    t("riskSentimentReport.colSentiment"),
+    t("riskSentimentReport.colTrend"),
+    t("riskSentimentReport.colNotes"),
   ]
   const rows = [...clients]
     .map((c) => {
-      const [name, room, risk, sentiment, notes] = buildRiskSentimentTableRowStrings(c)
+      const [name, room, risk, sentiment, notes] = buildRiskSentimentTableRowStrings(c, t)
       return [name, room, risk, sentiment, "", notes]
     })
     .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))

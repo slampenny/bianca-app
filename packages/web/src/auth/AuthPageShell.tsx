@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
 import { Link } from "react-router-dom"
+import { useDocumentTitle } from "../hooks/useDocumentTitle"
 import "../app.css"
 
 export function AuthPageShell({
@@ -13,6 +14,7 @@ export function AuthPageShell({
   wide?: boolean
   children: ReactNode
 }) {
+  useDocumentTitle()
   return (
     <div className="va-login">
       <div className={`va-login-card${wide ? " va-login-card--wide" : ""}`}>

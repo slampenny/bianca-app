@@ -1,11 +1,9 @@
 import { useState, type CSSProperties } from "react"
+import { useTranslation } from "react-i18next"
 import type { FraudAbuseAnalysisResult } from "../services/api/fraudAbuseAnalysisApi"
 import { useGetFraudAbuseAnalysisQuery, useTriggerFraudAbuseAnalysisMutation } from "../services/api/fraudAbuseAnalysisApi"
 
 const MIN_DATA_POINTS = 5
-
-const DISCLAIMER =
-  "This analysis is for informational purposes only and is not a substitute for professional assessment. If you suspect fraud, abuse, or neglect, contact appropriate authorities immediately."
 
 function getRiskLevel(
   score: number | undefined,
@@ -60,6 +58,7 @@ type Props = {
 }
 
 export function FraudAbuseAnalysisPanel({ clientId }: Props) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["financial", "abuse", "relationship"]))
 
   const {
@@ -79,7 +78,12 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
   const conversationCount = data?.conversationCount ?? latest?.conversationCount ?? 0
   const hasInsufficientData = Boolean(latest && conversationCount > 0 && conversationCount < MIN_DATA_POINTS)
 
-  const riskLabels = { critical: "Critical", high: "High", medium: "Medium", low: "Low" }
+  const riskLabels = {
+    critical: t("fraudAbuse.riskCritical"),
+    high: t("fraudAbuse.riskHigh"),
+    medium: t("fraudAbuse.riskMedium"),
+    low: t("fraudAbuse.riskLow"),
+  }
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -91,11 +95,11 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
   }
 
   if (!clientId) {
-    return <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>Select a resident to view fraud and abuse analysis.</p>
+    return <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>{t("fraudAbuse.selectResident")}</p>
   }
 
   if (isLoading && !analysisResponse) {
-    return <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>Loading fraud and abuse analysis…</p>
+    return <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>{t("fraudAbuse.loading")}</p>
   }
 
   if (isError) {
@@ -105,13 +109,13 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
         : ""
     return (
       <p style={{ fontSize: "0.875rem", color: "var(--va-red-600)" }}>
-        Could not load fraud and abuse analysis{msg ? `: ${msg}` : ""}.
+        {msg ? t("fraudAbuse.loadErrorSuffix", { message: msg }) : t("fraudAbuse.loadError")}
       </p>
     )
   }
 
   if (!latest) {
-    return <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>No fraud and abuse analysis available yet.</p>
+    return <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>{t("fraudAbuse.noData")}</p>
   }
 
   const overall = getRiskLevel(latest.overallRiskScore, riskLabels)
@@ -130,7 +134,7 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
           justifyContent: "space-between",
         }}
       >
-        <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--va-slate-500)" }}>Past month — same data as the mobile app.</p>
+        <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--va-slate-500)" }}>{t("fraudAbuse.pastMonthNote")}</p>
         <button
           type="button"
           className="va-btn-ghost"
@@ -145,7 +149,7 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
             }
           }}
         >
-          {triggerLoading || isFetching ? "Running…" : "Refresh analysis"}
+          {triggerLoading || isFetching ? t("fraudAbuse.running") : t("fraudAbuse.refreshAnalysis")}
         </button>
       </div>
 
@@ -165,7 +169,7 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
         <span style={{ color: "var(--va-red-600)", fontSize: "0.9rem" }} aria-hidden>
           ⚠
         </span>
-        <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.5, color: "var(--va-slate-700)" }}>{DISCLAIMER}</p>
+        <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.5, color: "var(--va-slate-700)" }}>{t("fraudAbuse.disclaimer")}</p>
       </div>
 
       {hasInsufficientData ? (
@@ -186,14 +190,14 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
             ℹ
           </span>
           <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.45, color: "var(--va-amber-900)" }}>
-            Limited data: {conversationCount} conversation(s) in range. Analysis is more reliable with at least {MIN_DATA_POINTS} conversations.
+            {t("fraudAbuse.insufficientData", { count: conversationCount, min: MIN_DATA_POINTS })}
           </p>
         </div>
       ) : null}
 
       <div style={reportCard}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-          <h3 style={sectionTitle}>Overview</h3>
+          <h3 style={sectionTitle}>{t("common.analysisOverview")}</h3>
           <span
             style={{
               display: "inline-flex",
@@ -217,20 +221,20 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, textAlign: "center" }}>
           <div>
             <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, color: "var(--va-navy)" }}>{data?.conversationCount ?? 0}</p>
-            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>Conversations</p>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>{t("common.statConversations")}</p>
           </div>
           <div>
             <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, color: "var(--va-navy)" }}>{data?.messageCount ?? 0}</p>
-            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>Messages</p>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>{t("common.statMessages")}</p>
           </div>
           <div>
             <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, color: overall.color }}>{formatScore(latest.overallRiskScore)}</p>
-            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>Overall risk</p>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>{t("fraudAbuse.overallRisk")}</p>
           </div>
         </div>
         {data?.totalWords != null ? (
           <p style={{ margin: "0.75rem 0 0", textAlign: "center", fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-            <strong style={{ color: "var(--va-slate-700)" }}>{data.totalWords}</strong> words analyzed
+            {t("common.wordsAnalyzed", { count: data.totalWords })}
           </p>
         ) : null}
       </div>
@@ -256,7 +260,7 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
             <span style={{ fontSize: "1.1rem" }} aria-hidden>
               💵
             </span>
-            <span style={sectionTitle}>Financial risk</span>
+            <span style={sectionTitle}>{t("fraudAbuse.sectionFinancial")}</span>
           </span>
           <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }}>{expanded.has("financial") ? "▲" : "▼"}</span>
         </button>
@@ -292,12 +296,12 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
         ) : null}
         {expanded.has("financial") && fin ? (
           <div style={{ paddingTop: 2 }}>
-            <MetricRow label="Large amount mentions" value={String(fin.largeAmountMentions ?? 0)} />
-            <MetricRow label="Transfer method mentions" value={String(fin.transferMethodMentions ?? 0)} />
-            <MetricRow label="Scam indicators" value={String(fin.scamIndicatorMentions ?? 0)} />
-            <MetricRow label="Urgency mentions" value={String(fin.urgencyMentions ?? 0)} />
-            <MetricRow label="Help requests" value={String(fin.helpRequestMentions ?? 0)} />
-            <MetricRow label="Relationship / money" value={String(fin.relationshipMoneyMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricLargeAmountMentions")} value={String(fin.largeAmountMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricTransferMethodMentions")} value={String(fin.transferMethodMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricScamIndicators")} value={String(fin.scamIndicatorMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricUrgencyMentions")} value={String(fin.urgencyMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricHelpRequests")} value={String(fin.helpRequestMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricRelationshipMoney")} value={String(fin.relationshipMoneyMentions ?? 0)} />
           </div>
         ) : null}
       </div>
@@ -323,7 +327,7 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
             <span style={{ fontSize: "1.1rem" }} aria-hidden>
               ⚠️
             </span>
-            <span style={sectionTitle}>Abuse &amp; neglect risk</span>
+            <span style={sectionTitle}>{t("fraudAbuse.sectionAbuse")}</span>
           </span>
           <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }}>{expanded.has("abuse") ? "▲" : "▼"}</span>
         </button>
@@ -359,13 +363,13 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
         ) : null}
         {expanded.has("abuse") && abs ? (
           <div style={{ paddingTop: 2 }}>
-            <MetricRow label="Physical abuse score" value={formatScore(abs.physicalAbuseScore)} />
-            <MetricRow label="Emotional abuse score" value={formatScore(abs.emotionalAbuseScore)} />
-            <MetricRow label="Neglect score" value={formatScore(abs.neglectScore)} />
-            <MetricRow label="Injury mentions" value={String(abs.injuryMentions ?? 0)} />
-            <MetricRow label="Isolation mentions" value={String(abs.isolationMentions ?? 0)} />
-            <MetricRow label="Fear mentions" value={String(abs.fearMentions ?? 0)} />
-            <MetricRow label="Basic needs" value={String(abs.basicNeedsMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricPhysicalAbuseScore")} value={formatScore(abs.physicalAbuseScore)} />
+            <MetricRow label={t("fraudAbuse.metricEmotionalAbuseScore")} value={formatScore(abs.emotionalAbuseScore)} />
+            <MetricRow label={t("fraudAbuse.metricNeglectScore")} value={formatScore(abs.neglectScore)} />
+            <MetricRow label={t("fraudAbuse.metricInjuryMentions")} value={String(abs.injuryMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricIsolationMentions")} value={String(abs.isolationMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricFearMentions")} value={String(abs.fearMentions ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricBasicNeeds")} value={String(abs.basicNeedsMentions ?? 0)} />
           </div>
         ) : null}
       </div>
@@ -391,7 +395,7 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
             <span style={{ fontSize: "1.1rem" }} aria-hidden>
               👥
             </span>
-            <span style={sectionTitle}>Relationship risk</span>
+            <span style={sectionTitle}>{t("fraudAbuse.sectionRelationship")}</span>
           </span>
           <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }}>{expanded.has("relationship") ? "▲" : "▼"}</span>
         </button>
@@ -427,11 +431,11 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
         ) : null}
         {expanded.has("relationship") && rel ? (
           <div style={{ paddingTop: 2 }}>
-            <MetricRow label="New people" value={String(rel.newPeopleCount ?? 0)} />
-            <MetricRow label="Isolation" value={String(rel.isolationCount ?? 0)} />
-            <MetricRow label="Control" value={String(rel.controlCount ?? 0)} />
-            <MetricRow label="Dependency" value={String(rel.dependencyCount ?? 0)} />
-            <MetricRow label="Suspicious behavior" value={String(rel.suspiciousBehaviorCount ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricNewPeople")} value={String(rel.newPeopleCount ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricIsolation")} value={String(rel.isolationCount ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricControl")} value={String(rel.controlCount ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricDependency")} value={String(rel.dependencyCount ?? 0)} />
+            <MetricRow label={t("fraudAbuse.metricSuspiciousBehavior")} value={String(rel.suspiciousBehaviorCount ?? 0)} />
           </div>
         ) : null}
       </div>
@@ -444,7 +448,7 @@ export function FraudAbuseAnalysisPanel({ clientId }: Props) {
             borderColor: "var(--va-amber-200)",
           }}
         >
-          <h4 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 600, color: "var(--va-amber-950)", marginBottom: 8 }}>Warnings</h4>
+          <h4 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 600, color: "var(--va-amber-950)", marginBottom: 8 }}>{t("common.warningsHeading")}</h4>
           {latest.warnings.map((w, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6, fontSize: "0.8125rem", color: "var(--va-amber-950)" }}>
               <span style={{ color: "var(--va-amber-600)" }} aria-hidden>

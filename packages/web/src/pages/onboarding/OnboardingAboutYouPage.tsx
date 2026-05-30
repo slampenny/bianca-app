@@ -1,16 +1,16 @@
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { AuthPageShell } from "../../auth/AuthPageShell"
-import { onboardingCopy } from "../../lib/onboardingCopy"
 import type { OnboardingPersona } from "../../lib/onboardingTypes"
 import "../../app.css"
 
 const PERSONA_ORDER: OnboardingPersona[] = ["organization", "caregiver", "agingInPlace"]
 
 export function OnboardingAboutYouPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [persona, setPersona] = useState<OnboardingPersona | null>(null)
-  const { title, subtitle, options } = onboardingCopy.aboutYou
 
   const handleContinue = () => {
     if (!persona) return
@@ -18,14 +18,14 @@ export function OnboardingAboutYouPage() {
   }
 
   return (
-    <AuthPageShell title={title} subtitle={subtitle} wide>
+    <AuthPageShell title={t("onboarding.aboutYou.title")} subtitle={t("onboarding.aboutYou.subtitle")} wide>
       <div className="va-onboarding-back">
         <Link to="/login" className="va-btn-ghost">
-          ← Back to sign in
+          {t("onboarding.registration.backSignIn")}
         </Link>
       </div>
 
-      <div className="va-onboarding-stack" role="group" aria-label="Who are you signing up as?">
+      <div className="va-onboarding-stack" role="group" aria-label={t("onboarding.whoAreYouAria")}>
         {PERSONA_ORDER.map((key) => (
           <button
             key={key}
@@ -35,7 +35,7 @@ export function OnboardingAboutYouPage() {
             onClick={() => setPersona(key)}
             aria-pressed={persona === key}
           >
-            {options[key]}
+            {t(`onboarding.aboutYou.${key}`)}
           </button>
         ))}
       </div>
@@ -48,13 +48,13 @@ export function OnboardingAboutYouPage() {
           disabled={!persona}
           onClick={handleContinue}
         >
-          Continue
+          {t("onboarding.continue")}
         </button>
       </div>
 
       <div className="va-auth-footer" style={{ marginTop: "1.25rem" }}>
-        <span style={{ color: "var(--va-slate-500)" }}>Already registered?</span>
-        <Link to="/login">Sign in</Link>
+        <span style={{ color: "var(--va-slate-500)" }}>{t("onboarding.alreadyRegistered")}</span>
+        <Link to="/login">{t("onboarding.signInLink")}</Link>
       </div>
     </AuthPageShell>
   )

@@ -1,5 +1,6 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useMemo } from "react"
+import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
@@ -11,6 +12,7 @@ import { formatAlertType, formatDetectedDate, formatDetectedTime } from "../lib/
 import { AlertOctagonIcon, ChevronRightIcon, ClockIcon, InboxIcon } from "../icons"
 
 export function AlertsPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const currentUser = useAppSelector(getCurrentUser)
   const authed = useAppSelector((s) => !!s.auth.tokens)
@@ -40,19 +42,19 @@ export function AlertsPage() {
 
   if (isLoading) {
     return (
-      <div style={{ padding: "3rem", textAlign: "center", color: "var(--va-slate-500)" }}>Loading alerts…</div>
+      <div style={{ padding: "3rem", textAlign: "center", color: "var(--va-slate-500)" }}>{t("alerts.loading")}</div>
     )
   }
 
   if (isError) {
     return (
       <div style={{ padding: "2rem", textAlign: "center", maxWidth: 480, margin: "0 auto" }}>
-        <p style={{ color: "var(--va-red-600)", marginBottom: 12 }}>Could not load alerts.</p>
+        <p style={{ color: "var(--va-red-600)", marginBottom: 12 }}>{t("alerts.loadError")}</p>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginBottom: 16 }}>
-          {(error as { data?: { message?: string } })?.data?.message ?? "Check your connection."}
+          {(error as { data?: { message?: string } })?.data?.message ?? t("common.checkConnection")}
         </p>
         <button type="button" className="va-btn-primary" onClick={() => void refetch()}>
-          Retry
+          {t("common.retry")}
         </button>
       </div>
     )
@@ -76,24 +78,19 @@ export function AlertsPage() {
         >
           <InboxIcon size={40} />
         </div>
-        <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--va-navy)", marginBottom: 8 }}>No active alerts</h2>
-        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.6 }}>
-          You&apos;ll see Bianca alerts here when the backend returns open items for your org.
-        </p>
+        <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--va-navy)", marginBottom: 8 }}>{t("alerts.emptyTitle")}</h2>
+        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.6 }}>{t("alerts.emptyBody")}</p>
       </div>
     )
   }
 
   return (
     <div data-testid="alerts-page" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)" }}>
-        {/* WEB_API_GAP: No dedicated “facility alert” fields (confidence %, structured risk); mapped from message + importance. */}
-        Severity and confidence are derived from API <code>importance</code> until richer fields exist.
-      </p>
+      <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)" }}>{t("alerts.devNote")}</p>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h1 className="va-page-title">Alerts</h1>
+        <h1 className="va-page-title">{t("alerts.title")}</h1>
         <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-          {alerts.length} alert{alerts.length === 1 ? "" : "s"}
+          {alerts.length === 1 ? t("alerts.countOne") : t("alerts.countMany", { count: alerts.length })}
         </span>
       </div>
 
@@ -138,8 +135,7 @@ export function AlertsPage() {
             </div>
             <p style={{ fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>{a.residentName}</p>
             <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginTop: 4 }}>
-              {/* WEB_API_GAP: Room not on alert payload */}
-              Client ID: {a.residentId || "—"}
+              {t("alerts.clientId", { id: a.residentId || t("common.emDash") })}
             </p>
             <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginTop: 10, lineHeight: 1.5 }}>{a.summary}</p>
             <div
@@ -154,11 +150,12 @@ export function AlertsPage() {
               }}
             >
               <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-                Confidence <strong style={{ color: "var(--va-navy)" }}>{a.confidence}%</strong>
+                {t("alerts.confidence")}{" "}
+                <strong style={{ color: "var(--va-navy)" }}>{a.confidence}%</strong>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
                 <ClockIcon size={12} />
-                Detected {formatDetectedTime(a.detectedAt)} · {formatDetectedDate(a.detectedAt)}
+                {t("alerts.detected", { time: formatDetectedTime(a.detectedAt), date: formatDetectedDate(a.detectedAt) })}
               </span>
               <span
                 style={{
@@ -171,7 +168,7 @@ export function AlertsPage() {
                   color: a.status === "new" ? "var(--va-red-700)" : "var(--va-amber-700)",
                 }}
               >
-                {a.status === "new" ? "New" : "Acknowledged"}
+                {a.status === "new" ? t("alerts.statusNew") : t("alerts.statusAck")}
               </span>
             </div>
           </div>

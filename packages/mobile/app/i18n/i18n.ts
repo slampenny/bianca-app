@@ -27,6 +27,7 @@ import { logger } from "../utils/logger"
 // This prevents users from seeing raw localization keys
 import enTranslations from "./en"
 import type { Translations } from "./en"
+import { mergeDeep } from "../utils/mergeDeep"
 
 // Lazy load other languages to improve initial app load time
 // English is pre-loaded synchronously above
@@ -74,7 +75,10 @@ const loadLanguage = async (locale: string): Promise<void> => {
   if (moduleLoader) {
     try {
       const module = await moduleLoader()
-      i18n.translations[locale] = module.default
+      i18n.translations[locale] = mergeDeep(
+        englishTranslations as Record<string, unknown>,
+        module.default as Record<string, unknown>,
+      )
       logger.debug(`Loaded language: ${locale}`)
     } catch (error) {
       logger.error(`Failed to load language ${locale}:`, error)

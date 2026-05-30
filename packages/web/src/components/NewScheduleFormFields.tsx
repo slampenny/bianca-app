@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next"
+import { AuthSelectField } from "./AuthSelectField"
+import { AuthTextField } from "./AuthTextField"
 import { weekdayShortLabel } from "../lib/scheduleDraft"
 
 export type ScheduleFrequency = "daily" | "weekly" | "monthly"
@@ -33,23 +36,35 @@ export function NewScheduleFormFields({
   monthlyDaysRaw,
   setMonthlyDaysRaw,
 }: NewScheduleFormFieldsProps) {
+  const { t } = useTranslation()
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(130px, 180px) minmax(130px, 180px) auto", gap: 8, alignItems: "center" }}>
-        <select
-          data-testid={`${testIdPrefix}-frequency`}
-          className="va-login-input"
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(130px, 1fr) minmax(130px, 1fr) auto", gap: 8, alignItems: "end" }}>
+        <AuthSelectField
+          label={t("residentDetail.scheduleFrequencyLabel")}
+          selectTestId={`${testIdPrefix}-frequency`}
           value={frequency}
           onChange={(e) => setFrequency(e.target.value as ScheduleFrequency)}
         >
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-        </select>
-        <input data-testid={`${testIdPrefix}-time`} className="va-login-input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <option value="daily">{t("residentDetail.freqDaily")}</option>
+          <option value="weekly">{t("residentDetail.freqWeekly")}</option>
+          <option value="monthly">{t("residentDetail.freqMonthly")}</option>
+        </AuthSelectField>
+        <AuthTextField
+          label={t("residentDetail.scheduleTimeLabel")}
+          type="time"
+          inputTestId={`${testIdPrefix}-time`}
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
+        />
         <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "var(--va-slate-700)" }}>
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-          Active
+          <input
+            type="checkbox"
+            data-testid={`${testIdPrefix}-active`}
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+          />
+          {t("residentDetail.scheduleActive")}
         </label>
       </div>
       {frequency === "weekly" ? (
@@ -77,26 +92,27 @@ export function NewScheduleFormFields({
               )
             })}
           </div>
-          <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
-            Repeat every
-            <input
-              data-testid={`${testIdPrefix}-weeks`}
-              className="va-login-input"
+          <div style={{ display: "flex", alignItems: "end", gap: 8, flexWrap: "wrap" }}>
+            <AuthTextField
+              label={t("residentDetail.repeatEvery")}
               type="number"
               min={1}
+              inputTestId={`${testIdPrefix}-weeks`}
               value={weeklyWeeks}
               onChange={(e) => setWeeklyWeeks(Math.max(1, Number(e.target.value) || 1))}
-              style={{ width: 86 }}
+              style={{ width: 120 }}
             />
-            week(s)
-          </label>
+            <span style={{ fontSize: "0.81rem", color: "var(--va-slate-700)", paddingBottom: 8 }}>{t("residentDetail.weeksSuffix")}</span>
+          </div>
         </div>
       ) : null}
       {frequency === "monthly" ? (
-        <label style={{ display: "grid", gap: 6, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
-          Days of month (comma-separated, 1-31)
-          <input data-testid={`${testIdPrefix}-monthdays`} className="va-login-input" value={monthlyDaysRaw} onChange={(e) => setMonthlyDaysRaw(e.target.value)} />
-        </label>
+        <AuthTextField
+          label={t("residentDetail.monthDaysLabel")}
+          inputTestId={`${testIdPrefix}-monthdays`}
+          value={monthlyDaysRaw}
+          onChange={(e) => setMonthlyDaysRaw(e.target.value)}
+        />
       ) : null}
     </>
   )

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
 import { ReportDocumentBody } from "../components/ReportDocumentBody"
 import {
@@ -21,6 +22,7 @@ function utcWeekReferenceFromDateInput(isoDate: string): string {
 }
 
 export function FamilyWeeklyDigestClientPage() {
+  const { t } = useTranslation()
   const { clientId } = useParams<{ clientId: string }>()
   const navigate = useNavigate()
   const authed = useAppSelector(isAuthenticated)
@@ -77,19 +79,17 @@ export function FamilyWeeklyDigestClientPage() {
         onClick={() => navigate("/reports/family_weekly_digest")}
       >
         <ChevronLeftIcon size={16} />
-        Back to weekly digest residents
+        {t("familyWeeklyDigest.back")}
       </button>
 
       {isSample ? (
-        <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)" }}>
-          Illustrative sample layout only. Use the resident list to preview digests from your account data.
-        </p>
+        <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)" }}>{t("familyWeeklyDigest.sampleBanner")}</p>
       ) : null}
 
       {!isSample && authed ? (
         <div className="va-card va-card-pad" style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-end" }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "0.75rem", color: "var(--va-slate-600)" }}>
-            Week (pick any day in the week, UTC)
+            {t("familyWeeklyDigest.weekLabel")}
             <input
               type="date"
               className="va-input"
@@ -99,7 +99,7 @@ export function FamilyWeeklyDigestClientPage() {
             />
           </label>
           <button type="button" className="va-btn-secondary" onClick={() => loadLive()} disabled={isLoading}>
-            {isLoading ? "Loading…" : "Refresh preview"}
+            {isLoading ? t("familyWeeklyDigest.loadingPreview") : t("familyWeeklyDigest.refreshPreview")}
           </button>
         </div>
       ) : null}
@@ -107,17 +107,17 @@ export function FamilyWeeklyDigestClientPage() {
       <div className="va-card va-card-pad">
         {!isSample && authed && isError ? (
           <p style={{ margin: 0, color: "var(--va-red-600)" }} role="alert">
-            Could not load this digest preview. You may not have access to this resident, or the server is unavailable.
+            {t("familyWeeklyDigest.loadError")}
           </p>
         ) : !isSample && authed && isLoading && !data ? (
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>Loading preview…</p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("familyWeeklyDigest.loadingPreview")}</p>
         ) : payload ? (
           <>
             <ReportDocumentBody payload={payload} />
             <div className="va-report-modal-actions">
               <button type="button" className="va-btn-secondary" onClick={() => printReportFromPayload(payload)}>
                 <PrintIcon size={18} />
-                Print / Save as PDF
+                {t("reportDetail.printPdf")}
               </button>
               <button
                 type="button"
@@ -125,12 +125,12 @@ export function FamilyWeeklyDigestClientPage() {
                 onClick={() => downloadReportPayloadCsv(payload, "bianca-weekly-family-digest")}
               >
                 <DownloadIcon size={18} />
-                Download data (CSV)
+                {t("reportDetail.downloadCsv")}
               </button>
             </div>
           </>
         ) : !isSample && authed ? (
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>Loading preview…</p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("familyWeeklyDigest.loadingPreview")}</p>
         ) : null}
       </div>
     </div>

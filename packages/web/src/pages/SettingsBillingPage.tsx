@@ -1,4 +1,5 @@
 import { FormEvent, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { canManageBilling } from "../lib/roleAccess"
 import {
@@ -10,15 +11,11 @@ import {
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { ConfirmModal } from "../components/ConfirmModal"
+import { AuthTextField } from "../components/AuthTextField"
 import "../app.css"
 
-function methodLabel(type?: string, brand?: string) {
-  if (type === "card") return brand ? `Card (${brand})` : "Card"
-  if (type) return type
-  return "Payment method"
-}
-
 export function SettingsBillingPage() {
+  const { t } = useTranslation()
   const user = useAppSelector(getCurrentUser)
   const role = user?.role
   const orgId = user?.org ? String(user.org) : ""
@@ -35,17 +32,23 @@ export function SettingsBillingPage() {
   const [errorMessage, setErrorMessage] = useState("")
   const [removePaymentMethodId, setRemovePaymentMethodId] = useState<string | null>(null)
 
+  const methodLabel = (type?: string, brand?: string) => {
+    if (type === "card") return brand ? t("settingsBilling.cardLabel", { brand }) : t("settingsBilling.cardGeneric")
+    if (type) return type
+    return t("settingsBilling.methodFallback")
+  }
+
   if (!canManage) {
     return (
       <div data-testid="settings-billing-page" className="va-page-wrap">
         <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
-          ← Back to settings
+          ← {t("settings.backToSettings")}
         </Link>
         <h1 className="va-page-title" style={{ marginTop: "1rem" }}>
-          Billing
+          {t("settingsBilling.title")}
         </h1>
         <div className="va-page-section">
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>You do not have permission to manage billing.</p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("settingsBilling.noPermission")}</p>
         </div>
       </div>
     )
@@ -58,11 +61,11 @@ export function SettingsBillingPage() {
     try {
       await attachPaymentMethod({ orgId, paymentMethodId: newPaymentMethodId.trim() }).unwrap()
       setNewPaymentMethodId("")
-      setMessage("Payment method added.")
+      setMessage(t("settingsBilling.added"))
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setErrorMessage(typeof msg === "string" ? msg : "Could not add payment method.")
+      setErrorMessage(typeof msg === "string" ? msg : t("settingsBilling.addError"))
     }
   }
 
@@ -71,11 +74,11 @@ export function SettingsBillingPage() {
     setErrorMessage("")
     try {
       await setDefaultPaymentMethod({ orgId, paymentMethodId }).unwrap()
-      setMessage("Default payment method updated.")
+      setMessage(t("settingsBilling.defaultUpdated"))
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setErrorMessage(typeof msg === "string" ? msg : "Could not update default method.")
+      setErrorMessage(typeof msg === "string" ? msg : t("settingsBilling.defaultError"))
     }
   }
 
@@ -86,38 +89,38 @@ export function SettingsBillingPage() {
     setErrorMessage("")
     try {
       await detachPaymentMethod({ orgId, paymentMethodId }).unwrap()
-      setMessage("Payment method removed.")
+      setMessage(t("settingsBilling.removed"))
       setRemovePaymentMethodId(null)
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setErrorMessage(typeof msg === "string" ? msg : "Could not remove payment method.")
+      setErrorMessage(typeof msg === "string" ? msg : t("settingsBilling.removeError"))
     }
   }
 
   return (
     <div data-testid="settings-billing-page" className="va-page-wrap">
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
-        ← Back to settings
+        ← {t("settings.backToSettings")}
       </Link>
       <h1 className="va-page-title" style={{ marginTop: "1rem" }}>
-        Billing
+        {t("settingsBilling.title")}
       </h1>
       <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem", lineHeight: 1.45 }}>
-        Manage organization payment methods and default billing source.
+        {t("settingsBilling.subtitle")}
       </p>
 
       <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Payment methods</h2>
-        {isLoading ? <p style={{ color: "var(--va-slate-500)", margin: 0 }}>Loading…</p> : null}
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settingsBilling.paymentMethodsTitle")}</h2>
+        {isLoading ? <p style={{ color: "var(--va-slate-500)", margin: 0 }}>{t("settingsBilling.loading")}</p> : null}
         {isError ? (
           <p style={{ color: "var(--va-red-600)", margin: 0 }}>
-            {(error as { data?: { message?: string } })?.data?.message || "Could not load payment methods."}
+            {(error as { data?: { message?: string } })?.data?.message || t("settingsBilling.loadError")}
           </p>
         ) : null}
         {!isLoading && !isError && methods.length === 0 ? (
           <p data-testid="billing-empty-state" style={{ color: "var(--va-slate-500)", margin: 0 }}>
-            No payment methods yet.
+            {t("settingsBilling.empty")}
           </p>
         ) : null}
         {!isLoading && !isError && methods.length > 0 ? (
@@ -133,8 +136,13 @@ export function SettingsBillingPage() {
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{ fontSize: "0.875rem", color: "var(--va-slate-700)" }}>
                       <strong>{methodLabel(m.type, m.brand)}</strong> · •••• {m.last4 || "----"}
-                      {m.expMonth && m.expYear ? ` · exp ${String(m.expMonth).padStart(2, "0")}/${String(m.expYear).slice(-2)}` : ""}
-                      {m.isDefault ? " · Default" : ""}
+                      {m.expMonth && m.expYear
+                        ? t("settingsBilling.expLabel", {
+                            month: String(m.expMonth).padStart(2, "0"),
+                            year: String(m.expYear).slice(-2),
+                          })
+                        : ""}
+                      {m.isDefault ? t("settingsBilling.defaultSuffix") : ""}
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                       {!m.isDefault ? (
@@ -145,7 +153,7 @@ export function SettingsBillingPage() {
                           onClick={() => void onSetDefault(id)}
                           disabled={settingDefault}
                         >
-                          Set default
+                          {t("settingsBilling.setDefault")}
                         </button>
                       ) : null}
                       <button
@@ -156,7 +164,7 @@ export function SettingsBillingPage() {
                         onClick={() => setRemovePaymentMethodId(id)}
                         disabled={detaching}
                       >
-                        Remove
+                        {t("settingsBilling.remove")}
                       </button>
                     </div>
                   </div>
@@ -168,24 +176,21 @@ export function SettingsBillingPage() {
       </div>
 
       <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Add payment method</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settingsBilling.addTitle")}</h2>
         <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)", marginTop: 0 }}>
-          Enter a Stripe payment method ID (for staging/testing workflows).
+          {t("settingsBilling.addHint")}
         </p>
         <form onSubmit={(e) => void onAttach(e)} style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            Payment method ID
-            <input
-              data-testid="billing-payment-method-id-input"
-              className="va-login-input"
-              value={newPaymentMethodId}
-              onChange={(e) => setNewPaymentMethodId(e.target.value)}
-              placeholder="pm_..."
-              required
-            />
-          </label>
+          <AuthTextField
+            label={t("settingsBilling.methodIdLabel")}
+            inputTestId="billing-payment-method-id-input"
+            value={newPaymentMethodId}
+            onChange={(e) => setNewPaymentMethodId(e.target.value)}
+            placeholder={t("settingsBilling.methodIdPlaceholder")}
+            required
+          />
           <button type="submit" className="va-btn-primary" data-testid="billing-add-payment-method" disabled={attaching}>
-            {attaching ? "Adding…" : "Add payment method"}
+            {attaching ? t("settingsBilling.adding") : t("settingsBilling.addButton")}
           </button>
         </form>
         {message ? (
@@ -202,10 +207,10 @@ export function SettingsBillingPage() {
 
       <ConfirmModal
         open={removePaymentMethodId !== null}
-        title="Remove this payment method?"
+        title={t("settingsBilling.removeConfirmTitle")}
         onClose={() => setRemovePaymentMethodId(null)}
         onConfirm={() => void performRemovePaymentMethod()}
-        confirmLabel={detaching ? "Removing…" : "Remove"}
+        confirmLabel={detaching ? t("settingsBilling.removing") : t("settingsBilling.remove")}
         confirmDisabled={detaching}
       />
     </div>

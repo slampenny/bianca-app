@@ -1,6 +1,9 @@
 import { Fragment, useMemo, useState } from "react"
 import { skipToken } from "@reduxjs/toolkit/query"
+import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
+import { ConfirmDialog } from "@bianca-app/ui"
+import { AuthSelectField } from "../components/AuthSelectField"
 import { canManageCaregivers } from "../lib/roleAccess"
 import { ChevronDownIcon, PencilIcon, TrashIcon } from "../icons"
 import { useDeleteCaregiverMutation, useGetCaregiverClientsQuery, useGetCaregiversQuery } from "../services/api/caregiverApi"
@@ -15,6 +18,7 @@ type DeleteState = {
 }
 
 export function CaregiversPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const user = useAppSelector(getCurrentUser)
   const role = user?.role
@@ -39,7 +43,7 @@ export function CaregiversPage() {
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setDeleteMessage(typeof msg === "string" ? msg : "Could not remove caregiver.")
+      setDeleteMessage(typeof msg === "string" ? msg : t("caregivers.removeError"))
     }
   }
 
@@ -52,38 +56,36 @@ export function CaregiversPage() {
   return (
     <div data-testid="caregivers-page" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div>
-        <h1 className="va-page-title">Caregivers</h1>
-        <p style={{ marginTop: 4, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-          Manage organization caregivers and send invites.
-        </p>
+        <h1 className="va-page-title">{t("caregivers.title")}</h1>
+        <p style={{ marginTop: 4, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>{t("caregivers.subtitle")}</p>
       </div>
 
       <div className="va-card va-card-pad">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Organization caregivers</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("caregivers.sectionTitle")}</h2>
         {isLoading ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading caregivers...</p>
+          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("caregivers.loading")}</p>
         ) : isError ? (
           <div style={{ maxWidth: 460 }}>
-            <p style={{ color: "var(--va-red-600)", marginBottom: 10 }}>Could not load caregivers.</p>
+            <p style={{ color: "var(--va-red-600)", marginBottom: 10 }}>{t("caregivers.loadError")}</p>
             <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem", marginBottom: 12 }}>
-              {(error as { data?: { message?: string } })?.data?.message ?? "Try again."}
+              {(error as { data?: { message?: string } })?.data?.message ?? t("common.retry")}
             </p>
             <button className="va-btn-secondary" type="button" onClick={() => void refetch()}>
-              Retry
+              {t("common.retry")}
             </button>
           </div>
         ) : caregivers.length === 0 ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>No caregivers found.</p>
+          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("caregivers.empty")}</p>
         ) : (
           <div className="va-table-wrap">
             <table className="va-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Role</th>
-                  <th>Actions</th>
+                  <th>{t("caregivers.colName")}</th>
+                  <th>{t("caregivers.colEmail")}</th>
+                  <th>{t("caregivers.colPhone")}</th>
+                  <th>{t("caregivers.colRole")}</th>
+                  <th>{t("caregivers.colActions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -106,7 +108,7 @@ export function CaregiversPage() {
                             className="va-btn-ghost"
                             style={{ padding: 0, display: "inline-flex", gap: 6, alignItems: "center" }}
                             onClick={() => toggleExpanded(id)}
-                            aria-label={isExpanded ? "Collapse assigned clients" : "Expand assigned clients"}
+                            aria-label={isExpanded ? t("caregivers.collapseClients") : t("caregivers.expandClients")}
                           >
                             <span style={{ display: "inline-flex", transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)" }}>
                               <ChevronDownIcon size={14} />
@@ -140,7 +142,7 @@ export function CaregiversPage() {
                             <button
                               type="button"
                               className="va-icon-btn"
-                              aria-label="Edit caregiver"
+                              aria-label={t("caregivers.editCaregiver")}
                               onClick={() => navigate(`/caregivers/${id}/edit`)}
                             >
                               <PencilIcon size={16} />
@@ -148,10 +150,10 @@ export function CaregiversPage() {
                             <button
                               type="button"
                               className="va-icon-btn"
-                              aria-label={id === currentId ? "Current user cannot be removed" : "Remove caregiver"}
+                              aria-label={id === currentId ? t("caregivers.cannotRemoveSelf") : t("caregivers.removeCaregiver")}
                               style={id === currentId ? { color: "var(--va-slate-300)" } : { color: "var(--va-red-600)" }}
                               disabled={deleting || id === currentId}
-                              onClick={() => setDeleteModal({ id, name: c.name || "Caregiver" })}
+                              onClick={() => setDeleteModal({ id, name: c.name || t("caregivers.defaultName") })}
                             >
                               <TrashIcon size={16} />
                             </button>
@@ -171,45 +173,28 @@ export function CaregiversPage() {
       <button
         type="button"
         className="va-caregivers-fab"
-        aria-label="Add caregiver"
+        aria-label={t("caregivers.addCaregiver")}
         data-testid="caregivers-add"
         onClick={() => navigate("/caregivers/new")}
       >
         +
       </button>
-      {deleteModal ? (
-        <div className="va-modal-backdrop" role="dialog" aria-modal onClick={() => setDeleteModal(null)}>
-          <div className="va-modal" onClick={(e) => e.stopPropagation()}>
-            <div style={{ padding: "1.1rem 1.3rem", borderBottom: "1px solid var(--va-slate-200)" }}>
-              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 600 }}>Remove caregiver?</h3>
-            </div>
-            <div style={{ padding: "1rem 1.3rem", fontSize: "0.875rem", color: "var(--va-slate-700)" }}>
-              <p style={{ margin: 0 }}>
-                This will remove <strong>{deleteModal.name}</strong> from the organization.
-              </p>
-              {deleteMessage ? (
-                <p style={{ marginTop: "0.75rem", color: "var(--va-red-600)" }}>{deleteMessage}</p>
-              ) : null}
-            </div>
-            <div
-              style={{
-                padding: "0.85rem 1.3rem",
-                borderTop: "1px solid var(--va-slate-200)",
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "0.5rem",
-              }}
-            >
-              <button type="button" className="va-btn-secondary" onClick={() => setDeleteModal(null)}>
-                Cancel
-              </button>
-              <button type="button" className="va-btn-primary" onClick={() => void onDelete()} disabled={deleting}>
-                {deleting ? "Removing..." : "Remove"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={deleteModal !== null}
+        title={t("caregivers.removeConfirmTitle", { name: deleteModal?.name ?? "" })}
+        onClose={() => setDeleteModal(null)}
+        onConfirm={() => void onDelete()}
+        confirmLabel={deleting ? t("caregivers.removing") : t("caregivers.remove")}
+        confirmDisabled={deleting}
+        cancelLabel={t("caregivers.cancel")}
+      >
+        <p style={{ margin: 0 }}>{t("caregivers.removeConfirmBody")}</p>
+        {deleteMessage ? (
+          <p style={{ marginTop: "0.75rem", color: "var(--va-red-600)" }} role="alert">
+            {deleteMessage}
+          </p>
+        ) : null}
+      </ConfirmDialog>
       <style>{`
         .va-caregivers-fab {
           position: fixed;
@@ -277,6 +262,7 @@ export function CaregiversPage() {
 }
 
 function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; colSpan: number }) {
+  const { t } = useTranslation()
   const { data, isLoading, isError, refetch } = useGetCaregiverClientsQuery(
     { id: caregiverId },
     { refetchOnMountOrArgChange: true },
@@ -310,11 +296,11 @@ function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; co
     try {
       await assignCaregiver({ clientId: selectedClientId, caregiverId }).unwrap()
       setSelectedClientId("")
-      setAssignMessage("Assigned.")
+      setAssignMessage(t("caregivers.assigned"))
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setAssignMessage(typeof msg === "string" ? msg : "Could not assign client.")
+      setAssignMessage(typeof msg === "string" ? msg : t("caregivers.assignError"))
     }
   }
 
@@ -322,11 +308,11 @@ function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; co
     setAssignMessage("")
     try {
       await removeCaregiver({ clientId, caregiverId }).unwrap()
-      setAssignMessage("Unassigned.")
+      setAssignMessage(t("caregivers.unassigned"))
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setAssignMessage(typeof msg === "string" ? msg : "Could not unassign client.")
+      setAssignMessage(typeof msg === "string" ? msg : t("caregivers.unassignError"))
     }
   }
 
@@ -336,43 +322,51 @@ function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; co
         <div className="va-caregiver-clients-wrap va-caregiver-clients-wrap--open">
           <div className="va-caregiver-clients-inner">
             <div style={{ padding: "0.5rem 0.75rem" }}>
-              <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginBottom: 6 }}>Assigned clients</p>
+              <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginBottom: 6 }}>{t("caregivers.assignedResidents")}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                <select
-                  className="va-login-input"
+                <AuthSelectField
+                  label={t("caregivers.assignResident")}
                   style={{ maxWidth: 320 }}
                   value={selectedClientId}
                   onChange={(e) => setSelectedClientId(e.target.value)}
                   disabled={allClientsLoading || assigning}
                 >
-                  <option value="">Assign resident...</option>
+                  <option value="">{t("caregivers.assignResident")}…</option>
                   {assignable.map((r) => (
                     <option key={r.id} value={r.id}>
                       {r.displayName} ({r.room})
                     </option>
                   ))}
-                </select>
+                </AuthSelectField>
                 <button type="button" className="va-btn-secondary" disabled={!selectedClientId || assigning} onClick={() => void onAssign()}>
-                  {assigning ? "Assigning..." : "Assign"}
+                  {assigning ? t("caregivers.assigning") : t("caregivers.assignResident")}
                 </button>
                 {assignMessage ? (
-                  <span style={{ fontSize: "0.75rem", color: assignMessage.includes("Could not") ? "var(--va-red-600)" : "var(--va-slate-600)" }}>
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color:
+                        assignMessage === t("caregivers.assignError") || assignMessage === t("caregivers.unassignError")
+                          ? "var(--va-red-600)"
+                          : "var(--va-slate-600)",
+                    }}
+                  >
                     {assignMessage}
                   </span>
                 ) : null}
               </div>
               {isLoading ? (
-                <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", margin: 0 }}>Loading...</p>
+                <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", margin: 0 }}>{t("caregivers.loadingClients")}</p>
               ) : isError ? (
-                <p style={{ fontSize: "0.8125rem", color: "var(--va-red-600)", margin: 0 }}>Could not load clients.</p>
+                <p style={{ fontSize: "0.8125rem", color: "var(--va-red-600)", margin: 0 }}>{t("caregivers.loadClientsError")}</p>
               ) : rows.length === 0 ? (
-                <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", margin: 0 }}>No clients assigned.</p>
+                <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", margin: 0 }}>{t("caregivers.noClientsAssigned")}</p>
               ) : (
                 <div>
                   {rows.map((r) => (
                     <div key={r.id} className="va-caregiver-client-line">
                       <span style={{ fontWeight: 600, color: "var(--va-navy)" }}>{r.displayName}</span>
-                      <span style={{ color: "var(--va-slate-600)" }}>Room {r.room}</span>
+                      <span style={{ color: "var(--va-slate-600)" }}>{t("caregivers.roomLabel", { room: r.room })}</span>
                       <StatusPill status={r.status} />
                       <span style={{ color: "var(--va-slate-600)" }}>
                         {r.lastCallDate} {r.lastCallTime}
@@ -382,7 +376,7 @@ function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; co
                         <button
                           type="button"
                           className="va-icon-btn"
-                          aria-label="Unassign resident"
+                          aria-label={t("caregivers.unassignAria")}
                           disabled={unassigning}
                           onClick={() => void onUnassign(r.id)}
                           style={{ color: "var(--va-red-600)" }}
@@ -403,10 +397,11 @@ function CaregiverClientsRow({ caregiverId, colSpan }: { caregiverId: string; co
 }
 
 function StatusPill({ status }: { status: "active" | "inactive" | "at_risk" }) {
+  const { t } = useTranslation()
   const map = {
-    active: { bg: "var(--va-emerald-100)", fg: "var(--va-emerald-700)", label: "Active" },
-    inactive: { bg: "var(--va-slate-100)", fg: "var(--va-slate-600)", label: "Inactive" },
-    at_risk: { bg: "var(--va-red-100)", fg: "var(--va-red-700)", label: "At Risk" },
+    active: { bg: "var(--va-emerald-100)", fg: "var(--va-emerald-700)", label: t("caregivers.statusActive") },
+    inactive: { bg: "var(--va-slate-100)", fg: "var(--va-slate-600)", label: t("caregivers.statusInactive") },
+    at_risk: { bg: "var(--va-red-100)", fg: "var(--va-red-700)", label: t("caregivers.statusAtRisk") },
   }
   const s = map[status]
   return (

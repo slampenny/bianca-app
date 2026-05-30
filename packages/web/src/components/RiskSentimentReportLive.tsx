@@ -1,14 +1,19 @@
 import { useMemo } from "react"
+import { useTranslation } from "react-i18next"
 import { downloadMockCsv } from "../data/reportsMock"
-import { buildRiskSentimentCsvExport, buildRiskSentimentTableRowStrings, riskSentimentReportSubtitle } from "../lib/riskSentimentReportPayload"
+import {
+  buildRiskSentimentCsvExport,
+  buildRiskSentimentTableRowStrings,
+  riskSentimentReportSubtitle,
+} from "../lib/riskSentimentReportPayload"
 import type { Client } from "../services/api/api.types"
 import { useGetSentimentTrendQuery } from "../services/api/sentimentApi"
 import { SentimentTrendSparkline } from "./SentimentTrendSparkline"
 import { PrintIcon, DownloadIcon } from "../icons"
 
-function RiskSentimentTableRow({ client }: { client: Client }) {
+function RiskSentimentTableRow({ client, t }: { client: Client; t: ReturnType<typeof useTranslation>["t"] }) {
   const id = String(client.id ?? "")
-  const [name, room, risk, sentiment, notes] = useMemo(() => buildRiskSentimentTableRowStrings(client), [client])
+  const [name, room, risk, sentiment, notes] = useMemo(() => buildRiskSentimentTableRowStrings(client, t), [client, t])
   const { data, isLoading, isError } = useGetSentimentTrendQuery(
     { clientId: id, timeRange: "month" },
     { skip: !id },
@@ -20,13 +25,13 @@ function RiskSentimentTableRow({ client }: { client: Client }) {
     }
     if (isError || !data) {
       return (
-        <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }} title="Could not load trend">
-          —
+        <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }} title={t("riskSentimentReport.trendLoadError")}>
+          {t("common.emDash")}
         </span>
       )
     }
     return <SentimentTrendSparkline points={data.dataPoints ?? []} />
-  }, [data, isError, isLoading])
+  }, [data, isError, isLoading, t])
 
   return (
     <tr>
@@ -55,14 +60,15 @@ export function RiskSentimentReportLive({
   scopeFullOrganization,
   filenameBase,
 }: Props) {
-  const subtitle = riskSentimentReportSubtitle(clients.length, scopeFullOrganization)
+  const { t } = useTranslation()
+  const subtitle = riskSentimentReportSubtitle(clients.length, scopeFullOrganization, t)
 
   const onPrint = () => {
     window.print()
   }
 
   const onCsv = () => {
-    const { headers, rows } = buildRiskSentimentCsvExport(clients)
+    const { headers, rows } = buildRiskSentimentCsvExport(clients, t)
     const day = new Date().toISOString().slice(0, 10)
     downloadMockCsv(`${filenameBase}-${day}.csv`, headers, rows)
   }
@@ -73,42 +79,36 @@ export function RiskSentimentReportLive({
         <div className="va-report-doc-brand">
           bianca<span className="va-report-doc-brand-dot">.</span>
         </div>
-        <h2 className="va-report-doc-title">Risk & sentiment trend</h2>
+        <h2 className="va-report-doc-title">{t("riskSentimentReport.title")}</h2>
         <p className="va-report-doc-meta">
           {subtitle} · {facilityLine} · {generatedAtLabel}
         </p>
         <ul className="va-report-doc-narrative">
-          <li>
-            Figures below match the Residents list and the mobile app home screen: latest fraud/abuse risk score and
-            recent conversation sentiment summary.
-          </li>
-          <li>Residents with no completed analyses yet show &quot;None&quot; / &quot;—&quot; until data exists.</li>
-          <li>
-            Sparklines use sentiment scores from analyzed calls in the past month (same data as the resident detail
-            sentiment tab).
-          </li>
+          <li>{t("riskSentimentReport.narrative0")}</li>
+          <li>{t("riskSentimentReport.narrative1")}</li>
+          <li>{t("riskSentimentReport.narrative2")}</li>
         </ul>
-        <div className="va-report-doc-table-cap">Roster · current signals</div>
+        <div className="va-report-doc-table-cap">{t("riskSentimentReport.rosterCaption")}</div>
         <table className="va-report-doc-table">
           <thead>
             <tr>
-              <th>Resident</th>
-              <th>Room</th>
-              <th>Risk level</th>
-              <th>Sentiment</th>
-              <th>Sentiment trend (30d)</th>
-              <th>Notes</th>
+              <th>{t("riskSentimentReport.colResident")}</th>
+              <th>{t("riskSentimentReport.colRoom")}</th>
+              <th>{t("riskSentimentReport.colRisk")}</th>
+              <th>{t("riskSentimentReport.colSentiment")}</th>
+              <th>{t("riskSentimentReport.colTrend")}</th>
+              <th>{t("riskSentimentReport.colNotes")}</th>
             </tr>
           </thead>
           <tbody>
             {clients.length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ color: "var(--va-slate-500)" }}>
-                  No assigned residents match this report.
+                  {t("riskSentimentReport.emptyRoster")}
                 </td>
               </tr>
             ) : (
-              clients.map((c) => <RiskSentimentTableRow key={String(c.id ?? "")} client={c} />)
+              clients.map((c) => <RiskSentimentTableRow key={String(c.id ?? "")} client={c} t={t} />)
             )}
           </tbody>
         </table>
@@ -116,11 +116,11 @@ export function RiskSentimentReportLive({
       <div className="va-report-modal-actions va-no-print">
         <button type="button" className="va-btn-secondary" onClick={onPrint}>
           <PrintIcon size={18} />
-          Print / Save as PDF
+          {t("riskSentimentReport.printPdf")}
         </button>
         <button type="button" className="va-btn-secondary" onClick={onCsv}>
           <DownloadIcon size={18} />
-          Download data (CSV)
+          {t("riskSentimentReport.downloadCsv")}
         </button>
       </div>
     </>

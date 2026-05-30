@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useTranslation } from "react-i18next"
 import {
   isGoogleSsoConfigured,
   isMicrosoftSsoConfigured,
@@ -19,6 +20,7 @@ type Props = {
 }
 
 export function SSOLoginButtons({ disabled, onSsoError, onSsoSuccess }: Props) {
+  const { t } = useTranslation()
   const [googleLoading, setGoogleLoading] = useState(false)
   const [microsoftLoading, setMicrosoftLoading] = useState(false)
 
@@ -62,7 +64,7 @@ export function SSOLoginButtons({ disabled, onSsoError, onSsoSuccess }: Props) {
 
   return (
     <div className="va-sso-block">
-      <p className="va-sso-divider">or continue with</p>
+      <p className="va-sso-divider">{t("sso.orContinueWith")}</p>
       <div className="va-sso-row">
         {showGoogle ? (
           <button
@@ -77,7 +79,7 @@ export function SSOLoginButtons({ disabled, onSsoError, onSsoSuccess }: Props) {
                 <span className="va-sso-google-icon" aria-hidden>
                   G
                 </span>
-                Google
+                {t("sso.google")}
               </>
             )}
           </button>
@@ -95,7 +97,7 @@ export function SSOLoginButtons({ disabled, onSsoError, onSsoSuccess }: Props) {
                 <span className="va-sso-ms-icon" aria-hidden>
                   M
                 </span>
-                Microsoft
+                {t("sso.microsoft")}
               </>
             )}
           </button>

@@ -1,0 +1,16 @@
+{
+  "login.apiLabel": "API:",
+  "appShell.pageTitleSuffix": "Bianca",
+  "residents.onboardingProgress": "{{completed}}/{{total}}",
+  "residents.colStatus": "Status",
+  "residentDetail.distChip": "{{label}}: {{count}}",
+  "residentDetail.biancaLabel": "Bianca",
+  "fraudAbuse.loadErrorSuffix": ": {{message}}",
+  "reports.thStatus": "Status",
+  "reports.deliveryCsv": "CSV",
+  "reports.deliveryPdf": "PDF",
+  "reports.activityCheckIn": "Check-in",
+  "caregivers.colStatus": "Status",
+  "sso.google": "Google",
+  "sso.microsoft": "Microsoft"
+}

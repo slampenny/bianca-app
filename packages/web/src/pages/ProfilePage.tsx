@@ -16,7 +16,9 @@ import { useGetMFAStatusQuery } from "../services/api/mfaApi"
 import { clearAuth, getAuthTokens, getCurrentUser } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
-import { i18n } from "../i18n/i18n"
+import { changeWebLanguage } from "../i18n/i18n"
+import { AuthSelectField } from "../components/AuthSelectField"
+import { AuthTextField } from "../components/AuthTextField"
 import { AvatarPicker } from "../components/AvatarPicker"
 import "../app.css"
 
@@ -197,23 +199,22 @@ export function ProfilePage() {
               onPick={setAvatarFile}
             />
 
-            <label className="va-login-label">
-              {t("profile.name")}
-              <input className="va-login-input" value={name} onChange={(ev) => setName(ev.target.value)} autoComplete="name" />
-            </label>
+            <AuthTextField
+              label={t("profile.name")}
+              value={name}
+              onChange={(ev) => setName(ev.target.value)}
+              autoComplete="name"
+            />
 
-            <label className="va-login-label">
-              {t("profile.email")}
-              <input
-                className="va-login-input"
-                type="email"
-                value={email}
-                onChange={(ev) => setEmail(ev.target.value)}
-                disabled={isSsoUser}
-                style={isSsoUser ? { opacity: 0.75 } : undefined}
-                autoComplete="email"
-              />
-            </label>
+            <AuthTextField
+              label={t("profile.email")}
+              type="email"
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
+              disabled={isSsoUser}
+              style={isSsoUser ? { opacity: 0.75 } : undefined}
+              autoComplete="email"
+            />
             {isSsoUser ? (
               <p className="va-login-helper">{t("profile.ssoEmailHelper")}</p>
             ) : null}
@@ -240,10 +241,12 @@ export function ProfilePage() {
               ) : null}
             </div>
 
-            <label className="va-login-label">
-              {t("profile.phone")}
-              <input className="va-login-input" value={phone} onChange={(ev) => setPhone(ev.target.value)} autoComplete="tel" />
-            </label>
+            <AuthTextField
+              label={t("profile.phone")}
+              value={phone}
+              onChange={(ev) => setPhone(ev.target.value)}
+              autoComplete="tel"
+            />
             <p className="va-login-helper">{t("profile.phoneFormatHelper")}</p>
 
             {profile?.isPhoneVerified ? (
@@ -258,24 +261,21 @@ export function ProfilePage() {
               <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: 8 }}>{t("profile.phoneNotVerified")}</p>
             )}
 
-            <label className="va-login-label" style={{ marginTop: "0.5rem" }}>
-              {t("profile.preferredLanguage")}
-              <select
-                className="va-login-input"
-                value={preferredLanguage}
-                onChange={(ev) => {
-                  const v = ev.target.value
-                  setPreferredLanguage(v)
-                  void i18n.changeLanguage(v.length >= 2 ? v.slice(0, 2).toLowerCase() : v)
-                }}
-              >
-                {LANGUAGE_OPTIONS.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.nativeName} ({l.label})
-                  </option>
-                ))}
-              </select>
-            </label>
+            <AuthSelectField
+              label={t("profile.preferredLanguage")}
+              value={preferredLanguage}
+              onChange={(ev) => {
+                const v = ev.target.value
+                setPreferredLanguage(v)
+                void changeWebLanguage(v.length >= 2 ? v.slice(0, 2).toLowerCase() : v)
+              }}
+            >
+              {LANGUAGE_OPTIONS.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.nativeName} ({l.label})
+                </option>
+              ))}
+            </AuthSelectField>
             <p className="va-login-helper">{t("profile.preferredLanguageHelper")}</p>
           </form>
         )}
@@ -286,27 +286,22 @@ export function ProfilePage() {
         <p className="va-login-helper" style={{ marginBottom: "0.75rem" }}>
           {t("profile.appearanceHelper")}
         </p>
-        <label className="va-login-label">
-          {t("profile.theme")}
-          <select className="va-login-input" value={themeMode} onChange={(ev) => onThemeChange(ev.target.value as WebThemeMode)}>
-            <option value="light">{t("profile.themeLight")}</option>
-            <option value="dark">{t("profile.themeDark")}</option>
-            <option value="system">{t("profile.themeSystem")}</option>
-          </select>
-        </label>
-        <label className="va-login-label" style={{ marginTop: "0.75rem" }}>
-          {t("profile.textSize")}
-          <select
-            className="va-login-input"
-            value={String(fontPct)}
-            onChange={(ev) => onFontChange(Number(ev.target.value))}
-          >
-            <option value="90">{t("profile.textSize90")}</option>
-            <option value="100">{t("profile.textSize100")}</option>
-            <option value="110">{t("profile.textSize110")}</option>
-            <option value="125">{t("profile.textSize125")}</option>
-          </select>
-        </label>
+        <AuthSelectField label={t("profile.theme")} value={themeMode} onChange={(ev) => onThemeChange(ev.target.value as WebThemeMode)}>
+          <option value="light">{t("profile.themeLight")}</option>
+          <option value="dark">{t("profile.themeDark")}</option>
+          <option value="system">{t("profile.themeSystem")}</option>
+        </AuthSelectField>
+        <AuthSelectField
+          label={t("profile.textSize")}
+          style={{ marginTop: "0.75rem" }}
+          value={String(fontPct)}
+          onChange={(ev) => onFontChange(Number(ev.target.value))}
+        >
+          <option value="90">{t("profile.textSize90")}</option>
+          <option value="100">{t("profile.textSize100")}</option>
+          <option value="110">{t("profile.textSize110")}</option>
+          <option value="125">{t("profile.textSize125")}</option>
+        </AuthSelectField>
       </div>
 
       <div className="va-page-section">

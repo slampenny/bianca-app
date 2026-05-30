@@ -1,56 +1,52 @@
 import { useState, type CSSProperties } from "react"
+import { useTranslation, type TFunction } from "react-i18next"
 import type { MedicalAnalysisResult, MedicalAnalysisSummaryResponse } from "../services/api/medicalAnalysisApi"
 
 const MIN_DATA_POINTS = 5
-
-const MEDICAL_DISCLAIMER =
-  "This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare providers for medical concerns."
 
 function invertRiskScore(riskScore: number | undefined): number | undefined {
   if (riskScore === undefined || riskScore === null) return undefined
   return Math.round(100 - riskScore)
 }
 
-function getHealthLevel(invertedScore: number): { level: string; color: string } {
-  if (invertedScore >= 70) return { level: "Good", color: "var(--va-emerald-700)" }
-  if (invertedScore >= 40) return { level: "Fair", color: "var(--va-amber-700)" }
-  return { level: "Poor", color: "var(--va-red-600)" }
+function getHealthLevel(invertedScore: number, t: (key: string) => string): { level: string; color: string } {
+  if (invertedScore >= 70) return { level: t("medicalAnalysis.healthGood"), color: "var(--va-emerald-700)" }
+  if (invertedScore >= 40) return { level: t("medicalAnalysis.healthFair"), color: "var(--va-amber-700)" }
+  return { level: t("medicalAnalysis.healthPoor"), color: "var(--va-red-600)" }
 }
 
-function getRiskLabel(score: number): { level: string; color: string } {
-  if (score >= 70) return { level: "High", color: "var(--va-red-600)" }
-  if (score >= 40) return { level: "Medium", color: "var(--va-amber-700)" }
-  return { level: "Low", color: "var(--va-emerald-700)" }
+function getRiskLabel(score: number, t: (key: string) => string): { level: string; color: string } {
+  if (score >= 70) return { level: t("medicalAnalysis.riskHigh"), color: "var(--va-red-600)" }
+  if (score >= 40) return { level: t("medicalAnalysis.riskMedium"), color: "var(--va-amber-700)" }
+  return { level: t("medicalAnalysis.riskLow"), color: "var(--va-emerald-700)" }
 }
 
-function getCognitiveInterpretation(metrics: MedicalAnalysisResult["cognitiveMetrics"]): string {
-  if (!metrics) return "No data available for this section."
+function getCognitiveInterpretation(metrics: MedicalAnalysisResult["cognitiveMetrics"], t: TFunction): string {
+  if (!metrics) return t("medicalAnalysis.noSectionData")
   const riskScore = metrics.riskScore ?? 0
-  if (riskScore < 30) return "Communication patterns appear normal with no significant cognitive concerns detected."
-  if (riskScore < 50) return "Some mild changes in communication patterns detected. Monitor for progression."
-  if (riskScore < 70) return "Moderate changes in communication patterns observed. Consider professional evaluation."
-  return "Significant changes in communication patterns detected. Professional evaluation strongly recommended."
+  if (riskScore < 30) return t("medicalAnalysis.cognitiveInterpNormal")
+  if (riskScore < 50) return t("medicalAnalysis.cognitiveInterpMild")
+  if (riskScore < 70) return t("medicalAnalysis.cognitiveInterpModerate")
+  return t("medicalAnalysis.cognitiveInterpSignificant")
 }
 
-function getPsychiatricInterpretation(metrics: MedicalAnalysisResult["psychiatricMetrics"]): string {
-  if (!metrics) return "No data available for this section."
+function getPsychiatricInterpretation(metrics: MedicalAnalysisResult["psychiatricMetrics"], t: TFunction): string {
+  if (!metrics) return t("medicalAnalysis.noSectionData")
   const overallRisk = metrics.overallRiskScore ?? 0
   const hasCrisis = metrics.crisisIndicators?.hasCrisisIndicators
-  if (hasCrisis) {
-    return "Crisis indicators detected. Immediate professional intervention is strongly recommended."
-  }
-  if (overallRisk < 40) return "Mental health indicators appear stable with no significant concerns."
-  if (overallRisk < 60) return "Some mild mental health indicators detected. Continue monitoring."
-  if (overallRisk < 80) return "Moderate mental health indicators observed. Consider professional consultation."
-  return "Significant mental health indicators detected. Professional consultation recommended."
+  if (hasCrisis) return t("medicalAnalysis.psychiatricInterpCrisis")
+  if (overallRisk < 40) return t("medicalAnalysis.psychiatricInterpStable")
+  if (overallRisk < 60) return t("medicalAnalysis.psychiatricInterpMild")
+  if (overallRisk < 80) return t("medicalAnalysis.psychiatricInterpModerate")
+  return t("medicalAnalysis.psychiatricInterpSignificant")
 }
 
-function getVocabularyInterpretation(metrics: MedicalAnalysisResult["vocabularyMetrics"]): string {
-  if (!metrics) return "No data available for this section."
+function getVocabularyInterpretation(metrics: MedicalAnalysisResult["vocabularyMetrics"], t: TFunction): string {
+  if (!metrics) return t("medicalAnalysis.noSectionData")
   const complexity = metrics.complexityScore ?? 0
-  if (complexity >= 70) return "Language complexity and vocabulary usage appear strong and well-maintained."
-  if (complexity >= 50) return "Language complexity and vocabulary usage are within normal ranges."
-  return "Language complexity and vocabulary usage appear limited. Monitor for changes."
+  if (complexity >= 70) return t("medicalAnalysis.vocabInterpStrong")
+  if (complexity >= 50) return t("medicalAnalysis.vocabInterpNormal")
+  return t("medicalAnalysis.vocabInterpLimited")
 }
 
 function getConfidenceStyles(conf: string | undefined): { bg: string; fg: string; dot: string } {
@@ -108,6 +104,7 @@ type Props = {
 }
 
 export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, isError }: Props) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["cognitive", "psychiatric", "vocabulary"]))
 
   const toggle = (id: string) => {
@@ -120,18 +117,16 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
   }
 
   if (isLoading) {
-    return <p style={{ marginTop: "0.9rem", color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading medical analysis…</p>
+    return <p style={{ marginTop: "0.9rem", color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("medicalAnalysis.loading")}</p>
   }
   if (isError) {
     return (
-      <p style={{ marginTop: "0.9rem", color: "var(--va-red-600)", fontSize: "0.875rem" }}>
-        Could not load medical analysis for this resident.
-      </p>
+      <p style={{ marginTop: "0.9rem", color: "var(--va-red-600)", fontSize: "0.875rem" }}>{t("medicalAnalysis.loadError")}</p>
     )
   }
   const hasData = Boolean(summary?.data?.hasData || latestResult)
   if (!hasData) {
-    return <p style={{ marginTop: "0.9rem", color: "var(--va-slate-500)", fontSize: "0.875rem" }}>No medical analysis available yet.</p>
+    return <p style={{ marginTop: "0.9rem", color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("medicalAnalysis.noData")}</p>
   }
 
   const latest = latestResult
@@ -152,7 +147,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
   const psychiatricInv = invertRiskScore(latest?.psychiatricMetrics?.overallRiskScore)
   const complexity = latest?.vocabularyMetrics?.complexityScore
   const c0 = complexity ?? 0
-  const vocabLabel = c0 >= 70 ? "Good" : c0 >= 40 ? "Fair" : "Poor"
+  const vocabLabel = c0 >= 70 ? t("medicalAnalysis.healthGood") : c0 >= 40 ? t("medicalAnalysis.healthFair") : t("medicalAnalysis.healthPoor")
   const vocabColor = c0 >= 70 ? "var(--va-emerald-700)" : c0 >= 40 ? "var(--va-amber-700)" : "var(--va-red-600)"
 
   return (
@@ -171,7 +166,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
         <span style={{ fontSize: "1rem" }} aria-hidden>
           ⚕
         </span>
-        <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.5, color: "var(--va-slate-700)" }}>{MEDICAL_DISCLAIMER}</p>
+        <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.5, color: "var(--va-slate-700)" }}>{t("medicalAnalysis.disclaimer")}</p>
       </div>
 
       {hasInsufficientData ? (
@@ -192,7 +187,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
             ℹ
           </span>
           <p style={{ margin: 0, fontSize: "0.75rem", lineHeight: 1.45, color: "var(--va-amber-900)" }}>
-            Limited data: {latest?.conversationCount ?? 0} call(s) analyzed. For more reliable results, {MIN_DATA_POINTS} or more calls over a longer period are recommended.
+            {t("medicalAnalysis.insufficientData", { count: latest?.conversationCount ?? 0, min: MIN_DATA_POINTS })}
           </p>
         </div>
       ) : null}
@@ -200,7 +195,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
       {/* Overview */}
       <div style={reportCard}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-          <h3 style={sectionTitle}>Overview</h3>
+          <h3 style={sectionTitle}>{t("common.analysisOverview")}</h3>
           <span
             style={{
               display: "inline-flex",
@@ -215,7 +210,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
             }}
           >
             <span style={{ width: 6, height: 6, borderRadius: 999, background: confStyles.dot }} />
-            {(confidence ?? "none").toUpperCase()} confidence
+            {t("common.confidenceBadge", { level: (confidence ?? "none").toUpperCase() })}
           </span>
         </div>
         <p style={{ margin: "0 0 0.75rem", fontSize: "0.8rem", color: "var(--va-slate-500)" }}>
@@ -223,7 +218,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
         </p>
         {overallHealth != null ? (
           <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <strong>Overall health score:</strong>{" "}
+            <strong>{t("medicalAnalysis.overallHealthScore")}</strong>{" "}
             <span
               style={{
                 fontWeight: 700,
@@ -237,15 +232,15 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, textAlign: "center" }}>
           <div>
             <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, color: "var(--va-navy)" }}>{conversationCount ?? "—"}</p>
-            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>Conversations</p>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>{t("common.statConversations")}</p>
           </div>
           <div>
             <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, color: "var(--va-navy)" }}>{messageCount ?? "—"}</p>
-            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>Messages</p>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>{t("common.statMessages")}</p>
           </div>
           <div>
             <p style={{ margin: 0, fontSize: "1.35rem", fontWeight: 700, color: "var(--va-navy)" }}>{totalWords != null ? totalWords : "—"}</p>
-            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>Total words</p>
+            <p style={{ margin: "0.2rem 0 0", fontSize: "0.68rem", color: "var(--va-slate-500)" }}>{t("common.statTotalWords")}</p>
           </div>
         </div>
       </div>
@@ -274,7 +269,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                 <span style={{ fontSize: "1.1rem" }} aria-hidden>
                   🧠
                 </span>
-                <span style={sectionTitle}>Cognitive health</span>
+                <span style={sectionTitle}>{t("medicalAnalysis.sectionCognitive")}</span>
               </span>
               <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }}>{expanded.has("cognitive") ? "▲" : "▼"}</span>
             </button>
@@ -293,39 +288,39 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                     gap: 6,
                     fontSize: "0.8rem",
                     fontWeight: 600,
-                    color: getHealthLevel(cognitiveInv).color,
+                    color: getHealthLevel(cognitiveInv, t).color,
                   }}
                 >
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: getHealthLevel(cognitiveInv).color }} />
-                  {getHealthLevel(cognitiveInv).level}
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: getHealthLevel(cognitiveInv, t).color }} />
+                  {getHealthLevel(cognitiveInv, t).level}
                 </span>
               ) : null}
             </div>
             <p style={{ margin: "0 0 0.5rem", fontSize: "0.8125rem", lineHeight: 1.5, color: "var(--va-slate-600)" }}>
-              {getCognitiveInterpretation(latest.cognitiveMetrics)}
+              {getCognitiveInterpretation(latest.cognitiveMetrics, t)}
             </p>
             {expanded.has("cognitive") && latest.cognitiveMetrics ? (
               <div style={{ paddingTop: 4 }}>
                 <MetricRow
-                  label="Filler words"
+                  label={t("medicalAnalysis.metricFillerWords")}
                   value={`${((latest.cognitiveMetrics.fillerWordDensity ?? 0) * 100).toFixed(1)}%`}
                 />
                 <MetricRow
-                  label="Vague references"
+                  label={t("medicalAnalysis.metricVagueReferences")}
                   value={`${((latest.cognitiveMetrics.vagueReferenceDensity ?? 0) * 100).toFixed(1)}%`}
                 />
                 {latest.cognitiveMetrics.temporalConfusionCount !== undefined ? (
-                  <MetricRow label="Temporal confusion" value={String(latest.cognitiveMetrics.temporalConfusionCount)} />
+                  <MetricRow label={t("medicalAnalysis.metricTemporalConfusion")} value={String(latest.cognitiveMetrics.temporalConfusionCount)} />
                 ) : null}
                 {latest.cognitiveMetrics.wordFindingDifficultyCount !== undefined ? (
-                  <MetricRow label="Word-finding difficulty" value={String(latest.cognitiveMetrics.wordFindingDifficultyCount)} />
+                  <MetricRow label={t("medicalAnalysis.metricWordFindingDifficulty")} value={String(latest.cognitiveMetrics.wordFindingDifficultyCount)} />
                 ) : null}
                 {latest.cognitiveMetrics.repetitionScore !== undefined ? (
-                  <MetricRow label="Repetition" value={`${latest.cognitiveMetrics.repetitionScore.toFixed(1)}%`} />
+                  <MetricRow label={t("medicalAnalysis.metricRepetition")} value={`${latest.cognitiveMetrics.repetitionScore.toFixed(1)}%`} />
                 ) : null}
                 {latest.cognitiveMetrics.informationDensity?.score !== undefined ? (
                   <MetricRow
-                    label="Information density"
+                    label={t("medicalAnalysis.metricInformationDensity")}
                     value={`${latest.cognitiveMetrics.informationDensity.score.toFixed(1)}%`}
                   />
                 ) : null}
@@ -355,7 +350,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                 <span style={{ fontSize: "1.1rem" }} aria-hidden>
                   ❤️
                 </span>
-                <span style={sectionTitle}>Mental health</span>
+                <span style={sectionTitle}>{t("medicalAnalysis.sectionMentalHealth")}</span>
               </span>
               <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }}>{expanded.has("psychiatric") ? "▲" : "▼"}</span>
             </button>
@@ -375,7 +370,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                 <span style={{ color: "var(--va-red-600)" }} aria-hidden>
                   ⚠
                 </span>
-                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-red-800)" }}>Crisis indicators present</span>
+                <span style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-red-800)" }}>{t("medicalAnalysis.crisisIndicatorsPresent")}</span>
               </div>
             ) : null}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
@@ -393,38 +388,38 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                     gap: 6,
                     fontSize: "0.8rem",
                     fontWeight: 600,
-                    color: getHealthLevel(psychiatricInv).color,
+                    color: getHealthLevel(psychiatricInv, t).color,
                   }}
                 >
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: getHealthLevel(psychiatricInv).color }} />
-                  {getHealthLevel(psychiatricInv).level}
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: getHealthLevel(psychiatricInv, t).color }} />
+                  {getHealthLevel(psychiatricInv, t).level}
                 </span>
               ) : null}
             </div>
             <p style={{ margin: "0 0 0.5rem", fontSize: "0.8125rem", lineHeight: 1.5, color: "var(--va-slate-600)" }}>
-              {getPsychiatricInterpretation(latest.psychiatricMetrics)}
+              {getPsychiatricInterpretation(latest.psychiatricMetrics, t)}
             </p>
             {expanded.has("psychiatric") && latest.psychiatricMetrics ? (
               <div style={{ paddingTop: 4 }}>
                 <MetricRow
-                  label="Depression score"
+                  label={t("medicalAnalysis.metricDepressionScore")}
                   value={`${(latest.psychiatricMetrics.depressionScore ?? 0).toFixed(0)}%`}
-                  valueColor={getRiskLabel(latest.psychiatricMetrics.depressionScore ?? 0).color}
+                  valueColor={getRiskLabel(latest.psychiatricMetrics.depressionScore ?? 0, t).color}
                 />
                 <MetricRow
-                  label="Anxiety score"
+                  label={t("medicalAnalysis.metricAnxietyScore")}
                   value={`${(latest.psychiatricMetrics.anxietyScore ?? 0).toFixed(0)}%`}
-                  valueColor={getRiskLabel(latest.psychiatricMetrics.anxietyScore ?? 0).color}
+                  valueColor={getRiskLabel(latest.psychiatricMetrics.anxietyScore ?? 0, t).color}
                 />
                 {latest.psychiatricMetrics.emotionalTone ? (
                   <>
                     <MetricRow
-                      label="Emotional tone"
+                      label={t("medicalAnalysis.metricEmotionalTone")}
                       value={latest.psychiatricMetrics.emotionalTone.dominantTone ?? "neutral"}
                     />
                     {latest.psychiatricMetrics.emotionalTone.negativeRatio != null ? (
                       <MetricRow
-                        label="Negative ratio"
+                        label={t("medicalAnalysis.metricNegativeRatio")}
                         value={`${(latest.psychiatricMetrics.emotionalTone.negativeRatio * 100).toFixed(1)}%`}
                       />
                     ) : null}
@@ -432,7 +427,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                 ) : null}
                 {latest.psychiatricMetrics.protectiveFactors !== undefined && latest.psychiatricMetrics.protectiveFactors !== "" ? (
                   <MetricRow
-                    label="Protective factors"
+                    label={t("medicalAnalysis.metricProtectiveFactors")}
                     value={String(latest.psychiatricMetrics.protectiveFactors)}
                   />
                 ) : null}
@@ -462,7 +457,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                 <span style={{ fontSize: "1.1rem" }} aria-hidden>
                   💬
                 </span>
-                <span style={sectionTitle}>Language & vocabulary</span>
+                <span style={sectionTitle}>{t("medicalAnalysis.sectionLanguageVocabulary")}</span>
               </span>
               <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }}>{expanded.has("vocabulary") ? "▲" : "▼"}</span>
             </button>
@@ -486,24 +481,24 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
               ) : null}
             </div>
             <p style={{ margin: "0 0 0.5rem", fontSize: "0.8125rem", lineHeight: 1.5, color: "var(--va-slate-600)" }}>
-              {getVocabularyInterpretation(latest.vocabularyMetrics)}
+              {getVocabularyInterpretation(latest.vocabularyMetrics, t)}
             </p>
             {expanded.has("vocabulary") && latest.vocabularyMetrics ? (
               <div style={{ paddingTop: 4 }}>
                 {latest.vocabularyMetrics.typeTokenRatio != null ? (
                   <MetricRow
-                    label="Type–token ratio"
+                    label={t("medicalAnalysis.metricTypeTokenRatio")}
                     value={`${(latest.vocabularyMetrics.typeTokenRatio * 100).toFixed(1)}%`}
                   />
                 ) : null}
                 {latest.vocabularyMetrics.avgWordLength != null ? (
-                  <MetricRow label="Avg. word length" value={latest.vocabularyMetrics.avgWordLength.toFixed(1)} />
+                  <MetricRow label={t("medicalAnalysis.metricAvgWordLength")} value={latest.vocabularyMetrics.avgWordLength.toFixed(1)} />
                 ) : null}
                 {latest.vocabularyMetrics.avgSentenceLength != null ? (
-                  <MetricRow label="Avg. sentence length" value={latest.vocabularyMetrics.avgSentenceLength.toFixed(1)} />
+                  <MetricRow label={t("medicalAnalysis.metricAvgSentenceLength")} value={latest.vocabularyMetrics.avgSentenceLength.toFixed(1)} />
                 ) : null}
                 {latest.vocabularyMetrics.uniqueWords != null ? (
-                  <MetricRow label="Unique words" value={String(latest.vocabularyMetrics.uniqueWords)} />
+                  <MetricRow label={t("medicalAnalysis.metricUniqueWords")} value={String(latest.vocabularyMetrics.uniqueWords)} />
                 ) : null}
               </div>
             ) : null}
@@ -517,7 +512,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                 borderColor: "var(--va-amber-100)",
               }}
             >
-              <h3 style={{ ...sectionTitle, marginBottom: 8 }}>Key indicators</h3>
+              <h3 style={{ ...sectionTitle, marginBottom: 8 }}>{t("medicalAnalysis.keyIndicators")}</h3>
               {latest.cognitiveMetrics.indicators.map((indicator, index) => (
                 <div key={index} style={{ display: "flex", gap: 8, marginBottom: 6, fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>
                   <span style={{ color: indicator.severity === "high" ? "var(--va-red-500)" : "var(--va-amber-600)" }} aria-hidden>
@@ -537,7 +532,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
                 borderColor: "var(--va-amber-200)",
               }}
             >
-              <h3 style={{ ...sectionTitle, marginBottom: 8 }}>Warnings & insights</h3>
+              <h3 style={{ ...sectionTitle, marginBottom: 8 }}>{t("medicalAnalysis.warningsAndInsights")}</h3>
               {latest.warnings.map((w, i) => (
                 <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6, fontSize: "0.8125rem", color: "var(--va-amber-950)" }}>
                   <span aria-hidden>⚠</span>
@@ -551,7 +546,7 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
 
       {riskIndicators.length > 0 ? (
         <div style={{ ...reportCard, background: "var(--va-red-50)", borderColor: "var(--va-red-100)" }}>
-          <h3 style={{ ...sectionTitle, color: "var(--va-red-800)", marginBottom: 8 }}>Risk indicators (summary)</h3>
+          <h3 style={{ ...sectionTitle, color: "var(--va-red-800)", marginBottom: 8 }}>{t("medicalAnalysis.riskIndicatorsSummary")}</h3>
           <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8125rem", color: "var(--va-red-800)" }}>
             {riskIndicators.map((r, i) => (
               <li key={`${r.category}-${i}`}>{r.description}</li>
@@ -562,16 +557,16 @@ export function MedicalAnalysisReportPanel({ summary, latestResult, isLoading, i
 
       {recommendations.length > 0 ? (
         <div style={reportCard}>
-          <h3 style={{ ...sectionTitle, marginBottom: 8 }}>Recommendations</h3>
+          <h3 style={{ ...sectionTitle, marginBottom: 8 }}>{t("medicalAnalysis.recommendations")}</h3>
           <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>
             {recommendations.map((r, i) => (
-              <li key={`${r.title || "rec"}-${i}`}>{r.title || r.description || "Recommendation"}</li>
+              <li key={`${r.title || "rec"}-${i}`}>{r.title || r.description || t("common.recommendationFallback")}</li>
             ))}
           </ul>
         </div>
       ) : concerns.length > 0 ? (
         <div style={reportCard}>
-          <h3 style={{ ...sectionTitle, marginBottom: 8 }}>Concerns (summary)</h3>
+          <h3 style={{ ...sectionTitle, marginBottom: 8 }}>{t("medicalAnalysis.concernsSummary")}</h3>
           <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>
             {concerns.map((c, i) => (
               <li key={`${c.category}-${i}`}>{c.description}</li>

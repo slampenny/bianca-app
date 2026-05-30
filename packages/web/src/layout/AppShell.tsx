@@ -1,5 +1,6 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import { isAlertUnreadForCaregiver } from "../lib/liveData"
 import { canManageCaregivers } from "../lib/roleAccess"
@@ -18,12 +19,14 @@ import {
   ZapIcon,
 } from "../icons"
 import { formatHeaderLastActivity } from "../lib/timeFormat"
+import { LocaleSync } from "../i18n/LocaleSync"
+import { useDocumentTitle } from "../hooks/useDocumentTitle"
 import { RealtimeSocketBridge } from "../realtime/RealtimeSocketBridge"
 import "../app.css"
 
 type NavItem = {
   to: string
-  label: string
+  labelKey: string
   icon: typeof DashboardIcon
   badge: boolean
   orgAdminOnly?: boolean
@@ -31,12 +34,12 @@ type NavItem = {
 }
 
 const NAV: NavItem[] = [
-  { to: "/", label: "Dashboard", icon: DashboardIcon, badge: false },
-  { to: "/alerts", label: "Alerts", icon: BellIcon, badge: true },
-  { to: "/residents", label: "Residents", icon: UsersIcon, badge: false },
-  { to: "/caregivers", label: "Caregivers", icon: UsersIcon, badge: false, orgAdminOnly: true },
-  { to: "/reports", label: "Reports", icon: FileTextIcon, badge: false },
-  { to: "/settings", label: "Settings", icon: SettingsIcon, badge: false },
+  { to: "/", labelKey: "nav.dashboard", icon: DashboardIcon, badge: false },
+  { to: "/alerts", labelKey: "nav.alerts", icon: BellIcon, badge: true },
+  { to: "/residents", labelKey: "nav.residents", icon: UsersIcon, badge: false },
+  { to: "/caregivers", labelKey: "nav.caregivers", icon: UsersIcon, badge: false, orgAdminOnly: true },
+  { to: "/reports", labelKey: "nav.reports", icon: FileTextIcon, badge: false },
+  { to: "/settings", labelKey: "nav.settings", icon: SettingsIcon, badge: false },
 ]
 
 function userInitials(name: string | undefined): string {
@@ -48,11 +51,13 @@ function userInitials(name: string | undefined): string {
 }
 
 export function AppShell() {
+  const { t } = useTranslation()
+  useDocumentTitle()
   const navigate = useNavigate()
   const currentUser = useAppSelector(getCurrentUser)
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const org = useAppSelector((s) => s.org)
-  const facilityName = org?.name || "Sunrise Memory Care"
+  const facilityName = org?.name || t("appShell.defaultFacility")
   const userId = currentUser?.id != null ? String(currentUser.id) : ""
   const { data: caregiverFresh } = useGetCaregiverQuery({ id: userId }, { skip: !authed || !userId })
   const avatarLabel = useMemo(() => userInitials(currentUser?.name), [currentUser?.name])
@@ -80,19 +85,19 @@ export function AppShell() {
   )
   const first = activityFeed[0]
   const [lastLabel, setLastLabel] = useState(
-    () => (first ? formatHeaderLastActivity(first.timestamp) : "No activity"),
+    () => (first ? formatHeaderLastActivity(first.timestamp) : t("header.noActivity")),
   )
 
   useEffect(() => {
     const tick = () => {
       setLastLabel(
-        first ? formatHeaderLastActivity(first.timestamp) : "No activity",
+        first ? formatHeaderLastActivity(first.timestamp) : t("header.noActivity"),
       )
     }
     tick()
     const id = setInterval(tick, 10_000)
     return () => clearInterval(id)
-  }, [first])
+  }, [first, t])
 
   const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -106,6 +111,7 @@ export function AppShell() {
 
   return (
     <div className="va-app">
+      <LocaleSync />
       <RealtimeSocketBridge />
       <aside
         className={`va-aside ${sidebarCollapsed ? "va-aside--collapsed" : "va-aside--open"} group/sidebar`}
@@ -136,25 +142,25 @@ export function AppShell() {
           <button
             type="button"
             className="va-icon-btn"
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={sidebarCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
             onClick={toggleSidebar}
           >
             <PanelIcon size={16} rotated={sidebarCollapsed} />
           </button>
         </div>
         <nav className="va-nav">
-          {navItems.map(({ to, label, icon: Icon, badge, testId }) => (
+          {navItems.map(({ to, labelKey, icon: Icon, badge, testId }) => (
             <NavLink
               key={to}
               to={to}
               end={to === "/"}
-              data-testid={testId ?? `nav-${label.toLowerCase().replace(/\s+/g, "-")}`}
+              data-testid={testId ?? `nav-${labelKey.split(".").pop()}`}
               className={({ isActive }) =>
                 `va-nav-link ${isActive ? "va-nav-link--active" : ""} ${sidebarCollapsed ? "justify-center" : ""}`
               }
             >
               <Icon size={20} />
-              {!sidebarCollapsed && <span>{label}</span>}
+              {!sidebarCollapsed && <span>{t(labelKey)}</span>}
               {badge && newAlertCount > 0 && (
                 <span className="va-badge">{newAlertCount > 9 ? "9+" : newAlertCount}</span>
               )}
@@ -164,31 +170,35 @@ export function AppShell() {
         <div className="va-simulate-wrap">
           <button type="button" className="va-simulate-btn" onClick={triggerAlert}>
             <ZapIcon size={14} />
-            {!sidebarCollapsed && <span>Simulate Alert</span>}
+            {!sidebarCollapsed && <span>{t("nav.simulateAlert")}</span>}
           </button>
         </div>
       </aside>
 
       <div className="va-main-col">
+        <a href="#main-content" className="va-skip-link">
+          {t("appShell.skipToMain")}
+        </a>
         <header className="va-header">
           <div className="va-header-loc">
             <span>{facilityName}</span>
             <span style={{ color: "var(--va-slate-300)", margin: "0 0.35rem" }}>—</span>
-            <span style={{ color: "var(--va-slate-500)", fontWeight: 400 }}>Phoenix, AZ</span>
+            <span style={{ color: "var(--va-slate-500)", fontWeight: 400 }}>{t("appShell.locationLine")}</span>
           </div>
           <div className="va-header-status">
             <span className="va-pulse" />
-            <span style={{ color: "var(--va-success)", fontWeight: 600 }}>System Active</span>
+            <span style={{ color: "var(--va-success)", fontWeight: 600 }}>{t("header.systemActive")}</span>
           </div>
           <div className="va-header-meta">
             <span>
-              Last activity: <strong style={{ color: "var(--va-slate-600)" }}>{lastLabel}</strong>
+              {t("header.lastActivity")}{" "}
+              <strong style={{ color: "var(--va-slate-600)" }}>{lastLabel}</strong>
             </span>
             <button
               type="button"
               className="va-avatar"
               title={currentUser?.email || undefined}
-              aria-label="Your profile"
+              aria-label={t("profile.ariaProfile")}
               onClick={() => navigate("/profile")}
               style={{ cursor: "pointer" }}
             >
@@ -205,7 +215,7 @@ export function AppShell() {
             </button>
           </div>
         </header>
-        <main className="va-scroll">
+        <main id="main-content" className="va-scroll" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
@@ -215,7 +225,7 @@ export function AppShell() {
           <div className="va-toast-inner">
             <AlertOctagonInline />
             <p style={{ fontSize: "0.875rem", color: "var(--va-slate-700)", flex: 1 }}>{toastMessage}</p>
-            <button type="button" className="va-toast-close" aria-label="Dismiss" onClick={dismissToast}>
+            <button type="button" className="va-toast-close" aria-label={t("common.dismiss")} onClick={dismissToast}>
               ×
             </button>
           </div>

@@ -366,8 +366,8 @@ export function OrgScreen() {
           
           <Toggle
             variant="switch"
-            label="Require Client Consent"
-            helper="When enabled, consent requests will be automatically sent to clients via email."
+            labelTx="orgScreen.requireClientConsentLabel"
+            helperTx="orgScreen.requireClientConsentHelper"
             value={requireClientConsent}
             onValueChange={setRequireClientConsent}
             editable={canEditOrg}

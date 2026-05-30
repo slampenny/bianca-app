@@ -11,10 +11,18 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cucumber": "mkdir -p test/e2e/cucumber/reports test/e2e/cucumber/screenshots && NODE_ENV=test npx @cucumber/cucumber --config test/e2e/cucumber/cucumber.config.cjs test/e2e/cucumber/features",
-    "test:e2e": "NODE_ENV=test npx playwright test"
+    "test:e2e": "NODE_ENV=test npx playwright test",
+    "test:a11y": "NODE_ENV=test npx playwright test test/e2e/a11y-smoke.e2e.test.ts",
+    "i18n:sync": "tsx scripts/sync-missing-keys.ts",
+    "i18n:chart-a11y": "tsx scripts/apply-chart-a11y-i18n.ts",
+    "i18n:translate": "python3 scripts/translate-untranslated.py",
+    "i18n:apply": "tsx scripts/apply-translated-fixes.ts",
+    "i18n:check": "tsx scripts/check-locale-coverage.ts",
+    "i18n:untranslated": "tsx scripts/check-untranslated-values.ts"
   },
   "dependencies": {
     "@bianca-app/shared": "*",
+    "@bianca-app/ui": "*",
     "@fontsource/space-grotesk": "^5.2.5",
     "@reduxjs/toolkit": "^2.2.1",
     "i18next": "^26.0.2",
@@ -28,6 +36,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
     "@cucumber/cucumber": "^12.5.0",
     "@cucumber/pretty-formatter": "^2.4.1",
     "@playwright/test": "^1.52.0",
@@ -39,6 +48,7 @@
     "@types/react-dom": "~18.2.0",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
+    "tsx": "^4.22.3",
     "typescript": "^5.8.3",
     "vite": "^6.0.3",
     "vitest": "^3.0.5"

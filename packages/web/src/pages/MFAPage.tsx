@@ -1,4 +1,6 @@
 import { FormEvent, useState } from "react"
+import { useTranslation } from "react-i18next"
+import { AuthTextField } from "../components/AuthTextField"
 import { useLocation, useNavigate } from "react-router-dom"
 import { useLoginMutation } from "../services/api/authApi"
 import { setAuthTokens, setCurrentUser } from "../store/authSlice"
@@ -6,6 +8,7 @@ import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
 import { parseLoginError } from "../lib/loginError"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
+import { useDocumentTitle } from "../hooks/useDocumentTitle"
 import "../app.css"
 
 type MfaState = {
@@ -15,6 +18,8 @@ type MfaState = {
 }
 
 export function MFAPage() {
+  const { t } = useTranslation()
+  useDocumentTitle()
   const navigate = useNavigate()
   const location = useLocation()
   const dispatch = useAppDispatch()
@@ -32,9 +37,9 @@ export function MFAPage() {
     return (
       <div className="va-login">
         <div className="va-login-card">
-          <p className="va-login-error">MFA session missing. Start from the login page.</p>
+          <p className="va-login-error">{t("mfaLogin.sessionMissing")}</p>
           <button type="button" className="va-btn-primary va-login-submit" onClick={() => navigate("/login")}>
-            Go to login
+            {t("mfaLogin.goToLogin")}
           </button>
         </div>
       </div>
@@ -44,7 +49,7 @@ export function MFAPage() {
   const handleVerify = async (e?: FormEvent) => {
     e?.preventDefault()
     if (mfaToken.length !== 6 && mfaToken.length !== 8) {
-      setErrorMessage("Enter a 6-digit code or 8-character backup code.")
+      setErrorMessage(t("mfaLogin.codeHint"))
       return
     }
 
@@ -58,7 +63,7 @@ export function MFAPage() {
       }).unwrap()
 
       if ("requireMFA" in result && result.requireMFA) {
-        setErrorMessage("Invalid code. Please try again.")
+        setErrorMessage(t("mfaLogin.invalidCode"))
         setMfaToken("")
         setLoading(false)
         return
@@ -72,7 +77,7 @@ export function MFAPage() {
         navigate("/", { replace: true })
       }
     } catch (err) {
-      setErrorMessage(parseLoginError(err).message)
+      setErrorMessage(parseLoginError(err, t).message)
       setMfaToken("")
     } finally {
       setLoading(false)
@@ -81,34 +86,31 @@ export function MFAPage() {
 
   const handleBackupShortcut = () => {
     if (mfaToken.length === 8) void handleVerify()
-    else setErrorMessage("Backup codes are 8 characters long.")
+    else setErrorMessage(t("mfaLogin.backupLength"))
   }
 
   return (
     <div className="va-login">
       <div className="va-login-card">
         <div className="va-login-brand">
-          <h1 className="va-login-title">Two-factor authentication</h1>
-          <p className="va-login-tagline">Enter the code from your authenticator app</p>
+          <h1 className="va-login-title">{t("mfaLogin.title")}</h1>
+          <p className="va-login-tagline">{t("mfaLogin.tagline")}</p>
         </div>
 
         <form className="va-login-form" onSubmit={handleVerify}>
-          <label className="va-login-label">
-            Verification code
-            <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              className="va-login-input"
-              value={mfaToken}
-              onChange={(e) => {
-                const d = e.target.value.replace(/[^0-9]/g, "").slice(0, 8)
-                setMfaToken(d)
-                setErrorMessage("")
-              }}
-              autoFocus
-            />
-          </label>
+          <AuthTextField
+            label={t("mfaLogin.verificationCode")}
+            type="text"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={mfaToken}
+            onChange={(e) => {
+              const d = e.target.value.replace(/[^0-9]/g, "").slice(0, 8)
+              setMfaToken(d)
+              setErrorMessage("")
+            }}
+            autoFocus
+          />
 
           {errorMessage ? (
             <div className="va-login-error" role="alert">
@@ -121,7 +123,7 @@ export function MFAPage() {
             className="va-btn-primary va-login-submit"
             disabled={mfaToken.length < 6 || loading}
           >
-            {loading ? "Verifying…" : "Verify"}
+            {loading ? t("mfaLogin.verifying") : t("mfaLogin.verify")}
           </button>
           <button
             type="button"
@@ -129,10 +131,10 @@ export function MFAPage() {
             disabled={mfaToken.length !== 8 || loading}
             onClick={handleBackupShortcut}
           >
-            Use backup code (8 digits)
+            {t("mfaLogin.useBackupButton")}
           </button>
           <button type="button" className="va-login-linkish" onClick={() => navigate("/login")}>
-            Cancel
+            {t("mfaLogin.cancel")}
           </button>
         </form>
       </div>

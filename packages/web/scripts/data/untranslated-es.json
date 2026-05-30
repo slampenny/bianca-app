@@ -1,0 +1,14 @@
+{
+  "login.apiLabel": "API:",
+  "alertDetail.sentimentNeutral": "Neutral",
+  "residents.onboardingProgress": "{{completed}}/{{total}}",
+  "residentDetail.distChip": "{{label}}: {{count}}",
+  "fraudAbuse.loadErrorSuffix": ": {{message}}",
+  "fraudAbuse.metricControl": "Control",
+  "reports.deliveryCsv": "CSV",
+  "reports.deliveryPdf": "PDF",
+  "reports.templates.consent_roster.tag1": "PII",
+  "caregivers.colRole": "Role",
+  "onboarding.registration.no": "No",
+  "sso.google": "Google"
+}

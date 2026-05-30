@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useLoginMutation } from "../services/api/authApi"
 import { needsOnboarding, resolvePostAuthPath } from "../lib/postAuthNavigation"
@@ -14,9 +15,11 @@ import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import { mapValidationErrorToMessage, parseLoginError } from "../lib/loginError"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
+import { AuthTextField } from "../components/AuthTextField"
 import { PasswordField } from "../components/PasswordField"
 import { SSOLoginButtons } from "../components/SSOLoginButtons"
 import { consumeSsoRedirectError } from "../services/webSsoService"
+import { useDocumentTitle } from "../hooks/useDocumentTitle"
 import type { AuthTokens, Caregiver, Org } from "../services/api/api.types"
 import "../app.css"
 
@@ -27,6 +30,8 @@ type LoginLocationState = {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation()
+  useDocumentTitle()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const location = useLocation()
@@ -43,9 +48,9 @@ export function LoginPage() {
 
   useEffect(() => {
     if (state.sessionExpired) {
-      setErrorMessage("Your session has expired. Please sign in again.")
+      setErrorMessage(t("login.sessionExpired"))
     }
-  }, [state.sessionExpired])
+  }, [state.sessionExpired, t])
 
   useEffect(() => {
     if (state.passwordReset) {
@@ -62,7 +67,7 @@ export function LoginPage() {
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
     if (validationError) {
-      setErrorMessage(mapValidationErrorToMessage(validationError))
+      setErrorMessage(mapValidationErrorToMessage(validationError, t))
       return
     }
     setLoading(true)
@@ -88,7 +93,7 @@ export function LoginPage() {
         navigate(resolvePostAuthPath(result.caregiver, state.from), { replace: true })
       }
     } catch (err) {
-      const { message, requiresSSOLinking, emailVerificationRequired } = parseLoginError(err)
+      const { message, requiresSSOLinking, emailVerificationRequired } = parseLoginError(err, t)
       if (emailVerificationRequired) {
         setErrorMessage(message)
         setNeedsEmailVerification(true)
@@ -113,34 +118,29 @@ export function LoginPage() {
           <span className="va-logo">
             bianca<span className="va-logo-teal">.</span>
           </span>
-          <p className="va-login-tagline">Sign in to continue to the facility dashboard</p>
+          <p className="va-login-tagline">{t("login.tagline")}</p>
         </div>
 
         <form className="va-login-form" onSubmit={handleSubmit}>
-          <label className="va-login-label">
-            Email
-            <input
-              type="email"
-              autoComplete="email"
-              className="va-login-input"
-              data-testid="email-input"
-              value={authEmail}
-              onChange={(e) => dispatch(setAuthEmail(e.target.value))}
-            />
-          </label>
-          <label className="va-login-label">
-            Password
-            <PasswordField
-              autoComplete="current-password"
-              inputTestId="password-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
+          <AuthTextField
+            label={t("login.email")}
+            type="email"
+            autoComplete="email"
+            inputTestId="email-input"
+            value={authEmail}
+            onChange={(e) => dispatch(setAuthEmail(e.target.value))}
+          />
+          <PasswordField
+            label={t("login.password")}
+            autoComplete="current-password"
+            inputTestId="password-input"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
           {state.passwordReset ? (
             <div className="va-login-success" role="status">
-              Your password was updated. Sign in with your new password.
+              {t("login.passwordResetSuccess")}
             </div>
           ) : null}
 
@@ -153,7 +153,7 @@ export function LoginPage() {
           {needsEmailVerification ? (
             <p className="va-login-helper" style={{ textAlign: "center", margin: 0 }}>
               <Link to="/check-email" state={{ email: authEmail }} className="va-link" style={{ fontSize: "inherit" }}>
-                Resend verification email
+                {t("login.resendVerificationLink")}
               </Link>
             </p>
           ) : null}
@@ -164,7 +164,7 @@ export function LoginPage() {
             disabled={loading}
             data-testid="login-button"
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? t("login.signingIn") : t("login.signIn")}
           </button>
         </form>
 
@@ -174,8 +174,8 @@ export function LoginPage() {
             const message = err.description || err.error
             setErrorMessage(
               err.error.includes("not configured")
-                ? `Single sign-on is not available: ${message}`
-                : `Sign-in failed: ${message}`,
+                ? t("login.ssoNotConfigured", { message })
+                : t("login.ssoFailed", { message }),
             )
           }}
           onSsoSuccess={(user) => {
@@ -193,20 +193,20 @@ export function LoginPage() {
 
         <div className="va-auth-footer">
           <Link to="/forgot-password" data-testid="login-forgot-password-link">
-            Forgot password?
+            {t("login.forgotPassword")}
           </Link>
           <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
             |
           </span>
-          <Link to="/onboarding">Create account</Link>
+          <Link to="/onboarding">{t("register.submit")}</Link>
           <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
             |
           </span>
-          <Link to="/signup">Accept invite</Link>
+          <Link to="/signup">{t("login.acceptInvite")}</Link>
         </div>
 
         <p className="va-login-hint">
-          API:{" "}
+          {t("login.apiLabel")}{" "}
           <code className="va-login-code">{import.meta.env.VITE_API_URL || "http://localhost:3000/v1"}</code>
         </p>
       </div>

@@ -1,0 +1,5 @@
+{
+  "residents.onboardingProgress": "{{completed}}/{{total}}",
+  "reports.deliveryCsv": "CSV",
+  "reports.deliveryPdf": "PDF"
+}

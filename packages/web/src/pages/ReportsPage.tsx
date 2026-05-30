@@ -1,28 +1,32 @@
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@bianca-app/ui"
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { AuthSelectField } from "../components/AuthSelectField"
+import { ChartFigure } from "../components/ChartFigure"
 import { ReportDocumentBody } from "../components/ReportDocumentBody"
 import {
   downloadFacilitySnapshotCsv,
   downloadResidentDigestCsv,
   getResidentDigestPayload,
   printResidentDigest,
-  reportTemplates,
   residentReportSnapshots,
-  staffVersusFamilyDigestCopy,
   type ReportDeliveryChannel,
   type RecentReportActivityRow,
   type ReportTemplateId,
   type ResidentReportSnapshot,
 } from "../data/reportsMock"
 import { formatActivityRowTime } from "../lib/timeFormat"
+import { summarizeChartSeries } from "../lib/chartSummary"
 import { useGetRecentActivityQuery } from "../services/api/activityApi"
 import type { ActivityFeedItem } from "../services/api/activityApi"
 import { useGetReportsSummaryQuery } from "../services/api/facilityReportsApi"
 import { isAuthenticated, getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { BellIcon, ChartBarIcon, DownloadIcon, FileTextIcon, PhoneIcon, PrintIcon, UsersIcon } from "../icons"
+import { localizedReportTemplates, localizedStaffVersusFamily } from "../lib/reportI18n"
 import "../app.css"
 
 type ReportsTab = "library" | "activity" | "resident"
@@ -38,7 +42,7 @@ const templateIcon: Record<ReportTemplateId, typeof FileTextIcon> = {
 
 const THUMB_BARS = [42, 68, 36, 88, 52, 74, 48]
 
-function ReportThumb({ id }: { id: ReportTemplateId }) {
+function ReportThumb({ id, t }: { id: ReportTemplateId; t: (key: string) => string }) {
   switch (id) {
     case "call_log":
     case "risk_sentiment":
@@ -65,7 +69,7 @@ function ReportThumb({ id }: { id: ReportTemplateId }) {
               }}
             />
           ))}
-          <p style={{ margin: 0, fontSize: 10, color: "var(--va-slate-400)", textAlign: "center" }}>Mood mix · sample</p>
+          <p style={{ margin: 0, fontSize: 10, color: "var(--va-slate-400)", textAlign: "center" }}>{t("reports.thumbMood")}</p>
         </div>
       )
     case "alert_audit":
@@ -93,7 +97,7 @@ function ReportThumb({ id }: { id: ReportTemplateId }) {
               color: "var(--va-amber-700)",
             }}
           >
-            Reviewed
+            {t("reports.thumbReviewed")}
           </span>
         </div>
       )
@@ -107,7 +111,7 @@ function ReportThumb({ id }: { id: ReportTemplateId }) {
             <CheckDot ok={false} />
           </div>
           <p style={{ margin: "8px 0 0", fontSize: 10, color: "var(--va-slate-400)", textAlign: "center" }}>
-            Consent coverage
+            {t("reports.thumbConsent")}
           </p>
         </div>
       )
@@ -115,11 +119,11 @@ function ReportThumb({ id }: { id: ReportTemplateId }) {
       return (
         <div className="va-report-thumb" aria-hidden style={{ justifyContent: "center", padding: "0.75rem", gap: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 10, color: "var(--va-slate-500)" }}>
-            <span>Mon</span>
-            <span>Tue</span>
-            <span>Wed</span>
-            <span>Thu</span>
-            <span>Fri</span>
+            <span>{t("reports.chartDayMon")}</span>
+            <span>{t("reports.chartDayTue")}</span>
+            <span>{t("reports.chartDayWed")}</span>
+            <span>{t("reports.chartDayThu")}</span>
+            <span>{t("reports.chartDayFri")}</span>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 4, height: 48 }}>
             {[1, 1, 0, 1, 1].map((ok, i) => (
@@ -134,7 +138,7 @@ function ReportThumb({ id }: { id: ReportTemplateId }) {
               />
             ))}
           </div>
-          <p style={{ margin: 0, fontSize: 9, color: "var(--va-slate-400)", textAlign: "center" }}>Calls · connected</p>
+          <p style={{ margin: 0, fontSize: 9, color: "var(--va-slate-400)", textAlign: "center" }}>{t("reports.thumbCallsConnected")}</p>
         </div>
       )
     default:
@@ -186,29 +190,61 @@ function sentimentStyles(label: ResidentReportSnapshot["sentimentLabel"]): { bg:
   }
 }
 
-function mapActivityToReportRow(item: ActivityFeedItem): RecentReportActivityRow {
+function mapActivityToReportRow(item: ActivityFeedItem, t: (key: string, opts?: Record<string, unknown>) => string): RecentReportActivityRow {
   const whenLabel = formatActivityRowTime(new Date(item.occurredAt))
   if (item.type === "alert") {
     return {
       id: item.id,
-      reportName: "Facility alert",
+      reportName: t("reports.activityFacilityAlert"),
       scope: item.residentName || "—",
       whenLabel,
       lastDelivery: "Viewed",
-      requestedBy: "System",
+      requestedBy: t("reports.activitySystem"),
       status: "Ready",
     }
   }
-  const callLabel = item.callType ? String(item.callType).replace(/_/g, " ") : "Check-in"
+  const callLabel = item.callType ? String(item.callType).replace(/_/g, " ") : t("reports.activityCheckIn")
   return {
     id: item.id,
-    reportName: `${callLabel} call`,
+    reportName: t("reports.activityCall", { type: callLabel }),
     scope: item.residentName || "—",
     whenLabel,
     lastDelivery: "Viewed",
-    requestedBy: "System",
+    requestedBy: t("reports.activitySystem"),
     status: "Ready",
   }
+}
+
+function localizedStatusLabel(t: (key: string) => string, status: RecentReportActivityRow["status"]): string {
+  return status === "Ready" ? t("reports.statusReady") : t("reports.statusScheduled")
+}
+
+function localizedRiskLabel(t: (key: string) => string, label: ResidentReportSnapshot["riskLabel"]): string {
+  const map: Record<ResidentReportSnapshot["riskLabel"], string> = {
+    High: t("reports.riskHigh"),
+    Medium: t("reports.riskMedium"),
+    Low: t("reports.riskLow"),
+  }
+  return map[label] ?? label
+}
+
+function localizedSentimentLabel(t: (key: string) => string, label: ResidentReportSnapshot["sentimentLabel"]): string {
+  const map: Record<ResidentReportSnapshot["sentimentLabel"], string> = {
+    Declining: t("reports.sentimentDeclining"),
+    Improving: t("reports.sentimentImproving"),
+    Stable: t("reports.sentimentStable"),
+  }
+  return map[label] ?? label
+}
+
+function localizedDeliveryLabel(t: (key: string) => string, kind: ReportDeliveryChannel): string {
+  const map: Record<ReportDeliveryChannel, string> = {
+    Viewed: t("reports.deliveryViewed"),
+    Printed: t("reports.deliveryPrinted"),
+    CSV: t("reports.deliveryCsv"),
+    PDF: t("reports.deliveryPdf"),
+  }
+  return map[kind] ?? kind
 }
 
 function deliveryChipStyle(kind: ReportDeliveryChannel): { bg: string; color: string } {
@@ -225,7 +261,10 @@ function deliveryChipStyle(kind: ReportDeliveryChannel): { bg: string; color: st
 }
 
 export function ReportsPage() {
+  const { t } = useTranslation()
   const authed = useAppSelector(isAuthenticated)
+  const reportTemplates = useMemo(() => localizedReportTemplates(t), [t])
+  const staffVersusFamilyDigestCopy = useMemo(() => localizedStaffVersusFamily(t), [t])
   const org = useAppSelector((s) => s.org)
   const currentUser = useAppSelector(getCurrentUser)
   const superAdminNeedsOrg = currentUser?.role === "superAdmin"
@@ -239,9 +278,20 @@ export function ReportsPage() {
   )
 
   const weeklyReportRuns = summary?.weeklyReportRuns ?? []
+  const weeklyReportChartSummary = useMemo(
+    () =>
+      summarizeChartSeries(
+        weeklyReportRuns,
+        "day",
+        "runs",
+        (day, count) => t("reports.activityChartSummaryItem", { day, count }),
+        t("reports.activityChartSummaryEmpty"),
+      ),
+    [weeklyReportRuns, t],
+  )
   const recentReportRows = useMemo(
-    () => (recentActivity?.results ?? []).map(mapActivityToReportRow),
-    [recentActivity?.results],
+    () => (recentActivity?.results ?? []).map((item) => mapActivityToReportRow(item, t)),
+    [recentActivity?.results, t],
   )
 
   const [tab, setTab] = useState<ReportsTab>("library")
@@ -270,20 +320,17 @@ export function ReportsPage() {
           }}
         >
           <div>
-            <h1 className="va-page-title">Reports</h1>
+            <h1 className="va-page-title">{t("reports.title")}</h1>
             <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 6, maxWidth: 600, lineHeight: 1.55 }}>
-              Read each report on screen first. Print and CSV use the same underlying content. The weekly family digest is
-              scoped to one authorized recipient; the care-team daily digest stays in the facility boundary.
+              {t("reports.intro")}
             </p>
           </div>
           <button type="button" className="va-btn-secondary" onClick={() => downloadFacilitySnapshotCsv()}>
             <DownloadIcon size={18} />
-            Combined facility data (CSV)
+            {t("reports.downloadCsv")}
           </button>
         </div>
-        <p className="va-reports-muted" style={{ margin: 0 }}>
-          Summary metrics and activity below use live facility data. Some report previews still use sample narratives until opened.
-        </p>
+        <p className="va-reports-muted" style={{ margin: 0 }}>{t("reports.liveMetricsNote")}</p>
       </div>
 
       <div
@@ -308,258 +355,263 @@ export function ReportsPage() {
       <div className="va-reports-stat-grid" aria-busy={summaryLoading}>
         <div className="va-reports-stat">
           <div className="va-reports-stat-value">{summaryLoading ? "—" : (summary?.generatedThisMonth ?? 0)}</div>
-          <div className="va-reports-stat-label">Daily digests generated this month</div>
+          <div className="va-reports-stat-label">{t("reports.statDigestsMonth")}</div>
         </div>
         <div className="va-reports-stat">
           <div className="va-reports-stat-value">{summaryLoading ? "—" : (summary?.scheduledDeliveries ?? 0)}</div>
-          <div className="va-reports-stat-label">Active call schedules</div>
+          <div className="va-reports-stat-label">{t("reports.statActiveSchedules")}</div>
         </div>
         <div className="va-reports-stat">
           <div className="va-reports-stat-value">{summaryLoading ? "—" : (summary?.residentsWithOpenFollowUps ?? 0)}</div>
-          <div className="va-reports-stat-label">Residents with open follow-ups</div>
+          <div className="va-reports-stat-label">{t("reports.statResidentsFollowups")}</div>
         </div>
         <div className="va-reports-stat">
           <div className="va-reports-stat-value" style={{ fontSize: "1.125rem", paddingTop: 4 }}>
             {summaryLoading ? "—" : (summary?.lastFacilityReportLabel ?? "—")}
           </div>
           <div className="va-reports-stat-label">
-            Last daily digest · {summaryLoading ? "—" : (summary?.complianceScoreLabel ?? "—")} consent posture
+            {t("reports.lastDigestLine", {
+              posture: summaryLoading ? "—" : (summary?.complianceScoreLabel ?? "—"),
+            })}
           </div>
         </div>
       </div>
 
-      <div
-        className="va-card va-card-pad"
-        style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}
-      >
-        <div className="va-reports-tabs" role="tablist" aria-label="Report views">
-          {(
-            [
-              ["library", "Report library"],
-              ["activity", "Facility activity"],
-              ["resident", "Per resident"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={tab === key}
-              className={`va-reports-tab${tab === key ? " va-reports-tab--active" : ""}`}
-              onClick={() => setTab(key)}
-            >
-              {label}
-            </button>
-          ))}
+      <Tabs value={tab} onValueChange={(value) => setTab(value as ReportsTab)}>
+        <div
+          className="va-card va-card-pad"
+          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}
+        >
+          <TabsList aria-label={t("reports.tabListAria")} variant="pills">
+            {(
+              [
+                ["library", t("reports.tabLibrary")],
+                ["activity", t("reports.tabActivity")],
+                ["resident", t("reports.tabResident")],
+              ] as const
+            ).map(([key, label]) => (
+              <TabsTrigger key={key} value={key} variant="pill">
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-500)", maxWidth: 400, lineHeight: 1.45 }}>
+            {t("reports.tabHint")}
+          </p>
         </div>
-        <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-500)", maxWidth: 400, lineHeight: 1.45 }}>
-          Open a report to see the full layout. Use print for a PDF copy; CSV pulls the same tables.
-        </p>
-      </div>
 
-      {tab === "library" ? (
-        <div className="va-reports-template-grid">
-          {reportTemplates.map((t) => {
-            const Icon = templateIcon[t.id]
-            return (
-              <article key={t.id} className="va-reports-template-card" style={{ padding: 0, overflow: "hidden" }}>
-                <ReportThumb id={t.id} />
-                <div style={{ padding: "0 1.5rem", display: "flex", flexDirection: "column", gap: "0.75rem", flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: "0.65rem",
-                        background: "rgba(20, 184, 166, 0.12)",
-                        color: "var(--va-teal)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
+        <TabsContent value="library" style={{ marginTop: "1.75rem" }}>
+          <div className="va-reports-template-grid">
+            {reportTemplates.map((tm) => {
+              const Icon = templateIcon[tm.id]
+              return (
+                <article key={tm.id} className="va-reports-template-card" style={{ padding: 0, overflow: "hidden" }}>
+                  <ReportThumb id={tm.id} t={t} />
+                  <div style={{ padding: "0 1.5rem", display: "flex", flexDirection: "column", gap: "0.75rem", flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "0.65rem",
+                          background: "rgba(20, 184, 166, 0.12)",
+                          color: "var(--va-teal)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Icon size={18} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <h3>{tm.title}</h3>
+                        <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", fontWeight: 600, color: "var(--va-teal)" }}>
+                          {tm.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                    <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.55, flex: 1 }}>
+                      {tm.description}
+                    </p>
+                    <div className="va-reports-tag-row">
+                      <span className="va-reports-tag va-reports-tag--teal">{tm.cadence}</span>
+                      {tm.tags.map((tag) => (
+                        <span key={tag} className="va-reports-tag">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <Link
+                      to={tm.id === "wellness_daily" ? "/reports/daily-digest" : `/reports/${tm.id}`}
+                      className="va-btn-primary"
+                      data-testid={`report-open-${tm.id}`}
+                      style={{ alignSelf: "stretch", justifyContent: "center", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
                     >
-                      <Icon size={18} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <h3>{t.title}</h3>
-                      <p style={{ margin: "0.25rem 0 0", fontSize: "0.75rem", fontWeight: 600, color: "var(--va-teal)" }}>
-                        {t.subtitle}
-                      </p>
-                    </div>
+                      {tm.id === "wellness_daily" ? t("reports.openLiveDigest") : t("reports.viewReport")}
+                    </Link>
                   </div>
-                  <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.55, flex: 1 }}>
-                    {t.description}
-                  </p>
-                  <div className="va-reports-tag-row">
-                    <span className="va-reports-tag va-reports-tag--teal">{t.cadence}</span>
-                    {t.tags.map((tag) => (
-                      <span key={tag} className="va-reports-tag">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <Link
-                    to={t.id === "wellness_daily" ? "/reports/daily-digest" : `/reports/${t.id}`}
-                    className="va-btn-primary"
-                    data-testid={`report-open-${t.id}`}
-                    style={{ alignSelf: "stretch", justifyContent: "center", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-                  >
-                    {t.id === "wellness_daily" ? "Open live digest" : "View report"}
-                  </Link>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      ) : null}
-
-      {tab === "activity" ? (
-        <div className="va-card va-card-pad" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div>
-            <h2 style={{ fontSize: "1.0625rem", fontWeight: 600, color: "var(--va-navy)", margin: 0 }}>Automated report volume</h2>
-            <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>
-              Daily wellness digests generated in your facility over the last seven days.
-            </p>
+                </article>
+              )
+            })}
           </div>
-          <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={weeklyReportRuns} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <XAxis dataKey="day" tick={{ fontSize: 12, fill: "var(--va-slate-500)" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: "var(--va-slate-500)" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip
-                  cursor={{ fill: "var(--va-slate-50)" }}
-                  contentStyle={{
-                    borderRadius: "0.5rem",
-                    border: "1px solid var(--va-slate-200)",
-                    fontSize: "0.8125rem",
-                  }}
-                />
-                <Bar dataKey="runs" fill="var(--va-teal)" radius={[6, 6, 0, 0]} maxBarSize={48} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      ) : null}
+        </TabsContent>
 
-      {tab === "resident" && selectedResident && residentPayload ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 360 }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--va-slate-500)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              Resident
-            </span>
-            <select className="va-reports-select" value={selectedResident.id} onChange={(e) => setResidentId(e.target.value)}>
-              {residentReportSnapshots.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.displayName} · Room {r.room}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="va-card" style={{ overflow: "hidden" }}>
-            <div
-              style={{
-                padding: "1.25rem 1.5rem",
-                background: "linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, var(--va-slate-50) 100%)",
-                borderBottom: "1px solid var(--va-slate-100)",
-              }}
+        <TabsContent value="activity" style={{ marginTop: "1.75rem" }}>
+          <div className="va-card va-card-pad" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <div>
+              <h2 style={{ fontSize: "1.0625rem", fontWeight: 600, color: "var(--va-navy)", margin: 0 }}>{t("reports.activityTitle")}</h2>
+              <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>
+                {t("reports.activitySubtitle")}
+              </p>
+            </div>
+            <ChartFigure
+              title={t("reports.activityTitle")}
+              summary={t("reports.activityChartSummary", { items: weeklyReportChartSummary })}
+              chartStyle={{ width: "100%", height: 260 }}
             >
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <h2 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--va-navy)", margin: 0 }}>{selectedResident.displayName}</h2>
-                  <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-                    Room {selectedResident.room} · Last digest {selectedResident.lastDigest}
-                  </p>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <span
-                    style={{
-                      padding: "0.35rem 0.75rem",
-                      borderRadius: 999,
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      ...riskStyles(selectedResident.riskLabel),
-                    }}
-                  >
-                    Risk · {selectedResident.riskLabel}
-                  </span>
-                  <span
-                    style={{
-                      padding: "0.35rem 0.75rem",
-                      borderRadius: 999,
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      ...sentimentStyles(selectedResident.sentimentLabel),
-                    }}
-                  >
-                    Sentiment · {selectedResident.sentimentLabel}
-                  </span>
-                </div>
-              </div>
-              <div style={{ marginTop: "1.25rem", height: 72, display: "flex", alignItems: "flex-end", gap: 6 }}>
-                {[32, 48, 40, 62, 55, 70, 44].map((h, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      flex: 1,
-                      height: `${h}%`,
-                      borderRadius: "6px 6px 2px 2px",
-                      background: i >= 4 ? "var(--va-teal)" : "var(--va-slate-200)",
-                      opacity: i === 5 ? 1 : 0.85,
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyReportRuns} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="day" tick={{ fontSize: 12, fill: "var(--va-slate-500)" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: "var(--va-slate-500)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                  <Tooltip
+                    cursor={{ fill: "var(--va-slate-50)" }}
+                    contentStyle={{
+                      borderRadius: "0.5rem",
+                      border: "1px solid var(--va-slate-200)",
+                      fontSize: "0.8125rem",
                     }}
                   />
-                ))}
-              </div>
-              <p style={{ margin: "0.5rem 0 0", fontSize: "0.6875rem", color: "var(--va-slate-400)" }}>Engagement signal · illustrative week</p>
-            </div>
-            <div className="va-card-pad" style={{ paddingTop: "1.25rem" }}>
-              <p style={{ margin: "0 0 1rem", fontSize: "0.8125rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>
-                This is a <strong style={{ color: "var(--va-navy)" }}>care-team snapshot</strong> (risk, sentiment, internal queue). It is not the same document as the{" "}
-                <strong>weekly family call digest</strong>, which stays high-level and is addressed to one verified contact at a time.
-              </p>
-              <ReportDocumentBody payload={residentPayload} />
-              <div className="va-report-modal-actions" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
-                <button type="button" className="va-btn-secondary" onClick={() => printResidentDigest(selectedResident)}>
-                  <PrintIcon size={18} />
-                  Print / Save as PDF
-                </button>
-                <button type="button" className="va-btn-secondary" onClick={() => downloadResidentDigestCsv(selectedResident)}>
-                  <DownloadIcon size={18} />
-                  Download data (CSV)
-                </button>
-                <Link
-                  to="/residents"
-                  className="va-btn-secondary"
-                  style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}
-                >
-                  Residents list
-                </Link>
-              </div>
-            </div>
+                  <Bar dataKey="runs" fill="var(--va-teal)" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartFigure>
           </div>
-        </div>
-      ) : null}
+        </TabsContent>
+
+        <TabsContent value="resident" style={{ marginTop: "1.75rem" }}>
+          {selectedResident && residentPayload ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <AuthSelectField
+                label={t("reports.residentLabel")}
+                labelClassName="va-reports-field-label"
+                selectClassName="va-reports-select"
+                selectTestId="reports-resident-select"
+                style={{ maxWidth: 360 }}
+                value={selectedResident.id}
+                onChange={(e) => setResidentId(e.target.value)}
+              >
+                {residentReportSnapshots.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {t("reports.residentOption", { name: r.displayName, room: r.room })}
+                  </option>
+                ))}
+              </AuthSelectField>
+
+              <div className="va-card" style={{ overflow: "hidden" }}>
+                <div
+                  style={{
+                    padding: "1.25rem 1.5rem",
+                    background: "linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, var(--va-slate-50) 100%)",
+                    borderBottom: "1px solid var(--va-slate-100)",
+                  }}
+                >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <h2 style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--va-navy)", margin: 0 }}>{selectedResident.displayName}</h2>
+                      <p style={{ margin: "0.35rem 0 0", fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
+                        {t("reports.lastDigest", { room: selectedResident.room, digest: selectedResident.lastDigest })}
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                      <span
+                        style={{
+                          padding: "0.35rem 0.75rem",
+                          borderRadius: 999,
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          ...riskStyles(selectedResident.riskLabel),
+                        }}
+                      >
+                        {t("reports.riskChip", { label: localizedRiskLabel(t, selectedResident.riskLabel) })}
+                      </span>
+                      <span
+                        style={{
+                          padding: "0.35rem 0.75rem",
+                          borderRadius: 999,
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          ...sentimentStyles(selectedResident.sentimentLabel),
+                        }}
+                      >
+                        {t("reports.sentimentChip", { label: localizedSentimentLabel(t, selectedResident.sentimentLabel) })}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: "1.25rem", height: 72, display: "flex", alignItems: "flex-end", gap: 6 }}>
+                    {[32, 48, 40, 62, 55, 70, 44].map((h, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          flex: 1,
+                          height: `${h}%`,
+                          borderRadius: "6px 6px 2px 2px",
+                          background: i >= 4 ? "var(--va-teal)" : "var(--va-slate-200)",
+                          opacity: i === 5 ? 1 : 0.85,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <p style={{ margin: "0.5rem 0 0", fontSize: "0.6875rem", color: "var(--va-slate-400)" }}>{t("reports.engagementNote")}</p>
+                </div>
+                <div className="va-card-pad" style={{ paddingTop: "1.25rem" }}>
+                  <p style={{ margin: "0 0 1rem", fontSize: "0.8125rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>
+                    {t("reports.snapshotNote")}
+                  </p>
+                  <ReportDocumentBody payload={residentPayload} />
+                  <div className="va-report-modal-actions" style={{ borderTop: "none", paddingTop: 0, marginTop: 0 }}>
+                    <button type="button" className="va-btn-secondary" onClick={() => printResidentDigest(selectedResident)}>
+                      <PrintIcon size={18} />
+                      {t("reports.printPdf")}
+                    </button>
+                    <button type="button" className="va-btn-secondary" onClick={() => downloadResidentDigestCsv(selectedResident)}>
+                      <DownloadIcon size={18} />
+                      {t("reports.downloadDataCsv")}
+                    </button>
+                    <Link
+                      to="/residents"
+                      className="va-btn-secondary"
+                      style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+                    >
+                      {t("reports.residentsList")}
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </TabsContent>
+      </Tabs>
 
       <div>
-        <h2 style={{ fontSize: "1.0625rem", fontWeight: 600, color: "var(--va-navy)", margin: "0 0 0.75rem" }}>Recent activity</h2>
+        <h2 style={{ fontSize: "1.0625rem", fontWeight: 600, color: "var(--va-navy)", margin: "0 0 0.75rem" }}>{t("reports.recentActivity")}</h2>
         <div className="va-card va-table-wrap" style={{ borderRadius: "1rem", overflow: "hidden" }}>
           <table className="va-table">
             <thead>
               <tr>
-                <th>Report</th>
-                <th>Scope</th>
-                <th>When</th>
-                <th>Last delivery</th>
-                <th>By</th>
-                <th>Status</th>
+                <th>{t("reports.thReport")}</th>
+                <th>{t("reports.thScope")}</th>
+                <th>{t("reports.thWhen")}</th>
+                <th>{t("reports.thDelivery")}</th>
+                <th>{t("reports.thBy")}</th>
+                <th>{t("reports.thStatus")}</th>
               </tr>
             </thead>
             <tbody>
               {recentReportRows.length === 0 ? (
                 <tr className="va-table-row--static">
                   <td colSpan={6} style={{ color: "var(--va-slate-500)", fontSize: "0.875rem", padding: "1.25rem 1rem" }}>
-                    No recent calls or alerts in the last 30 days.
+                    {t("reports.noRecentActivity")}
                   </td>
                 </tr>
               ) : (
@@ -578,7 +630,7 @@ export function ReportsPage() {
                           ...deliveryChipStyle(row.lastDelivery),
                         }}
                       >
-                        {row.lastDelivery}
+                        {localizedDeliveryLabel(t, row.lastDelivery)}
                       </span>
                     </td>
                     <td style={{ color: "var(--va-slate-600)" }}>{row.requestedBy}</td>
@@ -594,7 +646,7 @@ export function ReportsPage() {
                             : { background: "var(--va-slate-100)", color: "var(--va-slate-600)" }),
                         }}
                       >
-                        {row.status}
+                        {localizedStatusLabel(t, row.status)}
                       </span>
                     </td>
                   </tr>

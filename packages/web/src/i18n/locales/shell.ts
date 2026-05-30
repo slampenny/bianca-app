@@ -3,6 +3,7 @@ export const nav = {
   dashboard: "Dashboard",
   alerts: "Alerts",
   residents: "Residents",
+  caregivers: "Caregivers",
   reports: "Reports",
   settings: "Settings",
   simulateAlert: "Simulate Alert",

@@ -1,6 +1,9 @@
-import { FormEvent, useEffect, useMemo, useState } from "react"
+import { FormEvent, useEffect, useState } from "react"
 import { skipToken } from "@reduxjs/toolkit/query"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useParams } from "react-router-dom"
+import { AuthSelectField } from "../components/AuthSelectField"
+import { AuthTextField } from "../components/AuthTextField"
 import { AvatarPicker } from "../components/AvatarPicker"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import { canManageCaregivers } from "../lib/roleAccess"
@@ -15,6 +18,7 @@ import { useAppSelector } from "../store/store"
 import "../app.css"
 
 export function CaregiverFormPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { caregiverId } = useParams()
   const user = useAppSelector(getCurrentUser)
@@ -43,8 +47,6 @@ export function CaregiverFormPage() {
     setPreferredLanguage(caregiver.preferredLanguage || "en")
     setAvatarFile(null)
   }, [caregiver])
-
-  const title = useMemo(() => (isEdit ? "Edit caregiver" : "Add caregiver"), [isEdit])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -83,7 +85,7 @@ export function CaregiverFormPage() {
       navigate("/caregivers")
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setMessage(typeof msg === "string" ? msg : `Could not ${isEdit ? "update" : "add"} caregiver.`)
+      setMessage(typeof msg === "string" ? msg : isEdit ? t("caregivers.formUpdateError") : t("caregivers.formAddError"))
     }
   }
 
@@ -92,45 +94,53 @@ export function CaregiverFormPage() {
   return (
     <div className="va-page-wrap" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       <div>
-        <h1 className="va-page-title">{title}</h1>
+        <h1 className="va-page-title">{isEdit ? t("caregivers.formTitleEdit") : t("caregivers.formTitleAdd")}</h1>
         <p style={{ marginTop: 4, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-          {isEdit ? "Update caregiver details and profile image." : "Create a caregiver and send an invite."}
+          {isEdit ? t("caregivers.formSubtitleEdit") : t("caregivers.formSubtitleAdd")}
         </p>
       </div>
 
       <div className="va-card va-card-pad">
         {loadingCaregiver && isEdit ? (
-          <p style={{ margin: 0, color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading caregiver...</p>
+          <p style={{ margin: 0, color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("caregivers.formLoading")}</p>
         ) : (
           <form onSubmit={(e) => void onSubmit(e)} className="va-login-form">
             <AvatarPicker
-              label="Photo"
+              label={t("caregivers.formPhoto")}
               initialsSource={name || caregiver?.name || "?"}
               existingAvatarUrl={caregiver?.avatar}
               onPick={setAvatarFile}
             />
-            <label className="va-login-label">
-              Name
-              <input className="va-login-input" value={name} onChange={(ev) => setName(ev.target.value)} required />
-            </label>
-            <label className="va-login-label">
-              Email
-              <input className="va-login-input" type="email" value={email} onChange={(ev) => setEmail(ev.target.value)} required />
-            </label>
-            <label className="va-login-label">
-              Phone
-              <input className="va-login-input" value={phone} onChange={(ev) => setPhone(ev.target.value)} required />
-            </label>
-            <label className="va-login-label">
-              Preferred language
-              <select className="va-login-input" value={preferredLanguage} onChange={(ev) => setPreferredLanguage(ev.target.value)}>
-                {LANGUAGE_OPTIONS.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <AuthTextField
+              label={t("caregivers.colName")}
+              value={name}
+              onChange={(ev) => setName(ev.target.value)}
+              required
+            />
+            <AuthTextField
+              label={t("caregivers.colEmail")}
+              type="email"
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
+              required
+            />
+            <AuthTextField
+              label={t("caregivers.colPhone")}
+              value={phone}
+              onChange={(ev) => setPhone(ev.target.value)}
+              required
+            />
+            <AuthSelectField
+              label={t("caregivers.formPreferredLanguage")}
+              value={preferredLanguage}
+              onChange={(ev) => setPreferredLanguage(ev.target.value)}
+            >
+              {LANGUAGE_OPTIONS.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </AuthSelectField>
             {message ? (
               <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-red-600)" }}>
                 {message}
@@ -138,10 +148,14 @@ export function CaregiverFormPage() {
             ) : null}
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
               <button type="submit" className="va-btn-primary" disabled={creating || saving || uploadingAvatar}>
-                {creating || saving || uploadingAvatar ? "Saving..." : isEdit ? "Save caregiver" : "Add caregiver"}
+                {creating || saving || uploadingAvatar
+                  ? t("caregivers.formSaving")
+                  : isEdit
+                    ? t("caregivers.formSave")
+                    : t("caregivers.formAdd")}
               </button>
               <Link to="/caregivers" className="va-btn-secondary" style={{ textDecoration: "none" }}>
-                Cancel
+                {t("caregivers.cancel")}
               </Link>
             </div>
           </form>

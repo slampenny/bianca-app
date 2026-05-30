@@ -1,6 +1,7 @@
 import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
-import { buildWebResources } from "./localePatches"
+import { en } from "./locales/en"
+import { LANG_CODES } from "./locales"
 
 const STORAGE_KEY = "bianca_web_locale"
 
@@ -25,10 +26,10 @@ export function setWebLocaleStorage(code: string) {
 }
 
 void i18n.use(initReactI18next).init({
-  resources: buildWebResources(),
+  resources: { en: { translation: en } },
   lng: readStoredOrBrowserLang(),
   fallbackLng: "en",
-  supportedLngs: ["en", "es", "fr", "de", "zh", "ja", "pt", "it", "ru", "ar", "ko", "hu"],
+  supportedLngs: [...LANG_CODES],
   nonExplicitSupportedLngs: true,
   interpolation: { escapeValue: false },
   react: { useSuspense: false },
@@ -47,4 +48,5 @@ void i18n.on("languageChanged", (lng) => {
 
 applyDocumentLangDir(i18n.language)
 
-export { i18n }
+export { i18n, LANG_CODES }
+export { ensureWebLocaleLoaded, changeWebLanguage, isWebLocaleLoaded, normalizeWebLang } from "./loadLocale"

@@ -1,15 +1,19 @@
 import { FormEvent, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom"
+import { AuthSelectField } from "../../components/AuthSelectField"
+import { AuthTextField } from "../../components/AuthTextField"
 import { AuthPageShell } from "../../auth/AuthPageShell"
-import { onboardingCopy } from "../../lib/onboardingCopy"
 import type { OnboardingOrgInfoState, OnboardingRegisterState } from "../../lib/onboardingTypes"
-import { REGISTRATION_COUNTRY_OPTIONS } from "../../lib/registrationCountries"
-import { ORG_TIMEZONE_OPTIONS } from "../../lib/orgTimezones"
+import { useOrgTimezoneOptions, useRegistrationCountryOptions } from "../../hooks/useGeoOptions"
 import { isAuthenticated } from "../../store/authSlice"
 import { useAppSelector } from "../../store/store"
 import "../../app.css"
 
 export function OnboardingOrgInfoPage() {
+  const { t } = useTranslation()
+  const countryOptions = useRegistrationCountryOptions()
+  const timezoneOptions = useOrgTimezoneOptions()
   const navigate = useNavigate()
   const location = useLocation()
   const authed = useAppSelector(isAuthenticated)
@@ -18,8 +22,6 @@ export function OnboardingOrgInfoPage() {
   if (!state || state.persona !== "organization") {
     return <Navigate to="/onboarding" replace />
   }
-
-  const { title, subtitle, orgNameLabel, orgNamePlaceholder, countryLabel, timezoneLabel } = onboardingCopy.orgInfo
 
   const [orgName, setOrgName] = useState("")
   const [country, setCountry] = useState("US")
@@ -38,54 +40,45 @@ export function OnboardingOrgInfoPage() {
   }
 
   return (
-    <AuthPageShell title={title} subtitle={subtitle} wide>
+    <AuthPageShell title={t("onboarding.orgInfo.title")} subtitle={t("onboarding.orgInfo.subtitle")} wide>
       <div className="va-onboarding-back">
         <button type="button" className="va-btn-ghost" onClick={() => navigate(-1)}>
-          ← Back
+          {t("onboarding.registration.back")}
         </button>
       </div>
 
       <form className="va-login-form" onSubmit={handleSubmit}>
-        <label className="va-login-label">
-          {orgNameLabel}
-          <input
-            className="va-login-input"
-            value={orgName}
-            onChange={(ev) => setOrgName(ev.target.value)}
-            placeholder={orgNamePlaceholder}
-            autoComplete="organization"
-          />
-        </label>
+        <AuthTextField
+          label={t("onboarding.orgInfo.orgNameLabel")}
+          value={orgName}
+          onChange={(ev) => setOrgName(ev.target.value)}
+          placeholder={t("onboarding.orgInfo.orgNamePlaceholder")}
+          autoComplete="organization"
+        />
 
-        <label className="va-login-label">
-          {countryLabel}
-          <select className="va-login-input" value={country} onChange={(ev) => setCountry(ev.target.value)}>
-            {REGISTRATION_COUNTRY_OPTIONS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <AuthSelectField label={t("onboarding.orgInfo.countryLabel")} value={country} onChange={(ev) => setCountry(ev.target.value)}>
+          {countryOptions.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </AuthSelectField>
 
-        <label className="va-login-label">
-          {timezoneLabel}
-          <select className="va-login-input" value={timezone} onChange={(ev) => setTimezone(ev.target.value)}>
-            {ORG_TIMEZONE_OPTIONS.map((tz) => (
-              <option key={tz.value} value={tz.value}>
-                {tz.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <AuthSelectField label={t("onboarding.orgInfo.timezoneLabel")} value={timezone} onChange={(ev) => setTimezone(ev.target.value)}>
+          {timezoneOptions.map((tz) => (
+            <option key={tz.value} value={tz.value}>
+              {tz.label}
+            </option>
+          ))}
+        </AuthSelectField>
 
         <button type="submit" className="va-btn-primary va-login-submit" disabled={!orgName.trim()}>
-          Continue
+          {t("onboarding.continue")}
         </button>
       </form>
 
       <div className="va-auth-footer" style={{ marginTop: "1.25rem" }}>
-        <Link to="/login">Sign in</Link>
+        <Link to="/login">{t("onboarding.signInLink")}</Link>
       </div>
     </AuthPageShell>
   )

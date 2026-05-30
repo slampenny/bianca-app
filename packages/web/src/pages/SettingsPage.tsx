@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { canManageBilling } from "../lib/roleAccess"
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../config/legal"
@@ -13,6 +14,8 @@ import {
 import { useLogoutMutation, useResendVerificationEmailMutation } from "../services/api/authApi"
 import { useGetCaregiverQuery, useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
 import { useGetMFAStatusQuery } from "../services/api/mfaApi"
+import { AuthSelectField } from "../components/AuthSelectField"
+import { AuthTextField } from "../components/AuthTextField"
 import { clearAuth, getAuthTokens, getCurrentUser } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
@@ -26,6 +29,7 @@ function phoneOk(phone: string): boolean {
 }
 
 export function SettingsPage() {
+  const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const tokens = useAppSelector(getAuthTokens)
@@ -97,9 +101,9 @@ export function SettingsPage() {
     setEmailBanner("")
     try {
       await resendVerification({ email: email.trim() || profile?.email || "" }).unwrap()
-      setEmailBanner("Verification email sent. Check your inbox.")
+      setEmailBanner(t("profile.verificationEmailSent"))
     } catch {
-      setEmailBanner("Could not send email. Try again later.")
+      setEmailBanner(t("profile.verificationEmailFailed"))
     }
   }
 
@@ -110,15 +114,15 @@ export function SettingsPage() {
     if (!id || !profile) return
 
     if (!name.trim()) {
-      setFormError("Name is required.")
+      setFormError(t("profile.errorNameRequired"))
       return
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setFormError("Enter a valid email address.")
+      setFormError(t("profile.errorEmailInvalid"))
       return
     }
     if (!phoneOk(phone)) {
-      setFormError("Phone must be 10 digits or +1 followed by 10 digits.")
+      setFormError(t("profile.errorPhoneFormat"))
       return
     }
 
@@ -135,13 +139,13 @@ export function SettingsPage() {
           preferredLanguage,
         },
       }).unwrap()
-      setFormSuccess("Profile updated.")
+      setFormSuccess(t("profile.profileUpdated"))
       setAvatarFile(null)
       if (avatarPreview) URL.revokeObjectURL(avatarPreview)
       setAvatarPreview(null)
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setFormError(typeof msg === "string" ? msg : "Update failed.")
+      setFormError(typeof msg === "string" ? msg : t("profile.updateFailed"))
     }
   }
 
@@ -164,16 +168,16 @@ export function SettingsPage() {
 
   return (
     <div data-testid="settings-page" className="va-page-wrap">
-      <h1 className="va-page-title">Settings</h1>
+      <h1 className="va-page-title">{t("settings.title")}</h1>
       <p style={{ color: "var(--va-slate-500)", marginTop: 8, marginBottom: "1.5rem", fontSize: "0.875rem", lineHeight: 1.45 }}>
-        Profile, security, and appearance — aligned with the mobile app.
+        {t("settings.subtitle")}
       </p>
 
       {!isEmailVerified && (
         <div className="va-login-error" style={{ marginBottom: "1rem" }} role="status">
-          Please verify your email to use all features.{" "}
+          {t("profile.verifyEmailBanner")}{" "}
           <Link to="/check-email" state={{ email: profile?.email }} className="va-link" style={{ fontSize: "inherit" }}>
-            Open email help
+            {t("profile.verifyEmailHelp")}
           </Link>
         </div>
       )}
@@ -190,14 +194,14 @@ export function SettingsPage() {
             color: "var(--va-amber-700)",
           }}
         >
-          Add a phone number on your profile for account recovery and alerts.
+          {t("profile.phoneBanner")}
         </div>
       )}
 
       <div className="va-page-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Profile</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>{t("profile.title")}</h2>
         {loadingProfile && !fresh ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading profile…</p>
+          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("profile.loadingProfile")}</p>
         ) : (
           <form onSubmit={handleSaveProfile} className="va-login-form">
             <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
@@ -225,7 +229,7 @@ export function SettingsPage() {
                 </div>
               )}
               <label style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-                <span style={{ display: "block", marginBottom: 6 }}>Photo</span>
+                <span style={{ display: "block", marginBottom: 6 }}>{t("profile.photo")}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -235,33 +239,32 @@ export function SettingsPage() {
               </label>
             </div>
 
-            <label className="va-login-label">
-              Name
-              <input className="va-login-input" value={name} onChange={(ev) => setName(ev.target.value)} autoComplete="name" />
-            </label>
+            <AuthTextField
+              label={t("profile.name")}
+              value={name}
+              onChange={(ev) => setName(ev.target.value)}
+              autoComplete="name"
+            />
 
-            <label className="va-login-label">
-              Email
-              <input
-                className="va-login-input"
-                type="email"
-                value={email}
-                onChange={(ev) => setEmail(ev.target.value)}
-                disabled={isSsoUser}
-                style={isSsoUser ? { opacity: 0.75 } : undefined}
-                autoComplete="email"
-              />
-            </label>
+            <AuthTextField
+              label={t("profile.email")}
+              type="email"
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
+              disabled={isSsoUser}
+              style={isSsoUser ? { opacity: 0.75 } : undefined}
+              autoComplete="email"
+            />
             {isSsoUser ? (
-              <p className="va-login-helper">Email is managed by your sign-in provider.</p>
+              <p className="va-login-helper">{t("profile.ssoEmailHelper")}</p>
             ) : null}
 
             <div style={{ marginBottom: 8 }}>
               {isEmailVerified ? (
-                <p style={{ fontSize: "0.8125rem", color: "var(--va-emerald-600)", margin: 0 }}>✓ Email verified</p>
+                <p style={{ fontSize: "0.8125rem", color: "var(--va-emerald-600)", margin: 0 }}>{t("profile.emailVerified")}</p>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: "0.8125rem", color: "var(--va-amber-700)" }}>⏳ Email not verified</span>
+                  <span style={{ fontSize: "0.8125rem", color: "var(--va-amber-700)" }}>{t("profile.emailNotVerified")}</span>
                   <button
                     type="button"
                     className="va-btn-secondary"
@@ -269,7 +272,7 @@ export function SettingsPage() {
                     disabled={resendingEmail}
                     onClick={() => void handleResendEmail()}
                   >
-                    {resendingEmail ? "Sending…" : "Resend verification"}
+                    {resendingEmail ? t("profile.sending") : t("profile.resendVerification")}
                   </button>
                 </div>
               )}
@@ -278,22 +281,24 @@ export function SettingsPage() {
               ) : null}
             </div>
 
-            <label className="va-login-label">
-              Phone
-              <input className="va-login-input" value={phone} onChange={(ev) => setPhone(ev.target.value)} autoComplete="tel" />
-            </label>
-            <p className="va-login-helper">10 digits or +1 and 10 digits (US/Canada).</p>
+            <AuthTextField
+              label={t("profile.phone")}
+              value={phone}
+              onChange={(ev) => setPhone(ev.target.value)}
+              autoComplete="tel"
+            />
+            <p className="va-login-helper">{t("profile.phoneFormatHelper")}</p>
 
             {profile?.isPhoneVerified ? (
-              <p style={{ fontSize: "0.8125rem", color: "var(--va-emerald-600)", marginBottom: 8 }}>✓ Phone verified</p>
+              <p style={{ fontSize: "0.8125rem", color: "var(--va-emerald-600)", marginBottom: 8 }}>{t("profile.phoneVerified")}</p>
             ) : phoneOk(phone) ? (
               <p style={{ fontSize: "0.8125rem", marginBottom: 8 }}>
                 <Link to="/settings/phone" data-testid="settings-phone-link" className="va-link">
-                  Verify phone with SMS code →
+                  {t("profile.verifyPhoneLink")}
                 </Link>
               </p>
             ) : (
-              <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: 8 }}>⏳ Phone not verified</p>
+              <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: 8 }}>{t("profile.phoneNotVerified")}</p>
             )}
 
             {formError ? (
@@ -308,19 +313,18 @@ export function SettingsPage() {
             ) : null}
 
             <button type="submit" className="va-btn-primary va-login-submit" disabled={saving || uploading}>
-              {saving || uploading ? "Saving…" : "Save profile"}
+              {saving || uploading ? t("profile.saving") : t("profile.saveProfile")}
             </button>
           </form>
         )}
       </div>
 
       <div className="va-page-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Language</h2>
         <p className="va-login-helper" style={{ marginBottom: "0.75rem" }}>
-          Preferred language is saved to your account (for emails and future in-app translations).
+          {t("settings.languageHelper")}
         </p>
-        <select
-          className="va-login-input"
+        <AuthSelectField
+          label={t("settings.languageSectionTitle")}
           value={preferredLanguage}
           onChange={(ev) => setPreferredLanguage(ev.target.value)}
         >
@@ -329,39 +333,38 @@ export function SettingsPage() {
               {l.nativeName} ({l.label})
             </option>
           ))}
-        </select>
+        </AuthSelectField>
       </div>
 
       <div className="va-page-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Appearance</h2>
-        <label className="va-login-label">
-          Theme
-          <select className="va-login-input" value={themeMode} onChange={(ev) => onThemeChange(ev.target.value as WebThemeMode)}>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="system">Match system</option>
-          </select>
-        </label>
-        <label className="va-login-label" style={{ marginTop: "0.75rem" }}>
-          Text size
-          <select
-            className="va-login-input"
-            value={String(fontPct)}
-            onChange={(ev) => onFontChange(Number(ev.target.value))}
-          >
-            <option value="90">Smaller (90%)</option>
-            <option value="100">Default (100%)</option>
-            <option value="110">Larger (110%)</option>
-            <option value="125">Largest (125%)</option>
-          </select>
-        </label>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.appearanceTitle")}</h2>
+        <AuthSelectField label={t("profile.theme")} value={themeMode} onChange={(ev) => onThemeChange(ev.target.value as WebThemeMode)}>
+          <option value="light">{t("profile.themeLight")}</option>
+          <option value="dark">{t("profile.themeDark")}</option>
+          <option value="system">{t("profile.themeSystem")}</option>
+        </AuthSelectField>
+        <AuthSelectField
+          label={t("profile.textSize")}
+          style={{ marginTop: "0.75rem" }}
+          value={String(fontPct)}
+          onChange={(ev) => onFontChange(Number(ev.target.value))}
+        >
+          <option value="90">{t("profile.textSize90")}</option>
+          <option value="100">{t("profile.textSize100")}</option>
+          <option value="110">{t("profile.textSize110")}</option>
+          <option value="125">{t("profile.textSize125")}</option>
+        </AuthSelectField>
       </div>
 
       <div className="va-page-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Security</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.securityTitle")}</h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
-          MFA:{" "}
-          <strong>{mfaStatus?.mfaEnabled ? `On (${mfaStatus.backupCodesRemaining} backup codes left)` : "Off"}</strong>
+          {t("profile.mfaLabel")}{" "}
+          <strong>
+            {mfaStatus?.mfaEnabled
+              ? t("profile.mfaStateOn", { count: mfaStatus.backupCodesRemaining })
+              : t("profile.mfaStateOff")}
+          </strong>
         </p>
         <Link
           to="/settings/mfa"
@@ -369,46 +372,46 @@ export function SettingsPage() {
           className="va-btn-secondary"
           style={{ display: "inline-flex", textDecoration: "none", marginRight: 8 }}
         >
-          {mfaStatus?.mfaEnabled ? "Manage MFA" : "Set up MFA"}
+          {mfaStatus?.mfaEnabled ? t("profile.manageMfa") : t("profile.setupMfa")}
         </Link>
       </div>
 
       <div className="va-page-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Privacy</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.privacyTitle")}</h2>
         <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
-          Access requests and your privacy history.
+          {t("profile.privacyBody")}
         </p>
         <Link to="/settings/privacy" data-testid="settings-privacy-link" className="va-btn-secondary" style={{ display: "inline-flex", textDecoration: "none" }}>
-          Privacy & data requests
+          {t("profile.privacyLink")}
         </Link>
       </div>
 
       {canSeeBilling ? (
         <div className="va-page-section">
-          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Billing</h2>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settings.billingTitle")}</h2>
           <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem" }}>
-            Manage organization payment methods and default charge source.
+            {t("settings.billingBody")}
           </p>
           <Link to="/settings/billing" data-testid="settings-billing-link" className="va-btn-secondary" style={{ display: "inline-flex", textDecoration: "none" }}>
-            Payment methods
+            {t("settings.billingLink")}
           </Link>
         </div>
       ) : null}
 
       <div className="va-page-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Legal</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.legalTitle")}</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem 1.25rem", fontSize: "0.875rem" }}>
           <a href={TERMS_OF_SERVICE_URL} target="_blank" rel="noreferrer" className="va-link">
-            Terms of Service
+            {t("profile.terms")}
           </a>
           <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer" className="va-link">
-            Privacy Policy
+            {t("profile.privacyPolicy")}
           </a>
         </div>
       </div>
 
       <div className="va-page-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Session</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>{t("profile.sessionTitle")}</h2>
         <button
           type="button"
           className="va-btn-secondary"
@@ -417,9 +420,9 @@ export function SettingsPage() {
           disabled={signingOut}
           onClick={() => void signOut()}
         >
-          {signingOut ? "Signing out…" : "Sign out"}
+          {signingOut ? t("profile.signingOut") : t("profile.signOut")}
         </button>
-        <p className="va-settings-version">Web app v{APP_VERSION}</p>
+        <p className="va-settings-version">{t("profile.webVersion", { version: APP_VERSION })}</p>
       </div>
     </div>
   )

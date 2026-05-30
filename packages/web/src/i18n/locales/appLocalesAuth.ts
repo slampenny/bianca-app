@@ -8,12 +8,36 @@ export const appLocalesAuth = {
     checkConnectionApi: "Check your connection and API URL.",
     dismiss: "Dismiss",
     emDash: "—",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
+    analysisOverview: "Overview",
+    statConversations: "Conversations",
+    statMessages: "Messages",
+    statTotalWords: "Total words",
+    wordsAnalyzed: "{{count}} words analyzed",
+    confidenceBadge: "{{level}} confidence",
+    warningsHeading: "Warnings",
+    recommendationFallback: "Recommendation",
   },
   auth: {
     passwordErrors: {
       too_short: "Password must be at least 8 characters.",
       needs_letter_number: "Password must contain at least one letter and one number.",
     },
+  },
+  clientConsent: {
+    missingToken: "Consent token is missing. Please use the link from your email.",
+    successDefault: "Your consent has been recorded. Thank you.",
+    errorDefault: "We could not complete consent.",
+    expiredLink: "Invalid or expired consent link. Please contact your care organization for a new link.",
+    titleVerifying: "Verifying consent",
+    titleSuccess: "Consent confirmed",
+    titleMissing: "Consent",
+    titleError: "Could not confirm consent",
+    verifying: "Please wait while we confirm your consent…",
+    closeWindow: "You can close this window.",
+    needNewLink: "Contact your care organization if you need a new consent link.",
+    staffSignIn: "Staff sign in",
   },
   login: {
     tagline: "Sign in to continue to the facility dashboard",
@@ -26,6 +50,8 @@ export const appLocalesAuth = {
     forgotPassword: "Forgot password?",
     createAccount: "Create account",
     acceptInvite: "Accept invite",
+    ssoNotConfigured: "Single sign-on is not available: {{message}}",
+    ssoFailed: "Sign-in failed: {{message}}",
     apiLabel: "API:",
     sessionExpired: "Your session has expired. Please sign in again.",
     validation: {
@@ -61,6 +87,7 @@ export const appLocalesAuth = {
   register: {
     title: "Create account",
     subtitle: "Register your organization to use the facility dashboard.",
+    subtitleOnboarding: "Finish creating your account. You can still adjust details below.",
     accountTypeAria: "Account type",
     individual: "Individual",
     organization: "Organization",
@@ -83,6 +110,7 @@ export const appLocalesAuth = {
     creating: "Creating account…",
     submit: "Create account",
     alreadyRegistered: "Already registered?",
+    startTour: "New here? Start the tour",
     signIn: "Sign in",
     errors: {
       nameRequired: "Enter your full name.",
@@ -172,5 +200,7 @@ export const appLocalesAuth = {
   appShell: {
     defaultFacility: "Sunrise Memory Care",
     locationLine: "Phoenix, AZ",
+    skipToMain: "Skip to main content",
+    pageTitleSuffix: "Bianca",
   },
 } as const

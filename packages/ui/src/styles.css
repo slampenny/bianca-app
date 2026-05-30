@@ -1,0 +1,351 @@
+/* Bianca web UI primitives — uses --va-* tokens from packages/web app.css */
+
+/* Global focus visibility for ui components and interactive elements */
+.bianca-focus-ring:focus {
+  outline: none;
+}
+
+.bianca-focus-ring:focus-visible {
+  outline: 2px solid var(--va-teal, #14b8a6);
+  outline-offset: 2px;
+}
+
+/* Button */
+.bianca-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.25;
+}
+
+.bianca-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bianca-btn--primary {
+  background: var(--va-teal-strong, #0f766e);
+  color: #fff;
+}
+
+.bianca-btn--primary:hover:not(:disabled) {
+  background: var(--va-teal-light, #5eead4);
+  color: var(--va-navy, #0f172a);
+}
+
+.bianca-btn--secondary {
+  background: #fff;
+  color: var(--va-slate-700, #334155);
+  border: 1px solid var(--va-slate-200, #e2e8f0);
+}
+
+.bianca-btn--secondary:hover:not(:disabled) {
+  background: var(--va-slate-50, #f8fafc);
+}
+
+.bianca-btn--ghost {
+  background: transparent;
+  color: var(--va-slate-500, #64748b);
+  padding: 0.35rem 0.7rem;
+}
+
+.bianca-btn--ghost:hover:not(:disabled) {
+  color: var(--va-navy, #0f172a);
+}
+
+/* TextField */
+.bianca-field {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.bianca-field__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--va-slate-600, #475569);
+}
+
+.bianca-field__input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--va-slate-200, #e2e8f0);
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--va-navy, #0f172a);
+  background: #fff;
+}
+
+.bianca-field__input:focus {
+  outline: 2px solid var(--va-teal, #14b8a6);
+  outline-offset: 1px;
+  border-color: var(--va-teal, #14b8a6);
+}
+
+.bianca-field__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.bianca-field__error {
+  font-size: 0.8125rem;
+  color: var(--va-red-600, #dc2626);
+}
+
+.bianca-field__helper {
+  font-size: 0.8125rem;
+  color: var(--va-slate-500, #64748b);
+}
+
+.bianca-password-field {
+  position: relative;
+}
+
+.bianca-password-field .bianca-field__input {
+  padding-right: 2.75rem;
+}
+
+.bianca-password-toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--va-slate-500, #64748b);
+  cursor: pointer;
+}
+
+.bianca-password-toggle:focus-visible {
+  outline: 2px solid var(--va-teal, #14b8a6);
+  outline-offset: 1px;
+}
+
+.bianca-password-toggle svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Dialog */
+.bianca-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  animation: bianca-overlay-show 150ms ease;
+}
+
+.bianca-dialog-content {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 51;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 2rem);
+  max-width: 28rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 25px 50px rgba(15, 23, 42, 0.2);
+  animation: bianca-content-show 150ms ease;
+}
+
+.bianca-dialog-content--wide {
+  max-width: 42rem;
+}
+
+.bianca-dialog-header {
+  padding: 1.1rem 1.3rem;
+  border-bottom: 1px solid var(--va-slate-200, #e2e8f0);
+}
+
+.bianca-dialog-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--va-navy, #0f172a);
+}
+
+.bianca-dialog-body {
+  padding: 1rem 1.3rem;
+  font-size: 0.875rem;
+  color: var(--va-slate-700, #334155);
+  line-height: 1.5;
+}
+
+.bianca-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.85rem 1.3rem;
+  border-top: 1px solid var(--va-slate-200, #e2e8f0);
+}
+
+@keyframes bianca-overlay-show {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bianca-content-show {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Tabs */
+.bianca-tabs-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--va-slate-200, #e2e8f0);
+}
+
+.bianca-tabs-trigger {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0.35rem 0.7rem 0.5rem;
+  margin-bottom: -1px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--va-slate-500, #64748b);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.bianca-tabs-trigger:hover {
+  color: var(--va-navy, #0f172a);
+}
+
+.bianca-tabs-trigger:focus-visible {
+  outline: 2px solid var(--va-teal, #14b8a6);
+  outline-offset: 2px;
+}
+
+.bianca-tabs-trigger[data-state="active"] {
+  font-weight: 700;
+  color: var(--va-teal-700, #0f766e);
+  border-bottom-color: var(--va-teal, #14b8a6);
+}
+
+/* Reports-style tab variant (pill tabs in a row) */
+.bianca-tabs-list--pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: none;
+}
+
+.bianca-tabs-trigger--pill {
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  margin-bottom: 0;
+  border: 1px solid var(--va-slate-200, #e2e8f0);
+  border-bottom: 1px solid var(--va-slate-200, #e2e8f0);
+  background: #fff;
+  color: var(--va-slate-600, #475569);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.bianca-tabs-trigger--pill:hover {
+  background: var(--va-slate-50, #f8fafc);
+  border-color: var(--va-slate-300, #cbd5e1);
+}
+
+.bianca-tabs-trigger--pill[data-state="active"] {
+  background: rgba(20, 184, 166, 0.12);
+  border-color: rgba(20, 184, 166, 0.45);
+  color: var(--va-navy, #0f172a);
+}
+
+.bianca-dialog-header--split {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.bianca-dialog-subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--va-slate-400, #94a3b8);
+  font-weight: 400;
+}
+
+.bianca-dialog-close {
+  border: none;
+  background: transparent;
+  color: var(--va-slate-400, #94a3b8);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.bianca-dialog-close:focus-visible {
+  outline: 2px solid var(--va-teal, #14b8a6);
+  outline-offset: 2px;
+}
+
+.bianca-dialog-footer--muted {
+  background: var(--va-slate-50, #f8fafc);
+  border-radius: 0 0 1rem 1rem;
+}
+
+/* Auth field layout — matches va-login-label when combined with va-login-input */
+.bianca-field.va-login-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.bianca-field.va-login-label .bianca-field__label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--va-slate-600, #475569);
+}
+
+.bianca-field.va-login-label .bianca-field__input,
+.bianca-password-field.va-login-label .bianca-field__input {
+  background: var(--va-slate-50, #f8fafc);
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.bianca-field.va-login-label .bianca-field__input:focus,
+.bianca-password-field.va-login-label .bianca-field__input:focus {
+  background: #fff;
+}
+
+.bianca-tabs-content:focus-visible {
+  outline: 2px solid var(--va-teal, #14b8a6);
+  outline-offset: 2px;
+}

@@ -3,6 +3,7 @@
   --va-navy: #0f172a;
   --va-navy-light: #1e293b;
   --va-teal: #14b8a6;
+  --va-teal-strong: #0f766e;
   --va-teal-light: #5eead4;
   --va-slate-50: #f8fafc;
   --va-slate-100: #f1f5f9;
@@ -453,9 +454,9 @@
   font-size: 0.875rem;
 }
 .va-search input:focus {
-  outline: none;
-  ring: 2px solid rgba(37, 99, 235, 0.25);
-  border-color: #93c5fd;
+  outline: 2px solid var(--va-teal);
+  outline-offset: 1px;
+  border-color: var(--va-teal);
 }
 .va-search svg {
   position: absolute;
@@ -477,7 +478,7 @@
   font-weight: 600;
   border: none;
   cursor: pointer;
-  background: var(--va-teal);
+  background: var(--va-teal-strong);
   color: #fff;
 }
 .va-btn-primary:hover:not(:disabled) {
@@ -487,6 +488,16 @@
 .va-btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.va-btn-primary:focus-visible,
+.va-btn-secondary:focus-visible,
+.va-btn-ghost:focus-visible,
+.va-nav-link:focus-visible,
+.va-icon-btn:focus-visible,
+.va-chip:focus-visible {
+  outline: 2px solid var(--va-teal);
+  outline-offset: 2px;
 }
 
 .va-btn-ghost {
@@ -836,7 +847,7 @@
 .va-login-hint {
   margin: 1.25rem 0 0;
   font-size: 0.75rem;
-  color: var(--va-slate-400);
+  color: var(--va-slate-500);
   text-align: center;
 }
 .va-login-code {
@@ -948,6 +959,13 @@
   background: rgba(20, 184, 166, 0.15);
   color: var(--va-emerald-700);
 }
+.va-reports-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--va-slate-500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 .va-reports-select {
   width: 100%;
   max-width: 22rem;
@@ -959,7 +977,8 @@
   color: var(--va-navy);
 }
 .va-reports-select:focus {
-  outline: none;
+  outline: 2px solid var(--va-teal);
+  outline-offset: 1px;
   border-color: var(--va-teal);
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
 }
@@ -1069,6 +1088,31 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.va-skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 1000;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--va-navy);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 0.15s ease;
+}
+.va-skip-link:focus {
+  transform: translateY(0);
+  outline: 2px solid var(--va-teal-strong);
+  outline-offset: 2px;
+}
+
+#main-content:focus {
+  outline: none;
 }
 
 /* Dark appearance (Settings → Theme), toggled via `html.va-dark` */

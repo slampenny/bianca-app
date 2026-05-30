@@ -1,0 +1,22 @@
+{
+  "profile.privacyTitle": "Privacy",
+  "login.password": "Password",
+  "login.apiLabel": "API:",
+  "register.password": "Password",
+  "invite.password": "Password",
+  "appShell.pageTitleSuffix": "Bianca",
+  "alertDetail.sentimentDistressed": "Distressed",
+  "residents.colOnboarding": "Onboarding",
+  "residents.onboardingProgress": "{{completed}}/{{total}}",
+  "residentDetail.distChip": "{{label}}: {{count}}",
+  "residentDetail.biancaLabel": "Bianca",
+  "fraudAbuse.loadErrorSuffix": ": {{message}}",
+  "reports.deliveryCsv": "CSV",
+  "reports.deliveryPdf": "PDF",
+  "reports.activityCheckIn": "Check-in",
+  "reports.templates.call_log.tag1": "QA",
+  "reports.templates.consent_roster.tag1": "PII",
+  "settingsBilling.methodIdPlaceholder": "pm_...",
+  "sso.google": "Google",
+  "sso.microsoft": "Microsoft"
+}

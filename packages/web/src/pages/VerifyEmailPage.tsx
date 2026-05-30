@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useVerifyEmailQuery } from "../services/api/authApi"
@@ -10,16 +11,17 @@ import { useAppDispatch } from "../store/store"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
 import "../app.css"
 
-function errorText(err: unknown): string {
+function errorText(err: unknown, fallback: string): string {
   const e = err as { status?: number; data?: { error?: string; message?: string } }
   if (e.data && typeof e.data === "object") {
     if (typeof e.data.error === "string") return e.data.error
     if (typeof e.data.message === "string") return e.data.message
   }
-  return "Email verification failed. The link may be invalid or expired."
+  return fallback
 }
 
 export function VerifyEmailPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = searchParams.get("token")?.trim() ?? ""
   const navigate = useNavigate()
@@ -44,32 +46,32 @@ export function VerifyEmailPage() {
   }, [isSuccess, data, dispatch, navigate])
 
   return (
-    <AuthPageShell title="Email verification" subtitle="Confirming your email address…">
+    <AuthPageShell title={t("verifyEmail.title")} subtitle={t("verifyEmail.subtitle")}>
       {!token ? (
         <div className="va-login-error" role="alert">
-          Missing verification token. Open the link from your email, or sign in to request a new one.
+          {t("verifyEmail.missingToken")}
         </div>
       ) : null}
-      {token && isLoading ? <p className="va-auth-muted">Please wait…</p> : null}
+      {token && isLoading ? <p className="va-auth-muted">{t("verifyEmail.pleaseWait")}</p> : null}
       {token && error ? (
         <div className="va-login-error" role="alert">
-          {errorText(error)}
+          {errorText(error, t("verifyEmail.failed"))}
         </div>
       ) : null}
       {token && isSuccess && data && !data.success ? (
         <div className="va-login-error" role="alert">
-          {data.error || "Verification was not completed."}
+          {data.error || t("verifyEmail.notCompleted")}
         </div>
       ) : null}
       {token && isSuccess && data?.tokens && data?.caregiver ? (
-        <p className="va-auth-muted">Signing you in…</p>
+        <p className="va-auth-muted">{t("verifyEmail.signingIn")}</p>
       ) : null}
       <div className="va-auth-footer">
-        <Link to="/login">Back to sign in</Link>
+        <Link to="/login">{t("verifyEmail.backSignIn")}</Link>
         <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
           |
         </span>
-        <Link to="/check-email">Resend verification</Link>
+        <Link to="/check-email">{t("verifyEmail.resend")}</Link>
       </div>
     </AuthPageShell>
   )

@@ -1,22 +1,21 @@
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useGetInviteInfoQuery, useRegisterWithInviteMutation } from "../services/api/authApi"
 import { orgStubFromCaregiverOrgId } from "../lib/normalizeOrg"
-import { validatePasswordRules, validatePhoneDigits } from "../lib/passwordRules"
+import { validatePhoneDigits } from "../lib/passwordRules"
+import { validatePasswordRulesI18n } from "../lib/passwordI18n"
 import { setAuthEmail } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
+import { AuthTextField } from "../components/AuthTextField"
 import { PasswordField } from "../components/PasswordField"
 import "../app.css"
 
-function inviteFetchError(err: unknown): string {
-  const data = (err as { data?: { message?: string } })?.data
-  return typeof data?.message === "string" ? data.message : "Invalid or expired invite."
-}
-
 export function InviteSignupPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = useMemo(() => searchParams.get("token")?.trim() ?? "", [searchParams])
   const navigate = useNavigate()
@@ -43,30 +42,35 @@ export function InviteSignupPage() {
     setPhone(inviteInfo.phone || "")
   }, [inviteInfo])
 
-  const inviteErrMsg = inviteError ? inviteFetchError(inviteError) : ""
+  const inviteErrMsg = inviteError
+    ? (() => {
+        const data = (inviteError as { data?: { message?: string } })?.data
+        return typeof data?.message === "string" ? data.message : t("invite.invalidInvite")
+      })()
+    : ""
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setFormError("")
     if (!token) {
-      setFormError("Missing invite token. Open the link from your invitation email.")
+      setFormError(t("invite.errors.tokenMissing"))
       return
     }
-    const pw = validatePasswordRules(password)
+    const pw = validatePasswordRulesI18n(password, t)
     if (pw) {
       setFormError(pw)
       return
     }
     if (password !== confirm) {
-      setFormError("Passwords do not match.")
+      setFormError(t("invite.errors.passwordMismatch"))
       return
     }
     if (!name.trim()) {
-      setFormError("Name is required.")
+      setFormError(t("invite.errors.nameRequired"))
       return
     }
     if (!validatePhoneDigits(phone)) {
-      setFormError("Enter a valid phone number (at least 10 digits, or +1 followed by 10 digits).")
+      setFormError(t("invite.errors.phoneInvalid"))
       return
     }
     try {
@@ -82,18 +86,19 @@ export function InviteSignupPage() {
       notifyAuthSuccess()
       navigate("/", { replace: true })
     } catch (err: unknown) {
-      setFormError(inviteFetchError(err))
+      const data = (err as { data?: { message?: string } })?.data
+      setFormError(typeof data?.message === "string" ? data.message : t("invite.invalidInvite"))
     }
   }
 
   return (
-    <AuthPageShell title="Complete invitation" subtitle="Set your password to join your organization." wide>
+    <AuthPageShell title={t("invite.title")} subtitle={t("invite.subtitle")} wide>
       {!token ? (
         <div className="va-login-error" role="alert">
-          Missing invite token. Use the link from your email, or ask an admin to resend your invite.
+          {t("invite.missingTokenBanner")}
         </div>
       ) : null}
-      {token && inviteLoading ? <p className="va-auth-muted">Loading invitation…</p> : null}
+      {token && inviteLoading ? <p className="va-auth-muted">{t("invite.loading")}</p> : null}
       {token && inviteErrMsg && !inviteLoading ? (
         <div className="va-login-error" role="alert">
           {inviteErrMsg}
@@ -101,49 +106,50 @@ export function InviteSignupPage() {
       ) : null}
       {token && inviteInfo ? (
         <form className="va-login-form" onSubmit={handleSubmit}>
-          <label className="va-login-label">
-            Full name
-            <input
-              className="va-login-input"
-              value={name}
-              onChange={(ev) => setName(ev.target.value)}
-              autoComplete="name"
-            />
-          </label>
-          <label className="va-login-label">
-            Email
-            <input type="email" className="va-login-input" value={email} readOnly disabled />
-          </label>
-          <label className="va-login-label">
-            Phone
-            <input
-              className="va-login-input"
-              value={phone}
-              onChange={(ev) => setPhone(ev.target.value)}
-              autoComplete="tel"
-            />
-          </label>
-          <label className="va-login-label">
-            Password
-            <PasswordField value={password} onChange={(ev) => setPassword(ev.target.value)} autoComplete="new-password" />
-          </label>
-          <p className="va-login-helper">At least 8 characters, with at least one letter and one number.</p>
-          <label className="va-login-label">
-            Confirm password
-            <PasswordField value={confirm} onChange={(ev) => setConfirm(ev.target.value)} autoComplete="new-password" />
-          </label>
+          <AuthTextField
+            label={t("invite.fullName")}
+            value={name}
+            onChange={(ev) => setName(ev.target.value)}
+            autoComplete="name"
+          />
+          <AuthTextField
+            label={t("invite.email")}
+            type="email"
+            value={email}
+            readOnly
+            disabled
+          />
+          <AuthTextField
+            label={t("invite.phone")}
+            value={phone}
+            onChange={(ev) => setPhone(ev.target.value)}
+            autoComplete="tel"
+          />
+          <PasswordField
+            label={t("invite.password")}
+            value={password}
+            onChange={(ev) => setPassword(ev.target.value)}
+            autoComplete="new-password"
+          />
+          <p className="va-login-helper">{t("invite.rulesHint")}</p>
+          <PasswordField
+            label={t("invite.confirmPassword")}
+            value={confirm}
+            onChange={(ev) => setConfirm(ev.target.value)}
+            autoComplete="new-password"
+          />
           {formError ? (
             <div className="va-login-error" role="alert">
               {formError}
             </div>
           ) : null}
           <button type="submit" className="va-btn-primary va-login-submit" disabled={submitting}>
-            {submitting ? "Creating account…" : "Complete registration"}
+            {submitting ? t("invite.submitting") : t("invite.submit")}
           </button>
         </form>
       ) : null}
       <div className="va-auth-footer">
-        <Link to="/login">Already have an account? Sign in</Link>
+        <Link to="/login">{t("invite.footerHasAccount")}</Link>
       </div>
     </AuthPageShell>
   )

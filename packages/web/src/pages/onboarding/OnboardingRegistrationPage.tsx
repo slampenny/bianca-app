@@ -1,8 +1,12 @@
-import { FormEvent, useEffect, useState } from "react"
+import { FormEvent, useEffect, useId, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom"
+import { AuthCheckboxField } from "../../components/AuthCheckboxField"
+import { AuthSelectField } from "../../components/AuthSelectField"
+import { AuthTextField } from "../../components/AuthTextField"
 import { AuthPageShell } from "../../auth/AuthPageShell"
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../../config/legal"
-import { REGISTRATION_COUNTRY_OPTIONS } from "../../lib/registrationCountries"
+import { useRegistrationCountryOptions } from "../../hooks/useGeoOptions"
 import { validatePhoneDigits } from "../../lib/passwordRules"
 import type { OnboardingRegisterState } from "../../lib/onboardingTypes"
 import { useCompleteOnboardingMutation } from "../../services/api/authApi"
@@ -12,6 +16,9 @@ import { useAppSelector } from "../../store/store"
 import "../../app.css"
 
 export function OnboardingRegistrationPage() {
+  const { t } = useTranslation()
+  const consentLegendId = useId()
+  const countryOptions = useRegistrationCountryOptions()
   const navigate = useNavigate()
   const location = useLocation()
   const onboarding = (location.state ?? null) as OnboardingRegisterState | null
@@ -53,19 +60,19 @@ export function OnboardingRegistrationPage() {
     setError("")
 
     if (!acceptTerms) {
-      setError("Please accept the Terms of Service and Privacy Policy.")
+      setError(t("onboarding.registration.errors.termsRequired"))
       return
     }
     if (!name.trim()) {
-      setError("Enter your name.")
+      setError(t("onboarding.registration.errors.nameRequired"))
       return
     }
     if (phone.trim() && !validatePhoneDigits(phone)) {
-      setError("Phone must be at least 10 digits, or +1 followed by 10 digits.")
+      setError(t("onboarding.registration.errors.phoneInvalid"))
       return
     }
     if (!currentUser?.id) {
-      setError("Session expired. Please sign in again.")
+      setError(t("onboarding.registration.errors.sessionExpired"))
       return
     }
 
@@ -89,116 +96,108 @@ export function OnboardingRegistrationPage() {
       navigate("/", { replace: true })
     } catch (err: unknown) {
       const data = (err as { data?: { message?: string } })?.data
-      setError(typeof data?.message === "string" ? data.message : "Could not save. Please try again.")
+      setError(typeof data?.message === "string" ? data.message : t("onboarding.registration.errors.saveFailed"))
     }
   }
 
   return (
-    <AuthPageShell
-      title="Finish setting up your account"
-      subtitle="Confirm your details and accept our terms to start using Bianca."
-      wide
-    >
+    <AuthPageShell title={t("onboarding.registration.title")} subtitle={t("onboarding.registration.subtitle")} wide>
       <div className="va-onboarding-back">
         <button type="button" className="va-btn-ghost" onClick={() => navigate(-1)}>
-          ← Back
+          {t("onboarding.registration.back")}
         </button>
       </div>
 
       <form className="va-login-form" onSubmit={handleSubmit} noValidate>
-        <label className="va-login-label">
-          Full name
-          <input
-            className="va-login-input"
-            data-testid="onboarding-reg-name"
-            value={name}
-            onChange={(ev) => setName(ev.target.value)}
-            autoComplete="name"
-          />
-        </label>
+        <AuthTextField
+          label={t("onboarding.registration.fullName")}
+          inputTestId="onboarding-reg-name"
+          value={name}
+          onChange={(ev) => setName(ev.target.value)}
+          autoComplete="name"
+        />
 
-        <label className="va-login-label">
-          Email
-          <input
-            className="va-login-input"
-            data-testid="onboarding-reg-email"
-            value={email}
-            readOnly
-            style={{ opacity: 0.75 }}
-          />
-        </label>
+        <AuthTextField
+          label={t("onboarding.registration.email")}
+          inputTestId="onboarding-reg-email"
+          value={email}
+          readOnly
+          disabled
+        />
 
-        <label className="va-login-label">
-          Phone
-          <input
-            className="va-login-input"
-            data-testid="onboarding-reg-phone"
-            value={phone}
-            onChange={(ev) => setPhone(ev.target.value)}
-            autoComplete="tel"
-            placeholder="Optional but recommended"
-          />
-        </label>
+        <AuthTextField
+          label={t("onboarding.registration.phone")}
+          inputTestId="onboarding-reg-phone"
+          value={phone}
+          onChange={(ev) => setPhone(ev.target.value)}
+          autoComplete="tel"
+          placeholder={t("onboarding.registration.phonePlaceholder")}
+        />
 
-        <label className="va-login-label">
-          Country / region
-          <select
-            className="va-login-input"
-            value={country}
-            onChange={(ev) => setCountry(ev.target.value)}
-          >
-            {REGISTRATION_COUNTRY_OPTIONS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <AuthSelectField label={t("onboarding.registration.country")} value={country} onChange={(ev) => setCountry(ev.target.value)}>
+          {countryOptions.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </AuthSelectField>
 
-        <label className="va-login-label" style={{ flexDirection: "row", alignItems: "flex-start", gap: "0.5rem" }}>
-          <input
-            type="checkbox"
-            checked={acceptTerms}
-            onChange={(ev) => setAcceptTerms(ev.target.checked)}
-            data-testid="onboarding-reg-terms"
-          />
-          <span style={{ fontWeight: 400, lineHeight: 1.5 }}>
-            I have read and accept the{" "}
-            <a href={TERMS_OF_SERVICE_URL} target="_blank" rel="noreferrer" className="va-link">
-              Terms of Service
-            </a>{" "}
-            and{" "}
-            <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer" className="va-link">
-              Privacy Policy
-            </a>
-            .
-          </span>
-        </label>
+        <AuthCheckboxField
+          inputTestId="onboarding-reg-terms"
+          checked={acceptTerms}
+          onChange={(ev) => setAcceptTerms(ev.target.checked)}
+          label={
+            <>
+              {t("onboarding.registration.acceptTermsIntro")}{" "}
+              <a href={TERMS_OF_SERVICE_URL} target="_blank" rel="noreferrer" className="va-link">
+                {t("register.termsLink")}
+              </a>{" "}
+              {t("register.and")}{" "}
+              <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer" className="va-link">
+                {t("register.privacyLink")}
+              </a>
+              .
+            </>
+          }
+        />
 
         {showConsent ? (
           <fieldset className="va-login-label" style={{ border: "none", padding: 0, margin: 0 }}>
-            <legend style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
-              Are you in a single-consent jurisdiction?
+            <legend id={consentLegendId} style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
+              {t("onboarding.registration.singleConsentLegend")}
             </legend>
             <p className="va-auth-muted" style={{ marginTop: 0 }}>
-              In some regions only one party must consent to recorded wellness calls. Choose what applies to your
-              organization.
+              {t("onboarding.registration.singleConsentHelper")}
             </p>
-            <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
-              <button
-                type="button"
+            <div role="radiogroup" aria-labelledby={consentLegendId} style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
+              <label
                 className={singleConsentState ? "va-btn-primary" : "va-btn-secondary"}
-                onClick={() => setSingleConsentState(true)}
+                style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", margin: 0 }}
               >
-                Yes
-              </button>
-              <button
-                type="button"
+                <input
+                  type="radio"
+                  name="singleConsentState"
+                  className="sr-only"
+                  checked={singleConsentState}
+                  onChange={() => setSingleConsentState(true)}
+                  data-testid="onboarding-reg-consent-yes"
+                />
+                {t("onboarding.registration.yes")}
+              </label>
+              <label
                 className={!singleConsentState ? "va-btn-primary" : "va-btn-secondary"}
-                onClick={() => setSingleConsentState(false)}
+                style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", margin: 0 }}
               >
-                No
-              </button>
+                <input
+                  type="radio"
+                  name="singleConsentState"
+                  className="sr-only"
+                  checked={!singleConsentState}
+                  onChange={() => setSingleConsentState(false)}
+                  data-testid="onboarding-reg-consent-no"
+                />
+                {t("onboarding.registration.no")}
+              </label>
             </div>
           </fieldset>
         ) : null}
@@ -210,12 +209,12 @@ export function OnboardingRegistrationPage() {
         ) : null}
 
         <button type="submit" className="va-btn-primary va-login-submit" disabled={busy} data-testid="onboarding-reg-save">
-          {busy ? "Saving…" : "Save and continue"}
+          {busy ? t("onboarding.registration.saving") : t("onboarding.registration.saveContinue")}
         </button>
       </form>
 
       <div className="va-auth-footer" style={{ marginTop: "1.25rem" }}>
-        <Link to="/">Go to dashboard</Link>
+        <Link to="/">{t("onboarding.registration.goToDashboard")}</Link>
       </div>
     </AuthPageShell>
   )

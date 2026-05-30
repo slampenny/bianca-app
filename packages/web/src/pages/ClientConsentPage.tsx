@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useSearchParams } from "react-router-dom"
 import { useVerifyConsentMutation } from "../services/api/clientApi"
 import "../app.css"
@@ -8,13 +9,12 @@ import "../app.css"
  * (`GET /v1/clients/consent/verify?token=...`).
  */
 export function ClientConsentPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = searchParams.get("token")?.trim() || ""
   const [verifyConsent] = useVerifyConsentMutation()
   const [status, setStatus] = useState<"verifying" | "success" | "error">(() => (token ? "verifying" : "error"))
-  const [message, setMessage] = useState(() =>
-    token ? "" : "Consent token is missing. Please use the link from your email.",
-  )
+  const [message, setMessage] = useState(() => (token ? "" : t("clientConsent.missingToken")))
 
   useEffect(() => {
     if (!token) return
@@ -27,10 +27,10 @@ export function ClientConsentPage() {
         if (cancelled) return
         if (res.success) {
           setStatus("success")
-          setMessage(res.message || "Your consent has been recorded. Thank you.")
+          setMessage(res.message || t("clientConsent.successDefault"))
         } else {
           setStatus("error")
-          setMessage(res.message || "We could not complete consent.")
+          setMessage(res.message || t("clientConsent.errorDefault"))
         }
       })
       .catch((err: { data?: { error?: string; message?: string }; message?: string }) => {
@@ -40,17 +40,23 @@ export function ClientConsentPage() {
           err?.data?.error ||
             err?.data?.message ||
             err?.message ||
-            "Invalid or expired consent link. Please contact your care organization for a new link.",
+            t("clientConsent.expiredLink"),
         )
       })
 
     return () => {
       cancelled = true
     }
-  }, [token, verifyConsent])
+  }, [token, verifyConsent, t])
 
   const title =
-    status === "success" ? "Consent confirmed" : status === "error" && !token ? "Consent" : status === "error" ? "Could not confirm consent" : "Verifying consent"
+    status === "success"
+      ? t("clientConsent.titleSuccess")
+      : status === "error" && !token
+        ? t("clientConsent.titleMissing")
+        : status === "error"
+          ? t("clientConsent.titleError")
+          : t("clientConsent.titleVerifying")
 
   return (
     <div className="va-login">
@@ -66,7 +72,7 @@ export function ClientConsentPage() {
 
         {status === "verifying" ? (
           <p className="va-login-tagline" style={{ textAlign: "center" }}>
-            Please wait while we confirm your consent…
+            {t("clientConsent.verifying")}
           </p>
         ) : null}
 
@@ -76,7 +82,7 @@ export function ClientConsentPage() {
               {message}
             </div>
             <p className="va-login-helper" style={{ textAlign: "center" }}>
-              You can close this window.
+              {t("clientConsent.closeWindow")}
             </p>
           </>
         ) : null}
@@ -89,12 +95,12 @@ export function ClientConsentPage() {
 
         {status === "error" && token ? (
           <p className="va-login-helper" style={{ textAlign: "center", marginTop: "0.75rem" }}>
-            Contact your care organization if you need a new consent link.
+            {t("clientConsent.needNewLink")}
           </p>
         ) : null}
 
         <div className="va-auth-footer" style={{ justifyContent: "center", marginTop: "1.5rem" }}>
-          <Link to="/login">Staff sign in</Link>
+          <Link to="/login">{t("clientConsent.staffSignIn")}</Link>
         </div>
       </div>
     </div>

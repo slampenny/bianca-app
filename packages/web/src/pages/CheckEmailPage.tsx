@@ -1,5 +1,7 @@
 import { FormEvent, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useLocation } from "react-router-dom"
+import { AuthTextField } from "../components/AuthTextField"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useResendVerificationEmailMutation } from "../services/api/authApi"
 import "../app.css"
@@ -7,6 +9,7 @@ import "../app.css"
 type LocationState = { email?: string }
 
 export function CheckEmailPage() {
+  const { t } = useTranslation()
   const location = useLocation()
   const initialEmail = (location.state as LocationState | null)?.email?.trim() ?? ""
   const [email, setEmail] = useState(initialEmail)
@@ -23,53 +26,44 @@ export function CheckEmailPage() {
       setSent(true)
     } catch (err: unknown) {
       const data = (err as { data?: { message?: string } })?.data
-      setError(typeof data?.message === "string" ? data.message : "Could not resend. Try again later.")
+      setError(typeof data?.message === "string" ? data.message : t("checkEmail.resendFailed"))
     }
   }
 
   return (
-    <AuthPageShell
-      title="Verify your email"
-      subtitle="We sent a verification link to your inbox. You need to verify before signing in."
-      wide
-    >
+    <AuthPageShell title={t("checkEmail.title")} subtitle={t("checkEmail.subtitle")} wide>
       <div data-testid="check-email-page">
-      <p className="va-auth-muted">
-        Didn’t get it? Check spam, or resend the verification email below.
-      </p>
-      <form className="va-login-form" onSubmit={handleSubmit}>
-        <label className="va-login-label">
-          Email
-          <input
+        <p className="va-auth-muted">{t("checkEmail.hint")}</p>
+        <form className="va-login-form" onSubmit={handleSubmit}>
+          <AuthTextField
+            label={t("checkEmail.email")}
             type="email"
             autoComplete="email"
             required
-            className="va-login-input"
             value={email}
             onChange={(ev) => setEmail(ev.target.value)}
           />
-        </label>
-        {sent ? (
-          <div className="va-login-success" role="status">
-            If an account exists for that email, we’ve sent a new verification link.
+          {sent ? (
+            <div className="va-login-success" role="status">
+              {t("checkEmail.sent")}
+            </div>
+          ) : null}
+          {error ? (
+            <div className="va-login-error" role="alert">
+              {error}
+            </div>
+          ) : null}
+          <button type="submit" className="va-btn-primary va-login-submit" disabled={isLoading}>
+            {isLoading ? t("checkEmail.sending") : t("checkEmail.resend")}
+          </button>
+          <div className="va-auth-footer">
+            <Link to="/login">{t("checkEmail.backSignIn")}</Link>
+            <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
+              |
+            </span>
+            <Link to="/register">{t("checkEmail.createAccount")}</Link>
           </div>
-        ) : null}
-        {error ? (
-          <div className="va-login-error" role="alert">
-            {error}
-          </div>
-        ) : null}
-        <button type="submit" className="va-btn-primary va-login-submit" disabled={isLoading}>
-          {isLoading ? "Sending…" : "Resend verification email"}
-        </button>
-        <div className="va-auth-footer">
-          <Link to="/login">Back to sign in</Link>
-          <span style={{ color: "var(--va-slate-300)" }} aria-hidden>
-            |
-          </span>
-          <Link to="/register">Create an account</Link>
-        </div>
-      </form>
+        </form>
       </div>
     </AuthPageShell>
   )

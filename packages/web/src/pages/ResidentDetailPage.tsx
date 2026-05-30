@@ -1,13 +1,15 @@
 import type { CSSProperties, FormEvent, ReactNode } from "react"
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { ChartFigure } from "../components/ChartFigure"
+import { summarizeChartSeries } from "../lib/chartSummary"
 import { clientInitialsFromClient } from "../lib/clientDisplayName"
 import { apiRecordId, mapClientToResident, splitName } from "../lib/liveData"
 import { intervalsForDraft, weekdayShortLabel } from "../lib/scheduleDraft"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
-import { CONSENT_BULLETS } from "../data/residentMock"
 import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import {
   useDeleteClientMutation,
@@ -20,6 +22,10 @@ import { useGetSentimentSummaryQuery, useGetSentimentTrendQuery } from "../servi
 import { useGetMedicalAnalysisResultsQuery, useGetMedicalAnalysisSummaryQuery } from "../services/api/medicalAnalysisApi"
 import { useCreateScheduleForClientMutation, useDeleteScheduleMutation, useUpdateScheduleMutation } from "../services/api/scheduleApi"
 import type { Client, SentimentSummary, SentimentTrendPoint } from "../services/api/api.types"
+import { Button, Modal, Tabs, TabsContent, TabsList, TabsTrigger } from "@bianca-app/ui"
+import { AuthSelectField } from "../components/AuthSelectField"
+import { AuthTextAreaField } from "../components/AuthTextAreaField"
+import { AuthTextField } from "../components/AuthTextField"
 import { ConfirmModal } from "../components/ConfirmModal"
 import { AvatarPicker } from "../components/AvatarPicker"
 import { NewScheduleFormFields } from "../components/NewScheduleFormFields"
@@ -57,6 +63,7 @@ type AnalysisTab = "medical" | "sentiment" | "security"
 type MainTab = "overview" | "analysis" | "conversations"
 
 export function ResidentDetailPage() {
+  const { t } = useTranslation()
   const { residentId } = useParams()
   const navigate = useNavigate()
   const [consentOpen, setConsentOpen] = useState(false)
@@ -237,6 +244,22 @@ export function ResidentDetailPage() {
       .filter((row): row is { idx: number; dateLabel: string; score: number } => row.score !== null)
   }, [sentimentTrend?.dataPoints])
 
+  const sentimentChartSummary = useMemo(
+    () =>
+      summarizeChartSeries(
+        sentimentChartData,
+        "dateLabel",
+        "score",
+        (date, score) =>
+          t("residentDetail.sentimentChartSummaryItem", {
+            date,
+            score: `${Number(score) >= 0 ? "+" : ""}${Number(score).toFixed(2)}`,
+          }),
+        t("residentDetail.sentimentChartSummaryEmpty"),
+      ),
+    [sentimentChartData, t],
+  )
+
   const conversationRows = useMemo(() => {
     const rows = convPages?.results ?? []
     return [...rows]
@@ -254,38 +277,42 @@ export function ResidentDetailPage() {
           callDuration?: number | null
         }
         const start = c.startTime ?? withFallback.callStartTime ?? withFallback.createdAt
-        const t = start ? new Date(start) : null
-        const hasValidTime = !!t && !Number.isNaN(t.getTime())
+        const startedAt = start ? new Date(start) : null
+        const hasValidTime = !!startedAt && !Number.isNaN(startedAt.getTime())
         const rawDuration = c.duration ?? withFallback.callDuration
         const durationLabel = formatDurationSeconds(rawDuration)
         const displayOutcome = outcomeLabel(c.callOutcome ?? c.status)
         const outcome = c.callOutcome
         const id = String(c.id ?? c.callSid ?? `conv-${idx}`)
+        const dur =
+          durationLabel === "—" ? t("residentDetail.durationUnavailable") : durationLabel
         return {
           id,
           outcome,
           outcomeLabel: displayOutcome,
-          durationLabel: durationLabel === "—" ? "duration unavailable" : durationLabel,
+          durationLabel: dur,
           summary:
             outcome === "answered"
-              ? `Call answered — ${durationLabel === "—" ? "duration unavailable" : durationLabel}`
-              : `Call — ${displayOutcome} (${durationLabel === "—" ? "duration unavailable" : durationLabel})`,
+              ? t("residentDetail.callAnswered", { duration: dur })
+              : t("residentDetail.callOutcome", { outcome: displayOutcome, duration: dur }),
           description:
             outcome === "answered"
-              ? `Call answered — ${durationLabel === "—" ? "duration unavailable" : durationLabel}`
-              : `Call — ${displayOutcome} (${durationLabel === "—" ? "duration unavailable" : durationLabel})`,
+              ? t("residentDetail.callAnswered", { duration: dur })
+              : t("residentDetail.callOutcome", { outcome: displayOutcome, duration: dur }),
           date: hasValidTime
-            ? t.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-            : "Date unavailable",
-          time: hasValidTime ? t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : "Time unavailable",
+            ? startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+            : t("residentDetail.dateUnavailable"),
+          time: hasValidTime
+            ? startedAt.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+            : t("residentDetail.timeUnavailable"),
           dateShort: hasValidTime
-            ? t.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
-            : "Date unavailable",
+            ? startedAt.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+            : t("residentDetail.dateUnavailable"),
           messageCount: Array.isArray(c.messages) ? c.messages.length : 0,
           messages: c.messages ?? [],
         }
       })
-  }, [convPages?.results])
+  }, [convPages?.results, t])
 
   const residentSchedules = useMemo(() => {
     const list = (apiClient?.schedules ?? []).filter((s) => !!s.id && s.isActive !== false)
@@ -296,22 +323,20 @@ export function ResidentDetailPage() {
 
   if (clientLoading) {
     return (
-      <div style={{ padding: "3rem", textAlign: "center", color: "var(--va-slate-500)" }}>Loading client…</div>
+      <div style={{ padding: "3rem", textAlign: "center", color: "var(--va-slate-500)" }}>{t("residentDetail.loading")}</div>
     )
   }
 
   if (clientError || !resident || !apiClient) {
     return (
       <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
-        <p style={{ color: "var(--va-slate-500)" }}>Resident not found</p>
-        <p style={{ color: "var(--va-slate-400)", fontSize: "0.875rem", marginTop: 6 }}>
-          The directory may be out of date after a seed/reset. Go back to refresh the list.
-        </p>
+        <p style={{ color: "var(--va-slate-500)" }}>{t("residentDetail.notFound")}</p>
+        <p style={{ color: "var(--va-slate-400)", fontSize: "0.875rem", marginTop: 6 }}>{t("residentDetail.notFoundHint")}</p>
         <button type="button" className="va-btn-ghost" style={{ marginTop: "1rem" }} onClick={() => navigate("/residents")}>
-          Back to Residents
+          {t("residentDetail.back")}
         </button>
         <button type="button" className="va-btn-primary" style={{ marginTop: "1rem", display: "block", margin: "1rem auto 0" }} onClick={() => void refetch()}>
-          Retry
+          {t("common.retry")}
         </button>
       </div>
     )
@@ -325,7 +350,7 @@ export function ResidentDetailPage() {
   })
 
   /** Same request body as the add-schedule card. Returns false if weekly/monthly has no days (message set). Throws on API error. */
-  const createScheduleFromAddForm = async (noticeText = "Schedule added."): Promise<boolean> => {
+  const createScheduleFromAddForm = async (noticeText = t("residentDetail.scheduleAdded")): Promise<boolean> => {
     if (!apiClient.id) return false
     setScheduleError("")
     setScheduleNotice("")
@@ -336,7 +361,7 @@ export function ResidentDetailPage() {
       newScheduleMonthlyDaysRaw,
     )
     if (newScheduleFrequency !== "daily" && intervals.length === 0) {
-      setScheduleError("Select at least one interval for weekly/monthly schedules.")
+      setScheduleError(t("residentDetail.scheduleIntervalError"))
       return false
     }
     await createScheduleForClient({
@@ -384,12 +409,12 @@ export function ResidentDetailPage() {
       }
       if (canManageResidents && !primarySchedule) {
         try {
-          const created = await createScheduleFromAddForm("Resident profile saved. Call schedule added from the add schedule defaults.")
+          const created = await createScheduleFromAddForm(t("residentDetail.residentSavedScheduleAdded"))
           if (created) setMainTab("overview")
         } catch (schedErr: unknown) {
           const smsg = (schedErr as { data?: { message?: string } })?.data?.message
           setScheduleError(
-            typeof smsg === "string" ? smsg : "Could not create call schedule from the add form defaults. Fix Call schedule and save again.",
+            typeof smsg === "string" ? smsg : t("residentDetail.createScheduleOnSaveError"),
           )
         }
       }
@@ -397,7 +422,7 @@ export function ResidentDetailPage() {
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setSaveError(typeof msg === "string" ? msg : "Could not update resident.")
+      setSaveError(typeof msg === "string" ? msg : t("residentDetail.saveResidentError"))
     }
   }
 
@@ -409,7 +434,7 @@ export function ResidentDetailPage() {
       navigate("/residents", { replace: true })
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setSaveError(typeof msg === "string" ? msg : "Could not delete resident.")
+      setSaveError(typeof msg === "string" ? msg : t("residentDetail.deleteResidentError"))
     }
   }
 
@@ -451,7 +476,7 @@ export function ResidentDetailPage() {
       if (created) await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setScheduleError(typeof msg === "string" ? msg : "Could not add schedule.")
+      setScheduleError(typeof msg === "string" ? msg : t("residentDetail.scheduleAddError"))
     }
   }
 
@@ -466,7 +491,7 @@ export function ResidentDetailPage() {
       editScheduleMonthlyDaysRaw,
     )
     if (editScheduleFrequency !== "daily" && intervals.length === 0) {
-      setScheduleError("Select at least one interval for weekly/monthly schedules.")
+      setScheduleError(t("residentDetail.scheduleIntervalError"))
       return
     }
     try {
@@ -480,11 +505,11 @@ export function ResidentDetailPage() {
         },
       }).unwrap()
       setEditingScheduleId(null)
-      setScheduleNotice("Schedule updated.")
+      setScheduleNotice(t("residentDetail.scheduleUpdated"))
       await refetch()
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setScheduleError(typeof msg === "string" ? msg : "Could not update schedule.")
+      setScheduleError(typeof msg === "string" ? msg : t("residentDetail.scheduleUpdateError"))
     }
   }
 
@@ -494,7 +519,7 @@ export function ResidentDetailPage() {
     try {
       await deleteSchedule({ scheduleId }).unwrap()
       if (editingScheduleId === scheduleId) setEditingScheduleId(null)
-      setScheduleNotice("Schedule deleted.")
+      setScheduleNotice(t("residentDetail.scheduleDeleted"))
       setScheduleDeleteConfirmId(null)
       await refetch()
     } catch (err: unknown) {
@@ -502,7 +527,7 @@ export function ResidentDetailPage() {
       if (status === 401 || status === 403) {
         const schedule = residentSchedules.find((s) => String(s.id) === scheduleId)
         if (!schedule) {
-          setScheduleError("Could not delete schedule.")
+          setScheduleError(t("residentDetail.scheduleDeleteError"))
           return
         }
         try {
@@ -516,17 +541,17 @@ export function ResidentDetailPage() {
             },
           }).unwrap()
           if (editingScheduleId === scheduleId) setEditingScheduleId(null)
-          setScheduleNotice("Schedule deleted.")
+          setScheduleNotice(t("residentDetail.scheduleDeleted"))
           setScheduleDeleteConfirmId(null)
           await refetch()
           return
         } catch {
-          setScheduleError("Could not delete schedule.")
+          setScheduleError(t("residentDetail.scheduleDeleteError"))
           return
         }
       }
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setScheduleError(typeof msg === "string" ? msg : "Could not delete schedule.")
+      setScheduleError(typeof msg === "string" ? msg : t("residentDetail.scheduleDeleteError"))
     }
   }
 
@@ -534,7 +559,7 @@ export function ResidentDetailPage() {
     <div data-testid="resident-detail-page" style={{ display: "flex", flexDirection: "column", gap: "1.5rem", maxWidth: 900, margin: "0 auto" }}>
       <button type="button" className="va-btn-ghost" data-testid="resident-detail-back" onClick={() => navigate("/residents")}>
         <ChevronLeftIcon size={16} />
-        Back to Residents
+        {t("residentDetail.back")}
       </button>
       {canManageResidents ? (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
@@ -547,7 +572,7 @@ export function ResidentDetailPage() {
             }}
             data-testid="resident-edit-toggle"
           >
-            {editing ? "Cancel edit" : "Edit resident"}
+            {editing ? t("residentDetail.cancelEdit") : t("residentDetail.editResident")}
           </button>
           <button
             type="button"
@@ -557,7 +582,7 @@ export function ResidentDetailPage() {
             style={{ color: "var(--va-red-600)", borderColor: "var(--va-red-200)" }}
             data-testid="resident-delete"
           >
-            {deletingResident ? "Deleting..." : "Delete resident"}
+            {deletingResident ? t("residentDetail.deleting") : t("residentDetail.deleteResident")}
           </button>
         </div>
       ) : null}
@@ -581,7 +606,7 @@ export function ResidentDetailPage() {
           {apiClient.avatar ? (
             <img
               src={apiClient.avatar}
-              alt={`${displayName} avatar`}
+              alt={t("residentDetail.avatarAlt", { name: displayName })}
               style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
               referrerPolicy="no-referrer"
             />
@@ -594,150 +619,139 @@ export function ResidentDetailPage() {
             {displayName}
           </h1>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: 6, alignItems: "center" }}>
-            <span style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>Room {resident.room}</span>
+            <span style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>{t("residentDetail.room", { room: resident.room })}</span>
             <StatusPill status={resident.status} />
             <span style={{ fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-              Age {resident.age > 0 ? resident.age : "—"}
+              {resident.age > 0 ? t("residentDetail.age", { age: resident.age }) : t("residentDetail.ageUnknown")}
             </span>
           </div>
         </div>
       </div>
 
-      <div
-        data-testid="resident-main-tablist"
-        role="tablist"
-        aria-label="Resident sections"
-        style={{ display: "flex", borderBottom: "1px solid var(--va-slate-200)", gap: 4, flexWrap: "wrap" }}
-      >
-        {(
-          [
-            { id: "overview" as const, label: "Overview" },
-            { id: "analysis" as const, label: "Analysis" },
-            { id: "conversations" as const, label: "Conversations" },
-          ] as const
-        ).map((tab) => {
-          const active = mainTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              data-testid={`resident-main-tab-${tab.id}`}
-              aria-selected={active}
-              id={`resident-main-section-${tab.id}`}
-              className="va-btn-ghost"
-              style={{
-                border: "none",
-                borderRadius: 0,
-                background: "transparent",
-                padding: "0.35rem 0.7rem 0.5rem",
-                marginBottom: -1,
-                fontSize: "0.9rem",
-                fontWeight: active ? 700 : 500,
-                color: active ? "var(--va-teal-700, #0f766e)" : "var(--va-slate-500)",
-                borderBottom: active ? "2px solid var(--va-teal)" : "2px solid transparent",
-              }}
-              onClick={() => setMainTab(tab.id)}
-            >
+      <Tabs value={mainTab} onValueChange={(value) => setMainTab(value as MainTab)}>
+        <TabsList aria-label={t("residentDetail.sectionsAria")} data-testid="resident-main-tablist">
+          {(
+            [
+              { id: "overview" as const, label: t("residentDetail.tabOverview") },
+              { id: "analysis" as const, label: t("residentDetail.tabAnalysis") },
+              { id: "conversations" as const, label: t("residentDetail.tabConversations") },
+            ] as const
+          ).map((tab) => (
+            <TabsTrigger key={tab.id} value={tab.id} data-testid={`resident-main-tab-${tab.id}`}>
               {tab.label}
-            </button>
-          )
-        })}
-      </div>
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {mainTab === "overview" ? (
+      <TabsContent value="overview">
         <>
           {canManageResidents && editing ? (
         <div className="va-card va-card-pad">
-          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Edit resident</h2>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("residentDetail.editTitle")}</h2>
           <form onSubmit={(e) => void onSaveResident(e)} style={{ display: "grid", gap: "0.75rem" }}>
             <AvatarPicker
-              label="Resident photo"
+              label={t("residentDetail.photoLabel")}
               initialsSource={residentPreferredName || residentFirstName || "?"}
               existingAvatarUrl={apiClient?.avatar}
               onPick={setResidentAvatarFile}
             />
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              First name
-              <input
-                className="va-login-input"
-                type="text"
-                value={residentFirstName}
-                onChange={(e) => setResidentFirstName(e.target.value)}
-                required
-                autoComplete="given-name"
-              />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Last name
-              <input
-                className="va-login-input"
-                type="text"
-                value={residentLastName}
-                onChange={(e) => setResidentLastName(e.target.value)}
-                autoComplete="family-name"
-              />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Preferred name
-              <input className="va-login-input" type="text" value={residentPreferredName} onChange={(e) => setResidentPreferredName(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Age
-              <input className="va-login-input" type="number" min={0} max={150} value={residentAge} onChange={(e) => setResidentAge(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Email
-              <input className="va-login-input" type="email" value={residentEmail} onChange={(e) => setResidentEmail(e.target.value)} required />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Phone
-              <input className="va-login-input" type="tel" value={residentPhone} onChange={(e) => setResidentPhone(e.target.value)} required />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Preferred language
-              <select className="va-login-input" value={residentLanguage} onChange={(e) => setResidentLanguage(e.target.value)}>
-                {LANGUAGE_OPTIONS.map((o) => (
-                  <option key={o.code} value={o.code}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Room
-              <input className="va-login-input" type="text" value={residentRoom} onChange={(e) => setResidentRoom(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Move-in date
-              <input className="va-login-input" type="date" value={residentMoveInDate} onChange={(e) => setResidentMoveInDate(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Emergency contact name
-              <input className="va-login-input" type="text" value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Emergency contact relationship
-              <input className="va-login-input" type="text" value={emergencyRelationship} onChange={(e) => setEmergencyRelationship(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Emergency contact phone
-              <input className="va-login-input" type="tel" value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Emergency contact email
-              <input className="va-login-input" type="email" value={emergencyEmail} onChange={(e) => setEmergencyEmail(e.target.value)} />
-            </label>
-            <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-              Notes
-              <textarea
-                className="va-login-input"
-                value={residentNotes}
-                onChange={(e) => setResidentNotes(e.target.value)}
-                rows={4}
-                style={{ resize: "vertical" }}
-              />
-            </label>
+            <AuthTextField
+              label={t("residentDetail.firstName")}
+              type="text"
+              value={residentFirstName}
+              onChange={(e) => setResidentFirstName(e.target.value)}
+              required
+              autoComplete="given-name"
+            />
+            <AuthTextField
+              label={t("residentDetail.lastName")}
+              type="text"
+              value={residentLastName}
+              onChange={(e) => setResidentLastName(e.target.value)}
+              autoComplete="family-name"
+            />
+            <AuthTextField
+              label={t("residentDetail.preferredName")}
+              type="text"
+              value={residentPreferredName}
+              onChange={(e) => setResidentPreferredName(e.target.value)}
+            />
+            <AuthTextField
+              label={t("residentDetail.ageLabel")}
+              type="number"
+              min={0}
+              max={150}
+              value={residentAge}
+              onChange={(e) => setResidentAge(e.target.value)}
+            />
+            <AuthTextField
+              label={t("residentDetail.labelEmail")}
+              type="email"
+              value={residentEmail}
+              onChange={(e) => setResidentEmail(e.target.value)}
+              required
+            />
+            <AuthTextField
+              label={t("residentDetail.labelPhone")}
+              type="tel"
+              value={residentPhone}
+              onChange={(e) => setResidentPhone(e.target.value)}
+              required
+            />
+            <AuthSelectField
+              label={t("residentDetail.preferredLanguageLabel")}
+              value={residentLanguage}
+              onChange={(e) => setResidentLanguage(e.target.value)}
+            >
+              {LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.code} value={o.code}>
+                  {o.label}
+                </option>
+              ))}
+            </AuthSelectField>
+            <AuthTextField
+              label={t("residentDetail.roomField")}
+              type="text"
+              value={residentRoom}
+              onChange={(e) => setResidentRoom(e.target.value)}
+            />
+            <AuthTextField
+              label={t("residentDetail.labelMoveIn")}
+              type="date"
+              value={residentMoveInDate}
+              onChange={(e) => setResidentMoveInDate(e.target.value)}
+            />
+            <AuthTextField
+              label={t("residentDetail.emergencyName")}
+              type="text"
+              value={emergencyName}
+              onChange={(e) => setEmergencyName(e.target.value)}
+            />
+            <AuthTextField
+              label={t("residentDetail.emergencyRelationship")}
+              type="text"
+              value={emergencyRelationship}
+              onChange={(e) => setEmergencyRelationship(e.target.value)}
+            />
+            <AuthTextField
+              label={t("residentDetail.emergencyPhone")}
+              type="tel"
+              value={emergencyPhone}
+              onChange={(e) => setEmergencyPhone(e.target.value)}
+            />
+            <AuthTextField
+              label={t("residentDetail.emergencyEmail")}
+              type="email"
+              value={emergencyEmail}
+              onChange={(e) => setEmergencyEmail(e.target.value)}
+            />
+            <AuthTextAreaField
+              label={t("residentDetail.notes")}
+              value={residentNotes}
+              onChange={(e) => setResidentNotes(e.target.value)}
+              rows={4}
+              style={{ resize: "vertical" }}
+            />
             {saveError ? (
               <div className="va-login-error" role="alert">
                 {saveError}
@@ -745,10 +759,10 @@ export function ResidentDetailPage() {
             ) : null}
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
               <button type="submit" className="va-btn-primary" disabled={savingResident || uploadingAvatar}>
-                {savingResident || uploadingAvatar ? "Saving..." : "Save changes"}
+                {savingResident || uploadingAvatar ? t("residentDetail.saving") : t("residentDetail.saveChanges")}
               </button>
               <button type="button" className="va-btn-secondary" onClick={() => setEditing(false)}>
-                Cancel
+                {t("residentDetail.cancel")}
               </button>
             </div>
           </form>
@@ -758,9 +772,9 @@ export function ResidentDetailPage() {
       {canCallNow ? (
         <div className="va-card va-card-pad" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Live Call</h2>
+            <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>{t("residentDetail.liveCallTitle")}</h2>
             <p style={{ marginTop: 4, fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>
-              Open the full call workspace for live status, onboarding progress, and transcript stream.
+              {t("residentDetail.liveCallBody")}
             </p>
           </div>
           <button
@@ -769,7 +783,7 @@ export function ResidentDetailPage() {
             data-testid="resident-call-now"
             onClick={() => navigate(`/residents/${residentId || ""}/call`)}
           >
-            Call now
+            {t("residentDetail.callNow")}
           </button>
         </div>
       ) : null}
@@ -779,15 +793,15 @@ export function ResidentDetailPage() {
       {canManageResidents ? (
         <div className="va-card va-card-pad" data-testid="resident-schedules-card">
           <div style={{ marginBottom: "0.9rem" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: "var(--va-navy)" }}>Call schedule</h2>
+            <h2 style={{ fontSize: "1rem", fontWeight: 700, margin: 0, color: "var(--va-navy)" }}>{t("residentDetail.scheduleTitle")}</h2>
             <p style={{ margin: "0.35rem 0 0", fontSize: "0.825rem", color: "var(--va-slate-500)" }}>
-              Configure the recurring call schedule for this resident.
+              {t("residentDetail.scheduleSubtitle")}
             </p>
           </div>
 
           {!primarySchedule ? (
             <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: 10, padding: "0.85rem", display: "grid", gap: 10, background: "var(--va-slate-50)" }}>
-              <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--va-navy)" }}>Add schedule</h3>
+              <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--va-navy)" }}>{t("residentDetail.addScheduleTitle")}</h3>
               <NewScheduleFormFields
                 testIdPrefix="resident-schedule-new"
                 frequency={newScheduleFrequency}
@@ -811,71 +825,28 @@ export function ResidentDetailPage() {
               ) : null}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button type="button" data-testid="resident-schedule-add" className="va-btn-primary" onClick={() => void onAddSchedule()} disabled={creatingSchedule}>
-                  {creatingSchedule ? "Saving..." : "Save"}
+                  {creatingSchedule ? t("residentDetail.saving") : t("residentDetail.save")}
                 </button>
               </div>
             </div>
           ) : editingScheduleId ? (
             <div style={{ border: "1px solid var(--va-slate-200)", borderRadius: 10, padding: "0.85rem", display: "grid", gap: 10, background: "var(--va-slate-50)" }}>
-              <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--va-navy)" }}>Edit schedule</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(130px, 180px) minmax(130px, 180px) auto", gap: 8, alignItems: "center" }}>
-                <select data-testid="resident-schedule-edit-frequency" className="va-login-input" value={editScheduleFrequency} onChange={(e) => setEditScheduleFrequency(e.target.value as "daily" | "weekly" | "monthly")}>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-                <input data-testid="resident-schedule-edit-time" className="va-login-input" type="time" value={editScheduleTime} onChange={(e) => setEditScheduleTime(e.target.value)} />
-                <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "var(--va-slate-700)" }}>
-                  <input data-testid="resident-schedule-edit-active" type="checkbox" checked={editScheduleActive} onChange={(e) => setEditScheduleActive(e.target.checked)} />
-                  Active
-                </label>
-              </div>
-              {editScheduleFrequency === "weekly" ? (
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {[0, 1, 2, 3, 4, 5, 6].map((d) => {
-                      const active = editScheduleWeeklyDays.includes(d)
-                      return (
-                        <button
-                          key={d}
-                          type="button"
-                          data-testid={`resident-schedule-edit-day-${d}`}
-                          style={{
-                            padding: "0.25rem 0.58rem",
-                            fontSize: "0.75rem",
-                            borderRadius: 999,
-                            border: active ? "1px solid #14b8a6" : "1px solid #cbd5e1",
-                            background: active ? "#14b8a6" : "#ffffff",
-                            color: active ? "#ffffff" : "#334155",
-                          }}
-                          onClick={() => toggleWeeklyDay(d, "edit")}
-                        >
-                          {weekdayShortLabel(d)}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
-                    Repeat every
-                    <input
-                      data-testid="resident-schedule-edit-weeks"
-                      className="va-login-input"
-                      type="number"
-                      min={1}
-                      value={editScheduleWeeklyWeeks}
-                      onChange={(e) => setEditScheduleWeeklyWeeks(Math.max(1, Number(e.target.value) || 1))}
-                      style={{ width: 86 }}
-                    />
-                    week(s)
-                  </label>
-                </div>
-              ) : null}
-              {editScheduleFrequency === "monthly" ? (
-                <label style={{ display: "grid", gap: 6, fontSize: "0.81rem", color: "var(--va-slate-700)" }}>
-                  Days of month (comma-separated, 1-31)
-                  <input data-testid="resident-schedule-edit-monthdays" className="va-login-input" value={editScheduleMonthlyDaysRaw} onChange={(e) => setEditScheduleMonthlyDaysRaw(e.target.value)} />
-                </label>
-              ) : null}
+              <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "var(--va-navy)" }}>{t("residentDetail.editScheduleTitle")}</h3>
+              <NewScheduleFormFields
+                testIdPrefix="resident-schedule-edit"
+                frequency={editScheduleFrequency}
+                setFrequency={setEditScheduleFrequency}
+                time={editScheduleTime}
+                setTime={setEditScheduleTime}
+                active={editScheduleActive}
+                setActive={setEditScheduleActive}
+                weeklyDays={editScheduleWeeklyDays}
+                toggleWeeklyDay={(d) => toggleWeeklyDay(d, "edit")}
+                weeklyWeeks={editScheduleWeeklyWeeks}
+                setWeeklyWeeks={setEditScheduleWeeklyWeeks}
+                monthlyDaysRaw={editScheduleMonthlyDaysRaw}
+                setMonthlyDaysRaw={setEditScheduleMonthlyDaysRaw}
+              />
               {scheduleError ? <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-red-600)" }}>{scheduleError}</p> : null}
               {scheduleNotice ? (
                 <p data-testid="resident-schedule-notice" style={{ margin: 0, fontSize: "0.8rem", color: "var(--va-emerald-700)" }}>
@@ -884,10 +855,10 @@ export function ResidentDetailPage() {
               ) : null}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button type="button" data-testid="resident-schedule-save" className="va-btn-primary" onClick={() => void onSaveSchedule()} disabled={updatingSchedule}>
-                  {updatingSchedule ? "Saving..." : "Save"}
+                  {updatingSchedule ? t("residentDetail.saving") : t("residentDetail.save")}
                 </button>
                 <button type="button" data-testid="resident-schedule-cancel-edit" className="va-btn-secondary" onClick={() => setEditingScheduleId(null)}>
-                  Cancel
+                  {t("residentDetail.cancel")}
                 </button>
               </div>
             </div>
@@ -903,12 +874,18 @@ export function ResidentDetailPage() {
                   </div>
                   <div style={{ marginTop: 2, fontSize: "0.79rem", color: "var(--va-slate-500)" }}>
                     {primarySchedule.frequency === "weekly"
-                      ? `Days ${primarySchedule.intervals.map((i) => weekdayShortLabel(i.day)).join(", ")}`
+                      ? t("residentDetail.scheduleDaysWeekly", {
+                          days: primarySchedule.intervals.map((i) => weekdayShortLabel(i.day)).join(", "),
+                        })
                       : primarySchedule.frequency === "monthly"
-                        ? `Days ${primarySchedule.intervals.map((i) => i.day).join(", ")}`
-                        : "Every day"}
-                    {primarySchedule.nextCallDate ? ` · Next ${new Date(primarySchedule.nextCallDate).toLocaleString()}` : ""}
-                    {primarySchedule.isActive === false ? " · Inactive" : ""}
+                        ? t("residentDetail.scheduleDaysMonthly", {
+                            days: primarySchedule.intervals.map((i) => i.day).join(", "),
+                          })
+                        : t("residentDetail.everyDay")}
+                    {primarySchedule.nextCallDate
+                      ? t("residentDetail.nextCall", { when: new Date(primarySchedule.nextCallDate).toLocaleString() })
+                      : ""}
+                    {primarySchedule.isActive === false ? t("residentDetail.inactiveSuffix") : ""}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
@@ -918,7 +895,7 @@ export function ResidentDetailPage() {
                     data-testid={`resident-schedule-edit-${String(primarySchedule.id)}`}
                     onClick={() => startEditSchedule(String(primarySchedule.id))}
                   >
-                    Edit
+                    {t("residentDetail.editBtn")}
                   </button>
                   <button
                     type="button"
@@ -928,7 +905,7 @@ export function ResidentDetailPage() {
                     onClick={() => setScheduleDeleteConfirmId(String(primarySchedule.id))}
                     disabled={deletingSchedule}
                   >
-                    Delete
+                    {t("residentDetail.deleteBtn")}
                   </button>
                 </div>
               </div>
@@ -938,7 +915,7 @@ export function ResidentDetailPage() {
       ) : null}
 
       <div className="va-card va-card-pad">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem" }}>Resident Information</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.5rem" }}>{t("residentDetail.sectionInfo")}</h2>
         <div
           style={{
             display: "grid",
@@ -950,25 +927,25 @@ export function ResidentDetailPage() {
           <div>
             <InfoRow
               icon={<MessageIcon size={16} />}
-              label="Legal name"
+              label={t("residentDetail.legalName")}
               value={`${resident.firstName} ${resident.lastName}`.trim() || "—"}
             />
             <InfoRow
               icon={<MessageIcon size={16} />}
-              label="Preferred name"
+              label={t("residentDetail.preferredName")}
               value={apiClient.preferredName?.trim() || "—"}
             />
-            <InfoRow icon={<PhoneIcon size={16} />} label="Phone" value={resident.phone} />
-            <InfoRow icon={<MessageIcon size={16} />} label="Email" value={apiClient.email || "—"} />
+            <InfoRow icon={<PhoneIcon size={16} />} label={t("residentDetail.labelPhone")} value={resident.phone} />
+            <InfoRow icon={<MessageIcon size={16} />} label={t("residentDetail.labelEmail")} value={apiClient.email || "—"} />
             <InfoRow
               icon={<MessageIcon size={16} />}
-              label="Preferred language"
+              label={t("residentDetail.preferredLanguageLabel")}
               value={LANGUAGE_OPTIONS.find((o) => o.code === (apiClient.preferredLanguage || "en"))?.label || "English"}
             />
-            <InfoRow icon={<ClockIcon size={16} />} label="Move-in Date" value={resident.moveInDate} />
+            <InfoRow icon={<ClockIcon size={16} />} label={t("residentDetail.labelMoveIn")} value={resident.moveInDate} />
             <InfoRow
               icon={<MessageIcon size={16} />}
-              label="Emergency Contact"
+              label={t("residentDetail.labelEmergency")}
               value={
                 <>
                   {resident.emergencyContact.name} ({resident.emergencyContact.relationship})
@@ -983,7 +960,7 @@ export function ResidentDetailPage() {
                 </>
               }
             />
-            <InfoRow icon={<MessageIcon size={16} />} label="Notes" value={apiClient.notes || "—"} />
+            <InfoRow icon={<MessageIcon size={16} />} label={t("residentDetail.notes")} value={apiClient.notes || "—"} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "0.75rem 0", borderBottom: "1px solid var(--va-slate-100)" }}>
@@ -991,35 +968,35 @@ export function ResidentDetailPage() {
                 <CheckIcon size={16} />
               </span>
               <div>
-                <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500 }}>Consent Status</p>
+                <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500 }}>{t("residentDetail.consentStatus")}</p>
                 <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   {resident.consentOnFile ? (
                     <>
                       <span style={{ color: "var(--va-emerald-500)" }}>
                         <CheckIcon size={16} />
                       </span>
-                      <span style={{ color: "var(--va-emerald-700)" }}>On file</span>
+                      <span style={{ color: "var(--va-emerald-700)" }}>{t("residentDetail.onFile")}</span>
                       {apiClient.consentedAt ? (
                         <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>
                           · {formatConsentTimestamp(apiClient.consentedAt)}
                         </span>
                       ) : null}
                       <button type="button" className="va-link" style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }} onClick={() => setConsentOpen(true)}>
-                        View details
+                        {t("residentDetail.viewDetails")}
                       </button>
                     </>
                   ) : apiClient.consented === false ? (
                     <>
-                      <span style={{ color: "var(--va-red-600)" }}>Not on file</span>
+                      <span style={{ color: "var(--va-red-600)" }}>{t("residentDetail.consentNotOnFile")}</span>
                       <button type="button" className="va-link" style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }} onClick={() => setConsentOpen(true)}>
-                        View details
+                        {t("residentDetail.viewDetails")}
                       </button>
                     </>
                   ) : (
                     <>
-                      <span style={{ color: "var(--va-amber-700)" }}>Pending</span>
+                      <span style={{ color: "var(--va-amber-700)" }}>{t("residentDetail.consentPending")}</span>
                       <button type="button" className="va-link" style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }} onClick={() => setConsentOpen(true)}>
-                        View details
+                        {t("residentDetail.viewDetails")}
                       </button>
                     </>
                   )}
@@ -1028,17 +1005,17 @@ export function ResidentDetailPage() {
             </div>
             <InfoRow
               icon={<ClockIcon size={16} />}
-              label="Last Call"
+              label={t("residentDetail.labelLastCall")}
               value={
                 <>
-                  {resident.lastCallDate} at {resident.lastCallTime}{" "}
+                  {resident.lastCallDate} {t("residentDetail.at")} {resident.lastCallTime}{" "}
                   <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)" }}>
                     (
                     {resident.lastCallStatus === "completed"
-                      ? "Completed"
+                      ? t("residentDetail.lastCallCompleted")
                       : resident.lastCallStatus === "no_answer"
-                        ? "No answer"
-                        : "Declined"}
+                        ? t("residentDetail.lastCallNoAnswer")
+                        : t("residentDetail.lastCallDeclined")}
                     )
                   </span>
                 </>
@@ -1047,14 +1024,15 @@ export function ResidentDetailPage() {
             {(apiClient.latestOverallRiskScore != null || apiClient.sentimentTrendDirection) && (
               <InfoRow
                 icon={<MessageIcon size={16} />}
-                label="Scores"
+                label={t("residentDetail.labelScores")}
                 value={
                   <span style={{ fontSize: "0.875rem" }}>
-                    {apiClient.latestOverallRiskScore != null && <>Risk score: {apiClient.latestOverallRiskScore}</>}
+                    {apiClient.latestOverallRiskScore != null &&
+                      t("residentDetail.riskScore", { score: apiClient.latestOverallRiskScore })}
                     {apiClient.sentimentTrendDirection && (
                       <>
                         {apiClient.latestOverallRiskScore != null ? " · " : ""}
-                        Sentiment trend: {apiClient.sentimentTrendDirection}
+                        {t("residentDetail.sentimentTrend", { dir: apiClient.sentimentTrendDirection })}
                       </>
                     )}
                   </span>
@@ -1065,78 +1043,47 @@ export function ResidentDetailPage() {
         </div>
       </div>
         </>
-      ) : null}
+      </TabsContent>
 
-      {mainTab === "analysis" ? (
+      <TabsContent value="analysis">
         <div className="va-card va-card-pad">
+        <Tabs value={analysisTab} onValueChange={(value) => setAnalysisTab(value as AnalysisTab)}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Analysis</h2>
-          <div
-            data-testid="resident-analysis-tablist"
-            role="tablist"
-            aria-label="Resident analysis tabs"
-            style={{ display: "inline-flex", borderBottom: "1px solid var(--va-slate-200)", gap: 4 }}
-          >
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>{t("residentDetail.analysisTitle")}</h2>
+          <TabsList aria-label={t("residentDetail.analysisTabsAria")} data-testid="resident-analysis-tablist">
             {(
               [
-                { id: "sentiment" as const, label: "Sentiment" },
-                { id: "medical" as const, label: "Medical" },
-                { id: "security" as const, label: "Security" },
+                { id: "sentiment" as const, label: t("residentDetail.tabSentiment") },
+                { id: "medical" as const, label: t("residentDetail.tabMedical") },
+                { id: "security" as const, label: t("residentDetail.tabSecurity") },
               ] as const
-            ).map((tab) => {
-              const active = analysisTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-controls={`analysis-panel-${tab.id}`}
-                  id={`analysis-tab-${tab.id}`}
-                  className="va-btn-ghost"
-                  style={{
-                    border: "none",
-                    borderRadius: 0,
-                    background: "transparent",
-                    padding: "0.3rem 0.65rem 0.45rem",
-                    marginBottom: -1,
-                    fontSize: "0.84rem",
-                    fontWeight: active ? 700 : 500,
-                    color: active ? "var(--va-teal-700, #0f766e)" : "var(--va-slate-500)",
-                    borderBottom: active ? "2px solid var(--va-teal)" : "2px solid transparent",
-                  }}
-                  onClick={() => setAnalysisTab(tab.id)}
-                >
-                  {tab.label}
-                </button>
-              )
-            })}
-          </div>
+            ).map((tab) => (
+              <TabsTrigger key={tab.id} value={tab.id}>
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
         </div>
 
-        {analysisTab === "medical" ? (
-          <div role="tabpanel" id="analysis-panel-medical" aria-labelledby="analysis-tab-medical">
+        <TabsContent value="medical">
             <MedicalAnalysisReportPanel
               summary={medicalSummary}
               latestResult={medicalResults?.results?.[0]}
               isLoading={medicalSummaryLoading || medicalResultsLoading}
               isError={medicalSummaryError || medicalResultsError}
             />
-          </div>
-        ) : analysisTab === "sentiment" ? (
-          <div role="tabpanel" id="analysis-panel-sentiment" aria-labelledby="analysis-tab-sentiment">
+        </TabsContent>
+        <TabsContent value="sentiment">
             <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginTop: "0.6rem", marginBottom: "1rem", lineHeight: 1.45 }}>
-              Same timescales as the mobile app — powered by{" "}
-              <code style={{ fontSize: "0.7rem" }}>/sentiment/client/:id/trend</code> and{" "}
-              <code style={{ fontSize: "0.7rem" }}>/summary</code>.
+              {t("residentDetail.sentimentApiNote")}
             </p>
 
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: "1rem" }}>
               {(
                 [
-                  { id: "lastCall" as const, label: "Last call" },
-                  { id: "month" as const, label: "Past month" },
-                  { id: "lifetime" as const, label: "Lifetime" },
+                  { id: "lastCall" as const, label: t("residentDetail.tabLastCall") },
+                  { id: "month" as const, label: t("residentDetail.tabMonth") },
+                  { id: "lifetime" as const, label: t("residentDetail.tabLifetime") },
                 ] as const
               ).map((tab) => (
                 <button
@@ -1157,13 +1104,11 @@ export function ResidentDetailPage() {
             </div>
 
             {(sentimentTrendLoading || sentimentSummaryLoading) && (
-              <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading sentiment…</p>
+              <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("residentDetail.loadingSentiment")}</p>
             )}
 
             {(sentimentTrendError || sentimentSummaryError) && !sentimentTrendLoading && !sentimentSummaryLoading && (
-              <p style={{ color: "var(--va-red-600)", fontSize: "0.875rem" }}>
-                Could not load sentiment for this resident.
-              </p>
+              <p style={{ color: "var(--va-red-600)", fontSize: "0.875rem" }}>{t("residentDetail.sentimentLoadError")}</p>
             )}
 
             {!sentimentTrendLoading &&
@@ -1181,7 +1126,7 @@ export function ResidentDetailPage() {
                       {sentimentSummary.recentTrend && sentimentSummary.recentTrend.length > 0 && (
                         <div style={{ marginTop: "1rem" }}>
                           <h3 style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-slate-600)", marginBottom: 8 }}>
-                            Recent analyzed calls
+                            {t("residentDetail.recentAnalyzed")}
                           </h3>
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                             {sentimentSummary.recentTrend.slice(0, 8).map((pt) => (
@@ -1193,32 +1138,34 @@ export function ResidentDetailPage() {
                       <div style={{ marginTop: "1.25rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
                           <h3 style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-slate-600)", margin: 0 }}>
-                            Sentiment trend ({sentimentTrend.timeRange})
+                            {t("residentDetail.sentimentTrendTitle", { range: sentimentTrend.timeRange })}
                           </h3>
                           <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-                            Avg {sentimentTrend.summary.averageSentiment >= 0 ? "+" : ""}
+                            {t("residentDetail.avg")} {sentimentTrend.summary.averageSentiment >= 0 ? "+" : ""}
                             {sentimentTrend.summary.averageSentiment.toFixed(2)} ·{" "}
                             <span style={trendDirectionStyle(sentimentTrend.summary.trendDirection)}>
                               {trendDirectionIcon(sentimentTrend.summary.trendDirection)}{" "}
                               {sentimentTrend.summary.trendDirection}
                             </span>
                             {sentimentTrend.summary.confidence < 0.5 && (
-                              <span style={{ color: "var(--va-amber-700)", marginLeft: 6 }}>Low confidence</span>
+                              <span style={{ color: "var(--va-amber-700)", marginLeft: 6 }}>{t("residentDetail.lowConfidence")}</span>
                             )}
                           </span>
                         </div>
                         {sentimentChartData.length === 0 ? (
                           <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 12 }}>
                             {(sentimentTrend.analyzedConversations ?? 0) > 0
-                              ? "Not enough scored conversations in this range to draw a trend line."
-                              : "No sentiment analysis yet for conversations in this range."}
+                              ? t("residentDetail.trendNotEnough")
+                              : t("residentDetail.trendNone")}
                           </p>
                         ) : sentimentChartData.length < 2 ? (
-                          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 12 }}>
-                            At least two analyzed calls are needed to show a trend line.
-                          </p>
+                          <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 12 }}>{t("residentDetail.trendNeedTwo")}</p>
                         ) : (
-                          <div style={{ height: 220, marginTop: 12 }}>
+                          <ChartFigure
+                            title={t("residentDetail.sentimentTrendTitle", { range: sentimentTrend.timeRange })}
+                            summary={t("residentDetail.sentimentChartSummary", { items: sentimentChartSummary })}
+                            chartStyle={{ height: 220, marginTop: 12 }}
+                          >
                             <ResponsiveContainer width="100%" height="100%">
                               <LineChart data={sentimentChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -1226,12 +1173,12 @@ export function ResidentDetailPage() {
                                 <YAxis domain={[-1, 1]} tick={{ fontSize: 10, fill: "#94a3b8" }} width={32} />
                                 <Tooltip
                                   contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                                  formatter={(v: number) => [`${v >= 0 ? "+" : ""}${v.toFixed(2)}`, "Sentiment"]}
+                                  formatter={(v: number) => [`${v >= 0 ? "+" : ""}${v.toFixed(2)}`, t("residentDetail.chartSentiment")]}
                                 />
                                 <Line
                                   type="monotone"
                                   dataKey="score"
-                                  name="Sentiment"
+                                  name={t("residentDetail.chartSentiment")}
                                   stroke="#2563eb"
                                   strokeWidth={2}
                                   dot={{ r: 3, fill: "#2563eb" }}
@@ -1239,7 +1186,7 @@ export function ResidentDetailPage() {
                                 />
                               </LineChart>
                             </ResponsiveContainer>
-                          </div>
+                          </ChartFigure>
                         )}
                         {sentimentTrend.summary.keyInsights && sentimentTrend.summary.keyInsights.length > 0 && (
                           <div
@@ -1252,7 +1199,7 @@ export function ResidentDetailPage() {
                               color: "var(--va-slate-700)",
                             }}
                           >
-                            <p style={{ fontWeight: 600, marginBottom: 8 }}>Key insights</p>
+                            <p style={{ fontWeight: 600, marginBottom: 8 }}>{t("residentDetail.keyInsights")}</p>
                             <ul style={{ margin: 0, paddingLeft: "1.1rem" }}>
                               {sentimentTrend.summary.keyInsights.map((line) => (
                                 <li key={line} style={{ marginBottom: 4 }}>
@@ -1280,31 +1227,28 @@ export function ResidentDetailPage() {
                   color: "var(--va-red-700)",
                 }}
               >
-                Resident is flagged at risk — review conversations and alerts.
+                {t("residentDetail.atRiskBanner")}
               </div>
             )}
-          </div>
-        ) : (
-          <div role="tabpanel" id="analysis-panel-security" aria-labelledby="analysis-tab-security" style={{ marginTop: "0.8rem", display: "grid", gap: "0.85rem" }}>
+        </TabsContent>
+        <TabsContent value="security" style={{ marginTop: "0.8rem", display: "grid", gap: "0.85rem" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
-              <AnalysisStat label="Open alerts" value={String(unresolvedResidentAlerts.length)} tone={unresolvedResidentAlerts.length > 0 ? "warn" : "ok"} />
-              <AnalysisStat label="High/Urgent" value={String(criticalResidentAlerts.length)} tone={criticalResidentAlerts.length > 0 ? "danger" : "ok"} />
-              <AnalysisStat label="Traceable lines" value={String(traceabilityAlerts.length)} tone={traceabilityAlerts.length > 0 ? "warn" : "neutral"} />
-              <AnalysisStat label="Total alerts" value={String(residentAlerts.length)} tone="neutral" />
+              <AnalysisStat label={t("residentDetail.openAlerts")} value={String(unresolvedResidentAlerts.length)} tone={unresolvedResidentAlerts.length > 0 ? "warn" : "ok"} />
+              <AnalysisStat label={t("residentDetail.highUrgent")} value={String(criticalResidentAlerts.length)} tone={criticalResidentAlerts.length > 0 ? "danger" : "ok"} />
+              <AnalysisStat label={t("residentDetail.traceableLines")} value={String(traceabilityAlerts.length)} tone={traceabilityAlerts.length > 0 ? "warn" : "neutral"} />
+              <AnalysisStat label={t("residentDetail.totalAlerts")} value={String(residentAlerts.length)} tone="neutral" />
             </div>
             {unresolvedResidentAlerts.length === 0 ? (
-              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-                No open security alerts for this resident.
-              </p>
+              <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-500)" }}>{t("residentDetail.noSecurityAlerts")}</p>
             ) : (
               <div>
                 <h3 style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-slate-600)", marginBottom: 8 }}>
-                  Open alerts
+                  {t("residentDetail.openAlertsTitle")}
                 </h3>
                 <div style={{ display: "grid", gap: 8 }}>
                   {unresolvedResidentAlerts.slice(0, 6).map((a) => {
                     const id = apiRecordId(a as { id?: string; _id?: string })
-                    const label = a.message || "Alert"
+                    const label = a.message || t("residentDetail.defaultAlertLabel")
                     return (
                       <div
                         key={id || label}
@@ -1318,7 +1262,7 @@ export function ResidentDetailPage() {
                         <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>{label}</p>
                         {id ? (
                           <Link to={`/alerts/${id}`} className="va-link" style={{ fontSize: "0.75rem" }}>
-                            View alert
+                            {t("residentDetail.viewAlert")}
                           </Link>
                         ) : null}
                       </div>
@@ -1331,18 +1275,18 @@ export function ResidentDetailPage() {
             <div style={{ marginTop: "0.35rem" }}>
               {clientIdForApi ? <FraudAbuseAnalysisPanel clientId={clientIdForApi} /> : null}
             </div>
-          </div>
-        )}
+        </TabsContent>
+        </Tabs>
       </div>
-      ) : null}
+      </TabsContent>
 
-      {mainTab === "conversations" ? (
+      <TabsContent value="conversations">
         <div className="va-card va-card-pad">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>Recent Conversations</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "1rem" }}>{t("residentDetail.recentConversations")}</h2>
         {convLoading ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading…</p>
+          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("residentDetail.loadingShort")}</p>
         ) : conversationRows.length === 0 ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>No conversations yet.</p>
+          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("residentDetail.noConversations")}</p>
         ) : (
           <div>
             {conversationRows.map((c) => {
@@ -1394,7 +1338,7 @@ export function ResidentDetailPage() {
                         <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>{c.outcomeLabel}</span>
                       </span>
                       <span style={{ display: "block", fontSize: "0.875rem", marginTop: 4, color: "var(--va-slate-600)" }}>
-                        {c.messageCount > 0 ? `${c.messageCount} messages` : "No transcript messages available"}
+                        {c.messageCount > 0 ? t("residentDetail.messagesCount", { count: c.messageCount }) : t("residentDetail.noTranscriptMessages")}
                       </span>
                     </span>
                   </button>
@@ -1402,12 +1346,12 @@ export function ResidentDetailPage() {
                     <div style={{ padding: "0 0 0.75rem 1.75rem", display: "flex", flexDirection: "column", gap: 8 }}>
                       {c.messages.length === 0 ? (
                         <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>
-                          Transcript unavailable for this conversation.
+                          {t("residentDetail.transcriptUnavailable")}
                         </p>
                       ) : (
                         c.messages.map((m, idx) => {
                           const fromClient = m.role === "client"
-                          const senderLabel = fromClient ? displayName || "Patient" : "Bianca"
+                          const senderLabel = fromClient ? displayName || t("residentDetail.patientLabel") : t("residentDetail.biancaLabel")
                           const messageId = String((m as { id?: string; _id?: string }).id ?? (m as { _id?: string })._id ?? "")
                           const matchedAlert = traceabilityAlerts.find((a) => {
                             if (!a.conversationId || a.conversationId !== c.id) return false
@@ -1461,7 +1405,7 @@ export function ResidentDetailPage() {
                                     className="va-link"
                                     style={{ fontSize: "0.75rem", color: "var(--va-red-700)", textDecorationColor: "var(--va-red-300)" }}
                                   >
-                                    Linked alert
+                                    {t("residentDetail.linkedAlert")}
                                   </Link>
                                 </div>
                               ) : null}
@@ -1477,7 +1421,7 @@ export function ResidentDetailPage() {
             {clientAlert && alertLinkId ? (
               <p style={{ marginTop: 12 }}>
                 <Link to={`/alerts/${alertLinkId}`} className="va-link" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  View related alert
+                  {t("residentDetail.viewRelatedAlert")}
                   <span style={{ display: "inline-block", transform: "rotate(180deg)" }}>
                     <ChevronLeftIcon size={12} />
                   </span>
@@ -1487,29 +1431,30 @@ export function ResidentDetailPage() {
           </div>
         )}
       </div>
-      ) : null}
+      </TabsContent>
+      </Tabs>
 
-      {consentOpen && (
+      {consentOpen && apiClient ? (
         <ConsentModal client={apiClient} displayName={displayName} onClose={() => setConsentOpen(false)} />
-      )}
+      ) : null}
 
       <ConfirmModal
         open={confirmDeleteResidentOpen}
-        title={`Delete ${displayName || "this resident"}?`}
+        title={t("residentDetail.deleteResidentTitle", { name: displayName || "this resident" })}
         onClose={() => setConfirmDeleteResidentOpen(false)}
         onConfirm={() => void performDeleteResident()}
-        confirmLabel={deletingResident ? "Deleting..." : "Delete"}
+        confirmLabel={deletingResident ? t("residentDetail.deleting") : t("residentDetail.deleteBtn")}
         confirmDisabled={deletingResident}
       >
-        <p style={{ margin: 0 }}>This cannot be undone.</p>
+        <p style={{ margin: 0 }}>{t("residentDetail.deleteResidentBody")}</p>
       </ConfirmModal>
 
       <ConfirmModal
         open={scheduleDeleteConfirmId !== null}
-        title="Delete this schedule?"
+        title={t("residentDetail.deleteScheduleTitle")}
         onClose={() => setScheduleDeleteConfirmId(null)}
         onConfirm={() => (scheduleDeleteConfirmId ? void performDeleteSchedule(scheduleDeleteConfirmId) : undefined)}
-        confirmLabel={deletingSchedule ? "Deleting..." : "Delete"}
+        confirmLabel={deletingSchedule ? t("residentDetail.deleting") : t("residentDetail.deleteBtn")}
         confirmDisabled={deletingSchedule}
       />
 
@@ -1542,7 +1487,19 @@ function trendDirectionStyle(dir: string): CSSProperties {
 }
 
 function SentimentSummaryStrip({ summary }: { summary: SentimentSummary }) {
+  const { t } = useTranslation()
   const dist = summary.sentimentDistribution || {}
+  const distLabels: Record<string, string> = {
+    positive: t("alertDetail.sentimentPositive"),
+    neutral: t("alertDetail.sentimentNeutral"),
+    negative: t("residentDetail.sentimentNegative"),
+    mixed: t("residentDetail.sentimentMixed"),
+  }
+  const trendLabels: Record<string, string> = {
+    improving: t("residentDetail.trendImproving"),
+    declining: t("residentDetail.trendDeclining"),
+    stable: t("residentDetail.trendStable"),
+  }
   const parts = (["positive", "neutral", "negative", "mixed"] as const)
     .map((k) => ({ k, n: dist[k] ?? 0 }))
     .filter((x) => x.n > 0)
@@ -1557,16 +1514,16 @@ function SentimentSummaryStrip({ summary }: { summary: SentimentSummary }) {
       }}
     >
       <div>
-        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Analyzed
+        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-500)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {t("residentDetail.stripAnalyzed")}
         </p>
         <p style={{ fontSize: "1rem", fontWeight: 600, marginTop: 4 }}>
           {summary.analyzedConversations} / {summary.totalConversations}
         </p>
       </div>
       <div>
-        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Average
+        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-500)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {t("residentDetail.stripAverage")}
         </p>
         <p style={{ fontSize: "1rem", fontWeight: 600, marginTop: 4 }}>
           {summary.averageSentiment >= 0 ? "+" : ""}
@@ -1574,23 +1531,23 @@ function SentimentSummaryStrip({ summary }: { summary: SentimentSummary }) {
         </p>
       </div>
       <div>
-        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Direction
+        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-500)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {t("residentDetail.stripDirection")}
         </p>
         <p style={{ fontSize: "1rem", fontWeight: 600, marginTop: 4, ...trendDirectionStyle(summary.trendDirection) }}>
-          {trendDirectionIcon(summary.trendDirection)} {summary.trendDirection}
+          {trendDirectionIcon(summary.trendDirection)} {trendLabels[summary.trendDirection] ?? summary.trendDirection}
         </p>
       </div>
       <div>
-        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Confidence
+        <p style={{ fontSize: "0.65rem", color: "var(--va-slate-500)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {t("residentDetail.stripConfidence")}
         </p>
         <p style={{ fontSize: "1rem", fontWeight: 600, marginTop: 4 }}>{Math.round(summary.confidence * 100)}%</p>
       </div>
       {parts.length > 0 && (
         <div style={{ gridColumn: "1 / -1" }}>
-          <p style={{ fontSize: "0.65rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
-            Distribution
+          <p style={{ fontSize: "0.65rem", color: "var(--va-slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+            {t("residentDetail.stripDistribution")}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {parts.map(({ k, n }) => (
@@ -1604,7 +1561,7 @@ function SentimentSummaryStrip({ summary }: { summary: SentimentSummary }) {
                   color: "var(--va-slate-700)",
                 }}
               >
-                {k}: {n}
+                {t("residentDetail.distChip", { label: distLabels[k] ?? k, count: n })}
               </span>
             ))}
           </div>
@@ -1621,10 +1578,11 @@ function sentimentScoreStyles(score: number): { fg: string; bg: string } {
 }
 
 function SentimentRecentChip({ point }: { point: SentimentTrendPoint }) {
+  const { t } = useTranslation()
   const s = point.sentiment
-  const t = point.date ? new Date(point.date) : null
+  const tDate = point.date ? new Date(point.date) : null
   const dateStr =
-    t && !Number.isNaN(t.getTime()) ? t.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "—"
+    tDate && !Number.isNaN(tDate.getTime()) ? tDate.toLocaleDateString(undefined, { month: "short", day: "numeric" }) : t("common.emDash")
   if (!s) {
     return (
       <span
@@ -1636,7 +1594,7 @@ function SentimentRecentChip({ point }: { point: SentimentTrendPoint }) {
           color: "var(--va-slate-500)",
         }}
       >
-        {dateStr} — pending
+        {t("residentDetail.chipPending", { date: dateStr })}
       </span>
     )
   }
@@ -1665,13 +1623,12 @@ function SentimentLastCallPanel({
   point?: SentimentTrendPoint
   formatDuration: (sec?: number | null) => string
 }) {
+  const { t } = useTranslation()
   if (!point?.sentiment) {
     return (
       <div style={{ padding: "1rem 0", fontSize: "0.875rem", color: "var(--va-slate-500)" }}>
-        <p style={{ fontWeight: 600, color: "var(--va-slate-700)", marginBottom: 8 }}>Last call</p>
-        <p>
-          No analyzed sentiment for the most recent call yet, or there are no qualifying conversations in the summary.
-        </p>
+        <p style={{ fontWeight: 600, color: "var(--va-slate-700)", marginBottom: 8 }}>{t("residentDetail.lastCallHeading")}</p>
+        <p>{t("residentDetail.lastCallEmpty")}</p>
       </div>
     )
   }
@@ -1680,18 +1637,19 @@ function SentimentLastCallPanel({
   const callDate = point.date ? new Date(point.date) : null
   return (
     <div>
-      <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-slate-700)", marginBottom: 12 }}>Last call</p>
+      <p style={{ fontSize: "0.8125rem", fontWeight: 600, color: "var(--va-slate-700)", marginBottom: 12 }}>{t("residentDetail.lastCallHeading")}</p>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 12, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
         <span>
           {callDate && !Number.isNaN(callDate.getTime())
             ? callDate.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
-            : "—"}
+            : t("common.emDash")}
         </span>
-        <span>Duration {formatDuration(point.duration)}</span>
+        <span>{t("residentDetail.duration", { duration: formatDuration(point.duration) })}</span>
         {point.sentimentAnalyzedAt && (
-          <span style={{ color: "var(--va-slate-400)" }}>
-            Analyzed{" "}
-            {new Date(point.sentimentAnalyzedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+          <span style={{ color: "var(--va-slate-500)" }}>
+            {t("residentDetail.analyzed", {
+              date: new Date(point.sentimentAnalyzedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+            })}
           </span>
         )}
       </div>
@@ -1718,32 +1676,33 @@ function SentimentLastCallPanel({
             {s.overallSentiment}
           </span>
           <span style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--va-navy)" }}>
-            Score {s.sentimentScore >= 0 ? "+" : ""}
-            {s.sentimentScore.toFixed(2)}
+            {t("residentDetail.score", {
+              score: `${s.sentimentScore >= 0 ? "+" : ""}${s.sentimentScore.toFixed(2)}`,
+            })}
           </span>
           <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-            Confidence {Math.round(s.confidence * 100)}%
+            {t("residentDetail.confidencePct", { pct: Math.round(s.confidence * 100) })}
           </span>
         </div>
         {s.clientMood && (
           <p style={{ fontSize: "0.875rem", marginBottom: 6 }}>
-            <strong>Mood:</strong> {s.clientMood}
+            <strong>{t("residentDetail.mood")}</strong> {s.clientMood}
           </p>
         )}
         {s.concernLevel && (
           <p style={{ fontSize: "0.875rem", marginBottom: 6 }}>
-            <strong>Concern:</strong> {s.concernLevel}
+            <strong>{t("residentDetail.concern")}</strong> {s.concernLevel}
           </p>
         )}
         {s.keyEmotions && s.keyEmotions.length > 0 && (
           <p style={{ fontSize: "0.875rem", marginBottom: 6 }}>
-            <strong>Emotions:</strong> {s.keyEmotions.join(", ")}
+            <strong>{t("residentDetail.emotions")}</strong> {s.keyEmotions.join(", ")}
           </p>
         )}
         {s.summary && <p style={{ fontSize: "0.875rem", lineHeight: 1.5, color: "var(--va-slate-700)" }}>{s.summary}</p>}
         {s.recommendations && (
           <p style={{ fontSize: "0.8125rem", lineHeight: 1.5, color: "var(--va-slate-600)", marginTop: 8 }}>
-            <strong>Recommendations:</strong> {s.recommendations}
+            <strong>{t("residentDetail.recommendations")}</strong> {s.recommendations}
           </p>
         )}
       </div>
@@ -1777,10 +1736,11 @@ function AnalysisStat({
 
 
 function StatusPill({ status }: { status: "active" | "inactive" | "at_risk" }) {
+  const { t } = useTranslation()
   const map = {
-    active: { bg: "var(--va-emerald-100)", fg: "var(--va-emerald-700)", label: "Active" },
-    inactive: { bg: "var(--va-slate-100)", fg: "var(--va-slate-600)", label: "Inactive" },
-    at_risk: { bg: "var(--va-red-100)", fg: "var(--va-red-700)", label: "At Risk" },
+    active: { bg: "var(--va-emerald-100)", fg: "var(--va-emerald-700)", label: t("residents.statusActive") },
+    inactive: { bg: "var(--va-slate-100)", fg: "var(--va-slate-600)", label: t("residents.statusInactive") },
+    at_risk: { bg: "var(--va-red-100)", fg: "var(--va-red-700)", label: t("residents.statusAtRisk") },
   }
   const s = map[status]
   return (
@@ -1811,8 +1771,13 @@ function InfoRow({
 }
 
 function ConsentModal({ client, displayName, onClose }: { client: Client; displayName: string; onClose: () => void }) {
+  const { t } = useTranslation()
   const statusLabel =
-    client.consented === true ? "On file" : client.consented === false ? "Not on file" : "Pending"
+    client.consented === true
+      ? t("residentDetail.onFile")
+      : client.consented === false
+        ? t("residentDetail.consentNotOnFile")
+        : t("residentDetail.consentPending")
   const statusColor =
     client.consented === true
       ? "var(--va-emerald-700)"
@@ -1821,59 +1786,53 @@ function ConsentModal({ client, displayName, onClose }: { client: Client; displa
         : "var(--va-amber-700)"
 
   return (
-    <div className="va-modal-backdrop" role="dialog" aria-modal onClick={onClose}>
-      <div className="va-modal" onClick={(e) => e.stopPropagation()}>
-        <div style={{ padding: "1.25rem 2rem", borderBottom: "1px solid var(--va-slate-200)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+    <Modal
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+      title={t("residentDetail.consentModalTitle")}
+      subtitle={t("residentDetail.consentModalSubtitle")}
+      wide
+      closeLabel={t("residentDetail.close")}
+      footer={
+        <Button variant="primary" onClick={onClose} style={{ background: "var(--va-navy)" }}>
+          {t("residentDetail.close")}
+        </Button>
+      }
+    >
+      <div style={{ background: "var(--va-slate-50)", borderRadius: 12, padding: "1rem", marginBottom: "1.25rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <h2 style={{ fontSize: "1.125rem", fontWeight: 600 }}>Client consent</h2>
-            <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", marginTop: 4 }}>
-              Status from Bianca (same field as email consent flow). Signed PDF storage is not attached yet.
-            </p>
+            <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>{t("residentDetail.consentResidentLabel")}</span>
+            <p style={{ fontWeight: 600, color: "var(--va-slate-700)", margin: "0.25rem 0 0" }}>{displayName}</p>
           </div>
-          <button type="button" className="va-icon-btn" aria-label="Close" onClick={onClose} style={{ color: "var(--va-slate-400)" }}>
-            ×
-          </button>
-        </div>
-        <div style={{ padding: "1.5rem 2rem", fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6 }}>
-          <div style={{ background: "var(--va-slate-50)", borderRadius: 12, padding: "1rem", marginBottom: "1.25rem" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Resident</span>
-                <p style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{displayName}</p>
-              </div>
-              <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Status</span>
-                <p style={{ fontWeight: 600, color: statusColor }}>{statusLabel}</p>
-              </div>
-              <div>
-                <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Recorded</span>
-                <p style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{formatConsentTimestamp(client.consentedAt)}</p>
-              </div>
-              {client.consentEmailVersion ? (
-                <div>
-                  <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>Email version</span>
-                  <p style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{client.consentEmailVersion}</p>
-                </div>
-              ) : null}
+          <div>
+            <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>{t("residentDetail.consentStatusLabel")}</span>
+            <p style={{ fontWeight: 600, color: statusColor, margin: "0.25rem 0 0" }}>{statusLabel}</p>
+          </div>
+          <div>
+            <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>{t("residentDetail.consentRecorded")}</span>
+            <p style={{ fontWeight: 600, color: "var(--va-slate-700)", margin: "0.25rem 0 0" }}>{formatConsentTimestamp(client.consentedAt)}</p>
+          </div>
+          {client.consentEmailVersion ? (
+            <div>
+              <span style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase" }}>{t("residentDetail.consentEmailVersion")}</span>
+              <p style={{ fontWeight: 600, color: "var(--va-slate-700)", margin: "0.25rem 0 0" }}>{client.consentEmailVersion}</p>
             </div>
-          </div>
-          <p style={{ fontWeight: 600, marginBottom: 8 }}>Program scope (summary of what consent covers):</p>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {CONSENT_BULLETS.map((b) => (
-              <li key={b} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-                <span style={{ color: "var(--va-teal)", flexShrink: 0 }}>✓</span>
-                <span>{b}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div style={{ padding: "1rem 2rem", borderTop: "1px solid var(--va-slate-200)", background: "var(--va-slate-50)", borderRadius: "0 0 1rem 1rem", display: "flex", justifyContent: "flex-end" }}>
-          <button type="button" className="va-btn-primary" style={{ background: "var(--va-navy)" }} onClick={onClose}>
-            Close
-          </button>
+          ) : null}
         </div>
       </div>
-    </div>
+      <p style={{ fontWeight: 600, marginBottom: 8 }}>{t("residentDetail.consentProgramScope")}</p>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <li key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+            <span style={{ color: "var(--va-teal)", flexShrink: 0 }}>✓</span>
+            <span>{t(`residentDetail.consentBullet${i}`)}</span>
+          </li>
+        ))}
+      </ul>
+    </Modal>
   )
 }
 

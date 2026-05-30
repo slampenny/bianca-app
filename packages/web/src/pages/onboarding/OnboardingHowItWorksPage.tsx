@@ -1,12 +1,13 @@
+import { useTranslation } from "react-i18next"
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom"
 import { AuthPageShell } from "../../auth/AuthPageShell"
-import { onboardingCopy } from "../../lib/onboardingCopy"
 import type { OnboardingHowItWorksState } from "../../lib/onboardingTypes"
 import { isAuthenticated } from "../../store/authSlice"
 import { useAppSelector } from "../../store/store"
 import "../../app.css"
 
 export function OnboardingHowItWorksPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const authed = useAppSelector(isAuthenticated)
@@ -17,10 +18,8 @@ export function OnboardingHowItWorksPage() {
     return <Navigate to="/onboarding" replace />
   }
 
-  const { title, next, getStarted, byPersona } = onboardingCopy.howItWorks
-  const body = byPersona[persona]
   const isAgingInPlace = persona === "agingInPlace"
-  const buttonLabel = isAgingInPlace ? getStarted : next
+  const buttonLabel = isAgingInPlace ? t("onboarding.howItWorks.getStarted") : t("onboarding.howItWorks.next")
 
   const handleContinue = () => {
     if (persona === "organization") {
@@ -31,14 +30,14 @@ export function OnboardingHowItWorksPage() {
   }
 
   return (
-    <AuthPageShell title={title} wide>
+    <AuthPageShell title={t("onboarding.howItWorks.title")} wide>
       <div className="va-onboarding-back">
         <button type="button" className="va-btn-ghost" onClick={() => navigate(-1)}>
-          ← Back
+          {t("onboarding.registration.back")}
         </button>
       </div>
 
-      <p className="va-onboarding-body">{body}</p>
+      <p className="va-onboarding-body">{t(`onboarding.howItWorks.${persona}`)}</p>
 
       <div style={{ marginTop: "2.25rem" }}>
         <button type="button" className="va-btn-primary va-login-submit" data-testid="onboarding-how-it-works-continue" onClick={handleContinue}>
@@ -47,7 +46,7 @@ export function OnboardingHowItWorksPage() {
       </div>
 
       <div className="va-auth-footer" style={{ marginTop: "1.25rem" }}>
-        <Link to="/login">Sign in</Link>
+        <Link to="/login">{t("onboarding.signInLink")}</Link>
       </div>
     </AuthPageShell>
   )

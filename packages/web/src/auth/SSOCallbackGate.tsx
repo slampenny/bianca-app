@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react"
+import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
 import type { AuthTokens, Caregiver, Org } from "../services/api/api.types"
@@ -17,6 +18,7 @@ import { useAppDispatch } from "../store/store"
  * before showing the router tree (avoids a flash of the login screen when already signed in).
  */
 export function SSOCallbackGate({ children }: { children: ReactNode }) {
+  const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
   const [status, setStatus] = useState<"completing" | "done">(() =>
@@ -68,7 +70,7 @@ export function SSOCallbackGate({ children }: { children: ReactNode }) {
     return (
       <div className="va-login">
         <div className="va-login-card" style={{ textAlign: "center" }}>
-          <p className="va-login-tagline">Signing you in…</p>
+          <p className="va-login-tagline">{t("sso.signingIn")}</p>
         </div>
       </div>
     )

@@ -1,5 +1,6 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
 import { RiskSentimentReportLive } from "../components/RiskSentimentReportLive"
 import { ReportDocumentBody } from "../components/ReportDocumentBody"
@@ -38,6 +39,7 @@ function liveFilenameBase(id: ReportTemplateId): string {
 }
 
 export function ReportTemplateDetailPage() {
+  const { t } = useTranslation()
   const { templateId } = useParams<{ templateId: string }>()
   const navigate = useNavigate()
   const authed = useAppSelector(isAuthenticated)
@@ -138,7 +140,7 @@ export function ReportTemplateDetailPage() {
     if (!loadLiveClients) return null
     if (isLoading || isFetching || !pages) return null
     const opts = {
-      facilityLine: org?.name?.trim() || "Your organization",
+      facilityLine: org?.name?.trim() || t("reportDetail.defaultOrgName"),
       generatedAtLabel: new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
     }
     if (validId === "consent_roster") return buildConsentRosterReportPayload(pages.results, opts)
@@ -148,7 +150,7 @@ export function ReportTemplateDetailPage() {
   const callLogPayload = useMemo((): ReportPayload | null => {
     if (!callLogData || validId !== "call_log") return null
     return buildCallCompletionReportPayload(callLogData, {
-      facilityLine: org?.name?.trim() || "Your organization",
+      facilityLine: org?.name?.trim() || t("reportDetail.defaultOrgName"),
       generatedAtLabel: new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
       scopeFacilityWide: seesWholeFacilityInReports(currentUser?.role),
     })
@@ -157,7 +159,7 @@ export function ReportTemplateDetailPage() {
   const alertAuditPayload = useMemo((): ReportPayload | null => {
     if (!alertAuditData || validId !== "alert_audit") return null
     return buildAlertAuditReportPayload(alertAuditData, {
-      facilityLine: org?.name?.trim() || "Your organization",
+      facilityLine: org?.name?.trim() || t("reportDetail.defaultOrgName"),
       generatedAtLabel: new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
       scopeFacilityWide: seesWholeFacilityInReports(currentUser?.role),
     })
@@ -185,7 +187,7 @@ export function ReportTemplateDetailPage() {
   const showAlertAuditLoading =
     wantsLiveAlertAudit && !alertAuditOrgMissing && !alertAuditError && (alertAuditLoading || alertAuditFetching)
 
-  const facilityLine = org?.name?.trim() || "Your organization"
+  const facilityLine = org?.name?.trim() || t("reportDetail.defaultOrgName")
   const generatedAtLabel = new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
 
   const showRiskSentimentLive = validId === "risk_sentiment" && loadLiveClients && authed && !isError && !showLiveLoading
@@ -194,41 +196,30 @@ export function ReportTemplateDetailPage() {
     <div data-testid="report-detail-page" style={{ display: "flex", flexDirection: "column", gap: "1.25rem", maxWidth: 900, margin: "0 auto", paddingBottom: 48 }}>
       <button type="button" className="va-btn-ghost va-no-print" data-testid="report-detail-back" onClick={() => navigate("/reports")}>
         <ChevronLeftIcon size={16} />
-        Back to Reports
+        {t("reportDetail.backToReports")}
       </button>
 
       {showSampleBanner ? (
         <p className="va-no-print" style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)" }}>
-          Illustrative sample data. Sign in to generate this report from your live roster (same sources as the Residents
-          list).
+          {t("reportDetail.sampleBanner")}
         </p>
       ) : null}
 
       <div className="va-card va-card-pad">
         {showCallLogOrgHint ? (
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>
-            Choose an organization context to load the call completion log (super admin).
-          </p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("reportDetail.callLogOrgHint")}</p>
         ) : showCallLogError ? (
-          <p style={{ margin: 0, color: "var(--va-red-600)" }}>
-            Could not load call completion data. Check your connection and try again.
-          </p>
+          <p style={{ margin: 0, color: "var(--va-red-600)" }}>{t("reportDetail.callLogLoadError")}</p>
         ) : showCallLogLoading ? (
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>Loading call log…</p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("reportDetail.callLogLoading")}</p>
         ) : showAlertAuditOrgHint ? (
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>
-            Choose an organization context to load the alert audit trail (super admin).
-          </p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("reportDetail.alertAuditOrgHint")}</p>
         ) : showAlertAuditError ? (
-          <p style={{ margin: 0, color: "var(--va-red-600)" }}>
-            Could not load alert audit data. Check your connection and try again.
-          </p>
+          <p style={{ margin: 0, color: "var(--va-red-600)" }}>{t("reportDetail.alertAuditLoadError")}</p>
         ) : showAlertAuditLoading ? (
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>Loading alert audit…</p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("reportDetail.alertAuditLoading")}</p>
         ) : showLiveError ? (
-          <p style={{ margin: 0, color: "var(--va-red-600)" }}>
-            Could not load clients. Check your connection and try again.
-          </p>
+          <p style={{ margin: 0, color: "var(--va-red-600)" }}>{t("reportDetail.rosterLoadError")}</p>
         ) : showRiskSentimentLive ? (
           <RiskSentimentReportLive
             clients={sortedRiskClients}
@@ -238,7 +229,7 @@ export function ReportTemplateDetailPage() {
             filenameBase={liveFilenameBase(validId)}
           />
         ) : showLiveLoading ? (
-          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>Loading roster…</p>
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("reportDetail.rosterLoading")}</p>
         ) : payload ? (
           <>
             <ReportDocumentBody payload={payload} />
@@ -260,7 +251,7 @@ export function ReportTemplateDetailPage() {
                     const pg = callLogData.pagination
                     const fromN = (pg.page - 1) * pg.limit + 1
                     const toN = Math.min(pg.page * pg.limit, pg.totalResults)
-                    return `Showing ${fromN}–${toN} of ${pg.totalResults} calls`
+                    return t("reportDetail.paginationShowing", { from: fromN, to: toN, total: pg.totalResults })
                   })()}
                 </span>
                 <button
@@ -269,10 +260,13 @@ export function ReportTemplateDetailPage() {
                   disabled={callLogData.pagination.page <= 1}
                   onClick={() => setCallLogPage((p) => Math.max(1, p - 1))}
                 >
-                  Previous
+                  {t("reportDetail.previous")}
                 </button>
                 <span style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-                  Page {callLogData.pagination.page} of {Math.max(1, callLogData.pagination.totalPages)}
+                  {t("reportDetail.paginationPage", {
+                    page: callLogData.pagination.page,
+                    totalPages: Math.max(1, callLogData.pagination.totalPages),
+                  })}
                 </span>
                 <button
                   type="button"
@@ -280,14 +274,14 @@ export function ReportTemplateDetailPage() {
                   disabled={callLogData.pagination.page >= callLogData.pagination.totalPages}
                   onClick={() => setCallLogPage((p) => p + 1)}
                 >
-                  Next
+                  {t("reportDetail.next")}
                 </button>
               </div>
             ) : null}
             <div className="va-report-modal-actions va-no-print">
               <button type="button" className="va-btn-secondary" onClick={() => printReportFromPayload(payload)}>
                 <PrintIcon size={18} />
-                Print / Save as PDF
+                {t("reportDetail.printPdf")}
               </button>
               <button
                 type="button"
@@ -295,12 +289,12 @@ export function ReportTemplateDetailPage() {
                 onClick={() => downloadReportPayloadCsv(payload, liveFilenameBase(validId))}
               >
                 <DownloadIcon size={18} />
-                Download data (CSV)
+                {t("reportDetail.downloadCsv")}
               </button>
             </div>
             {validId === "call_log" && callLogData?.pagination && callLogData.pagination.totalResults > 0 ? (
               <p className="va-no-print" style={{ margin: "0.5rem 0 0", fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-                Print and CSV include this page only. Use Next to export additional pages.
+                {t("reportDetail.exportHint")}
               </p>
             ) : null}
           </>

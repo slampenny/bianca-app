@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
   useDisableMFAMutation,
@@ -7,10 +8,12 @@ import {
   useRegenerateBackupCodesMutation,
   useVerifyAndEnableMFAMutation,
 } from "../services/api/mfaApi"
+import { AuthTextField } from "../components/AuthTextField"
 import { ConfirmModal } from "../components/ConfirmModal"
 import "../app.css"
 
 export function SettingsMfaPage() {
+  const { t } = useTranslation()
   const { data: mfaStatus, isLoading: statusLoading, refetch } = useGetMFAStatusQuery()
   const [enableMFA, { isLoading: enabling }] = useEnableMFAMutation()
   const [verifyMFA, { isLoading: verifying }] = useVerifyAndEnableMFAMutation()
@@ -48,7 +51,7 @@ export function SettingsMfaPage() {
       setBackupCodes(r.backupCodes || [])
       setStep("verify")
     } catch (e: unknown) {
-      setError((e as { data?: { message?: string } })?.data?.message || "Could not start MFA setup.")
+      setError((e as { data?: { message?: string } })?.data?.message || t("settingsMfa.startError"))
     }
   }
 
@@ -56,17 +59,17 @@ export function SettingsMfaPage() {
     e.preventDefault()
     setError("")
     if (otp.trim().length !== 6) {
-      setError("Enter the 6-digit code from your authenticator app.")
+      setError(t("settingsMfa.enterSix"))
       return
     }
     try {
       await verifyMFA({ token: otp.trim() }).unwrap()
-      setInfo("Multi-factor authentication is on.")
+      setInfo(t("settingsMfa.enabledInfo"))
       setStep("manage")
       setOtp("")
       void refetch()
     } catch (e: unknown) {
-      setError((e as { data?: { message?: string } })?.data?.message || "Invalid code.")
+      setError((e as { data?: { message?: string } })?.data?.message || t("settingsMfa.invalidCode"))
       setOtp("")
     }
   }
@@ -75,7 +78,7 @@ export function SettingsMfaPage() {
     e.preventDefault()
     setError("")
     if (disableOtp.trim().length !== 6) {
-      setError("Enter your current 6-digit code to disable MFA.")
+      setError(t("settingsMfa.disableSix"))
       return
     }
     setShowDisableConfirm(true)
@@ -86,12 +89,12 @@ export function SettingsMfaPage() {
     try {
       await disableMFA({ token: disableOtp.trim() }).unwrap()
       setDisableOtp("")
-      setInfo("MFA has been disabled.")
+      setInfo(t("settingsMfa.disabledInfo"))
       setStep("intro")
       setShowDisableConfirm(false)
       void refetch()
     } catch (e: unknown) {
-      setError((e as { data?: { message?: string } })?.data?.message || "Could not disable MFA.")
+      setError((e as { data?: { message?: string } })?.data?.message || t("settingsMfa.disableError"))
     }
   }
 
@@ -99,7 +102,7 @@ export function SettingsMfaPage() {
     e.preventDefault()
     setError("")
     if (regenOtp.trim().length !== 6) {
-      setError("Enter your 6-digit code to regenerate backup codes.")
+      setError(t("settingsMfa.regenSix"))
       return
     }
     setShowRegenConfirm(true)
@@ -111,27 +114,27 @@ export function SettingsMfaPage() {
       const r = await regenCodes({ token: regenOtp.trim() }).unwrap()
       setBackupCodes(r.backupCodes || [])
       setRegenOtp("")
-      setInfo("New backup codes generated — save them in a safe place.")
+      setInfo(t("settingsMfa.regenInfo"))
       setShowRegenConfirm(false)
     } catch (e: unknown) {
-      setError((e as { data?: { message?: string } })?.data?.message || "Could not regenerate codes.")
+      setError((e as { data?: { message?: string } })?.data?.message || t("settingsMfa.regenError"))
     }
   }
 
   return (
     <div data-testid="settings-mfa-page" className="va-page-wrap">
       <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
-        ← Back to settings
+        ← {t("settings.settingsTitle")}
       </Link>
       <h1 className="va-page-title" style={{ marginTop: "1rem" }}>
-        Multi-factor authentication
+        {t("settingsMfa.title")}
       </h1>
       <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem", lineHeight: 1.45 }}>
-        Use an authenticator app (Google Authenticator, Authy, etc.) for a second sign-in step.
+        {t("settingsMfa.subtitle")}
       </p>
 
       {statusLoading ? (
-        <p style={{ color: "var(--va-slate-500)" }}>Loading…</p>
+        <p style={{ color: "var(--va-slate-500)" }}>{t("profile.loadingProfile")}</p>
       ) : (
         <div className="va-page-section" style={{ marginTop: "1.25rem" }}>
           {info ? (
@@ -147,27 +150,26 @@ export function SettingsMfaPage() {
 
           {step === "intro" && (
             <>
-              <p style={{ fontSize: "0.875rem", marginBottom: "1rem" }}>
-                Status: <strong>off</strong>
-              </p>
+              <p style={{ fontSize: "0.875rem", marginBottom: "1rem" }}>{t("settingsMfa.statusOff")}</p>
               <button type="button" className="va-btn-primary" style={{ width: "100%" }} disabled={enabling} onClick={() => void startEnable()}>
-                {enabling ? "Starting…" : "Set up authenticator"}
+                {enabling ? t("settingsMfa.starting") : t("settingsMfa.setupAuthenticator")}
               </button>
             </>
           )}
 
           {step === "verify" && qrCode && (
             <>
-              <p style={{ fontSize: "0.8125rem", marginBottom: "0.75rem" }}>Scan this QR code, then enter the 6-digit code.</p>
-              <img src={qrCode} alt="Authenticator QR code" style={{ width: 200, height: 200, display: "block", margin: "0 auto 1rem" }} />
+              <p style={{ fontSize: "0.8125rem", marginBottom: "0.75rem" }}>{t("settingsMfa.scanQr")}</p>
+              <img src={qrCode} alt={t("settingsMfa.qrAlt")} style={{ width: 200, height: 200, display: "block", margin: "0 auto 1rem" }} />
               {secret ? (
                 <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", wordBreak: "break-all", marginBottom: "1rem" }}>
-                  Manual key: <code>{secret}</code>
+                  {t("settingsMfa.manualKeyPrefix")} <code>{secret}</code>
                 </p>
               ) : null}
               {backupCodes.length > 0 ? (
                 <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "var(--va-slate-50)", borderRadius: 8, fontSize: "0.75rem" }}>
-                  <strong>One-time backup codes</strong> (save now):
+                  <strong>{t("settingsMfa.backupCodesStrong")}</strong>
+                  {t("settingsMfa.backupCodesSaveSuffix")}
                   <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.2rem" }}>
                     {backupCodes.map((c) => (
                       <li key={c} style={{ fontFamily: "monospace" }}>
@@ -178,22 +180,19 @@ export function SettingsMfaPage() {
                 </div>
               ) : null}
               <form onSubmit={submitVerify} className="va-login-form" style={{ gap: "0.75rem" }}>
-                <label className="va-login-label">
-                  Verification code
-                  <input
-                    className="va-login-input"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    value={otp}
-                    onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="000000"
-                  />
-                </label>
+                <AuthTextField
+                  label={t("settingsMfa.verificationCode")}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otp}
+                  onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="000000"
+                />
                 <button type="submit" className="va-btn-primary" disabled={verifying}>
-                  {verifying ? "Verifying…" : "Confirm & enable"}
+                  {verifying ? t("settingsMfa.verifying") : t("settingsMfa.confirmEnable")}
                 </button>
                 <button type="button" className="va-btn-secondary va-login-secondary" onClick={() => setStep("intro")}>
-                  Cancel
+                  {t("settingsMfa.cancel")}
                 </button>
               </form>
             </>
@@ -201,32 +200,27 @@ export function SettingsMfaPage() {
 
           {step === "manage" && mfaStatus?.mfaEnabled && (
             <>
-              <p style={{ fontSize: "0.875rem", marginBottom: "0.5rem" }}>
-                Status: <strong>on</strong>
-              </p>
+              <p style={{ fontSize: "0.875rem", marginBottom: "0.5rem" }}>{t("settingsMfa.statusOn")}</p>
               <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: "1.25rem" }}>
-                Backup codes remaining: <strong>{mfaStatus.backupCodesRemaining}</strong>
+                {t("settingsMfa.backupRemaining", { count: mfaStatus.backupCodesRemaining })}
               </p>
 
               <form onSubmit={submitRegen} style={{ marginBottom: "1.5rem" }}>
-                <p style={{ fontSize: "0.8125rem", fontWeight: 600, marginBottom: 8 }}>Regenerate backup codes</p>
-                <label className="va-login-label">
-                  Current 6-digit code
-                  <input
-                    className="va-login-input"
-                    inputMode="numeric"
-                    value={regenOtp}
-                    onChange={(ev) => setRegenOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))}
-                  />
-                </label>
+                <p style={{ fontSize: "0.8125rem", fontWeight: 600, marginBottom: 8 }}>{t("settingsMfa.regenSection")}</p>
+                <AuthTextField
+                  label={t("settingsMfa.currentCode")}
+                  inputMode="numeric"
+                  value={regenOtp}
+                  onChange={(ev) => setRegenOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))}
+                />
                 <button type="submit" className="va-btn-secondary va-login-secondary" disabled={regening} style={{ marginTop: 8 }}>
-                  {regening ? "Working…" : "Regenerate backup codes"}
+                  {regening ? t("settingsMfa.working") : t("settingsMfa.regenButton")}
                 </button>
               </form>
 
               {backupCodes.length > 0 ? (
                 <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "var(--va-emerald-100)", borderRadius: 8, fontSize: "0.75rem" }}>
-                  <strong>New backup codes</strong>
+                  <strong>{t("settingsMfa.newBackupTitle")}</strong>
                   <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.2rem" }}>
                     {backupCodes.map((c) => (
                       <li key={c} style={{ fontFamily: "monospace" }}>
@@ -238,23 +232,20 @@ export function SettingsMfaPage() {
               ) : null}
 
               <form onSubmit={submitDisable}>
-                <p style={{ fontSize: "0.8125rem", fontWeight: 600, marginBottom: 8 }}>Turn off MFA</p>
-                <label className="va-login-label">
-                  Current 6-digit code
-                  <input
-                    className="va-login-input"
-                    inputMode="numeric"
-                    value={disableOtp}
-                    onChange={(ev) => setDisableOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))}
-                  />
-                </label>
+                <p style={{ fontSize: "0.8125rem", fontWeight: 600, marginBottom: 8 }}>{t("settingsMfa.turnOff")}</p>
+                <AuthTextField
+                  label={t("settingsMfa.currentCode")}
+                  inputMode="numeric"
+                  value={disableOtp}
+                  onChange={(ev) => setDisableOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))}
+                />
                 <button
                   type="submit"
                   className="va-btn-secondary va-login-secondary"
                   disabled={disabling}
                   style={{ marginTop: 8, borderColor: "var(--va-red-200)", color: "var(--va-red-700)" }}
                 >
-                  {disabling ? "Disabling…" : "Disable MFA"}
+                  {disabling ? t("settingsMfa.disabling") : t("settingsMfa.disableMfa")}
                 </button>
               </form>
             </>
@@ -264,24 +255,24 @@ export function SettingsMfaPage() {
 
       <ConfirmModal
         open={showDisableConfirm}
-        title="Disable multi-factor authentication?"
+        title={t("settingsMfa.disableConfirmTitle")}
         onClose={() => setShowDisableConfirm(false)}
         onConfirm={() => void performDisable()}
-        confirmLabel={disabling ? "Disabling…" : "Disable MFA"}
+        confirmLabel={disabling ? t("settingsMfa.disabling") : t("settingsMfa.disableMfa")}
         confirmDisabled={disabling}
       >
-        <p style={{ margin: 0 }}>Your account will be less protected.</p>
+        <p style={{ margin: 0 }}>{t("settingsMfa.disableConfirmBody")}</p>
       </ConfirmModal>
 
       <ConfirmModal
         open={showRegenConfirm}
-        title="Regenerate backup codes?"
+        title={t("settingsMfa.regenConfirmTitle")}
         onClose={() => setShowRegenConfirm(false)}
         onConfirm={() => void performRegen()}
-        confirmLabel={regening ? "Working…" : "Continue"}
+        confirmLabel={regening ? t("settingsMfa.working") : t("settingsMfa.regenContinue")}
         confirmDisabled={regening}
       >
-        <p style={{ margin: 0 }}>Old backup codes will stop working.</p>
+        <p style={{ margin: 0 }}>{t("settingsMfa.regenConfirmBody")}</p>
       </ConfirmModal>
     </div>
   )

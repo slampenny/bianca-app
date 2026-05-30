@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
   useGenerateCaregiverDailyDigestMutation,
@@ -44,22 +45,24 @@ function entryNotes(entry: CaregiverDailyDigestEntry, labels: CaregiverDailyDige
 function DigestTable({
   entries,
   labels,
+  t,
 }: {
   entries: CaregiverDailyDigestEntry[]
   labels: CaregiverDailyDigest["payload"]["labels"]
+  t: (key: string, opts?: Record<string, unknown>) => string
 }) {
   return (
     <div style={{ overflowX: "auto", borderRadius: "0.5rem", border: "1px solid var(--va-slate-200)" }}>
       <div className="va-report-doc-table-cap" style={{ padding: "0.65rem 1rem 0", margin: 0 }}>
-        Residents · digest day (UTC)
+        {t("dailyDigest.tableCaption")}
       </div>
       <table className="va-report-doc-table" data-testid="daily-digest-table">
         <thead>
           <tr>
-            <th>Resident</th>
-            <th>Calls</th>
-            <th>Mood / tone</th>
-            <th>Summary & notes</th>
+            <th>{t("dailyDigest.colResident")}</th>
+            <th>{t("dailyDigest.colCalls")}</th>
+            <th>{t("dailyDigest.colMood")}</th>
+            <th>{t("dailyDigest.colSummary")}</th>
           </tr>
         </thead>
         <tbody>
@@ -67,8 +70,10 @@ function DigestTable({
             <tr key={entry.clientId}>
               <td style={{ fontWeight: 600, color: "var(--va-navy)", whiteSpace: "nowrap" }}>{entry.clientName}</td>
               <td style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", whiteSpace: "nowrap" }}>
-                {entry.callsPlaced} placed · {entry.answeredCalls} answered
-                {entry.lastCallAt ? ` · ${entry.lastCallAt.slice(11, 16)} UTC` : ""}
+                {t("dailyDigest.callsPlacedAnswered", { placed: entry.callsPlaced, answered: entry.answeredCalls })}
+                {entry.lastCallAt
+                  ? t("dailyDigest.callsTimeUtc", { time: entry.lastCallAt.slice(11, 16) })
+                  : ""}
               </td>
               <td style={{ fontSize: "0.875rem", lineHeight: 1.45 }}>
                 {entry.sentiment && Object.keys(entry.sentiment).length > 0
@@ -85,6 +90,7 @@ function DigestTable({
 }
 
 export function DailyDigestPage() {
+  const { t } = useTranslation()
   const currentUser = useAppSelector(getCurrentUser)
   const userId = currentUser?.id != null ? String(currentUser.id) : ""
   const isAdmin = canManageCaregivers(currentUser?.role)
@@ -120,17 +126,17 @@ export function DailyDigestPage() {
     const res = await generate({ digestDate: iso, sendEmail: emailWhenBuild }).unwrap()
     setShown(res)
     if (emailWhenBuild && res.status === "sent") {
-      setSendMessage("Digest emailed to your account address.")
+      setSendMessage(t("dailyDigest.emailedSuccess"))
     }
-  }, [digestDate, emailWhenBuild, generate])
+  }, [digestDate, emailWhenBuild, generate, t])
 
   const onSendEmail = useCallback(async () => {
     if (!digest?.id) return
     setSendMessage(null)
     const res = await sendDigest({ digestId: digest.id }).unwrap()
     setShown(res)
-    setSendMessage("Digest emailed to your account address.")
-  }, [digest?.id, sendDigest])
+    setSendMessage(t("dailyDigest.emailedSuccess"))
+  }, [digest?.id, sendDigest, t])
 
   return (
     <div
@@ -152,14 +158,10 @@ export function DailyDigestPage() {
             padding: "0.35rem 0",
           }}
         >
-          ← Back to Reports
+          {t("dailyDigest.backToReports")}
         </Link>
-        <h1 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", color: "var(--va-navy)" }}>Daily digest</h1>
-        <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>
-          Summaries and sentiment for your assigned residents for one calendar day (UTC). Text is generated in your profile
-          language; when a resident&apos;s language differs, conversation summaries are omitted and sentiment is shown when
-          it&apos;s available for that row.
-        </p>
+        <h1 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem", color: "var(--va-navy)" }}>{t("dailyDigest.title")}</h1>
+        <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>{t("dailyDigest.intro")}</p>
       </div>
 
       <div
@@ -175,7 +177,7 @@ export function DailyDigestPage() {
         }}
       >
         <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.75rem", color: "var(--va-slate-600)" }}>
-          Digest date (UTC)
+          {t("dailyDigest.digestDateLabel")}
           <input
             type="date"
             className="va-input"
@@ -195,22 +197,22 @@ export function DailyDigestPage() {
           }}
         >
           <input type="checkbox" checked={emailWhenBuild} onChange={(e) => setEmailWhenBuild(e.target.checked)} />
-          Email me when I build
+          {t("dailyDigest.emailWhenBuild")}
         </label>
         <button type="button" className="va-btn-primary" disabled={genLoading} onClick={() => void onGenerate()}>
-          {genLoading ? "Building…" : "Build / refresh digest"}
+          {genLoading ? t("dailyDigest.building") : t("dailyDigest.buildRefresh")}
         </button>
       </div>
 
       {genError ? (
         <p style={{ color: "var(--va-red-600)", fontSize: "0.875rem" }} role="alert">
-          Could not build digest. Check your connection and try again.
+          {t("dailyDigest.buildError")}
         </p>
       ) : null}
 
       {sendError ? (
         <p style={{ color: "var(--va-red-600)", fontSize: "0.875rem" }} role="alert">
-          Could not send email. Confirm your profile has a valid email, then try again.
+          {t("dailyDigest.sendError")}
         </p>
       ) : null}
 
@@ -227,7 +229,7 @@ export function DailyDigestPage() {
             <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)" }}>{digest.payload.subtitle}</p>
             <p style={{ margin: "0.35rem 0 0", fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>{digest.payload.dateLabel}</p>
             <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem", fontWeight: 600, color: "var(--va-slate-600)" }}>
-              {digest.status === "sent" ? "Emailed" : "Draft"}
+              {digest.status === "sent" ? t("dailyDigest.statusEmailed") : t("dailyDigest.statusDraft")}
               {digest.sentAt ? ` · ${new Date(digest.sentAt).toLocaleString()}` : ""}
             </p>
             <p style={{ margin: "0.75rem 0 0", fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>
@@ -241,28 +243,26 @@ export function DailyDigestPage() {
                 disabled={sendLoading}
                 onClick={() => void onSendEmail()}
               >
-                {sendLoading ? "Sending…" : "Email digest"}
+                {sendLoading ? t("dailyDigest.sending") : t("dailyDigest.emailDigest")}
               </button>
             ) : null}
           </header>
           {digest.payload.entries.length > 0 ? (
-            <DigestTable entries={digest.payload.entries} labels={digest.payload.labels} />
+            <DigestTable entries={digest.payload.entries} labels={digest.payload.labels} t={t} />
           ) : (
-            <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>
-              No assigned residents on your roster, so this digest is empty. Assign residents to see them here.
-            </p>
+            <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("dailyDigest.emptyRoster")}</p>
           )}
         </div>
       ) : null}
 
       <section>
-        <h2 style={{ fontSize: "1rem", margin: "0 0 0.75rem", color: "var(--va-navy)" }}>Recent digests</h2>
+        <h2 style={{ fontSize: "1rem", margin: "0 0 0.75rem", color: "var(--va-navy)" }}>{t("dailyDigest.recentTitle")}</h2>
         {isAdmin ? (
           <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "0.75rem", marginBottom: "0.75rem", maxWidth: 320 }}>
-            Filter by caregiver ID (org admin)
+            {t("dailyDigest.filterCaregiver")}
             <input
               className="va-input"
-              placeholder={selfCaregiver?.id ?? "Caregiver ObjectId"}
+              placeholder={selfCaregiver?.id ?? t("dailyDigest.caregiverPlaceholder")}
               value={caregiverFilter}
               onChange={(e) => setCaregiverFilter(e.target.value)}
               style={{ padding: "0.5rem 0.65rem", borderRadius: 6, border: "1px solid var(--va-slate-200)" }}
@@ -270,7 +270,7 @@ export function DailyDigestPage() {
           </label>
         ) : null}
         {listLoading ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>Loading…</p>
+          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("dailyDigest.loading")}</p>
         ) : (
           <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 8 }}>
             {(listData?.results ?? []).map((d) => (
@@ -291,7 +291,11 @@ export function DailyDigestPage() {
                 >
                   <strong style={{ color: "var(--va-navy)" }}>{d.payload?.dateLabel ?? d.digestDate}</strong>
                   <span style={{ color: "var(--va-slate-500)", marginLeft: 8 }}>
-                    · {d.payload?.entries?.length ?? 0} residents · {d.status === "sent" ? "emailed" : "draft"}
+                    {t("dailyDigest.listResidents", {
+                      count: d.payload?.entries?.length ?? 0,
+                      status:
+                        d.status === "sent" ? t("dailyDigest.statusEmailedShort") : t("dailyDigest.statusDraftShort"),
+                    })}
                   </span>
                 </button>
               </li>
@@ -299,7 +303,7 @@ export function DailyDigestPage() {
           </ul>
         )}
         {!listLoading && (listData?.results?.length ?? 0) === 0 ? (
-          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>No saved digests yet. Build one above.</p>
+          <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("dailyDigest.noSavedDigests")}</p>
         ) : null}
       </section>
     </div>

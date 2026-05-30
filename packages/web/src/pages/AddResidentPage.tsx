@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import { intervalsForDraft } from "../lib/scheduleDraft"
+import { AuthSelectField } from "../components/AuthSelectField"
+import { AuthTextField } from "../components/AuthTextField"
 import { AvatarPicker } from "../components/AvatarPicker"
 import { NewScheduleFormFields, type ScheduleFrequency } from "../components/NewScheduleFormFields"
 import { useCreateClientMutation, useAssignCaregiverToClientMutation, useUploadClientAvatarMutation } from "../services/api/clientApi"
@@ -112,7 +114,7 @@ export function AddResidentPage() {
       newScheduleMonthlyDaysRaw,
     )
     if (newScheduleFrequency !== "daily" && scheduleIntervals.length === 0) {
-      setFormError("Select at least one interval for weekly/monthly schedules.")
+      setFormError(t("residents.scheduleIntervalRequired"))
       return
     }
     try {
@@ -137,7 +139,7 @@ export function AddResidentPage() {
       if (avatarFile) {
         const up = await uploadClientAvatar({ clientId: cid, file: avatarFile })
         if ("error" in up) {
-          setFormError("Resident created, but image upload failed.")
+          setFormError(t("residents.avatarUploadFailed"))
           setPartialCreateId(cid)
           return
         }
@@ -160,7 +162,7 @@ export function AddResidentPage() {
         }).unwrap()
       } catch (schedErr: unknown) {
         const msg = (schedErr as { data?: { message?: string } })?.data?.message
-        setFormError(typeof msg === "string" ? msg : "Resident created, but schedule could not be saved.")
+        setFormError(typeof msg === "string" ? msg : t("residents.scheduleSaveFailed"))
         setPartialCreateId(cid)
         return
       }
@@ -195,96 +197,75 @@ export function AddResidentPage() {
 
       <div className="va-card va-card-pad">
         <form onSubmit={(e) => void onSubmit(e)} className="va-login-form">
-          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelFirstName")}</span>
-            <input
-              className="va-login-input"
-              type="text"
-              autoComplete="given-name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              required
-              data-testid="add-resident-first-name"
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelLastName")}</span>
-            <input
-              className="va-login-input"
-              type="text"
-              autoComplete="family-name"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              data-testid="add-resident-last-name"
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelPreferredName")}</span>
-            <input
-              className="va-login-input"
-              type="text"
-              autoComplete="nickname"
-              value={preferredName}
-              onChange={(e) => setPreferredName(e.target.value)}
-              data-testid="add-resident-preferred-name"
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelEmail")}</span>
-            <input
-              className="va-login-input"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              data-testid="add-resident-email"
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelPhone")}</span>
-            <input
-              className="va-login-input"
-              type="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              data-testid="add-resident-phone"
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "0.75rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelRoom")}</span>
-            <input
-              className="va-login-input"
-              type="text"
-              autoComplete="off"
-              value={room}
-              onChange={(e) => setRoom(e.target.value)}
-              placeholder="e.g. 101A"
-              data-testid="add-resident-room"
-            />
-          </label>
-          <label style={{ display: "block", marginBottom: "1rem", fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-            <span style={{ display: "block", marginBottom: 6 }}>{t("residents.labelLanguage")}</span>
-            <select
-              className="va-login-input"
-              value={preferredLanguage}
-              onChange={(e) => setPreferredLanguage(e.target.value)}
-              data-testid="add-resident-language"
-            >
-              {LANGUAGE_OPTIONS.map((o) => (
-                <option key={o.code} value={o.code}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <AuthTextField
+            label={t("residents.labelFirstName")}
+            type="text"
+            autoComplete="given-name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            required
+            inputTestId="add-resident-first-name"
+          />
+          <AuthTextField
+            label={t("residents.labelLastName")}
+            type="text"
+            autoComplete="family-name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            inputTestId="add-resident-last-name"
+          />
+          <AuthTextField
+            label={t("residents.labelPreferredName")}
+            type="text"
+            autoComplete="nickname"
+            value={preferredName}
+            onChange={(e) => setPreferredName(e.target.value)}
+            inputTestId="add-resident-preferred-name"
+          />
+          <AuthTextField
+            label={t("residents.labelEmail")}
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            inputTestId="add-resident-email"
+          />
+          <AuthTextField
+            label={t("residents.labelPhone")}
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+            inputTestId="add-resident-phone"
+          />
+          <AuthTextField
+            label={t("residents.labelRoom")}
+            type="text"
+            autoComplete="off"
+            value={room}
+            onChange={(e) => setRoom(e.target.value)}
+            placeholder={t("residents.roomPlaceholder")}
+            inputTestId="add-resident-room"
+          />
+          <AuthSelectField
+            label={t("residents.labelLanguage")}
+            value={preferredLanguage}
+            onChange={(e) => setPreferredLanguage(e.target.value)}
+            selectTestId="add-resident-language"
+          >
+            {LANGUAGE_OPTIONS.map((o) => (
+              <option key={o.code} value={o.code}>
+                {o.label}
+              </option>
+            ))}
+          </AuthSelectField>
 
           <div style={{ marginBottom: "1rem" }}>
-            <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, marginBottom: 6 }}>Call schedule</h2>
+            <h2 style={{ fontSize: "0.9375rem", fontWeight: 600, marginBottom: 6 }}>{t("residents.callScheduleTitle")}</h2>
             <p style={{ fontSize: "0.8125rem", color: "var(--va-slate-500)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
-              Configure a recurring call schedule for this resident.
+              {t("residents.callScheduleIntro")}
             </p>
             <div
               style={{
@@ -341,10 +322,10 @@ export function AddResidentPage() {
               {peers.length > 0 ? (
                 <div style={{ display: "flex", gap: 8, margin: "0.35rem 0.25rem 0.5rem" }}>
                   <button type="button" className="va-btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }} onClick={selectAllCaregivers}>
-                    Select all
+                    {t("residents.selectAllCaregivers")}
                   </button>
                   <button type="button" className="va-btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }} onClick={clearAllCaregivers}>
-                    Clear all
+                    {t("residents.clearAllCaregivers")}
                   </button>
                 </div>
               ) : null}
@@ -370,7 +351,7 @@ export function AddResidentPage() {
           )}
 
           <AvatarPicker
-            label="Resident photo (optional)"
+            label={t("residents.avatarOptionalLabel")}
             initialsSource={preferredName || firstName || "?"}
             onPick={setAvatarFile}
           />

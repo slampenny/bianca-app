@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next"
 import type { SentimentTrendPoint } from "../services/api/api.types"
 
 function scoresFromPoints(points: SentimentTrendPoint[]): number[] {
@@ -17,10 +18,11 @@ type Props = {
 
 /** Compact line chart of sentiment scores (e.g. GET /sentiment/client/:id/trend?timeRange=month). */
 export function SentimentTrendSparkline({ points, width = 88, height = 36 }: Props) {
+  const { t } = useTranslation()
   const scores = scoresFromPoints(points)
   if (scores.length === 0) {
     return (
-      <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }} title="No scored calls in this range">
+      <span style={{ color: "var(--va-slate-400)", fontSize: "0.75rem" }} title={t("residentDetail.sparklineEmpty")}>
         —
       </span>
     )

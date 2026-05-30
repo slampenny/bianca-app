@@ -1,12 +1,14 @@
 import { FormEvent, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useResetPasswordMutation } from "../services/api/authApi"
-import { validatePasswordRules } from "../lib/passwordRules"
+import { validatePasswordRulesI18n } from "../lib/passwordI18n"
 import { PasswordField } from "../components/PasswordField"
 import "../app.css"
 
 export function ResetPasswordPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = useMemo(() => searchParams.get("token")?.trim() ?? "", [searchParams])
@@ -20,16 +22,16 @@ export function ResetPasswordPage() {
     e.preventDefault()
     setError("")
     if (!token) {
-      setError("This reset link is missing a token. Open the link from your email.")
+      setError(t("resetPassword.missingToken"))
       return
     }
-    const pwErr = validatePasswordRules(password)
+    const pwErr = validatePasswordRulesI18n(password, t)
     if (pwErr) {
       setError(pwErr)
       return
     }
     if (password !== confirm) {
-      setError("Passwords do not match.")
+      setError(t("resetPassword.passwordMismatch"))
       return
     }
     try {
@@ -40,39 +42,44 @@ export function ResetPasswordPage() {
       })
     } catch (err: unknown) {
       const data = (err as { data?: { message?: string } })?.data
-      setError(typeof data?.message === "string" ? data.message : "Reset failed. The link may have expired.")
+      setError(typeof data?.message === "string" ? data.message : t("resetPassword.failed"))
     }
   }
 
   return (
-    <AuthPageShell title="Choose a new password" subtitle="Enter a new password for your account.">
+    <AuthPageShell title={t("resetPassword.title")} subtitle={t("resetPassword.subtitle")}>
       {!token ? (
         <div className="va-login-error" role="alert">
-          Invalid or missing reset link. Request a new one from the sign-in page.
+          {t("resetPassword.invalidLink")}
         </div>
-      ) : null}
-      <form className="va-login-form" onSubmit={handleSubmit}>
-        <label className="va-login-label">
-          New password
-          <PasswordField autoComplete="new-password" value={password} onChange={(ev) => setPassword(ev.target.value)} />
-        </label>
-        <p className="va-login-helper">At least 8 characters, with at least one letter and one number.</p>
-        <label className="va-login-label">
-          Confirm password
-          <PasswordField autoComplete="new-password" value={confirm} onChange={(ev) => setConfirm(ev.target.value)} />
-        </label>
-        {error ? (
-          <div className="va-login-error" role="alert">
-            {error}
-          </div>
-        ) : null}
-        <button type="submit" className="va-btn-primary va-login-submit" disabled={isLoading || !token}>
-          {isLoading ? "Updating…" : "Update password"}
-        </button>
-        <div className="va-auth-footer">
-          <Link to="/login">Back to sign in</Link>
-        </div>
-      </form>
+      ) : (
+        <form className="va-login-form" onSubmit={handleSubmit}>
+          <PasswordField
+            label={t("resetPassword.newPassword")}
+            value={password}
+            onChange={(ev) => setPassword(ev.target.value)}
+            autoComplete="new-password"
+          />
+          <p className="va-login-helper">{t("resetPassword.rulesHint")}</p>
+          <PasswordField
+            label={t("resetPassword.confirm")}
+            value={confirm}
+            onChange={(ev) => setConfirm(ev.target.value)}
+            autoComplete="new-password"
+          />
+          {error ? (
+            <div className="va-login-error" role="alert">
+              {error}
+            </div>
+          ) : null}
+          <button type="submit" className="va-btn-primary va-login-submit" disabled={isLoading}>
+            {isLoading ? t("resetPassword.updating") : t("resetPassword.update")}
+          </button>
+        </form>
+      )}
+      <div className="va-auth-footer">
+        <Link to="/login">{t("resetPassword.backSignIn")}</Link>
+      </div>
     </AuthPageShell>
   )
 }

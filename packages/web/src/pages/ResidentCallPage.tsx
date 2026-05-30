@@ -1,7 +1,10 @@
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
+import type { TFunction } from "i18next"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { ChevronLeftIcon } from "../icons"
+import { AuthTextField } from "../components/AuthTextField"
 import { useGetClientQuery } from "../services/api/clientApi"
 import { useEndCallMutation, useGetCallStatusQuery, useInitiateCallMutation } from "../services/api/callWorkflowApi"
 import { mapClientToResident } from "../lib/liveData"
@@ -23,6 +26,7 @@ type ActiveResidentCall = {
 }
 
 export function ResidentCallPage() {
+  const { t } = useTranslation()
   const { residentId } = useParams()
   const navigate = useNavigate()
   const user = useAppSelector(getCurrentUser)
@@ -62,9 +66,8 @@ export function ResidentCallPage() {
   }, [liveCallStatus?.data])
 
   const resident = apiClient ? mapClientToResident(apiClient) : null
-  const displayName = resident ? resident.displayName : "Resident"
+  const displayName = resident ? resident.displayName : t("residentCall.defaultResidentName")
   const effectiveCallStatus = liveCallStatus?.data?.status || activeCall?.status || ""
-  /** Twilio leg can be active while DB status is stale (out-of-order webhooks). */
   const twilioLiveCallStatus = liveCallStatus?.data?.callStatus
   const isLiveCall =
     effectiveCallStatus === "in-progress" ||
@@ -83,7 +86,9 @@ export function ResidentCallPage() {
     try {
       const resp = await initiateCall({
         clientId: apiClient.id,
-        callNotes: callNotesDraft.trim() || `Manual call initiated to ${displayName || "resident"}`,
+        callNotes:
+          callNotesDraft.trim() ||
+          t("residentCall.manualCallNotes", { name: displayName || t("residentCall.defaultResidentName") }),
       }).unwrap()
       setActiveCall({
         conversationId: String(resp.conversationId),
@@ -99,9 +104,9 @@ export function ResidentCallPage() {
       })
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setCallError(typeof msg === "string" ? msg : "Could not initiate call.")
+      setCallError(typeof msg === "string" ? msg : t("residentCall.initiateError"))
     }
-  }, [apiClient?.id, callNotesDraft, canCallNow, displayName, initiateCall, isInitiatingCall])
+  }, [apiClient?.id, callNotesDraft, canCallNow, displayName, initiateCall, isInitiatingCall, t])
 
   useEffect(() => {
     if (loadingClient || !apiClient?.id || !canCallNow || activeCall || isInitiatingCall || autoCallAttempted.current) return
@@ -119,18 +124,35 @@ export function ResidentCallPage() {
       setActiveCall((prev) => (prev ? { ...prev, status: "completed" } : prev))
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
-      setCallError(typeof msg === "string" ? msg : "Could not end call.")
+      setCallError(typeof msg === "string" ? msg : t("residentCall.endError"))
     }
   }
+
+  const statusMessage = callStatusMessage(
+    t,
+    effectiveCallStatus,
+    liveCallStatus?.data?.callOutcome,
+    displayName,
+    isLiveCall,
+  )
+
+  const durationSuffix = liveCallStatus?.data?.startTime
+    ? formatLiveCallDuration(
+        t,
+        liveCallStatus.data.startTime,
+        isLiveCall ? "in-progress" : effectiveCallStatus,
+        liveCallStatus.data.duration,
+      )
+    : ""
 
   if (!canCallNow) {
     return (
       <div style={{ padding: "2rem", color: "var(--va-slate-600)" }}>
         <button type="button" className="va-btn-ghost" onClick={() => navigate(`/residents/${residentId || ""}`)}>
           <ChevronLeftIcon size={16} />
-          Back
+          {t("residentCall.back")}
         </button>
-        <p style={{ marginTop: "1rem" }}>Only org admins and super admins can initiate calls.</p>
+        <p style={{ marginTop: "1rem" }}>{t("settings.adminOnlyCalls")}</p>
       </div>
     )
   }
@@ -139,14 +161,16 @@ export function ResidentCallPage() {
     <div data-testid="resident-call-page" style={{ maxWidth: 980, margin: "0 auto", display: "grid", gap: "1rem" }}>
       <button type="button" className="va-btn-ghost" onClick={() => navigate(`/residents/${residentId || ""}`)}>
         <ChevronLeftIcon size={16} />
-        Back to Resident
+        {t("residentCall.backToResident")}
       </button>
       <div className="va-card va-card-pad">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <div>
-            <h1 className="va-page-title" style={{ marginBottom: 0 }}>Live Call</h1>
+            <h1 className="va-page-title" style={{ marginBottom: 0 }}>
+              {t("residentCall.liveCallTitle")}
+            </h1>
             <p style={{ marginTop: 4, fontSize: "0.85rem", color: "var(--va-slate-500)" }}>
-              {loadingClient ? "Loading resident…" : `Resident: ${displayName}`}
+              {loadingClient ? t("residentCall.loadingResident") : t("residentCall.residentLabel", { name: displayName })}
             </p>
           </div>
           {activeCall ? (
@@ -169,19 +193,16 @@ export function ResidentCallPage() {
           <div style={{ marginTop: "0.75rem", display: "grid", gap: 10 }}>
             {showAutoInitiating ? (
               <p data-testid="resident-call-initiating" style={{ margin: 0, fontSize: "0.85rem", color: "var(--va-slate-600)" }}>
-                {loadingClient ? "Loading resident…" : `Calling ${displayName}…`}
+                {loadingClient ? t("residentCall.loadingResident") : t("residentCall.calling", { name: displayName })}
               </p>
             ) : (
               <>
-                <label style={{ display: "grid", gap: 6, fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-                  Call notes (optional)
-                  <input
-                    className="va-login-input"
-                    value={callNotesDraft}
-                    onChange={(e) => setCallNotesDraft(e.target.value)}
-                    placeholder="Manual call initiated by caregiver"
-                  />
-                </label>
+                <AuthTextField
+                  label={t("residentCall.callNotesLabel")}
+                  value={callNotesDraft}
+                  onChange={(e) => setCallNotesDraft(e.target.value)}
+                  placeholder={t("residentCall.callNotesPlaceholder")}
+                />
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <button
                     type="button"
@@ -190,11 +211,9 @@ export function ResidentCallPage() {
                     disabled={isInitiatingCall || !apiClient?.id}
                     onClick={() => void onCallNow()}
                   >
-                    {isInitiatingCall ? "Calling..." : "Call now"}
+                    {isInitiatingCall ? t("residentCall.callingButton") : t("residentCall.callNow")}
                   </button>
-                  <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-                    Live status + transcript updates every 2s.
-                  </span>
+                  <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>{t("residentCall.liveStatusHint")}</span>
                 </div>
               </>
             )}
@@ -202,51 +221,85 @@ export function ResidentCallPage() {
         ) : (
           <div style={{ marginTop: "0.75rem", display: "grid", gap: 10 }}>
             {!liveOnboarding?.journeyComplete ? (
-              <div style={{ borderRadius: "0.65rem", border: "1px solid var(--va-amber-200)", background: "var(--va-amber-50)", padding: "0.55rem 0.65rem" }}>
-                <p style={{ margin: 0, fontSize: "0.78rem", fontWeight: 600, color: "var(--va-amber-800)" }}>Onboarding Progress</p>
+              <div
+                style={{
+                  borderRadius: "0.65rem",
+                  border: "1px solid var(--va-amber-200)",
+                  background: "var(--va-amber-50)",
+                  padding: "0.55rem 0.65rem",
+                }}
+              >
+                <p style={{ margin: 0, fontSize: "0.78rem", fontWeight: 600, color: "var(--va-amber-800)" }}>
+                  {t("residentCall.onboardingProgressTitle")}
+                </p>
                 <p style={{ margin: "0.2rem 0 0", fontSize: "0.78rem", color: "var(--va-amber-800)" }}>
-                  {liveSessionsCompleted}/{liveOnboardingTotalDays} completed
-                  {liveIsOnboardingCall && liveOnboardingDay != null ? ` · This call: Day ${liveOnboardingDay}` : ""}
-                  {!liveIsOnboardingCall && liveCurrentStageDay != null ? ` · Next: Day ${liveCurrentStageDay}` : ""}
+                  {t("residentCall.onboardingProgressLine", {
+                    completed: liveSessionsCompleted,
+                    total: liveOnboardingTotalDays,
+                    thisCall:
+                      liveIsOnboardingCall && liveOnboardingDay != null
+                        ? t("residentCall.thisCallDay", { day: liveOnboardingDay })
+                        : "",
+                    nextDay:
+                      !liveIsOnboardingCall && liveCurrentStageDay != null
+                        ? t("residentCall.nextDay", { day: liveCurrentStageDay })
+                        : "",
+                  })}
                 </p>
               </div>
             ) : null}
 
             <p style={{ margin: 0, fontSize: "0.72rem" }}>
               <Link to={`/residents/${residentId ?? ""}#voice-onboarding`} style={{ color: "#2563eb" }}>
-                Full journey & captured answers
+                {t("residentCall.fullJourneyLink")}
               </Link>
             </p>
 
             <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <p style={{ margin: 0, fontSize: "0.85rem", color: "var(--va-slate-600)" }}>
-                {callStatusMessage(
-                  effectiveCallStatus,
-                  liveCallStatus?.data?.callOutcome,
-                  displayName,
-                  isLiveCall,
-                )}
-                {liveCallStatus?.data?.startTime
-                  ? ` · ${formatLiveCallDuration(liveCallStatus.data.startTime, isLiveCall ? "in-progress" : effectiveCallStatus, liveCallStatus.data.duration)}`
-                  : ""}
-                {liveCallFetching ? " · Updating..." : ""}
-                {liveCallStatusError ? " · Status temporarily unavailable" : ""}
+                {statusMessage}
+                {durationSuffix}
+                {liveCallFetching ? t("residentCall.updating") : ""}
+                {liveCallStatusError ? t("residentCall.statusUnavailable") : ""}
               </p>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button type="button" className="va-btn-secondary" onClick={() => { setActiveCall(null); setHasAutoCalled(false) }}>
-                  Dismiss
+                <button
+                  type="button"
+                  className="va-btn-secondary"
+                  onClick={() => {
+                    setActiveCall(null)
+                    setHasAutoCalled(false)
+                  }}
+                >
+                  {t("residentCall.dismiss")}
                 </button>
                 {isLiveCall ? (
-                  <button type="button" className="va-btn-primary" style={{ background: "var(--va-red-600)" }} onClick={() => void onEndLiveCall()} disabled={isEndingCall}>
-                    {isEndingCall ? "Ending..." : "End call"}
+                  <button
+                    type="button"
+                    className="va-btn-primary"
+                    style={{ background: "var(--va-red-600)" }}
+                    onClick={() => void onEndLiveCall()}
+                    disabled={isEndingCall}
+                  >
+                    {isEndingCall ? t("residentCall.ending") : t("residentCall.endCall")}
                   </button>
                 ) : null}
               </div>
             </div>
 
-            <div style={{ maxHeight: 420, overflow: "auto", border: "1px solid var(--va-slate-200)", borderRadius: "0.75rem", padding: "0.65rem" }}>
+            <div
+              style={{
+                maxHeight: 420,
+                overflow: "auto",
+                border: "1px solid var(--va-slate-200)",
+                borderRadius: "0.75rem",
+                padding: "0.65rem",
+              }}
+            >
               {liveCallMessages.length === 0 ? (
-                <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>Waiting for transcript…</p>
+                <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>
+                  {t("residentCall.waitingTranscript")}
+                </p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {liveCallMessages.map((m, idx) => {
@@ -297,27 +350,34 @@ function callStatusTone(status: string): { bg: string; fg: string } {
 }
 
 function callStatusMessage(
+  t: TFunction,
   status: string,
   outcome: string | undefined,
   residentName: string,
   isLiveCall?: boolean,
 ): string {
-  if (outcome === "voicemail") return "Answering machine detected"
-  if (outcome === "no_answer") return "No answer"
-  if (outcome === "busy") return "Line busy"
-  if (isLiveCall) return `Connected with ${residentName}`
-  if (status === "initiated") return "Setting up call..."
-  if (status === "in-progress") return `Connected with ${residentName}`
-  if (status === "completed") return outcome === "answered" ? "Call completed" : "Call ended"
-  if (status === "failed") return "Call failed"
-  return "Unknown status"
+  if (outcome === "voicemail") return t("residentCall.statusVoicemail")
+  if (outcome === "no_answer") return t("residentCall.statusNoAnswer")
+  if (outcome === "busy") return t("residentCall.statusBusy")
+  if (isLiveCall) return t("residentCall.statusConnected", { name: residentName })
+  if (status === "initiated") return t("residentCall.statusSettingUp")
+  if (status === "in-progress") return t("residentCall.statusConnected", { name: residentName })
+  if (status === "completed") return outcome === "answered" ? t("residentCall.statusCompleted") : t("residentCall.statusEnded")
+  if (status === "failed") return t("residentCall.statusFailed")
+  return t("residentCall.statusUnknown")
 }
 
-function formatLiveCallDuration(startIso: string, status: string, apiDuration: number | undefined): string {
-  if (status === "completed" || status === "failed") return `Duration ${formatDurationSeconds(apiDuration)}`
+function formatLiveCallDuration(
+  t: TFunction,
+  startIso: string,
+  status: string,
+  apiDuration: number | undefined,
+): string {
+  if (status === "completed" || status === "failed") {
+    return ` · ${t("residentCall.durationPrefix")} ${formatDurationSeconds(apiDuration)}`
+  }
   const start = new Date(startIso)
-  if (Number.isNaN(start.getTime())) return "Duration unavailable"
+  if (Number.isNaN(start.getTime())) return ` · ${t("residentCall.durationUnavailable")}`
   const sec = Math.max(0, Math.round((Date.now() - start.getTime()) / 1000))
-  return `Duration ${formatDurationSeconds(sec)}`
+  return ` · ${t("residentCall.durationPrefix")} ${formatDurationSeconds(sec)}`
 }
-

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import type { ClientOnboardingFlags, ClientOnboardingResponseRow } from "../services/api/api.types"
 import { useGetClientOnboardingQuery } from "../services/api/clientApi"
@@ -10,8 +11,8 @@ function humanizeQuestionId(id: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-function formatResponseValue(v: unknown): string {
-  if (v == null) return "—"
+function formatResponseValue(v: unknown, emDash: string): string {
+  if (v == null) return emDash
   if (typeof v === "string") return v
   if (typeof v === "number" || typeof v === "boolean") return String(v)
   try {
@@ -33,19 +34,15 @@ function responsesForDay(rows: ClientOnboardingResponseRow[], day: number): Clie
   return [...byQ.values()].sort((a, b) => a.questionId.localeCompare(b.questionId))
 }
 
-const FLAG_LABELS: { key: keyof ClientOnboardingFlags; label: string }[] = [
-  { key: "safety", label: "Safety" },
-  { key: "memory", label: "Memory" },
-  { key: "mood", label: "Mood" },
-  { key: "distress", label: "Distress" },
-  { key: "confusion", label: "Confusion" },
-]
+const FLAG_KEYS: (keyof ClientOnboardingFlags)[] = ["safety", "memory", "mood", "distress", "confusion"]
 
 export function ClientOnboardingSection({ clientId, residentPathId }: { clientId: string; residentPathId: string }) {
+  const { t } = useTranslation()
   const { data, isLoading, isError, error } = useGetClientOnboardingQuery({ clientId }, { skip: !clientId })
   const [openDay, setOpenDay] = useState<number | null>(null)
   const journeyComplete = !!data?.journey.journeyComplete
   const [showFull, setShowFull] = useState(!journeyComplete)
+  const emDash = t("common.emDash")
 
   useEffect(() => {
     setShowFull(!journeyComplete)
@@ -68,6 +65,17 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
     return m
   }, [data])
 
+  const flagLabel = (key: keyof ClientOnboardingFlags) => {
+    const map: Record<keyof ClientOnboardingFlags, string> = {
+      safety: t("clientOnboarding.flagSafety"),
+      memory: t("clientOnboarding.flagMemory"),
+      mood: t("clientOnboarding.flagMood"),
+      distress: t("clientOnboarding.flagDistress"),
+      confusion: t("clientOnboarding.flagConfusion"),
+    }
+    return map[key]
+  }
+
   if (!clientId) return null
 
   if (isLoading) {
@@ -77,7 +85,7 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
         style={{ padding: "0.55rem 0.75rem", background: "var(--va-slate-50)" }}
         data-testid="resident-onboarding-section"
       >
-        <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--va-slate-500)" }}>Loading onboarding…</p>
+        <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--va-slate-500)" }}>{t("clientOnboarding.loading")}</p>
       </div>
     )
   }
@@ -86,9 +94,9 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
     const msg = (error as { data?: { message?: string } })?.data?.message
     return (
       <div className="va-card va-card-pad" data-testid="resident-onboarding-section">
-        <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Voice onboarding</h2>
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>{t("clientOnboarding.title")}</h2>
         <p style={{ marginTop: 8, fontSize: "0.8125rem", color: "var(--va-red-600)" }}>
-          {typeof msg === "string" ? msg : "Could not load onboarding data."}
+          {typeof msg === "string" ? msg : t("clientOnboarding.loadError")}
         </p>
       </div>
     )
@@ -110,22 +118,22 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
         data-testid="resident-onboarding-section"
       >
         <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--va-slate-600)" }}>
-          <span style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>Voice onboarding</span>
+          <span style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{t("clientOnboarding.title")}</span>
           {" — "}
-          disabled for this organization. Calls use the regular wellness format.
+          {t("clientOnboarding.disabledLine")}
         </p>
       </div>
     )
   }
 
-  const activeFlags = FLAG_LABELS.filter((f) => flags[f.key])
+  const activeFlags = FLAG_KEYS.filter((k) => flags[k])
   const callWorkspaceLink = (
     <Link
       to={`/residents/${residentPathId}/call`}
       className="va-btn-ghost"
       style={{ textDecoration: "none", fontSize: "0.78rem", padding: "0.25rem 0.5rem", alignSelf: "flex-start" }}
     >
-      Open call workspace
+      {t("clientOnboarding.openCallWorkspace")}
     </Link>
   )
 
@@ -143,14 +151,14 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
       >
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem 1rem", justifyContent: "space-between" }}>
           <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--va-slate-600)" }}>
-            <span style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>Voice onboarding</span>
+            <span style={{ fontWeight: 600, color: "var(--va-slate-700)" }}>{t("clientOnboarding.title")}</span>
             {" — "}
-            completed ({journey.totalDays}/{journey.totalDays}). Rarely needed after the first week; expand to review captured answers.
+            {t("clientOnboarding.completedSummary", { total: journey.totalDays })}
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", alignItems: "center" }}>
             {callWorkspaceLink}
             <button type="button" className="va-btn-secondary" style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }} onClick={() => setShowFull(true)}>
-              Show details
+              {t("clientOnboarding.showDetails")}
             </button>
           </div>
         </div>
@@ -158,13 +166,15 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
     )
   }
 
+  const daysLabel = journey.totalDays === 1 ? t("clientOnboarding.day") : t("clientOnboarding.days")
+
   return (
     <div id="voice-onboarding" className="va-card va-card-pad" data-testid="resident-onboarding-section">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>Voice onboarding</h2>
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, margin: 0 }}>{t("clientOnboarding.title")}</h2>
           <p style={{ marginTop: 4, fontSize: "0.8125rem", color: "var(--va-slate-500)", maxWidth: 520 }}>
-            Guided call onboarding ({journey.totalDays} {journey.totalDays === 1 ? "day" : "days"}). Progress is recorded from completed onboarding calls and captured answers.
+            {t("clientOnboarding.guidedIntro", { days: journey.totalDays, daysLabel })}
           </p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
@@ -173,11 +183,11 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
             className="va-btn-primary"
             style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}
           >
-            Open call workspace
+            {t("clientOnboarding.openCallWorkspace")}
           </Link>
           {journeyComplete ? (
             <button type="button" className="va-btn-ghost" style={{ fontSize: "0.78rem" }} onClick={() => setShowFull(false)}>
-              Hide details
+              {t("clientOnboarding.hideDetails")}
             </button>
           ) : null}
         </div>
@@ -193,17 +203,19 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
         }}
       >
         <p style={{ margin: 0, fontSize: "0.78rem", fontWeight: 600, color: journey.journeyComplete ? "var(--va-emerald-800)" : "var(--va-amber-800)" }}>
-          {journey.journeyComplete ? "Journey complete" : "In progress"}
+          {journey.journeyComplete ? t("clientOnboarding.journeyComplete") : t("clientOnboarding.inProgress")}
         </p>
         <p style={{ margin: "0.25rem 0 0", fontSize: "0.78rem", color: journey.journeyComplete ? "var(--va-emerald-800)" : "var(--va-amber-800)" }}>
-          {journey.sessionsCompletedCount}/{journey.totalDays} sessions completed
-          {!journey.journeyComplete && journey.currentDay != null ? ` · Next focus: Day ${journey.currentDay}` : ""}
+          {t("clientOnboarding.sessionsLine", { completed: journey.sessionsCompletedCount, total: journey.totalDays })}
+          {!journey.journeyComplete && journey.currentDay != null
+            ? t("clientOnboarding.nextFocus", { day: journey.currentDay })
+            : ""}
         </p>
       </div>
 
       {activeFlags.length > 0 ? (
         <p style={{ marginTop: "0.65rem", fontSize: "0.75rem", color: "var(--va-red-700)" }}>
-          Flags from captures: {activeFlags.map((f) => f.label).join(", ")}
+          {t("clientOnboarding.flagsPrefix")} {activeFlags.map((k) => flagLabel(k)).join(", ")}
         </p>
       ) : null}
 
@@ -240,26 +252,32 @@ export function ClientOnboardingSection({ clientId, residentPathId }: { clientId
                 data-testid={`resident-onboarding-day-${d.dayNumber}`}
               >
                 <span style={{ fontWeight: 600, fontSize: "0.86rem", color: "var(--va-navy)" }}>
-                  Day {d.dayNumber}
+                  {t("clientOnboarding.dayLabel", { day: d.dayNumber })}
                   <span style={{ fontWeight: 500, color: "var(--va-slate-500)", marginLeft: 8 }}>
-                    {d.capturedCount}/{d.totalQuestions} topics · {d.sessionCompleted ? "Session done" : "Session open"}
+                    {t("clientOnboarding.topicsMeta", {
+                      captured: d.capturedCount,
+                      total: d.totalQuestions,
+                      session: d.sessionCompleted ? t("clientOnboarding.sessionDone") : t("clientOnboarding.sessionOpen"),
+                    })}
                   </span>
                 </span>
-                <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>{expanded ? "Hide answers" : "Show answers"}</span>
+                <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
+                  {expanded ? t("clientOnboarding.hideAnswers") : t("clientOnboarding.showAnswers")}
+                </span>
               </button>
               {expanded ? (
                 <div style={{ padding: "0.65rem 0.75rem", borderTop: "1px solid var(--va-slate-100)" }}>
                   {answers.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>No captured answers for this day yet.</p>
+                    <p style={{ margin: 0, fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>{t("clientOnboarding.noAnswersDay")}</p>
                   ) : (
                     <ul style={{ margin: 0, paddingLeft: "1.1rem", display: "grid", gap: 10 }}>
                       {answers.map((r) => (
                         <li key={r.questionId} style={{ fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>
                           <span style={{ fontWeight: 600, color: "var(--va-navy)" }}>{humanizeQuestionId(r.questionId)}</span>
-                          <div style={{ marginTop: 2, whiteSpace: "pre-wrap" }}>{formatResponseValue(r.responseValue)}</div>
+                          <div style={{ marginTop: 2, whiteSpace: "pre-wrap" }}>{formatResponseValue(r.responseValue, emDash)}</div>
                           {r.verbatimTranscript ? (
                             <div style={{ marginTop: 4, fontSize: "0.75rem", color: "var(--va-slate-500)" }}>
-                              Transcript: {r.verbatimTranscript}
+                              {t("clientOnboarding.transcriptPrefix")} {r.verbatimTranscript}
                             </div>
                           ) : null}
                         </li>

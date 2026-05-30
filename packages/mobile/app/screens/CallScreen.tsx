@@ -158,10 +158,10 @@ export function CallScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Call</Text>
+          <Text style={styles.headerTitle} tx="callScreen.title" />
         </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>No client selected</Text>
+          <Text style={styles.errorText} tx="callScreen.noClientSelected" />
         </View>
       </View>
     )
@@ -185,7 +185,7 @@ export function CallScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Call with {client.name} v1</Text>
+        <Text style={styles.headerTitle} tx="callScreen.callWith" txOptions={{ name: client.name }} />
       </View>
 
       {!journeyComplete && (
@@ -273,22 +273,22 @@ export function CallScreen() {
       {/* Call Information */}
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         <View style={styles.infoSection}>
-          <Text style={styles.sectionTitle}>Call Details</Text>
+          <Text style={styles.sectionTitle} tx="callScreen.callDetails" />
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Client:</Text>
+            <Text style={styles.infoLabel} tx="callScreen.clientLabel" />
             <Text style={styles.infoValue}>{client.name}</Text>
           </View>
           
           {client.phone && (
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Phone:</Text>
+              <Text style={styles.infoLabel} tx="callScreen.phoneLabel" />
               <Text style={styles.infoValue}>{client.phone}</Text>
             </View>
           )}
 
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Status:</Text>
+            <Text style={styles.infoLabel} tx="callScreen.statusLabel" />
             <Text style={styles.infoValue}>
               {activeCall?.status ? activeCall.status.replace('-', ' ').toUpperCase() : 'INITIATED'}
             </Text>
@@ -300,13 +300,13 @@ export function CallScreen() {
           <Text style={styles.sectionTitle}>
             Live Conversation
             {isConversationFetching && (
-              <Text style={styles.liveIndicator}> 🔄</Text>
+              <Text style={styles.liveIndicator} text=" 🔄" />
             )}
             {typeof callStatusData?.data?.aiSpeaking === 'object' && (callStatusData?.data?.aiSpeaking as { isSpeaking?: boolean })?.isSpeaking && (
-              <Text style={styles.speakingIndicator}> 🎤 AI Speaking...</Text>
+              <Text style={styles.speakingIndicator} tx="callScreen.aiSpeaking" />
             )}
             {typeof callStatusData?.data?.aiSpeaking === 'object' && (callStatusData?.data?.aiSpeaking as { userIsSpeaking?: boolean })?.userIsSpeaking && (
-              <Text style={styles.speakingIndicator}> 👤 User Speaking...</Text>
+              <Text style={styles.speakingIndicator} tx="callScreen.userSpeaking" />
             )}
           </Text>
           

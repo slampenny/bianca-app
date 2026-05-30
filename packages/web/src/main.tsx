@@ -14,9 +14,12 @@ import { StrictMode } from "react"
 import { Provider } from "react-redux"
 import { PersistGate } from "redux-persist/integration/react"
 import { createRoot } from "react-dom/client"
+import "./i18n/i18n"
+import { I18nProvider } from "./i18n/I18nProvider"
 import App from "./App"
 import { persistor, store } from "./store/store"
 import { initWebPreferencesFromStorage } from "./lib/webPreferences"
+import "@bianca-app/ui/styles.css"
 import "./index.css"
 
 initWebPreferencesFromStorage()
@@ -33,7 +36,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
-        <App />
+        <I18nProvider>
+          <App />
+        </I18nProvider>
       </PersistGate>
     </Provider>
   </StrictMode>,

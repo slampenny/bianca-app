@@ -375,23 +375,11 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
         <View style={styles.container}>
           <Text style={styles.title}>✓</Text>
           
-          <Text 
-            preset="heading" 
-            text="Password Reset Successful!" 
-            style={styles.title}
-          />
+          <Text preset="heading" tx="confirmResetScreen.successTitle" style={styles.title} />
           
-          <Text 
-            preset="default"
-            text="Your password has been updated successfully. You can now log in with your new password."
-            style={styles.message}
-          />
+          <Text preset="default" tx="confirmResetScreen.successMessage" style={styles.message} />
           
-          <Text 
-            size="sm"
-            text="Redirecting to login..."
-            style={styles.message}
-          />
+          <Text size="sm" tx="confirmResetScreen.redirecting" style={styles.message} />
         </View>
       </Screen>
     )
@@ -466,8 +454,8 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
 
           <Button
             testID="reset-password-submit"
-            accessibilityLabel="Reset password"
-            text="Reset Password"
+            accessibilityLabel={translate("confirmResetScreen.resetPasswordButton")}
+            tx="confirmResetScreen.resetPasswordButton"
             onPress={handleConfirmReset}
             disabled={isLoading || !newPassword || !confirmPassword}
             loading={isLoading}
@@ -475,7 +463,7 @@ export const ConfirmResetScreen = (props: ConfirmResetScreenRouteProp) => {
           />
 
           <Button
-            text="Back to Login"
+            tx="confirmResetScreen.backToLogin"
             onPress={() => navigation.navigate("Login")}
             preset="default"
             style={styles.backButton}
