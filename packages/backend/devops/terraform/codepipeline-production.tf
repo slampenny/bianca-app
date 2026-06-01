@@ -585,6 +585,13 @@ resource "aws_codepipeline" "production" {
       configuration = {
         ProjectName   = aws_codebuild_project.production_create_green_instance.name
         PrimarySource = "SourceOutput"
+        EnvironmentVariables = jsonencode([
+          {
+            name  = "PIPELINE_EXECUTION_ID"
+            value = "#{codepipeline.PipelineExecutionId}"
+            type  = "PLAINTEXT"
+          }
+        ])
       }
       run_order = 1
     }

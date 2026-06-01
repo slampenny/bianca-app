@@ -23,6 +23,9 @@ phases:
   build:
     commands:
       - |
+        INSTANCE_INFO="$CODEBUILD_SRC_DIR/instance-info.txt"
+        : > "$INSTANCE_INFO"
+
         GREEN_TAG="${GREEN_TAG:-bianca-staging-green}"
         BLUE_TAG="${BLUE_TAG:-bianca-staging}"
         ENVIRONMENT_TAG="${ENVIRONMENT_TAG:-staging}"
@@ -41,10 +44,11 @@ phases:
         fi
         echo "Using launch template: $ACTUAL_LAUNCH_TEMPLATE_NAME, version: $LAUNCH_TEMPLATE_VERSION"
 
-        PIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-}"
+        PIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-${PIPELINE_EXECUTION_ID:-}}"
         if [ -z "$PIPELINE_EXECUTION_ID" ] && [ -n "${CODEPIPELINE_BUILD_ID:-}" ]; then
           PIPELINE_EXECUTION_ID="${CODEPIPELINE_BUILD_ID%%:*}"
         fi
+        export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
         if [ -z "$PIPELINE_EXECUTION_ID" ]; then
           echo "WARNING: Pipeline execution ID not set — green instance will not be execution-scoped"
         else
@@ -61,7 +65,7 @@ phases:
         BLUE_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${BLUE_TAG:-bianca-staging}" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "")
         if [ -n "$BLUE_INSTANCE_ID" ] && [ "$BLUE_INSTANCE_ID" != "None" ]; then
           echo "Found blue instance: $BLUE_INSTANCE_ID"
-          echo "BLUE_INSTANCE_ID=$BLUE_INSTANCE_ID" >> instance-info.txt
+          echo "BLUE_INSTANCE_ID=$BLUE_INSTANCE_ID" >> "$INSTANCE_INFO"
         fi
         echo "Creating new green instance..."
         ENV_TAG="${ENVIRONMENT_TAG:-staging}"
@@ -77,7 +81,10 @@ phases:
           exit 1
         fi
         echo "Green instance created: $GREEN_INSTANCE_ID"
-        echo "GREEN_INSTANCE_ID=$GREEN_INSTANCE_ID" >> instance-info.txt
+        echo "GREEN_INSTANCE_ID=$GREEN_INSTANCE_ID" >> "$INSTANCE_INFO"
+        if [ -n "$PIPELINE_EXECUTION_ID" ]; then
+          echo "PIPELINE_EXECUTION_ID=$PIPELINE_EXECUTION_ID" >> "$INSTANCE_INFO"
+        fi
         echo "Waiting for green instance to be running..."
         if ! aws ec2 wait instance-running --instance-ids $GREEN_INSTANCE_ID; then
           echo "ERROR: Instance failed to reach running state"
@@ -103,7 +110,7 @@ phases:
         fi
         GREEN_INSTANCE_IP=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
         echo "Green instance IP: $GREEN_INSTANCE_IP"
-        echo "GREEN_INSTANCE_IP=$GREEN_INSTANCE_IP" >> instance-info.txt
+        echo "GREEN_INSTANCE_IP=$GREEN_INSTANCE_IP" >> "$INSTANCE_INFO"
         
         # Verify instance is tagged correctly for CodeDeploy
         echo "Verifying instance tags..."
@@ -125,25 +132,23 @@ phases:
   post_build:
     commands:
       - |
-        if [ -f instance-info.txt ]; then
-          cat instance-info.txt
-          echo "Instance information saved for next pipeline stages"
-        else
-          echo "WARNING: instance-info.txt not found"
+        INSTANCE_INFO="$CODEBUILD_SRC_DIR/instance-info.txt"
+        if [ ! -f "$INSTANCE_INFO" ]; then
+          echo "ERROR: instance-info.txt not found at $INSTANCE_INFO"
           exit 1
         fi
-      - |
-        if [ -f instance-info.txt ]; then
-          . instance-info.txt
-          if [ -n "$GREEN_INSTANCE_ID" ]; then
-            INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo "unknown")
-            echo "Final instance state: $INSTANCE_STATE"
-            if [ "$INSTANCE_STATE" != "running" ]; then
-              echo "ERROR: Green instance is not in running state: $INSTANCE_STATE"
-              exit 1
-            fi
-            echo "Green instance verification passed"
+        cat "$INSTANCE_INFO"
+        echo "Instance information saved for next pipeline stages"
+
+        GREEN_INSTANCE_ID=$(grep '^GREEN_INSTANCE_ID=' "$INSTANCE_INFO" | cut -d= -f2-)
+        if [ -n "$GREEN_INSTANCE_ID" ]; then
+          INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids "$GREEN_INSTANCE_ID" --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo "unknown")
+          echo "Final instance state: $INSTANCE_STATE"
+          if [ "$INSTANCE_STATE" != "running" ]; then
+            echo "ERROR: Green instance is not in running state: $INSTANCE_STATE"
+            exit 1
           fi
+          echo "Green instance verification passed"
         fi
 artifacts:
   files:

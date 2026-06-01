@@ -451,6 +451,10 @@ resource "aws_codebuild_project" "staging_create_green_instance" {
       name  = "KEY_NAME"
       value = var.asterisk_key_pair_name
     }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-staging-pipeline"
+    }
   }
 
   source {
@@ -722,6 +726,13 @@ resource "aws_codepipeline" "staging" {
       configuration = {
         ProjectName   = aws_codebuild_project.staging_create_green_instance.name
         PrimarySource = "SourceOutput"
+        EnvironmentVariables = jsonencode([
+          {
+            name  = "PIPELINE_EXECUTION_ID"
+            value = "#{codepipeline.PipelineExecutionId}"
+            type  = "PLAINTEXT"
+          }
+        ])
       }
       run_order = 1
     }

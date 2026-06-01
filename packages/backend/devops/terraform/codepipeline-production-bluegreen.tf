@@ -56,6 +56,10 @@ resource "aws_codebuild_project" "production_create_green_instance" {
       name  = "ENVIRONMENT_TAG"
       value = "production"
     }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-production-pipeline"
+    }
   }
 
   source {
