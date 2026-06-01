@@ -181,6 +181,29 @@ const orgSchema = mongoose.Schema(
         },
       ],
     },
+    /** Automated Daily Wellness Digest email scheduling (org-local send time). */
+    dailyDigestSettings: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      /** Org-local HH:mm; null uses platform default from config. */
+      sendTime: {
+        type: String,
+        trim: true,
+        default: null,
+        validate: {
+          validator(v) {
+            if (v == null || String(v).trim() === '') {
+              return true;
+            }
+            const { isValidHHmm } = require('../utils/digestScheduler.utils');
+            return isValidHHmm(v);
+          },
+          message: 'dailyDigestSettings.sendTime must be HH:mm (24-hour)',
+        },
+      },
+    },
   },
   {
     timestamps: true,

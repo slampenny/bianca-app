@@ -461,11 +461,47 @@ describe('Caregiver routes', () => {
         isEmailVerified: true, // Set by fixture
       });
       expect(res.body).toHaveProperty('clients');
+      expect(res.body.notificationPreferences).toEqual({ dailyDigestEmail: false });
 
       const dbCaregiver = await Caregiver.findById(caregiver.id);
       expect(dbCaregiver).toBeDefined();
       expect(dbCaregiver.password).not.toBe(updateBody.password);
       expect(dbCaregiver).toMatchObject({ name: updateBody.name, email: updateBody.email, role: 'staff' });
+    });
+
+    test('should update notificationPreferences.dailyDigestEmail', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+
+      const enableRes = await request(app)
+        .patch(`/v1/caregivers/${caregiver.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ notificationPreferences: { dailyDigestEmail: true } })
+        .expect(httpStatus.OK);
+
+      expect(enableRes.body.notificationPreferences).toEqual({ dailyDigestEmail: true });
+
+      const dbEnabled = await Caregiver.findById(caregiver.id);
+      expect(dbEnabled.notificationPreferences.dailyDigestEmail).toBe(true);
+
+      const disableRes = await request(app)
+        .patch(`/v1/caregivers/${caregiver.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ notificationPreferences: { dailyDigestEmail: false } })
+        .expect(httpStatus.OK);
+
+      expect(disableRes.body.notificationPreferences).toEqual({ dailyDigestEmail: false });
+    });
+
+    test('should reject unknown notificationPreferences keys', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { caregiver, accessToken } = await insertCaregivertoOrgAndReturnToken(org, caregiverOne);
+
+      await request(app)
+        .patch(`/v1/caregivers/${caregiver.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({ notificationPreferences: { dailyDigestEmail: true, marketingEmail: true } })
+        .expect(httpStatus.BAD_REQUEST);
     });
 
     test('should return 401 error if access token is missing', async () => {

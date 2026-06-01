@@ -50,6 +50,11 @@ const updateCaregiver = {
       password: Joi.string().required().custom(password).optional(),
       themePreference: Joi.string().valid('healthcare', 'colorblind').optional(),
       preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar', 'hu').optional(),
+      notificationPreferences: Joi.object()
+        .keys({
+          dailyDigestEmail: Joi.boolean().optional(),
+        })
+        .optional(),
       externalId: Joi.string().trim().allow('', null).optional(),
       active: Joi.boolean().optional(),
       clients: Joi.array().items(Joi.string().custom(objectId)),

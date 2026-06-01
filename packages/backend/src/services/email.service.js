@@ -302,6 +302,8 @@ const sendEmail = async (to, subject, text, html, attachments = null) => {
       logger.info(`[Email Service] Captured test email to ${to} with subject: ${subject}`);
       return {
         messageId: record.id,
+        provider: 'capture',
+        raw: record,
         envelope: { from: senderAddress, to },
         accepted: [to],
       };
@@ -360,7 +362,12 @@ const sendEmail = async (to, subject, text, html, attachments = null) => {
            logger.info(`Email sent to ${to}. Response: ${JSON.stringify(info)}`);
         }
         
-        return info;
+        return {
+          messageId: info.messageId || info.MessageId || null,
+          provider: config.env === 'test' || process.env.E2E_CAPTURE_EMAILS === '1' ? 'capture' : 'smtp',
+          raw: info,
+          ...info,
+        };
       } catch (error) {
         lastError = error;
         retries--;

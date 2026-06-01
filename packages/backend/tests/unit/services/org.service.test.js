@@ -70,6 +70,20 @@ describe('orgService', () => {
     expect(updatedOrg).toHaveProperty('country', 'CA');
   });
 
+  it('should update dailyDigestSettings', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const enabled = await orgService.updateOrgById(org.id, {
+      dailyDigestSettings: { enabled: true, sendTime: '17:30' },
+    });
+    expect(enabled.dailyDigestSettings.enabled).toBe(true);
+    expect(enabled.dailyDigestSettings.sendTime).toBe('17:30');
+
+    const disabled = await orgService.updateOrgById(org.id, {
+      dailyDigestSettings: { enabled: false },
+    });
+    expect(disabled.dailyDigestSettings.enabled).toBe(false);
+  });
+
   it('should delete an org', async () => {
     const [org] = await insertOrgs([orgOne]);
     await orgService.deleteOrgById(org.id);

@@ -71,6 +71,8 @@
 		"emailScreenHint": "Az „E-mail összefoglaló” gombbal küldhet másolatot a megerősített fiók e-mailjére, vagy jelölje be az „E-mail, ha elkészítem” opciót az összefoglaló készítésekor.",
 		"emailSubject": "Napi gondozási összefoglaló — %s",
 		"emailPlainIntro": "Ez az üzenet az Önhöz rendelt lakók jólétellenőrzéseit foglalja össze. A teljes elrendezéshez nyissa meg a HTML változatot.",
-		"emailConfidentialFooter": "Bizalmas — csak a címzett gondozó számára. Ne továbbítsa."
+		"emailConfidentialFooter": "Bizalmas — csak a címzett gondozó számára. Ne továbbítsa.",
+		"emailAiDisclaimer": "This digest is automatically generated from wellness check-in calls. It is not clinical advice and should be reviewed alongside the original call record when decisions are needed.",
+		"safeNoSummaryFallback": "Check-in completed; no written summary is available yet."
 	}
 }

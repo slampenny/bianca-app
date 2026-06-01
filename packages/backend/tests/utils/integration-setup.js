@@ -244,7 +244,7 @@ jest.mock('../../src/services/stripeUsage.service', () => ({
     totalUsage: 0,
     items: []
   }),
-  reportCallUsage: jest.fn().mockResolvedValue({ success: true })
+  reportConversationUsage: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 // Don't mock paymentMethod.service - we want to test our own business logic

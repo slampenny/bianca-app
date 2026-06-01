@@ -50,6 +50,8 @@ export function SettingsPage() {
   const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
   const [preferredLanguage, setPreferredLanguage] = useState("en")
+  const [dailyDigestEmail, setDailyDigestEmail] = useState(false)
+  const [notifBanner, setNotifBanner] = useState("")
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
@@ -71,6 +73,7 @@ export function SettingsPage() {
     setEmail(profile.email ?? "")
     setPhone(profile.phone ?? "")
     setPreferredLanguage(profile.preferredLanguage || "en")
+    setDailyDigestEmail(profile.notificationPreferences?.dailyDigestEmail === true)
     setAvatarFile(null)
     setAvatarPreview(null)
   }, [profile])
@@ -95,6 +98,22 @@ export function SettingsPage() {
   const onFontChange = (pct: number) => {
     setFontPct(pct)
     applyWebFontScalePct(pct)
+  }
+
+  const handleDailyDigestEmailChange = async (enabled: boolean) => {
+    setNotifBanner("")
+    setDailyDigestEmail(enabled)
+    if (!id) return
+    try {
+      await updateCaregiver({
+        id,
+        caregiver: { notificationPreferences: { dailyDigestEmail: enabled } },
+      }).unwrap()
+      setNotifBanner(t("settings.dailyDigestEmailSaved"))
+    } catch {
+      setDailyDigestEmail(!enabled)
+      setNotifBanner(t("settings.dailyDigestEmailSaveFailed"))
+    }
   }
 
   const handleResendEmail = async () => {
@@ -334,6 +353,39 @@ export function SettingsPage() {
             </option>
           ))}
         </AuthSelectField>
+      </div>
+
+      <div className="va-page-section">
+        <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("settings.notificationsTitle")}</h2>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 12,
+            cursor: saving ? "wait" : "pointer",
+            fontSize: "0.875rem",
+          }}
+        >
+          <input
+            type="checkbox"
+            data-testid="settings-daily-digest-email"
+            checked={dailyDigestEmail}
+            disabled={saving}
+            onChange={(ev) => void handleDailyDigestEmailChange(ev.target.checked)}
+            style={{ marginTop: 3 }}
+          />
+          <span>
+            <span style={{ display: "block", fontWeight: 500 }}>{t("settings.dailyDigestEmailLabel")}</span>
+            <span style={{ display: "block", marginTop: 4, color: "var(--va-slate-500)", fontSize: "0.8125rem", lineHeight: 1.45 }}>
+              {t("settings.dailyDigestEmailHelper")}
+            </span>
+          </span>
+        </label>
+        {notifBanner ? (
+          <p style={{ fontSize: "0.8125rem", marginTop: 10, color: "var(--va-slate-600)" }} role="status">
+            {notifBanner}
+          </p>
+        ) : null}
       </div>
 
       <div className="va-page-section">

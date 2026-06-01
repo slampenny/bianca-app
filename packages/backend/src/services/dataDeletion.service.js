@@ -9,6 +9,7 @@
 
 const { getJurisdiction, getDataRetentionPeriod, shouldAutoDeleteData } = require('../utils/jurisdiction.utils');
 const { Org, Client, Call, Conversation, Message, MedicalAnalysis, ConsentRecord } = require('../models');
+const digestCleanup = require('./caregiverDailyDigestCleanup.service');
 const logger = require('../config/logger');
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
@@ -246,6 +247,36 @@ async function deleteExpiredConsentRecords(country) {
 }
 
 /**
+ * Redact or delete expired daily digests aligned with conversation retention.
+ * @param {string} country - Organization country
+ * @returns {Promise<Object>} - Redaction statistics
+ */
+async function deleteExpiredDigests(country) {
+  const jurisdiction = getJurisdiction(country);
+  const retention = getDataRetentionPeriod(country, 'conversations');
+
+  if (!retention.autoDelete) {
+    logger.info(`[Data Deletion] Skipping digest redaction for ${jurisdiction.jurisdiction} (retention required)`);
+    return { redacted: 0, deleted: 0 };
+  }
+
+  const stats = await digestCleanup.deleteExpiredDigestsForCountry(country, retention.years);
+  logger.info(
+    `[Data Deletion] Digest cleanup for ${jurisdiction.jurisdiction}: redacted ${stats.redacted}, deleted ${stats.deleted} drafts (older than ${retention.years} years)`
+  );
+  return stats;
+}
+
+/**
+ * Redact digests with orphaned references for a country.
+ * @param {string} country - Organization country
+ * @returns {Promise<Object>} - Cleanup statistics
+ */
+async function cleanupOrphanedDigestsForCountry(country) {
+  return digestCleanup.cleanupOrphanedDigests(country);
+}
+
+/**
  * Process data deletion for a specific organization
  * @param {string} country - Organization country code
  * @returns {Promise<Object>} - Deletion statistics
@@ -273,6 +304,8 @@ async function processDataDeletionForOrg(country) {
     conversations: 0,
     medicalAnalysis: 0,
     consentRecords: 0,
+    dailyDigests: { redacted: 0, deleted: 0 },
+    orphanedDigests: { redacted: 0, deleted: 0, entriesStripped: 0 },
     total: 0
   };
   
@@ -281,8 +314,18 @@ async function processDataDeletionForOrg(country) {
     stats.conversations = await deleteExpiredConversations(country);
     stats.medicalAnalysis = await deleteExpiredMedicalAnalysis(country);
     stats.consentRecords = await deleteExpiredConsentRecords(country);
+    stats.dailyDigests = await deleteExpiredDigests(country);
+    stats.orphanedDigests = await cleanupOrphanedDigestsForCountry(country);
     
-    stats.total = stats.calls + stats.conversations + stats.medicalAnalysis + stats.consentRecords;
+    stats.total =
+      stats.calls +
+      stats.conversations +
+      stats.medicalAnalysis +
+      stats.consentRecords +
+      stats.dailyDigests.redacted +
+      stats.dailyDigests.deleted +
+      stats.orphanedDigests.redacted +
+      stats.orphanedDigests.deleted;
     
     logger.info(`[Data Deletion] Completed deletion for ${jurisdiction.jurisdiction}:`, stats);
   } catch (error) {
@@ -413,8 +456,20 @@ async function handleDeletionRequest(userId, dataType = 'all') {
     });
     result.deleted.medicalAnalysis = deletedAnalysis.deletedCount;
   }
+
+  if (dataType === 'all' || dataType === 'calls' || dataType === 'conversations') {
+    result.deleted.dailyDigests = await digestCleanup.cleanupDigestsForClients(clientIds, 'erasure_request');
+  }
   
-  result.deleted.total = Object.values(result.deleted).reduce((sum, count) => sum + (typeof count === 'number' ? count : 0), 0);
+  result.deleted.total = Object.values(result.deleted).reduce((sum, count) => {
+    if (typeof count === 'number') {
+      return sum + count;
+    }
+    if (count && typeof count === 'object') {
+      return sum + (count.redacted || 0) + (count.deleted || 0);
+    }
+    return sum;
+  }, 0);
   
   logger.info(`[Data Deletion] User deletion request completed:`, result);
   
@@ -429,4 +484,6 @@ module.exports = {
   deleteExpiredConversations,
   deleteExpiredMedicalAnalysis,
   deleteExpiredConsentRecords,
+  deleteExpiredDigests,
+  cleanupOrphanedDigestsForCountry,
 };

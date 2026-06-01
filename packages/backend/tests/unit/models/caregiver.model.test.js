@@ -154,6 +154,32 @@ describe('Caregiver model', () => {
     });
   });
 
+  describe('Notification preferences', () => {
+    test('should default dailyDigestEmail to false', () => {
+      const caregiver = new Caregiver({
+        name: faker.name.findName(),
+        email: faker.internet.email().toLowerCase(),
+        password: 'password1',
+        phone: faker.phone.phoneNumberFormat(1),
+        org: testOrg._id,
+      });
+      expect(caregiver.notificationPreferences.dailyDigestEmail).toBe(false);
+    });
+
+    test('should persist dailyDigestEmail opt-in', async () => {
+      const caregiver = await Caregiver.create({
+        name: faker.name.findName(),
+        email: faker.internet.email().toLowerCase(),
+        password: 'password1',
+        phone: faker.phone.phoneNumberFormat(1),
+        org: testOrg._id,
+        notificationPreferences: { dailyDigestEmail: true },
+      });
+      const reloaded = await Caregiver.findById(caregiver._id);
+      expect(reloaded.notificationPreferences.dailyDigestEmail).toBe(true);
+    });
+  });
+
   describe('Account security fields', () => {
     test('should have account locked field with default false', () => {
       const newCaregiver = {

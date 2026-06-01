@@ -5,7 +5,7 @@ const { Conversation, Client, Org, Call } = require('../../../src/models');
 // Mock config and logger before requiring agenda
 jest.mock('../../../src/config/config', () => ({
   mongoose: { url: 'mongodb://localhost:27017/test' },
-  billing: { enableDailyBilling: false, billingTime: '00:00' },
+  billing: { enableUsageReporting: false, usageReportingTime: '00:00' },
 }));
 
 jest.mock('../../../src/config/logger', () => ({

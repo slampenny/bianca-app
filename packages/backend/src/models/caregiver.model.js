@@ -191,6 +191,12 @@ const caregiverSchema = mongoose.Schema(
       enum: ['organization', 'caregiver', 'agingInPlace'],
       required: false,
     },
+    notificationPreferences: {
+      dailyDigestEmail: {
+        type: Boolean,
+        default: false,
+      },
+    },
     clients: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Client' }],
   },
   {

@@ -1,5 +1,5 @@
 const logger = require('../config/logger');
-const { Org, Client, Call, Conversation } = require('../models');
+const { Org, Client, Call } = require('../models');
 const stripeSubscriptionService = require('./stripeSubscription.service');
 const stripeUsageService = require('./stripeUsage.service');
 const stripeSyncService = require('./stripeSync.service');
@@ -53,9 +53,7 @@ const reportConversationUsage = async (orgId, call) => {
       billingConfig
     );
 
-    // Note: We don't mark call as billed yet
-    // Stripe will create invoices on billing cycle, and webhooks will sync them
-    // The call.lineItemId will be set when the invoice is synced
+    await Call.updateOne({ _id: call._id }, { stripeUsageReportedAt: new Date() });
 
     logger.debug(
       `Reported call ${call._id} usage to Stripe for org ${orgId}`
@@ -67,9 +65,8 @@ const reportConversationUsage = async (orgId, call) => {
 };
 
 /**
- * Process billing for an organization
- * This maintains backward compatibility with existing billing logic
- * while using Stripe for actual billing
+ * Process usage reporting for an organization.
+ * Reports unreported call usage to Stripe; Stripe invoices monthly.
  * @param {string} orgId - Organization ID
  * @returns {Promise<void>}
  */
@@ -80,33 +77,28 @@ const processOrgBilling = async (orgId) => {
       throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
     }
 
-    logger.info(`Processing billing for organization: ${org.name} (${orgId})`);
+    logger.info(`[Stripe Billing] Processing usage for organization: ${org.name} (${orgId})`);
 
-    // Get all patients for this organization
     const clients = await Client.find({ org: orgId });
     if (clients.length === 0) {
-      logger.info(`No clients found for org ${org.name}, skipping billing`);
+      logger.info(`[Stripe Billing] No clients found for org ${org.name}, skipping`);
       return;
     }
 
-    // Get unbilled calls from the last 24 hours (Call model tracks billing, not Conversation)
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-
     const unbilledCalls = await Call.find({
       clientId: { $in: clients.map((c) => c._id) },
-      lineItemId: null, // Not yet billed
-      endTime: { $gte: yesterday }, // From last 24 hours
-      cost: { $gt: 0 }, // Has a cost
+      lineItemId: null,
+      stripeUsageReportedAt: null,
+      cost: { $gt: 0 },
     }).populate('clientId');
 
     if (unbilledCalls.length === 0) {
-      logger.info(`No unbilled calls found for org ${org.name}`);
+      logger.info(`[Stripe Billing] No unreported calls found for org ${org.name}`);
       return;
     }
 
     logger.info(
-      `Found ${unbilledCalls.length} unbilled calls for org ${org.name}`
+      `[Stripe Billing] Found ${unbilledCalls.length} unreported calls for org ${org.name}`
     );
 
     // Ensure subscription exists
@@ -135,9 +127,38 @@ const processOrgBilling = async (orgId) => {
       // Don't fail the entire process if sync fails
     }
 
-    logger.info(`Completed billing processing for org ${org.name}`);
+    logger.info(`[Stripe Billing] Completed usage reporting for org ${org.name}`);
   } catch (error) {
-    logger.error(`Error processing billing for org ${orgId}:`, error);
+    logger.error(`[Stripe Billing] Error processing usage for org ${orgId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Report pending call usage to Stripe for all organizations.
+ * Stripe creates and charges invoices on the monthly billing cycle.
+ * @returns {Promise<void>}
+ */
+const processUsageReporting = async () => {
+  logger.info('[Stripe Billing] Starting usage reporting process...');
+
+  try {
+    const orgs = await Org.find({});
+    logger.info(`[Stripe Billing] Processing usage for ${orgs.length} organizations`);
+
+    for (const org of orgs) {
+      try {
+        await processOrgBilling(org._id);
+      } catch (error) {
+        logger.error(
+          `[Stripe Billing] Error processing usage for org ${org._id}: ${error.message}`
+        );
+      }
+    }
+
+    logger.info('[Stripe Billing] Usage reporting process completed');
+  } catch (error) {
+    logger.error(`[Stripe Billing] Error in usage reporting process: ${error.message}`);
     throw error;
   }
 };
@@ -246,6 +267,7 @@ const getUnbilledCosts = async (orgId, days = 7) => {
 module.exports = {
   reportConversationUsage,
   processOrgBilling,
+  processUsageReporting,
   getUnbilledCosts,
 };
 

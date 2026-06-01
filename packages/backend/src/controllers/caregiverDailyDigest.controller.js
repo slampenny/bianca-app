@@ -12,7 +12,10 @@ const createDigest = catchAsync(async (req, res) => {
 });
 
 const listDigests = catchAsync(async (req, res) => {
-  const filter = pick(req.query, ['caregiverId', 'digestDate']);
+  const filter = pick(req.query, ['caregiverId', 'digestDate', 'includeAllVersions']);
+  if (filter.includeAllVersions != null) {
+    filter.includeAllVersions = filter.includeAllVersions === true || filter.includeAllVersions === 'true';
+  }
   const options = pick(req.query, ['sortBy', 'limit', 'page']);
   const result = await caregiverDailyDigestService.queryDigests(req.caregiver, filter, options);
   res.send(result);

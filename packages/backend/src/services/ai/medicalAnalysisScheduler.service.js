@@ -6,6 +6,7 @@ const conversationService = require('../conversation.service');
 const clientService = require('../client.service');
 const logger = require('../../config/logger');
 const config = require('../../config/config');
+const { scheduleRecurringJob } = require('../../utils/agenda.utils');
 
 /**
  * Medical Analysis Scheduler Service
@@ -86,16 +87,26 @@ class MedicalAnalysisScheduler {
    */
   async scheduleRecurringJobs() {
     try {
-      // Schedule monthly analysis (1st of every month at 9 AM)
-      await this.agenda.every(this.config.analysisSchedule, 'monthly-medical-analysis', {
-        type: 'monthly',
-        description: 'Monthly medical pattern analysis for all clients'
+      await scheduleRecurringJob({
+        agenda: this.agenda,
+        jobName: 'monthly-medical-analysis',
+        interval: this.config.analysisSchedule,
+        data: {
+          type: 'monthly',
+          description: 'Monthly medical pattern analysis for all clients',
+        },
+        logger,
       });
 
-      // Schedule cleanup job (1st of every month at 10 PM)
-      await this.agenda.every('0 22 1 * *', 'cleanup-old-analyses', {
-        type: 'cleanup',
-        description: 'Cleanup old medical analysis results'
+      await scheduleRecurringJob({
+        agenda: this.agenda,
+        jobName: 'cleanup-old-analyses',
+        interval: '0 22 1 * *',
+        data: {
+          type: 'cleanup',
+          description: 'Cleanup old medical analysis results',
+        },
+        logger,
       });
 
       logger.info('Recurring medical analysis jobs scheduled');

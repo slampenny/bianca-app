@@ -58,6 +58,22 @@ describe('caregiverService', () => {
     expect(updatedCaregiver).toHaveProperty('name', updateBody.name);
   });
 
+  it('should update notificationPreferences.dailyDigestEmail', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);
+    expect(caregiver.notificationPreferences.dailyDigestEmail).toBe(false);
+
+    const enabled = await caregiverService.updateCaregiverById(caregiver.id, {
+      notificationPreferences: { dailyDigestEmail: true },
+    });
+    expect(enabled.notificationPreferences.dailyDigestEmail).toBe(true);
+
+    const disabled = await caregiverService.updateCaregiverById(caregiver.id, {
+      notificationPreferences: { dailyDigestEmail: false },
+    });
+    expect(disabled.notificationPreferences.dailyDigestEmail).toBe(false);
+  });
+
   it('should delete a caregiver by id', async () => {
     const [org] = await insertOrgs([orgOne]);
     const caregiver = await caregiverService.createCaregiver(org.id, caregiverOneWithPassword);

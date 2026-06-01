@@ -1,60 +1,24 @@
-<testsuites id="" name="" tests="10" failures="0" skipped="6" errors="0" time="129.771001">
-<testsuite name="a11y-smoke.e2e.test.ts" timestamp="2026-05-29T23:57:15.070Z" hostname="chromium" tests="10" failures="0" skipped="6" time="128.898" errors="0">
-<testcase name="Accessibility smoke › login page" classname="a11y-smoke.e2e.test.ts" time="1.248">
+<testsuites id="" name="" tests="10" failures="0" skipped="0" errors="0" time="15.463212">
+<testsuite name="a11y-smoke.e2e.test.ts" timestamp="2026-06-01T15:04:25.533Z" hostname="chromium" tests="10" failures="0" skipped="0" time="14.524" errors="0">
+<testcase name="Accessibility smoke › login page" classname="a11y-smoke.e2e.test.ts" time="1.319">
 </testcase>
-<testcase name="Accessibility smoke › register page" classname="a11y-smoke.e2e.test.ts" time="1.1">
+<testcase name="Accessibility smoke › register page" classname="a11y-smoke.e2e.test.ts" time="1.263">
 </testcase>
-<testcase name="Accessibility smoke › forgot password page" classname="a11y-smoke.e2e.test.ts" time="1.09">
+<testcase name="Accessibility smoke › forgot password page" classname="a11y-smoke.e2e.test.ts" time="1.253">
 </testcase>
-<testcase name="Accessibility smoke › authenticated app pages › residents page" classname="a11y-smoke.e2e.test.ts" time="20.727">
-<properties>
-<property name="skip" value="Backend login unavailable or MFA required — skipping authenticated a11y smoke">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testcase name="Accessibility smoke › authenticated app pages › residents page" classname="a11y-smoke.e2e.test.ts" time="1.656">
 </testcase>
-<testcase name="Accessibility smoke › authenticated app pages › reports page" classname="a11y-smoke.e2e.test.ts" time="20.708">
-<properties>
-<property name="skip" value="Backend login unavailable or MFA required — skipping authenticated a11y smoke">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testcase name="Accessibility smoke › authenticated app pages › reports page" classname="a11y-smoke.e2e.test.ts" time="1.578">
 </testcase>
-<testcase name="Accessibility smoke › authenticated app pages › settings page" classname="a11y-smoke.e2e.test.ts" time="20.729">
-<properties>
-<property name="skip" value="Backend login unavailable or MFA required — skipping authenticated a11y smoke">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testcase name="Accessibility smoke › authenticated app pages › settings page" classname="a11y-smoke.e2e.test.ts" time="1.564">
 </testcase>
-<testcase name="Accessibility smoke › authenticated app pages › dashboard page" classname="a11y-smoke.e2e.test.ts" time="20.754">
-<properties>
-<property name="skip" value="Backend login unavailable or MFA required — skipping authenticated a11y smoke">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testcase name="Accessibility smoke › authenticated app pages › dashboard page" classname="a11y-smoke.e2e.test.ts" time="1.547">
 </testcase>
-<testcase name="Accessibility smoke › authenticated app pages › alerts page" classname="a11y-smoke.e2e.test.ts" time="20.733">
-<properties>
-<property name="skip" value="Backend login unavailable or MFA required — skipping authenticated a11y smoke">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testcase name="Accessibility smoke › authenticated app pages › alerts page" classname="a11y-smoke.e2e.test.ts" time="1.631">
 </testcase>
-<testcase name="Accessibility smoke › authenticated app pages › caregivers page" classname="a11y-smoke.e2e.test.ts" time="20.701">
-<properties>
-<property name="skip" value="Backend login unavailable or MFA required — skipping authenticated a11y smoke">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testcase name="Accessibility smoke › authenticated app pages › caregivers page" classname="a11y-smoke.e2e.test.ts" time="1.54">
 </testcase>
-<testcase name="Accessibility smoke › check email page" classname="a11y-smoke.e2e.test.ts" time="1.108">
+<testcase name="Accessibility smoke › check email page" classname="a11y-smoke.e2e.test.ts" time="1.173">
 </testcase>
 </testsuite>
 </testsuites>

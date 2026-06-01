@@ -21,7 +21,9 @@ export type CaregiverDailyDigestPayload = {
   title: string
   subtitle: string
   dateLabel: string
-  digestDateUtc: string
+  digestDayStartIso?: string
+  /** @deprecated Legacy payloads only; prefer digestDayStartIso */
+  digestDateUtc?: string
   labels: {
     conversationSummary: string
     sentiment: string
@@ -38,10 +40,21 @@ export type CaregiverDailyDigest = {
   org: string
   caregiver: string
   digestDate: string
+  version?: number
+  builtAt?: string
   locale: string
   status: "draft" | "sent" | string
   payload: CaregiverDailyDigestPayload
+  payloadHash?: string | null
   sentAt?: string | null
+  sentPayloadHash?: string | null
+  emailMessageId?: string | null
+  emailRecipient?: string | null
+  emailSubject?: string | null
+  previousDigest?: string | null
+  supersedesDigest?: string | null
+  supersedesDigestMeta?: { id: string; version: number; status: string } | null
+  listScope?: "latestPerDigestDate" | "allVersions" | string
   createdAt?: string
   updatedAt?: string
 }
@@ -61,7 +74,7 @@ export const dailyDigestApi = createApi({
   endpoints: (builder) => ({
     listCaregiverDailyDigests: builder.query<
       CaregiverDailyDigestPages,
-      { caregiverId?: string; digestDate?: string; limit?: number; page?: number; sortBy?: string }
+      { caregiverId?: string; digestDate?: string; includeAllVersions?: boolean; limit?: number; page?: number; sortBy?: string }
     >({
       query: (params) => ({
         url: "/caregiver-daily-digests",

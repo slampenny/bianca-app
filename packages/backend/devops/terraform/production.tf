@@ -223,7 +223,10 @@ resource "aws_iam_role_policy_attachment" "production_ssm_managed_core" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Production EBS Volume for MongoDB data persistence
+# Production EBS Volume for MongoDB data persistence.
+# Attachment is NOT managed here: blue/green swap detaches/reattaches this volume between
+# instances (see buildspec-swap-and-terminate.yml). Managing aws_volume_attachment causes
+# VolumeInUse on apply. Volume is identified by tag Name=bianca-production-mongodb-data.
 resource "aws_ebs_volume" "production_mongodb" {
   availability_zone = aws_subnet.production_public.availability_zone
   size              = 20 # 20GB same as staging for cost optimization
@@ -233,6 +236,10 @@ resource "aws_ebs_volume" "production_mongodb" {
     Name        = "bianca-production-mongodb-data"
     Environment = "production"
     Purpose     = "MongoDB data persistence"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -715,6 +722,16 @@ resource "aws_sns_topic" "production_alerts" {
 }
 
 # Lambda function removed - not essential for basic production setup
+
+output "production_mongodb_volume_id" {
+  value       = aws_ebs_volume.production_mongodb.id
+  description = "EBS volume ID for production MongoDB data (persistent across instance replacements)"
+}
+
+output "production_mongodb_volume_tag" {
+  value       = aws_ebs_volume.production_mongodb.tags["Name"]
+  description = "Name tag used by blue/green swap to find the production MongoDB volume"
+}
 
 # Data sources are defined in main.tf
 

@@ -259,6 +259,17 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
     }
     updateBody.phone = normalizedPhone;
   }
+
+  if (updateBody.notificationPreferences !== undefined) {
+    const { dailyDigestEmail } = updateBody.notificationPreferences;
+    if (dailyDigestEmail !== undefined) {
+      if (!caregiver.notificationPreferences) {
+        caregiver.notificationPreferences = { dailyDigestEmail: false };
+      }
+      caregiver.notificationPreferences.dailyDigestEmail = dailyDigestEmail === true;
+    }
+    delete updateBody.notificationPreferences;
+  }
   
   // If this is an invited user completing registration (setting password), promote them to staff
   // Also promote if they already have a password and are adding a phone (completing profile)
@@ -307,6 +318,9 @@ const deleteCaregiverById = async (caregiverId) => {
       await client.save();
       logger.debug(`Caregiver ${caregiverId} removed from client ${client._id}`);
     }
+
+    const digestCleanup = require('./caregiverDailyDigestCleanup.service');
+    await digestCleanup.cleanupDigestsForCaregiver(caregiverId, 'caregiver_deleted');
 
     // Remove caregiver
     await caregiver.delete();

@@ -84,6 +84,19 @@ const updateOrgById = async (orgId, updateBody) => {
     org.voiceOnboarding = updateBody.voiceOnboarding;
     const { voiceOnboarding, ...restUpdateBody } = updateBody;
     Object.assign(org, restUpdateBody);
+  } else if (updateBody.dailyDigestSettings) {
+    if (!org.dailyDigestSettings) {
+      org.dailyDigestSettings = { enabled: false, sendTime: null };
+    }
+    const { enabled, sendTime } = updateBody.dailyDigestSettings;
+    if (enabled !== undefined) {
+      org.dailyDigestSettings.enabled = enabled === true;
+    }
+    if (sendTime !== undefined) {
+      org.dailyDigestSettings.sendTime = sendTime ? String(sendTime).trim() : null;
+    }
+    const { dailyDigestSettings, ...restUpdateBody } = updateBody;
+    Object.assign(org, restUpdateBody);
   } else {
     Object.assign(org, updateBody);
   }
@@ -102,6 +115,9 @@ const deleteOrgById = async (orgId) => {
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
   }
+
+  const digestCleanup = require('./caregiverDailyDigestCleanup.service');
+  await digestCleanup.cleanupDigestsForOrg(orgId, 'org_deleted');
 
   // Soft delete org
   await org.delete();

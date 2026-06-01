@@ -339,7 +339,10 @@ resource "aws_eip_association" "staging" {
   allocation_id = aws_eip.staging.id
 }
 
-# EBS Volume for MongoDB data persistence
+# EBS Volume for MongoDB data persistence.
+# Attachment is NOT managed here: blue/green swap detaches/reattaches this volume between
+# instances (see buildspec-swap-and-terminate.yml). Managing aws_volume_attachment causes
+# VolumeInUse on apply. Volume is identified by tag Name=bianca-staging-mongodb-data.
 resource "aws_ebs_volume" "staging_mongodb" {
   availability_zone = aws_subnet.staging_public.availability_zone
   size              = 20 # 20GB should be plenty for staging
@@ -349,6 +352,10 @@ resource "aws_ebs_volume" "staging_mongodb" {
     Name        = "bianca-staging-mongodb-data"
     Environment = "staging"
     Purpose     = "MongoDB data persistence"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -827,6 +834,16 @@ output "staging_frontend_url" {
 output "staging_frontend_s3_bucket" {
   value       = aws_s3_bucket.staging_frontend.bucket
   description = "Staging frontend S3 bucket name"
+}
+
+output "staging_mongodb_volume_id" {
+  value       = aws_ebs_volume.staging_mongodb.id
+  description = "EBS volume ID for staging MongoDB data (persistent across instance replacements)"
+}
+
+output "staging_mongodb_volume_tag" {
+  value       = aws_ebs_volume.staging_mongodb.tags["Name"]
+  description = "Name tag used by blue/green swap to find the staging MongoDB volume"
 }
 
 ################################################################################

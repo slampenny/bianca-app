@@ -160,6 +160,10 @@ const envVarsSchema = Joi.object({
 
   /** "true" = use legacy keyword/DB phrase/regex detectors; "false" (default) = embedding-first for fraud + emergency */
   USE_KEYWORD_BASED_DETECTORS: Joi.string().valid('true', 'false').optional(),
+
+  DAILY_DIGEST_SCHEDULER_ENABLED: Joi.string().valid('true', 'false').optional(),
+  DAILY_DIGEST_COORDINATOR_INTERVAL_MINUTES: Joi.number().integer().min(1).max(1440).optional(),
+  DAILY_DIGEST_DEFAULT_SEND_TIME: Joi.string().optional(),
   
 }).unknown();
 
@@ -213,10 +217,22 @@ const baselineConfig = {
   billing: { 
     ratePerMinute: 0.1,
     minimumBillableDuration: 30,
-    enableDailyBilling: true,
-    billingTime: '02:00',
-    autoCharge: true,
+    enableUsageReporting:
+      process.env.BILLING_ENABLE_USAGE_REPORTING !== 'false'
+      && process.env.BILLING_ENABLE_DAILY !== 'false',
+    usageReportingTime: process.env.BILLING_TIME || '02:00',
     gracePeriodDays: 30
+  },
+  dailyDigestScheduler: {
+    enabled: process.env.DAILY_DIGEST_SCHEDULER_ENABLED === 'true',
+    coordinatorIntervalMinutes: (() => {
+      const raw = parseInt(process.env.DAILY_DIGEST_COORDINATOR_INTERVAL_MINUTES, 10);
+      return Number.isFinite(raw) && raw > 0 ? raw : 15;
+    })(),
+    defaultSendTime: process.env.DAILY_DIGEST_DEFAULT_SEND_TIME || '18:00',
+    staleProcessingMinutes: 30,
+    childJobConcurrency: 5,
+    lockLifetimeMs: 10 * 60 * 1000,
   },
   app: {
     rtpPortRange: process.env.APP_RTP_PORT_RANGE || '20002-30000'

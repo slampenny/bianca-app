@@ -26,6 +26,7 @@ const OrgDTO = (org) => {
     requireClientConsent,
     debugAudioUploadEnabled,
     voiceOnboarding,
+    dailyDigestSettings,
   } = orgObj;
   
   const id = _id;
@@ -72,6 +73,10 @@ const OrgDTO = (org) => {
           })),
         }
       : { useDefault: true, days: [] },
+    dailyDigestSettings: {
+      enabled: dailyDigestSettings?.enabled === true,
+      sendTime: dailyDigestSettings?.sendTime || null,
+    },
   };
 };
 

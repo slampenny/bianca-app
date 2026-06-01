@@ -71,6 +71,8 @@
 		"emailScreenHint": "Use “Enviar resumen por correo” para enviar una copia a su correo verificado, o marque “Enviarme correo al generar” al crear el resumen.",
 		"emailSubject": "Resumen diario de atención — %s",
 		"emailPlainIntro": "Este mensaje resume las llamadas de bienestar de sus residentes asignados. Abra la versión HTML para el formato completo.",
-		"emailConfidentialFooter": "Confidencial — solo para el cuidador destinado. No reenviar."
+		"emailConfidentialFooter": "Confidencial — solo para el cuidador destinado. No reenviar.",
+		"emailAiDisclaimer": "This digest is automatically generated from wellness check-in calls. It is not clinical advice and should be reviewed alongside the original call record when decisions are needed.",
+		"safeNoSummaryFallback": "Check-in completed; no written summary is available yet."
 	}
 }

@@ -54,6 +54,9 @@ export const caregiverApi = createApi({
         if (caregiver.phone !== undefined) body.phone = caregiver.phone
         if (caregiver.avatar !== undefined) body.avatar = caregiver.avatar
         if (caregiver.preferredLanguage !== undefined) body.preferredLanguage = caregiver.preferredLanguage
+        if (caregiver.notificationPreferences !== undefined) {
+          body.notificationPreferences = caregiver.notificationPreferences
+        }
         return {
           url: `/caregivers/${id}`,
           method: "PATCH",

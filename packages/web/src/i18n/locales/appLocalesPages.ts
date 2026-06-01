@@ -392,7 +392,7 @@ export const appLocalesPages = {
     backToReports: "← Back to Reports",
     title: "Daily digest",
     intro:
-      "Summaries and sentiment for your assigned residents for one calendar day (UTC). Text is generated in your profile language; when a resident's language differs, conversation summaries are omitted and sentiment is shown when it's available for that row.",
+      "Summaries and sentiment for your assigned residents for one calendar day (UTC). Text is generated in your profile language; when a resident's language differs, conversation summaries are omitted and sentiment is shown when it's available for that row. Sent digests are preserved — refreshing creates a new draft version.",
     digestDateLabel: "Digest date (UTC)",
     emailWhenBuild: "Email me when I build",
     building: "Building…",
@@ -412,6 +412,12 @@ export const appLocalesPages = {
     listResidents: "· {{count}} residents · {{status}}",
     statusEmailedShort: "emailed",
     statusDraftShort: "draft",
+    versionLabel: "Version {{version}}",
+    sentImmutableNote: "This version was emailed and is preserved as sent.",
+    listSupersedesSent: "· draft supersedes emailed v{{version}}",
+    showAllVersions: "Show all versions (admin)",
+    aiDisclaimer:
+      "Automatically generated from wellness check-in calls — not clinical advice. Review the original call record when decisions are needed.",
     noSavedDigests: "No saved digests yet. Build one above.",
     tableCaption: "Residents · digest day (UTC)",
     colResident: "Resident",
@@ -801,6 +807,13 @@ export const appLocalesPages = {
     billingLink: "Payment methods",
     backToSettings: "Back to settings",
     adminOnlyCalls: "Only org admins and super admins can initiate calls.",
+    notificationsTitle: "Email notifications",
+    dailyDigestEmailLabel: "Daily wellness digest emails",
+    dailyDigestEmailHelper:
+      "When enabled, Bianca sends an automated daily email summary of wellness check-ins. This does not affect manual digest sends from the Daily Digest page.",
+    dailyDigestEmailSaving: "Saving…",
+    dailyDigestEmailSaved: "Notification preference saved.",
+    dailyDigestEmailSaveFailed: "Could not save notification preference.",
   },
   residentCall: {
     back: "Back",

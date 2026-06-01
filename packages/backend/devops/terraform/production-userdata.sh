@@ -299,9 +299,10 @@ aws ecr get-login-password --region us-east-2 | docker login --username AWS --pa
 # Format and mount EBS volume for MongoDB data (same behavior as staging-userdata.sh).
 # The Terraform-tagged volume (bianca-production-mongodb-data) is attached as /dev/sdf by
 # blue/green swap; on Nitro instances it may appear as /dev/nvme1n1 (see buildspec-swap-and-terminate.yml).
+# Do NOT store MongoDB data on the root volume — if the EBS volume is missing, swap Step 0 must attach it first.
 echo "Setting up EBS volume for MongoDB..."
 MONGO_DEV=""
-for cand in /dev/sdf /dev/nvme1n1 /dev/xvdf; do
+for cand in /dev/nvme1n1 /dev/nvme2n1 /dev/sdf /dev/xvdf; do
   if [ -b "$cand" ]; then
     MONGO_DEV="$cand"
     break
@@ -311,10 +312,12 @@ done
 if [ -n "$MONGO_DEV" ]; then
   if ! blkid "$MONGO_DEV" >/dev/null 2>&1; then
     echo "Formatting EBS volume $MONGO_DEV..."
-    mkfs.ext4 "$MONGO_DEV"
+    mkfs.ext4 -F "$MONGO_DEV"
   fi
   mkdir -p /opt/mongodb-data
-  mount "$MONGO_DEV" /opt/mongodb-data
+  if ! mount "$MONGO_DEV" /opt/mongodb-data 2>/dev/null; then
+    mount -o nouuid "$MONGO_DEV" /opt/mongodb-data
+  fi
   chown 999:999 /opt/mongodb-data
   chmod 755 /opt/mongodb-data
   if ! grep -q '/opt/mongodb-data' /etc/fstab; then
@@ -322,10 +325,9 @@ if [ -n "$MONGO_DEV" ]; then
   fi
   echo "EBS volume mounted successfully at $MONGO_DEV -> /opt/mongodb-data"
 else
-  echo "Warning: MongoDB data EBS not found (/dev/sdf, /dev/nvme1n1, /dev/xvdf). Using /opt/mongodb-data on root volume until the bianca-production-mongodb-data volume is attached."
-  mkdir -p /opt/mongodb-data
-  chown 999:999 /opt/mongodb-data
-  chmod 755 /opt/mongodb-data
+  echo "CRITICAL: bianca-production-mongodb-data EBS not attached — MongoDB must not use the root volume."
+  echo "Attach the Terraform volume (tag Name=bianca-production-mongodb-data) before starting MongoDB."
+  echo "Blue/green swap Step 0 handles attach/mount on green instances."
 fi
 
 mkdir -p /opt/redis-data

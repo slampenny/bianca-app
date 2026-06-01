@@ -49,6 +49,8 @@ const deleteClientById = async (clientId) => {
   if (!client) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
+  const digestCleanup = require('./caregiverDailyDigestCleanup.service');
+  await digestCleanup.cleanupDigestsForClient(clientId, 'client_deleted');
   await client.deleteOne();
   return client;
 };

@@ -12,6 +12,7 @@ const listDigests = {
   query: Joi.object().keys({
     caregiverId: Joi.string().custom(objectId).optional(),
     digestDate: Joi.string().optional().allow('', null),
+    includeAllVersions: Joi.boolean().optional(),
     sortBy: Joi.string().optional(),
     limit: Joi.number().integer().min(1).max(100),
     page: Joi.number().integer().min(1),

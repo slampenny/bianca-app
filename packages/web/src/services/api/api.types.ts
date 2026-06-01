@@ -36,6 +36,9 @@ export interface Caregiver {
   ssoProviderId?: string | null
   onboardingComplete?: boolean
   mfaEnabled?: boolean
+  notificationPreferences?: {
+    dailyDigestEmail?: boolean
+  }
 }
 
 export interface Org {

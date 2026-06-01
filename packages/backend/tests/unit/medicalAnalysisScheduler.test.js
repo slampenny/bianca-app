@@ -39,6 +39,7 @@ const mockAgenda = {
   define: jest.fn(),
   start: jest.fn().mockResolvedValue(),
   stop: jest.fn().mockResolvedValue(),
+  cancel: jest.fn().mockResolvedValue(0),
   every: jest.fn().mockReturnValue({
     timezone: jest.fn().mockReturnThis(),
     save: jest.fn().mockResolvedValue()
@@ -118,6 +119,14 @@ describe('Medical Analysis Scheduler', () => {
         'client-medical-analysis',
         expect.any(Object),
         expect.any(Function)
+      );
+
+      expect(scheduler.agenda.cancel).toHaveBeenCalledWith({ name: 'monthly-medical-analysis' });
+      expect(scheduler.agenda.cancel).toHaveBeenCalledWith({ name: 'cleanup-old-analyses' });
+      expect(scheduler.agenda.every).toHaveBeenCalledWith(
+        expect.any(String),
+        'monthly-medical-analysis',
+        expect.objectContaining({ type: 'monthly' })
       );
       
       expect(scheduler.agenda.start).toHaveBeenCalled();

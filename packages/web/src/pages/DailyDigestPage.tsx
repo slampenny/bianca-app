@@ -97,11 +97,18 @@ export function DailyDigestPage() {
   const [caregiverFilter, setCaregiverFilter] = useState<string>("")
   const [digestDate, setDigestDate] = useState(() => utcDateInputValue())
   const [emailWhenBuild, setEmailWhenBuild] = useState(false)
+  const [includeAllVersions, setIncludeAllVersions] = useState(false)
   const [shown, setShown] = useState<CaregiverDailyDigest | null>(null)
   const [sendMessage, setSendMessage] = useState<string | null>(null)
 
   const listArgs = useMemo(() => {
-    const base: { caregiverId?: string; limit: number; page: number; sortBy: string } = {
+    const base: {
+      caregiverId?: string
+      includeAllVersions?: boolean
+      limit: number
+      page: number
+      sortBy: string
+    } = {
       limit: 20,
       page: 1,
       sortBy: "digestDate:desc",
@@ -109,8 +116,11 @@ export function DailyDigestPage() {
     if (isAdmin && caregiverFilter.trim()) {
       base.caregiverId = caregiverFilter.trim()
     }
+    if (isAdmin && includeAllVersions) {
+      base.includeAllVersions = true
+    }
     return base
-  }, [isAdmin, caregiverFilter])
+  }, [isAdmin, caregiverFilter, includeAllVersions])
 
   const { data: listData, isLoading: listLoading } = useListCaregiverDailyDigestsQuery(listArgs)
   const [generate, { isLoading: genLoading, error: genError }] = useGenerateCaregiverDailyDigestMutation()
@@ -230,9 +240,22 @@ export function DailyDigestPage() {
             <p style={{ margin: "0.35rem 0 0", fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>{digest.payload.dateLabel}</p>
             <p style={{ margin: "0.5rem 0 0", fontSize: "0.75rem", fontWeight: 600, color: "var(--va-slate-600)" }}>
               {digest.status === "sent" ? t("dailyDigest.statusEmailed") : t("dailyDigest.statusDraft")}
+              {digest.version != null ? ` · ${t("dailyDigest.versionLabel", { version: digest.version })}` : ""}
               {digest.sentAt ? ` · ${new Date(digest.sentAt).toLocaleString()}` : ""}
             </p>
+            {digest.status === "sent" ? (
+              <p style={{ margin: "0.35rem 0 0", fontSize: "0.75rem", color: "var(--va-slate-500)", lineHeight: 1.45 }}>
+                {t("dailyDigest.sentImmutableNote")}
+              </p>
+            ) : digest.supersedesDigestMeta?.status === "sent" ? (
+              <p style={{ margin: "0.35rem 0 0", fontSize: "0.75rem", color: "var(--va-slate-500)", lineHeight: 1.45 }}>
+                {t("dailyDigest.listSupersedesSent", { version: digest.supersedesDigestMeta.version })}
+              </p>
+            ) : null}
             <p style={{ margin: "0.75rem 0 0", fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>
+              {t("dailyDigest.aiDisclaimer")}
+            </p>
+            <p style={{ margin: "0.35rem 0 0", fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>
               {digest.payload.labels.emailScreenHint}
             </p>
             {digest.status === "draft" ? (
@@ -269,6 +292,22 @@ export function DailyDigestPage() {
             />
           </label>
         ) : null}
+        {isAdmin ? (
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: "0.8125rem",
+              color: "var(--va-slate-600)",
+              cursor: "pointer",
+              marginBottom: "0.75rem",
+            }}
+          >
+            <input type="checkbox" checked={includeAllVersions} onChange={(e) => setIncludeAllVersions(e.target.checked)} />
+            {t("dailyDigest.showAllVersions")}
+          </label>
+        ) : null}
         {listLoading ? (
           <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("dailyDigest.loading")}</p>
         ) : (
@@ -291,11 +330,15 @@ export function DailyDigestPage() {
                 >
                   <strong style={{ color: "var(--va-navy)" }}>{d.payload?.dateLabel ?? d.digestDate}</strong>
                   <span style={{ color: "var(--va-slate-500)", marginLeft: 8 }}>
+                    {d.version != null ? `v${d.version} · ` : ""}
                     {t("dailyDigest.listResidents", {
                       count: d.payload?.entries?.length ?? 0,
                       status:
                         d.status === "sent" ? t("dailyDigest.statusEmailedShort") : t("dailyDigest.statusDraftShort"),
                     })}
+                    {d.supersedesDigestMeta?.status === "sent"
+                      ? ` ${t("dailyDigest.listSupersedesSent", { version: d.supersedesDigestMeta.version })}`
+                      : ""}
                   </span>
                 </button>
               </li>

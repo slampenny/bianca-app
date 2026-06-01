@@ -81,11 +81,13 @@ const callSchema = mongoose.Schema(
     lineItemId: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'LineItem',
-      default: null, // Indicates that the call has not been billed yet
+      default: null, // Set when usage is included on a synced Stripe invoice
     },
-    // Temporary field used for atomic billing operations to prevent race conditions
-    // When a billing process claims calls, it sets this to a unique session ID
-    // After billing completes, this field is removed
+    stripeUsageReportedAt: {
+      type: Date,
+      default: null, // Set when usage has been reported to Stripe
+    },
+    // Legacy field retained for existing indexes; no longer used by billing
     billingSessionId: {
       type: mongoose.SchemaTypes.ObjectId,
       default: null,
@@ -159,6 +161,7 @@ const callSchema = mongoose.Schema(
 callSchema.index({ clientId: 1 });
 callSchema.index({ callSid: 1 });
 callSchema.index({ lineItemId: 1 });
+callSchema.index({ clientId: 1, lineItemId: 1, stripeUsageReportedAt: 1 });
 callSchema.index({ clientId: 1, lineItemId: 1 });
 callSchema.index({ clientId: 1, lineItemId: 1, billingSessionId: 1 });
 callSchema.index({ billingSessionId: 1 }); // For fetching claimed calls during billing

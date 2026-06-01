@@ -2,6 +2,7 @@ const Joi = require('joi');
 const validator = require('validator');
 const { objectId } = require('./custom.validation');
 const { MAX_ONBOARDING_DAYS } = require('../services/onboardingPlan.service');
+const { HH_MM_PATTERN } = require('../utils/digestScheduler.utils');
 
 const voiceOnboardingQuestionSchema = Joi.object().keys({
   id: Joi.string().trim().min(1).max(100).required(),
@@ -100,6 +101,12 @@ const updateOrg = {
       debugAudioUploadEnabled: Joi.boolean().optional(),
       /** Super admin: per-org resident voice onboarding plan */
       voiceOnboarding: voiceOnboardingSchema.optional(),
+      dailyDigestSettings: Joi.object()
+        .keys({
+          enabled: Joi.boolean().optional(),
+          sendTime: Joi.string().pattern(HH_MM_PATTERN).optional().allow(null, ''),
+        })
+        .optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })

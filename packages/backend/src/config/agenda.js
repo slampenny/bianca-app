@@ -3,6 +3,7 @@ const Agenda = require('agenda');
 const moment = require('moment');
 const config = require('./config');
 const logger = require('./logger');
+const { scheduleRecurringJob } = require('../utils/agenda.utils');
 const Schedule = require('../models/schedule.model');
 const { clientService, alertService, paymentService } = require('../services');
 const { Org, Client, Conversation } = require('../models');
@@ -14,36 +15,61 @@ const agenda = new Agenda({
   },
 });
 
-// Listen for the 'ready' event to ensure the connection is established
-agenda.on('ready', () => {
-  logger.info('Agenda is connected and ready!');
+/** Recurring jobs registered via scheduleRecurringJob on the main agenda instance. */
+const MAIN_RECURRING_AGENDA_JOBS = [
+  'runSchedules',
+  'processUsageReporting',
+  'processDataDeletion',
+  'checkClientsWithoutSchedules',
+  'processDailyDigestCoordinator',
+];
 
-  // Schedule your centralized job to run every 15 minutes to support 15-minute schedule increments
-  agenda.every('15 minutes', 'runSchedules');
-  logger.info('[Agenda] Schedule runner job scheduled to run every 15 minutes');
-  
-  // Schedule daily billing job based on configuration
-  if (config.billing.enableDailyBilling) {
-    const [hour, minute] = config.billing.billingTime.split(':');
-    agenda.every(`${minute} ${hour} * * *`, 'processDailyBilling');
-    logger.info(`[Agenda] Daily billing scheduled for ${config.billing.billingTime} daily`);
+// Listen for the 'ready' event to ensure the connection is established
+agenda.on('ready', async () => {
+  logger.info('Agenda is connected and ready!');
+  await registerRecurringAgendaJobs(agenda);
+  await agenda.start();
+});
+
+/**
+ * Register all recurring jobs on the main Agenda instance (restart-safe).
+ */
+async function registerRecurringAgendaJobs(agendaInstance) {
+  await scheduleRecurringJob({
+    agenda: agendaInstance,
+    jobName: 'runSchedules',
+    interval: '15 minutes',
+    logger,
+  });
+
+  if (config.billing.enableUsageReporting) {
+    const [hour, minute] = config.billing.usageReportingTime.split(':');
+    await scheduleRecurringJob({
+      agenda: agendaInstance,
+      jobName: 'processUsageReporting',
+      interval: `${minute} ${hour} * * *`,
+      logger,
+    });
   } else {
-    logger.info('[Agenda] Daily billing is disabled in configuration');
+    logger.info('[Agenda] Stripe usage reporting is disabled in configuration');
   }
 
-  // Schedule daily data deletion job (runs at 2 AM daily)
-  // Only deletes data for PIPEDA jurisdictions (HIPAA requires retention)
-  agenda.every('0 2 * * *', 'processDataDeletion');
-  logger.info('[Agenda] Daily data deletion scheduled for 2:00 AM daily');
+  await scheduleRecurringJob({
+    agenda: agendaInstance,
+    jobName: 'processDataDeletion',
+    interval: '0 2 * * *',
+    logger,
+  });
 
-  // Schedule patient schedule check job (runs every 30 minutes)
-  // Checks for patients created more than 30 minutes ago without schedules
-  agenda.every('30 minutes', 'checkClientsWithoutSchedules');
-  logger.info('[Agenda] Client schedule check scheduled to run every 30 minutes');
+  await scheduleRecurringJob({
+    agenda: agendaInstance,
+    jobName: 'checkClientsWithoutSchedules',
+    interval: '30 minutes',
+    logger,
+  });
 
-  // Start processing jobs only after the connection is ready
-  agenda.start();
-});
+  await scheduleDailyDigestCoordinator(agendaInstance);
+}
 
 // Centralized job definition with distributed locking settings
 agenda.define('runSchedules', { concurrency: 1, lockLifetime: 600000 }, async (job, done) => {
@@ -58,13 +84,13 @@ agenda.define('runSchedules', { concurrency: 1, lockLifetime: 600000 }, async (j
   }
 });
 
-// Daily billing job definition
-agenda.define('processDailyBilling', { concurrency: 1, lockLifetime: 1800000 }, async (job, done) => {
+// Stripe usage reporting job definition
+agenda.define('processUsageReporting', { concurrency: 1, lockLifetime: 1800000 }, async (job, done) => {
   try {
-    await processDailyBilling();
+    await processUsageReporting();
     done();
   } catch (error) {
-    logger.error(`Error in processDailyBilling job: ${error}`);
+    logger.error(`Error in processUsageReporting job: ${error}`);
     done(error);
   }
 });
@@ -82,7 +108,7 @@ agenda.define('processDataDeletion', { concurrency: 1, lockLifetime: 3600000 }, 
   }
 });
 
-// Client schedule check job definition
+// Check clients without schedules job definition
 agenda.define('checkClientsWithoutSchedules', { concurrency: 1, lockLifetime: 600000 }, async (job, done) => {
   try {
     await checkClientsWithoutSchedules();
@@ -92,6 +118,86 @@ agenda.define('checkClientsWithoutSchedules', { concurrency: 1, lockLifetime: 60
     done(error);
   }
 });
+
+function registerDailyDigestAgendaJobs(agendaInstance) {
+  if (!config.dailyDigestScheduler?.enabled) {
+    return;
+  }
+
+  const lockLifetime = config.dailyDigestScheduler.lockLifetimeMs;
+  const childConcurrency = config.dailyDigestScheduler.childJobConcurrency;
+
+  agendaInstance.define(
+    'processDailyDigestCoordinator',
+    { concurrency: 1, lockLifetime },
+    async (job, done) => {
+      logger.info('[Agenda] Starting processDailyDigestCoordinator job');
+      try {
+        const scheduler = require('../services/caregiverDailyDigestScheduler.service');
+        await scheduler.runDailyDigestCoordinatorTick({
+          now: new Date(),
+          enqueueCaregiverJob: (runId) => agendaInstance.now('processCaregiverDailyDigest', { runId }),
+        });
+        logger.info('[Agenda] Completed processDailyDigestCoordinator job');
+        done();
+      } catch (error) {
+        logger.error(`Error in processDailyDigestCoordinator job: ${error}`);
+        done(error);
+      }
+    }
+  );
+
+  agendaInstance.define(
+    'processCaregiverDailyDigest',
+    {
+      concurrency: childConcurrency,
+      lockLifetime,
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 60000 },
+    },
+    async (job, done) => {
+      const { runId } = job.attrs.data || {};
+      if (!runId) {
+        return done(new Error('processCaregiverDailyDigest missing runId'));
+      }
+      try {
+        const scheduler = require('../services/caregiverDailyDigestScheduler.service');
+        await scheduler.processCaregiverDailyDigestJob({
+          runId,
+          agendaJobId: job.attrs._id ? String(job.attrs._id) : null,
+        });
+        done();
+      } catch (error) {
+        logger.error(`Error in processCaregiverDailyDigest job runId=${runId}: ${error.message}`);
+        done(error);
+      }
+    }
+  );
+}
+
+registerDailyDigestAgendaJobs(agenda);
+
+/**
+ * Schedule (or reschedule) the digest coordinator recurring job.
+ * Cancels existing coordinator jobs first to avoid duplicates on restart / blue-green overlap.
+ */
+async function scheduleDailyDigestCoordinator(agendaInstance) {
+  if (!config.dailyDigestScheduler?.enabled) {
+    logger.info('[Agenda] Daily digest scheduler is disabled in configuration');
+    return;
+  }
+
+  const intervalMinutes = config.dailyDigestScheduler.coordinatorIntervalMinutes;
+  await scheduleRecurringJob({
+    agenda: agendaInstance,
+    jobName: 'processDailyDigestCoordinator',
+    interval: `${intervalMinutes} minutes`,
+    logger,
+  });
+  logger.info(
+    `[Agenda] Daily digest coordinator default send ${config.dailyDigestScheduler.defaultSendTime} org-local`
+  );
+}
 
 // Retry missed call job definition
 agenda.define('retryMissedCall', { concurrency: 1, lockLifetime: 300000 }, async (job, done) => {
@@ -276,260 +382,9 @@ async function runSchedules() {
   }
 }
 
-async function processDailyBilling() {
-  logger.info('[Daily Billing] Starting daily billing process...');
-  
-  try {
-    // Get all organizations
-    const orgs = await Org.find({});
-    logger.info(`[Daily Billing] Processing billing for ${orgs.length} organizations`);
-    
-    for (const org of orgs) {
-      try {
-        await processOrgBilling(org);
-      } catch (error) {
-        logger.error(`[Daily Billing] Error processing billing for org ${org._id}: ${error.message}`);
-        // Continue with other orgs even if one fails
-      }
-    }
-    
-    logger.info('[Daily Billing] Daily billing process completed');
-  } catch (error) {
-    logger.error(`[Daily Billing] Error in daily billing process: ${error.message}`);
-    throw error;
-  }
-}
-
-async function processOrgBilling(org) {
-  logger.info(`[Daily Billing] Processing billing for organization: ${org.name} (${org._id})`);
-  
-  // Get all clients for this organization
-  const clients = await Client.find({ org: org._id });
-  logger.info(`[Daily Billing] Found ${clients.length} clients for org ${org.name}`);
-  
-  if (clients.length === 0) {
-    logger.info(`[Daily Billing] No clients found for org ${org.name}, skipping billing`);
-    return;
-  }
-  
-  // Get unbilled calls from the last 24 hours (Call model tracks billing, not Conversation)
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const { Call } = require('../models');
-  const mongoose = require('mongoose');
-  
-  // Use a temporary marker to claim these calls atomically
-  // This prevents race conditions when multiple billing processes run concurrently
-  const billingSessionId = new mongoose.Types.ObjectId();
-  
-  // Atomically claim unbilled calls by setting a temporary marker
-  // Only calls with lineItemId: null will be updated, ensuring no duplicates
-  const updateResult = await Call.updateMany(
-    {
-      clientId: { $in: clients.map((c) => c._id) },
-      lineItemId: null, // Not yet billed
-      endTime: { $gte: yesterday }, // From last 24 hours
-      cost: { $gt: 0 }, // Has a cost
-      $or: [
-        { billingSessionId: null }, // Not already claimed
-        { billingSessionId: { $exists: false } } // Field doesn't exist (older records)
-      ]
-    },
-    {
-      $set: { billingSessionId: billingSessionId }
-    }
-  );
-  
-  if (updateResult.modifiedCount === 0) {
-    logger.info(`[Daily Billing] No unbilled calls found for org ${org.name}`);
-    return;
-  }
-  
-  logger.info(`[Daily Billing] Claimed ${updateResult.modifiedCount} unbilled calls for org ${org.name}`);
-  
-  // Now fetch the calls we just claimed
-  const unbilledCalls = await Call.find({
-    billingSessionId: billingSessionId
-  }).populate('clientId');
-  
-  // Group calls by client for itemized billing
-  const clientBilling = {};
-  let totalCost = 0;
-  
-  for (const call of unbilledCalls) {
-    const clientId = call.clientId._id.toString();
-    if (!clientBilling[clientId]) {
-      clientBilling[clientId] = {
-        client: call.clientId,
-        calls: [],
-        totalCost: 0
-      };
-    }
-    
-    clientBilling[clientId].calls.push(call);
-    clientBilling[clientId].totalCost += call.cost;
-    totalCost += call.cost;
-  }
-  
-  if (totalCost === 0) {
-    logger.info(`[Daily Billing] Total cost is $0 for org ${org.name}, skipping invoice creation`);
-    // Clear the session markers since we're not billing
-    await Call.updateMany(
-      { billingSessionId: billingSessionId },
-      { $unset: { billingSessionId: 1 } }
-    );
-    return;
-  }
-  
-  try {
-    // Create invoice for the organization
-    const invoice = await createOrgInvoice(org, clientBilling, totalCost);
-    
-    // Create a mapping of clientId to lineItemId
-    const clientToLineItem = {};
-    for (const lineItem of invoice.lineItems) {
-      clientToLineItem[lineItem.clientId.toString()] = lineItem._id;
-    }
-    
-    // Update each call with its client's line item ID and clear session marker
-    for (const call of unbilledCalls) {
-      const clientId = call.clientId._id.toString();
-      const lineItemId = clientToLineItem[clientId];
-      
-      if (lineItemId) {
-        await Call.updateOne(
-          { _id: call._id },
-          { 
-            $set: { lineItemId: lineItemId },
-            $unset: { billingSessionId: 1 }
-          }
-        );
-      }
-    }
-    
-    logger.info(`[Daily Billing] Successfully marked ${unbilledCalls.length} calls as billed for org ${org.name}`);
-    
-    if (invoice) {
-      logger.info(`[Daily Billing] Created invoice ${invoice.invoiceNumber} for org ${org.name} with total cost $${totalCost.toFixed(2)}`);
-    }
-    
-    // Attempt to charge the payment method
-    if (org.paymentMethod) {
-      try {
-        await chargePaymentMethod(org, invoice);
-      } catch (error) {
-        logger.error(`[Daily Billing] Failed to charge payment method for org ${org.name}: ${error.message}`);
-        // Create alert for failed payment
-        await alertService.createAlert({
-          message: `Failed to charge payment method for daily billing. Invoice ${invoice.invoiceNumber} created but not paid.`,
-          importance: 'high',
-          alertType: 'system',
-          createdBy: org._id,
-          createdModel: 'Org',
-          visibility: 'orgAdmin',
-          relevanceUntil: moment().add(7, 'days').toISOString(),
-        });
-      }
-    } else {
-      const msg = `[Daily Billing] No payment method found for org ${org.name}, invoice created but not charged`;
-      if (process.env.NODE_ENV === 'test') {
-        logger.debug(msg);
-      } else {
-        logger.warn(msg);
-      }
-      // Create alert for missing payment method
-      await alertService.createAlert({
-        message: `No payment method configured for daily billing. Invoice ${invoice.invoiceNumber} created but not charged.`,
-        importance: 'medium',
-        alertType: 'system',
-        createdBy: org._id,
-        createdModel: 'Org',
-        visibility: 'orgAdmin',
-        relevanceUntil: moment().add(7, 'days').toISOString(),
-      });
-    }
-  } catch (error) {
-    // If invoice creation or updates fail, clear the session markers so calls can be retried
-    logger.error(`[Daily Billing] Error processing billing for org ${org.name}: ${error.message}`);
-    await Call.updateMany(
-      { billingSessionId: billingSessionId },
-      { $unset: { billingSessionId: 1 } }
-    );
-    throw error;
-  }
-}
-
-/**
- * Get next invoice number atomically to avoid E11000 duplicate key when processDailyBilling runs concurrently.
- */
-async function getNextInvoiceNumber() {
-  const mongoose = require('mongoose');
-  const db = mongoose.connection?.db;
-  if (!db) {
-    // Fallback when no connection (e.g. some tests): use timestamp-based to avoid duplicates
-    return `INV-${Date.now().toString().slice(-9)}`;
-  }
-  const result = await db.collection('counters').findOneAndUpdate(
-    { _id: 'invoiceNumber' },
-    { $inc: { value: 1 } },
-    { upsert: true, returnDocument: 'after' }
-  );
-  const nextNum = result?.value ?? 1;
-  return `INV-${nextNum.toString().padStart(6, '0')}`;
-}
-
-async function createOrgInvoice(org, clientBilling, totalCost) {
-  const invoiceNumber = await getNextInvoiceNumber();
-
-  // Create invoice
-  const invoice = await require('../models').Invoice.create({
-    org: org._id,
-    invoiceNumber,
-    issueDate: new Date(),
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-    status: 'pending',
-    totalAmount: totalCost,
-    notes: `Daily billing for ${Object.keys(clientBilling).length} clients`
-  });
-  
-  // Create line items for each client
-  const lineItemData = [];
-  for (const [clientId, billing] of Object.entries(clientBilling)) {
-    lineItemData.push({
-      clientId: billing.client._id,
-      invoiceId: invoice._id,
-      amount: billing.totalCost,
-      description: `Daily billing - ${billing.calls.length} call(s)`,
-      periodStart: new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
-      periodEnd: new Date(), // Now
-      quantity: billing.calls.length,
-      unitPrice: billing.totalCost / billing.calls.length
-    });
-  }
-  
-  const lineItems = await require('../models').LineItem.create(lineItemData);
-  
-  // Add lineItems to invoice object for caller to use
-  invoice.lineItems = lineItems;
-  
-  // Return invoice with lineItems attached
-  return invoice;
-}
-
-async function chargePaymentMethod(org, invoice) {
-  // This would integrate with your payment processing system (Stripe, etc.)
-  // For now, we'll just log that we would charge the payment method
-  logger.info(`[Daily Billing] Would charge payment method for org ${org.name}, invoice ${invoice.invoiceNumber}, amount $${invoice.totalAmount}`);
-  
-  // TODO: Implement actual payment processing
-  // Example:
-  // const paymentResult = await stripeService.chargePaymentMethod(org.paymentMethod, invoice.totalAmount);
-  // if (paymentResult.success) {
-  //   invoice.status = 'paid';
-  //   invoice.paidAt = new Date();
-  //   await invoice.save();
-  // }
+async function processUsageReporting() {
+  const stripeBillingService = require('../services/stripeBilling.service');
+  await stripeBillingService.processUsageReporting();
 }
 
 async function checkClientsWithoutSchedules() {
@@ -588,5 +443,9 @@ async function checkClientsWithoutSchedules() {
 module.exports = {
   agenda,
   runSchedules,
-  processDailyBilling,
+  processUsageReporting,
+  registerDailyDigestAgendaJobs,
+  scheduleDailyDigestCoordinator,
+  registerRecurringAgendaJobs,
+  MAIN_RECURRING_AGENDA_JOBS,
 };

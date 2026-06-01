@@ -22,6 +22,7 @@ module.exports.PaymentMethod = require('./paymentMethod.model');
 module.exports.Report = require('./report.model');
 module.exports.FamilyWeeklyDigest = require('./familyWeeklyDigest.model');
 module.exports.CaregiverDailyDigest = require('./caregiverDailyDigest.model');
+module.exports.CaregiverDailyDigestSchedulerRun = require('./caregiverDailyDigestSchedulerRun.model');
 module.exports.Schedule = require('./schedule.model');
 module.exports.ClientMemory = require('./clientMemory.model').ClientMemory;
 module.exports.EmbeddingAnchorPhrase = require('./embeddingAnchorPhrase.model').EmbeddingAnchorPhrase;
