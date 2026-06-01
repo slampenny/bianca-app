@@ -47,9 +47,25 @@ const breachLogSchema = new mongoose.Schema(
     status: {
       type: String,
       required: true,
-      enum: ['INVESTIGATING', 'CONFIRMED', 'FALSE_POSITIVE', 'MITIGATED', 'RESOLVED'],
+      enum: [
+        'INVESTIGATING',
+        'FALSE_POSITIVE',
+        'SECURITY_EVENT_CONFIRMED',
+        'BREACH_CONFIRMED',
+        'CLOSED',
+        // Legacy values (pre-triage workflow); prefer new statuses for updates
+        'CONFIRMED',
+        'MITIGATED',
+        'RESOLVED',
+      ],
       default: 'INVESTIGATING',
       index: true
+    },
+
+    orgId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Org',
+      index: true,
     },
     
     // User/Session Information
@@ -78,6 +94,12 @@ const breachLogSchema = new mongoose.Schema(
     details: {
       type: String,
       required: true,
+    },
+
+    /** Snapshot of automated alert email subject/body at detection time */
+    alertSnapshot: {
+      subject: { type: String },
+      text: { type: String },
     },
     
     // Evidence (stored as encrypted JSON string)
@@ -180,10 +202,23 @@ const breachLogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Caregiver'
     },
+
+    resolutionReason: {
+      type: String,
+      trim: true,
+    },
     
     resolutionNotes: {
       type: String,
     },
+
+    statusHistory: [{
+      status: { type: String, required: true },
+      changedAt: { type: Date, required: true, default: Date.now },
+      changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Caregiver' },
+      notes: { type: String },
+      resolutionReason: { type: String },
+    }],
     
     // Root Cause Analysis
     rootCause: {
@@ -206,6 +241,7 @@ breachLogSchema.index({ userId: 1, detectedAt: -1 });
 breachLogSchema.index({ requiresHHSNotification: 1, hhsNotified: 1 });
 breachLogSchema.index({ requiresPrivacyCommissionerNotification: 1, privacyCommissionerNotified: 1 });
 breachLogSchema.index({ organizationCountry: 1, detectedAt: -1 });
+breachLogSchema.index({ orgId: 1, detectedAt: -1 });
 
 // Plugin to convert mongoose to JSON
 breachLogSchema.plugin(toJSON);
@@ -215,7 +251,7 @@ breachLogSchema.plugin(toJSON);
  */
 breachLogSchema.statics.getNotificationRequired = async function() {
   return this.find({
-    status: 'CONFIRMED',
+    status: { $in: ['BREACH_CONFIRMED', 'CONFIRMED'] },
     $or: [
       { requiresHHSNotification: true, hhsNotified: false },
       { requiresPrivacyCommissionerNotification: true, privacyCommissionerNotified: false },
@@ -269,10 +305,16 @@ breachLogSchema.statics.getStatistics = async function(startDate, endDate) {
           $sum: { $cond: [{ $eq: ['$status', 'INVESTIGATING'] }, 1, 0] }
         },
         confirmed: {
-          $sum: { $cond: [{ $eq: ['$status', 'CONFIRMED'] }, 1, 0] }
+          $sum: {
+            $cond: [
+              { $in: ['$status', ['BREACH_CONFIRMED', 'CONFIRMED', 'SECURITY_EVENT_CONFIRMED']] },
+              1,
+              0,
+            ],
+          },
         },
         resolved: {
-          $sum: { $cond: [{ $eq: ['$status', 'RESOLVED'] }, 1, 0] }
+          $sum: { $cond: [{ $in: ['$status', ['CLOSED', 'RESOLVED', 'MITIGATED']] }, 1, 0] }
         },
         falsePositives: {
           $sum: { $cond: [{ $eq: ['$status', 'FALSE_POSITIVE'] }, 1, 0] }

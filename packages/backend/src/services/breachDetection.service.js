@@ -9,10 +9,12 @@
  * Detects and responds to potential security breaches
  */
 
+const moment = require('moment-timezone');
 const logger = require('../config/logger');
 const { AuditLog, BreachLog, Caregiver, Org } = require('../models');
 const emailService = require('./email.service');
 const { getJurisdiction, getBreachNotificationDeadline } = require('../utils/jurisdiction.utils');
+const { resolveOrgTimezone } = require('../utils/digestDay.utils');
 
 // Detection thresholds
 const DETECTION_RULES = {
@@ -147,37 +149,59 @@ class BreachDetectionService {
     }
   }
 
+  isOffHoursInTimezone(instant, orgTimezone) {
+    const timezone = resolveOrgTimezone(orgTimezone);
+    const accessHour = moment.tz(instant, timezone).hour();
+    return DETECTION_RULES.off_hours.hours.includes(accessHour);
+  }
+
   /**
    * Detect off-hours access to sensitive data
-   * Rule: Access to PHI between 10 PM and 6 AM
+   * Rule: Access to PHI between 10 PM and 6 AM in the org's local timezone
    */
   async detectOffHoursAccess() {
-    const now = new Date();
-    const currentHour = now.getHours();
-    
-    // Only check during off-hours
-    if (!DETECTION_RULES.off_hours.hours.includes(currentHour)) {
-      return 0;
-    }
-
     const last10Minutes = new Date(Date.now() - 600000);
     
     try {
-      const offHoursAccess = await AuditLog.find({
+      const recentPhiAccess = await AuditLog.find({
         action: { $in: ['READ', 'UPDATE', 'DELETE'] },
         resource: { $in: ['client', 'conversation', 'medicalAnalysis'] },
         timestamp: { $gte: last10Minutes },
         outcome: 'SUCCESS',
         'complianceFlags.phiAccessed': true
-      }).populate('userId', 'name email role');
+      }).populate('userId', 'name email role org');
 
-      for (const access of offHoursAccess) {
+      const orgIds = [
+        ...new Set(
+          recentPhiAccess
+            .map((access) => access.userId?.org?.toString())
+            .filter(Boolean)
+        ),
+      ];
+      const orgs = orgIds.length
+        ? await Org.find({ _id: { $in: orgIds } }).select('name timezone country')
+        : [];
+      const orgById = new Map(orgs.map((org) => [org._id.toString(), org]));
+
+      let alertsCreated = 0;
+
+      for (const access of recentPhiAccess) {
+        const org = orgById.get(access.userId?.org?.toString());
+        const orgTimezone = resolveOrgTimezone(org?.timezone);
+
+        // Suppress false positives when access occurred during org business hours
+        if (!this.isOffHoursInTimezone(access.timestamp, orgTimezone)) {
+          continue;
+        }
+
+        const accessLocalTime = moment.tz(access.timestamp, orgTimezone).format('YYYY-MM-DD HH:mm z');
+
         // Check if this is a known issue (already logged)
         const existingBreach = await BreachLog.findOne({
           type: 'off_hours_access',
           userId: access.userId,
           detectedAt: { $gte: last10Minutes },
-          status: { $in: ['INVESTIGATING', 'CONFIRMED'] }
+          status: { $in: ['INVESTIGATING', 'SECURITY_EVENT_CONFIRMED', 'BREACH_CONFIRMED', 'CONFIRMED'] }
         });
 
         if (!existingBreach) {
@@ -186,16 +210,18 @@ class BreachDetectionService {
             severity: DETECTION_RULES.off_hours.severity,
             userId: access.userId?._id,
             ipAddress: access.ipAddress,
-            details: `Off-hours access to ${access.resource} at ${currentHour}:00`,
+            organizationCountry: org?.country,
+            details: `Off-hours PHI access to ${access.resource} at ${accessLocalTime} (${org?.name || 'unknown org'})`,
             evidence: [access],
             affectedResourceType: access.resource,
             affectedResourceIds: [access.resourceId],
             autoLock: false // Don't auto-lock for off-hours (might be legitimate)
           });
+          alertsCreated += 1;
         }
       }
 
-      return offHoursAccess.length;
+      return alertsCreated;
     } catch (error) {
       logger.error('[BREACH] Failed to detect off-hours access:', error);
       return 0;
@@ -268,7 +294,7 @@ class BreachDetectionService {
         type: data.type,
         userId: data.userId,
         detectedAt: { $gte: new Date(Date.now() - 3600000) },
-        status: { $in: ['INVESTIGATING', 'CONFIRMED'] }
+        status: { $in: ['INVESTIGATING', 'SECURITY_EVENT_CONFIRMED', 'BREACH_CONFIRMED', 'CONFIRMED'] }
       });
 
       if (recentBreach) {
@@ -278,13 +304,27 @@ class BreachDetectionService {
 
       // Determine jurisdiction and notification requirements
       let organizationCountry = data.organizationCountry;
+      let orgId = data.orgId;
+      let notificationContext = {};
       
       // If country not provided, try to get it from user's organization
-      if (!organizationCountry && data.userId) {
+      if (data.userId) {
         try {
-          const caregiver = await Caregiver.findById(data.userId).populate('org');
-          if (caregiver?.org) {
-            organizationCountry = caregiver.org.country;
+          const caregiver = await Caregiver.findById(data.userId).populate('org', 'name country timezone');
+          if (caregiver) {
+            notificationContext = {
+              userName: caregiver.name,
+              userEmail: caregiver.email,
+              userRole: caregiver.role,
+              orgName: caregiver.org?.name,
+              orgTimezone: resolveOrgTimezone(caregiver.org?.timezone),
+            };
+            if (caregiver.org) {
+              orgId = caregiver.org._id;
+              if (!organizationCountry) {
+                organizationCountry = caregiver.org.country;
+              }
+            }
           }
         } catch (error) {
           logger.warn('[BREACH] Could not determine organization country:', error.message);
@@ -312,6 +352,12 @@ class BreachDetectionService {
         affectedCount: data.affectedCount || 0,
         status: 'INVESTIGATING',
         organizationCountry: organizationCountry || 'US',
+        orgId,
+        statusHistory: [{
+          status: 'INVESTIGATING',
+          changedAt: new Date(),
+          notes: 'Automated detector alert — requires triage',
+        }],
         // Jurisdiction-aware notification settings
         requiresHHSNotification: requiresHHSNotification,
         requiresPrivacyCommissionerNotification: requiresPrivacyCommissionerNotification,
@@ -328,7 +374,11 @@ class BreachDetectionService {
       logger.warn(`[BREACH] Alert created: ${breach._id} - ${data.type} - ${data.severity}`);
 
       // Send notification to security team
-      await this.notifySecurityTeam(breach);
+      const alertSnapshot = await this.notifySecurityTeam(breach, notificationContext);
+      if (alertSnapshot) {
+        breach.alertSnapshot = alertSnapshot;
+        await breach.save();
+      }
 
       // Auto-lock account if critical
       if (data.autoLock && data.userId) {
@@ -382,7 +432,8 @@ class BreachDetectionService {
   /**
    * Notify security team via email/SNS
    */
-  async notifySecurityTeam(breach) {
+  async notifySecurityTeam(breach, notificationContext = {}) {
+    let alertSnapshot = null;
     try {
       logger.warn(`[BREACH] 🚨 SECURITY ALERT 🚨`);
       logger.warn(`[BREACH] Type: ${breach.type}`);
@@ -390,78 +441,93 @@ class BreachDetectionService {
       logger.warn(`[BREACH] Details: ${breach.details}`);
       logger.warn(`[BREACH] Breach ID: ${breach._id}`);
 
+      const jurisdiction = getJurisdiction(breach.organizationCountry);
+      const jurisdictionName = jurisdiction.jurisdiction === 'HIPAA' ? 'HIPAA' :
+        jurisdiction.jurisdiction === 'PIPEDA' ? 'PIPEDA' : 'Privacy';
+      const isInvestigating = breach.status === 'INVESTIGATING';
+      const contextLines = [
+        notificationContext.orgName ? `Organization: ${notificationContext.orgName}` : null,
+        notificationContext.orgTimezone ? `Org timezone: ${notificationContext.orgTimezone}` : null,
+        notificationContext.userName ? `User: ${notificationContext.userName}` : null,
+        notificationContext.userEmail ? `User email: ${notificationContext.userEmail}` : null,
+        notificationContext.userRole ? `User role: ${notificationContext.userRole}` : null,
+        breach.userId ? `User ID: ${breach.userId}` : null,
+        breach.affectedResourceType ? `Resource type: ${breach.affectedResourceType}` : null,
+        breach.affectedResourceIds?.length ? `Resource ID(s): ${breach.affectedResourceIds.join(', ')}` : null,
+        breach.ipAddress ? `IP Address: ${breach.ipAddress}` : null,
+      ].filter(Boolean);
+
+      const triageNotice = isInvestigating
+        ? 'This is a potential security event requiring triage. Do not treat as a confirmed or reportable breach until investigated per SOP_Breach_Response.md.'
+        : 'Investigate immediately per SOP_Breach_Response.md';
+
+      const reportableNotice = !isInvestigating && breach.requiresHHSNotification
+        ? '⚠️ HHS NOTIFICATION REQUIRED (500+ individuals)'
+        : '';
+      const pipedaNotice = !isInvestigating && breach.requiresPrivacyCommissionerNotification
+        ? '⚠️ PRIVACY COMMISSIONER NOTIFICATION REQUIRED (significant harm)'
+        : '';
+
+      const deadlineNotice = !isInvestigating && breach.notificationDeadline
+        ? `If confirmed reportable, notification deadline: ${breach.notificationDeadline.toISOString()} (${jurisdiction.breachNotificationRequirement === 'within_60_days' ? 'within 60 days' : 'as soon as feasible'})`
+        : null;
+
       // Send email notification to admin
       const adminEmail = process.env.ADMIN_EMAIL || 'admin@biancatechnologies.com';
       if (adminEmail) {
         try {
-          // Determine jurisdiction for notification message
-          const jurisdiction = getJurisdiction(breach.organizationCountry);
-          const jurisdictionName = jurisdiction.jurisdiction === 'HIPAA' ? 'HIPAA' : 
-                                   jurisdiction.jurisdiction === 'PIPEDA' ? 'PIPEDA' : 'Privacy';
-          
-          const notificationRequirement = breach.notificationDeadline 
-            ? `Notification deadline: ${breach.notificationDeadline.toISOString()} (${jurisdiction.breachNotificationRequirement === 'within_60_days' ? 'within 60 days' : 'as soon as feasible'})`
-            : `Notification required: ${jurisdiction.breachNotificationRequirement === 'as_soon_as_feasible' ? 'AS SOON AS FEASIBLE (PIPEDA)' : 'within 60 days (HIPAA)'}`;
-          
-          const regulatorInfo = jurisdiction.regulator 
-            ? `\nRegulator: ${jurisdiction.regulatorName}\nRegulator Contact: ${jurisdiction.regulatorContact}`
-            : '';
-          
-          const subject = `🚨 ${jurisdictionName} Breach Alert: ${breach.type}`;
+          const subject = `Potential security event: ${breach.type}`;
           const text = `
-${jurisdictionName} Security Breach Detected
+Potential Security Event (${jurisdictionName})
 
-Breach Type: ${breach.type}
+Status: ${breach.status}
+Event Type: ${breach.type}
 Severity: ${breach.severity}
-Jurisdiction: ${jurisdiction.jurisdiction} (${breach.organizationCountry || 'US'})
+Applicable framework: ${jurisdiction.jurisdiction} (${breach.organizationCountry || 'US'})
 Detected At: ${breach.detectedAt.toISOString()}
-Breach ID: ${breach._id}
+Event ID: ${breach._id}
 
 Details:
 ${breach.details}
 
-${breach.userId ? `User ID: ${breach.userId}` : ''}
-${breach.ipAddress ? `IP Address: ${breach.ipAddress}` : ''}
-${breach.affectedCount > 0 ? `Affected Records: ${breach.affectedCount}` : ''}
+${contextLines.join('\n')}
 
-${notificationRequirement}
-${regulatorInfo}
-
-${breach.requiresHHSNotification ? '⚠️ HHS NOTIFICATION REQUIRED (500+ individuals)' : ''}
-${breach.requiresPrivacyCommissionerNotification ? '⚠️ PRIVACY COMMISSIONER NOTIFICATION REQUIRED (significant harm)' : ''}
-
-ACTION REQUIRED: Investigate immediately per SOP_Breach_Response.md
+${triageNotice}
+${deadlineNotice || ''}
+${reportableNotice}
+${pipedaNotice}
 
 This is an automated alert from the breach detection system.
           `.trim();
 
           const html = `
-<h2>🚨 ${jurisdictionName} Security Breach Detected</h2>
+<h2>Potential Security Event (${jurisdictionName})</h2>
 
-<p><strong>Breach Type:</strong> ${breach.type}<br>
+<p><strong>Status:</strong> ${breach.status}<br>
+<strong>Event Type:</strong> ${breach.type}<br>
 <strong>Severity:</strong> ${breach.severity}<br>
-<strong>Jurisdiction:</strong> ${jurisdiction.jurisdiction} (${breach.organizationCountry || 'US'})<br>
+<strong>Applicable framework:</strong> ${jurisdiction.jurisdiction} (${breach.organizationCountry || 'US'})<br>
 <strong>Detected At:</strong> ${breach.detectedAt.toISOString()}<br>
-<strong>Breach ID:</strong> ${breach._id}</p>
+<strong>Event ID:</strong> ${breach._id}</p>
 
 <p><strong>Details:</strong><br>
 ${breach.details}</p>
 
-${breach.userId ? `<p><strong>User ID:</strong> ${breach.userId}</p>` : ''}
-${breach.ipAddress ? `<p><strong>IP Address:</strong> ${breach.ipAddress}</p>` : ''}
-${breach.affectedCount > 0 ? `<p><strong>Affected Records:</strong> ${breach.affectedCount}</p>` : ''}
+${contextLines.map((line) => {
+  const separatorIndex = line.indexOf(': ');
+  if (separatorIndex === -1) return `<p>${line}</p>`;
+  return `<p><strong>${line.slice(0, separatorIndex)}:</strong> ${line.slice(separatorIndex + 2)}</p>`;
+}).join('\n')}
 
-<p><strong>${notificationRequirement}</strong></p>
-${regulatorInfo ? `<p><strong>Regulator:</strong> ${jurisdiction.regulatorName}<br><strong>Contact:</strong> <a href="${jurisdiction.regulatorContact}">${jurisdiction.regulatorContact}</a></p>` : ''}
-
-${breach.requiresHHSNotification ? '<p style="color: red;"><strong>⚠️ HHS NOTIFICATION REQUIRED (500+ individuals)</strong></p>' : ''}
-${breach.requiresPrivacyCommissionerNotification ? '<p style="color: red;"><strong>⚠️ PRIVACY COMMISSIONER NOTIFICATION REQUIRED (significant harm)</strong></p>' : ''}
-
-<p><strong style="color: red;">ACTION REQUIRED:</strong> Investigate immediately per SOP_Breach_Response.md</p>
+<p><strong>${triageNotice}</strong></p>
+${deadlineNotice ? `<p>${deadlineNotice}</p>` : ''}
+${reportableNotice ? `<p style="color: red;"><strong>${reportableNotice}</strong></p>` : ''}
+${pipedaNotice ? `<p style="color: red;"><strong>${pipedaNotice}</strong></p>` : ''}
 
 <p><em>This is an automated alert from the breach detection system.</em></p>
           `.trim();
 
+          alertSnapshot = { subject, text };
           await emailService.sendEmail(adminEmail, subject, text, html);
           logger.info(`[BREACH] Email notification sent to ${adminEmail}`);
         } catch (emailError) {
@@ -479,15 +545,23 @@ ${breach.requiresPrivacyCommissionerNotification ? '<p style="color: red;"><stro
 
           await sns.publish({
             TopicArn: process.env.SECURITY_ALERT_TOPIC_ARN,
-            Subject: `🚨 HIPAA Breach Alert: ${breach.type}`,
+            Subject: `Potential security event: ${breach.type}`,
             Message: JSON.stringify({
+              status: breach.status,
               severity: breach.severity,
               type: breach.type,
+              jurisdiction: jurisdiction.jurisdiction,
               details: breach.details,
               breachId: breach._id.toString(),
               userId: breach.userId?.toString(),
+              orgName: notificationContext.orgName,
+              orgTimezone: notificationContext.orgTimezone,
+              userName: notificationContext.userName,
+              userRole: notificationContext.userRole,
+              affectedResourceType: breach.affectedResourceType,
+              affectedResourceIds: breach.affectedResourceIds,
               timestamp: breach.detectedAt.toISOString(),
-              actionRequired: 'Investigate immediately'
+              actionRequired: 'Triage per SOP_Breach_Response.md'
             }, null, 2)
           });
           logger.info(`[BREACH] SNS notification sent to ${process.env.SECURITY_ALERT_TOPIC_ARN}`);
@@ -499,6 +573,7 @@ ${breach.requiresPrivacyCommissionerNotification ? '<p style="color: red;"><stro
     } catch (error) {
       logger.error('[BREACH] Failed to notify security team:', error);
     }
+    return alertSnapshot;
   }
 
   /**

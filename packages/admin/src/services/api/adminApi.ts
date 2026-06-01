@@ -4,6 +4,9 @@ import type {
   AdminCaregiverSearchRow,
   AdminOrgSearchResponse,
   AdminOrgDetail,
+  BreachLogDetail,
+  BreachLogListResponse,
+  UpdateBreachLogStatusBody,
   CorpEmailForwardsListResponse,
   EmbeddingAnchorMergeResponse,
   EmbeddingAnchorPhraseRow,
@@ -21,7 +24,7 @@ import baseQueryWithAuth from "./baseQueryWithAuth"
 export const adminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: baseQueryWithAuth(),
-  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards"],
+  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards", "BreachLogs"],
   endpoints: (builder) => ({
     getObservability: builder.query<ObservabilityPayload, void>({
       query: () => ({
@@ -187,6 +190,46 @@ export const adminApi = createApi({
       }),
       invalidatesTags: ["CorpEmailForwards"],
     }),
+    listBreachLogs: builder.query<
+      BreachLogListResponse,
+      {
+        page?: number
+        limit?: number
+        status?: string
+        type?: string
+        severity?: string
+        jurisdiction?: string
+        orgId?: string
+        userId?: string
+        startDate?: string
+        endDate?: string
+      }
+    >({
+      query: (params) => ({
+        url: "/admin/breach-logs",
+        method: "GET",
+        params,
+      }),
+      providesTags: ["BreachLogs"],
+    }),
+    getBreachLog: builder.query<BreachLogDetail, string>({
+      query: (id) => ({
+        url: `/admin/breach-logs/${id}`,
+        method: "GET",
+      }),
+      providesTags: (_r, _e, id) => [{ type: "BreachLogs", id }],
+    }),
+    updateBreachLogStatus: builder.mutation<
+      BreachLogDetail,
+      { id: string; body: UpdateBreachLogStatusBody }
+    >({
+      query: ({ id, body }) => ({
+        url: `/admin/breach-logs/${id}/status`,
+        method: "PATCH",
+        body,
+      }),
+      invalidatesTags: (_r, _e, { id }) => [{ type: "BreachLogs", id }, "BreachLogs"],
+    }),
   }),
 })
 
@@ -211,4 +254,7 @@ export const {
   usePatchOrgMutation,
   useGetCorpEmailForwardsQuery,
   useSaveCorpEmailForwardsMutation,
+  useListBreachLogsQuery,
+  useGetBreachLogQuery,
+  useUpdateBreachLogStatusMutation,
 } = adminApi

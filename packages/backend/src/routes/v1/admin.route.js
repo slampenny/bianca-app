@@ -106,4 +106,25 @@ router.put(
   adminController.saveCorpEmailForwards,
 );
 
+router.get(
+  '/breach-logs',
+  auth(),
+  validate(adminValidation.listBreachLogs),
+  adminController.listBreachLogs,
+);
+
+router.get(
+  '/breach-logs/:id',
+  auth(),
+  validate(adminValidation.breachLogIdParam),
+  adminController.getBreachLog,
+);
+
+router.patch(
+  '/breach-logs/:id/status',
+  auth(),
+  validate(adminValidation.updateBreachLogStatus),
+  adminController.updateBreachLogStatus,
+);
+
 module.exports = router;

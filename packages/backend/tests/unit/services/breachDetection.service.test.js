@@ -4,6 +4,7 @@
  */
 
 const mongoose = require('mongoose');
+const moment = require('moment-timezone');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const breachDetectionService = require('../../../src/services/breachDetection.service');
 const { AuditLog, BreachLog, Caregiver, Org } = require('../../../src/models');
@@ -275,28 +276,8 @@ describe('Breach Detection Service', () => {
   });
 
   describe('detectOffHoursAccess', () => {
-    it('should detect off-hours PHI access', async () => {
-      // Create an audit log that would be off-hours if detected (2 AM window)
-      const twoAmToday = new Date();
-      twoAmToday.setHours(2, 0, 0, 0);
-      const mockTimestamp = twoAmToday.getTime();
-      const recentTime = new Date(mockTimestamp - 2 * 60 * 1000); // 2 min ago
-
-      await AuditLog.create({
-        timestamp: recentTime,
-        userId: testCaregiver._id,
-        userRole: 'staff',
-        action: 'READ',
-        resource: 'client',
-        resourceId: 'client-123',
-        outcome: 'SUCCESS',
-        ipAddress: '192.168.1.100',
-        complianceFlags: {
-          phiAccessed: true
-        }
-      });
-
-      // Mock Date so service believes it is 2 AM (off-hours)
+    const mockNow = (isoString) => {
+      const mockTimestamp = new Date(isoString).getTime();
       const OriginalDate = global.Date;
       const MockDate = function (...args) {
         if (args.length === 0) {
@@ -310,60 +291,121 @@ describe('Breach Detection Service', () => {
       MockDate.prototype = OriginalDate.prototype;
       Object.setPrototypeOf(MockDate, OriginalDate);
       global.Date = MockDate;
+      return () => {
+        global.Date = OriginalDate;
+      };
+    };
+
+    it('should detect off-hours PHI access using org timezone', async () => {
+      await Org.findByIdAndUpdate(testOrg._id, { timezone: 'America/Los_Angeles' });
+      const restoreDate = mockNow('2026-06-02T09:05:00.000Z'); // 2:05 AM PDT
 
       try {
+        await AuditLog.create({
+          timestamp: new Date('2026-06-02T09:02:00.000Z'), // 2:02 AM PDT
+          userId: testCaregiver._id,
+          userRole: 'staff',
+          action: 'READ',
+          resource: 'client',
+          resourceId: 'client-123',
+          outcome: 'SUCCESS',
+          ipAddress: '192.168.1.100',
+          complianceFlags: {
+            phiAccessed: true
+          }
+        });
+
         const result = await breachDetectionService.detectOffHoursAccess();
-        // If we're in off-hours (2 AM) and the log is in the last 10 min, should detect
-        expect(result).toBeGreaterThanOrEqual(0);
-        if (result > 0) {
-          expect(result).toBe(1);
-        }
+        expect(result).toBe(1);
+
+        const breaches = await BreachLog.find({ type: 'off_hours_access' });
+        expect(breaches).toHaveLength(1);
+        expect(breaches[0].details).toContain('Test Org');
+        expect(breaches[0].details).toContain('02:02');
       } finally {
-        global.Date = OriginalDate;
+        restoreDate();
       }
     });
 
-    it('should not detect during normal hours', async () => {
-      const normalHoursTime = new Date();
-      normalHoursTime.setHours(14, 30, 0, 0); // 2:30 PM
-      const mockTimestamp = normalHoursTime.getTime();
-      
-      // Mock Date using the same pattern as agenda tests
-      const OriginalDate = global.Date;
-      
-      const MockDate = function(...args) {
-        if (args.length === 0) {
-          return new OriginalDate(mockTimestamp);
-        }
-        return new OriginalDate(...args);
-      };
-      
-      MockDate.now = jest.fn(() => mockTimestamp);
-      MockDate.UTC = OriginalDate.UTC.bind(OriginalDate);
-      MockDate.parse = OriginalDate.parse;
-      MockDate.prototype = OriginalDate.prototype;
-      Object.setPrototypeOf(MockDate, OriginalDate);
-      global.Date = MockDate;
+    it('should not detect access during org business hours even when server time is UTC off-hours', async () => {
+      await Org.findByIdAndUpdate(testOrg._id, { timezone: 'America/Los_Angeles' });
+      const restoreDate = mockNow('2026-06-01T22:55:00.000Z'); // 3:55 PM PDT
 
-      await AuditLog.create({
-        timestamp: normalHoursTime,
+      try {
+        await AuditLog.create({
+          timestamp: new Date('2026-06-01T22:50:00.000Z'), // 3:50 PM PDT
+          userId: testCaregiver._id,
+          userRole: 'staff',
+          action: 'READ',
+          resource: 'client',
+          resourceId: 'patient-123',
+          outcome: 'SUCCESS',
+          ipAddress: '192.168.1.100',
+          complianceFlags: {
+            phiAccessed: true
+          }
+        });
+
+        const result = await breachDetectionService.detectOffHoursAccess();
+        expect(result).toBe(0);
+        expect(await BreachLog.countDocuments({ type: 'off_hours_access' })).toBe(0);
+      } finally {
+        restoreDate();
+      }
+    });
+
+    it('should not detect during normal org-local hours', async () => {
+      await Org.findByIdAndUpdate(testOrg._id, { timezone: 'America/Los_Angeles' });
+      const restoreDate = mockNow('2026-06-01T21:35:00.000Z'); // 2:35 PM PDT
+
+      try {
+        await AuditLog.create({
+          timestamp: new Date('2026-06-01T21:30:00.000Z'),
+          userId: testCaregiver._id,
+          userRole: 'staff',
+          action: 'READ',
+          resource: 'client',
+          resourceId: 'patient-123',
+          outcome: 'SUCCESS',
+          ipAddress: '192.168.1.100',
+          complianceFlags: {
+            phiAccessed: true
+          }
+        });
+
+        const result = await breachDetectionService.detectOffHoursAccess();
+        expect(result).toBe(0);
+      } finally {
+        restoreDate();
+      }
+    });
+  });
+
+  describe('notifySecurityTeam', () => {
+    it('should use potential security event wording for investigating alerts', async () => {
+      const emailService = require('../../../src/services/email.service');
+      const sendEmailSpy = jest.spyOn(emailService, 'sendEmail').mockResolvedValue(undefined);
+
+      await breachDetectionService.createBreachAlert({
+        type: 'off_hours_access',
+        severity: 'MEDIUM',
         userId: testCaregiver._id,
-        userRole: 'staff',
-        action: 'READ',
-        resource: 'client',
-        resourceId: 'patient-123',
-        outcome: 'SUCCESS',
-        ipAddress: '192.168.1.100',
-        complianceFlags: {
-          phiAccessed: true
-        }
+        details: 'Off-hours PHI access to client at 2026-06-02 02:02 PDT (Test Org)',
+        autoLock: false
       });
 
-      const result = await breachDetectionService.detectOffHoursAccess();
-      expect(result).toBe(0);
-      
-      // Restore Date
-      global.Date = OriginalDate;
+      expect(sendEmailSpy).toHaveBeenCalled();
+      const [recipient, subject, text, html] = sendEmailSpy.mock.calls[0];
+      expect(recipient).toBeTruthy();
+      expect(subject).toBe('Potential security event: off_hours_access');
+      expect(text).toContain('Potential Security Event');
+      expect(text).not.toContain('Security Breach Detected');
+      expect(text).toContain('requiring triage');
+      expect(text).toContain('Test User');
+      expect(text).toContain('Test Org');
+      expect(html).toContain('Potential Security Event');
+
+      sendEmailSpy.mockRestore();
     });
   });
 

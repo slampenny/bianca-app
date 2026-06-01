@@ -12,6 +12,8 @@ import { OrgFlagsPage } from "./pages/OrgFlagsPage"
 import { OrgVoiceOnboardingPage } from "./pages/OrgVoiceOnboardingPage"
 import { CorpEmailForwardsPage } from "./pages/CorpEmailForwardsPage"
 import { InviteSignupPage } from "./pages/InviteSignupPage"
+import { SecurityEventsPage } from "./pages/SecurityEventsPage"
+import { SecurityEventDetailPage } from "./pages/SecurityEventDetailPage"
 
 export default function App() {
   return (
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="voice-onboarding" element={<OrgVoiceOnboardingPage />} />
           <Route path="embedding-anchors" element={<EmbeddingAnchorsPage />} />
           <Route path="corp-email" element={<CorpEmailForwardsPage />} />
+          <Route path="security-events" element={<SecurityEventsPage />} />
+          <Route path="security-events/:id" element={<SecurityEventDetailPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

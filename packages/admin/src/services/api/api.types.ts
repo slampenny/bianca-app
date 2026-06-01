@@ -181,3 +181,89 @@ export interface SaveCorpEmailForwardsResult {
 export interface SaveCorpEmailForwardsResponse {
   results: SaveCorpEmailForwardsResult[]
 }
+
+export type BreachLogStatus =
+  | "INVESTIGATING"
+  | "FALSE_POSITIVE"
+  | "SECURITY_EVENT_CONFIRMED"
+  | "BREACH_CONFIRMED"
+  | "CLOSED"
+  | "CONFIRMED"
+  | "MITIGATED"
+  | "RESOLVED"
+
+export interface BreachLogSummary {
+  id: string
+  type: string
+  severity: string
+  status: BreachLogStatus
+  jurisdiction: string
+  organizationCountry?: string | null
+  detectedAt: string
+  details: string
+  ipAddress?: string | null
+  userId?: string | null
+  userName?: string | null
+  userEmail?: string | null
+  userRole?: string | null
+  orgId?: string | null
+  orgName?: string | null
+  affectedResourceType?: string | null
+  affectedResourceIds?: string[]
+  affectedCount?: number
+  notificationDeadline?: string | null
+  requiresHHSNotification?: boolean
+  requiresPrivacyCommissionerNotification?: boolean
+  resolvedAt?: string | null
+  resolvedBy?: string | null
+  resolutionReason?: string | null
+  resolutionNotes?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface BreachLogListResponse {
+  results: BreachLogSummary[]
+  page: number
+  limit: number
+  totalPages: number
+  totalResults: number
+}
+
+export interface BreachLogStatusHistoryEntry {
+  status: string
+  changedAt: string
+  changedBy?: string | null
+  notes?: string | null
+  resolutionReason?: string | null
+}
+
+export interface BreachLogRelatedAuditLog {
+  id: string
+  timestamp: string
+  action: string
+  resource: string
+  resourceId: string
+  outcome: string
+  ipAddress: string
+  userRole?: string
+}
+
+export interface BreachLogDetail extends Omit<BreachLogSummary, "resolvedBy"> {
+  userAgent?: string | null
+  evidence?: string | null
+  alertSnapshot?: { subject?: string; text?: string } | null
+  statusHistory: BreachLogStatusHistoryEntry[]
+  resolvedBy?: { id?: string; name?: string; email?: string } | null
+  org?: { id?: string; name?: string; timezone?: string | null; country?: string | null } | null
+  relatedAuditLogs: BreachLogRelatedAuditLog[]
+  mitigationSteps?: unknown[]
+  rootCause?: string | null
+  preventiveMeasures?: string | null
+}
+
+export interface UpdateBreachLogStatusBody {
+  status: BreachLogStatus
+  resolutionNotes?: string
+  resolutionReason?: string
+}

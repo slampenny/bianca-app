@@ -497,3 +497,67 @@ a.admin-btn {
   font-size: 1rem;
   color: #fff;
 }
+
+.admin-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.admin-label--wide {
+  flex: 1;
+  min-width: 220px;
+}
+
+.admin-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.admin-dl {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  gap: 0.65rem 1rem;
+  margin: 0;
+}
+
+.admin-dl dt {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-dl dd {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #e2e8f0;
+}
+
+.admin-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: #e2e8f0;
+}
+
+.admin-link {
+  color: #38bdf8;
+  text-decoration: none;
+}
+
+.admin-link:hover {
+  text-decoration: underline;
+}
+
+.admin-badge--warn {
+  color: #fcd34d;
+  border-color: rgba(252, 211, 77, 0.35);
+}
+
+.admin-badge--danger {
+  color: #fca5a5;
+  border-color: rgba(252, 165, 165, 0.35);
+}

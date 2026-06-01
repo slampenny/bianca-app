@@ -123,6 +123,82 @@ const saveCorpEmailForwards = {
   }),
 };
 
+const listBreachLogs = {
+  query: Joi.object().keys({
+    status: Joi.string()
+      .valid(
+        'INVESTIGATING',
+        'FALSE_POSITIVE',
+        'SECURITY_EVENT_CONFIRMED',
+        'BREACH_CONFIRMED',
+        'CLOSED',
+        'CONFIRMED',
+        'MITIGATED',
+        'RESOLVED',
+      )
+      .optional(),
+    type: Joi.string()
+      .valid(
+        'excessive_failed_logins',
+        'unusual_data_access_volume',
+        'off_hours_access',
+        'unauthorized_export_attempt',
+        'suspicious_ip_address',
+        'brute_force_attempt',
+        'privilege_escalation_attempt',
+        'data_exfiltration_attempt',
+        'unauthorized_access',
+        'other',
+      )
+      .optional(),
+    severity: Joi.string().valid('LOW', 'MEDIUM', 'HIGH', 'CRITICAL').optional(),
+    jurisdiction: Joi.string().valid('HIPAA', 'PIPEDA', 'OTHER').optional(),
+    orgId: Joi.string().custom(objectId).optional(),
+    userId: Joi.string().custom(objectId).optional(),
+    startDate: Joi.date().iso().optional(),
+    endDate: Joi.date().iso().optional(),
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(20),
+  }),
+};
+
+const breachLogIdParam = {
+  params: Joi.object().keys({
+    id: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const updateBreachLogStatus = {
+  ...breachLogIdParam,
+  body: Joi.object().keys({
+    status: Joi.string()
+      .valid(
+        'INVESTIGATING',
+        'FALSE_POSITIVE',
+        'SECURITY_EVENT_CONFIRMED',
+        'BREACH_CONFIRMED',
+        'CLOSED',
+      )
+      .required(),
+    resolutionNotes: Joi.string().trim().min(1).max(5000).when('status', {
+      is: Joi.valid('FALSE_POSITIVE', 'BREACH_CONFIRMED', 'CLOSED'),
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    }),
+    resolutionReason: Joi.string()
+      .valid(
+        'timezone_false_positive',
+        'legitimate_access',
+        'detector_bug',
+        'user_error',
+        'confirmed_unauthorized_access',
+        'confirmed_breach',
+        'other',
+      )
+      .optional(),
+  }),
+};
+
 module.exports = {
   searchCaregivers,
   impersonate,
@@ -135,4 +211,7 @@ module.exports = {
   embeddingAnchorIdParam,
   embeddingAnchorUpdate,
   saveCorpEmailForwards,
+  listBreachLogs,
+  breachLogIdParam,
+  updateBreachLogStatus,
 };

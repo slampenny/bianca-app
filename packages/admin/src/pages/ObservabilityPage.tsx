@@ -85,6 +85,9 @@ export function ObservabilityPage() {
           <Link to="/corp-email" className="admin-btn admin-btn--ghost">
             Corp email
           </Link>
+          <Link to="/security-events" className="admin-btn admin-btn--ghost">
+            Security events
+          </Link>
           <Link to="/impersonate" className="admin-btn admin-btn--ghost">
             Sign in as user
           </Link>

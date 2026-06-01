@@ -10,6 +10,7 @@ const { AuditLog, Caregiver } = require('../models');
 const logger = require('../config/logger');
 const embeddingAnchorPhraseService = require('../services/embeddingAnchorPhrase.service');
 const corpEmailForwardService = require('../services/corpEmailForward.service');
+const breachLogService = require('../services/breachLog.service');
 
 function assertSuperAdmin(req) {
   if (req.caregiver.role !== 'superAdmin') {
@@ -348,6 +349,29 @@ const getDefaultVoiceOnboardingPlan = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ plan: onboardingPlanService.getDefaultPlanTemplate() });
 });
 
+const listBreachLogs = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const result = await breachLogService.listBreachLogs(req.query);
+  res.send(result);
+});
+
+const getBreachLog = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const breach = await breachLogService.getBreachLogById(req.params.id, req.caregiver, req);
+  res.send(breach);
+});
+
+const updateBreachLogStatus = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const breach = await breachLogService.updateBreachLogStatus(
+    req.params.id,
+    req.body,
+    req.caregiver,
+    req,
+  );
+  res.send(breach);
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -366,4 +390,7 @@ module.exports = {
   listCorpEmailForwards,
   saveCorpEmailForwards,
   getDefaultVoiceOnboardingPlan,
+  listBreachLogs,
+  getBreachLog,
+  updateBreachLogStatus,
 };
