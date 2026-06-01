@@ -344,7 +344,7 @@ Then("I should not see the web billing settings page", async function () {
 })
 
 When("I go back to web settings from subpage", async function () {
-  await this.page.getByRole("link", { name: /Back to settings/i }).click()
+  await this.page.getByTestId("settings-back-link").click()
   await expect(this.page.getByTestId("settings-page")).toBeVisible({ timeout: 15000 })
 })
 

@@ -64,7 +64,7 @@ export function SettingsPrivacyPage() {
 
   return (
     <div data-testid="settings-privacy-page" className="va-page-wrap">
-      <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }}>
+      <Link to="/settings" className="va-link" style={{ fontSize: "0.875rem" }} data-testid="settings-back-link">
         ← {t("settings.backToSettings")}
       </Link>
       <h1 className="va-page-title" style={{ marginTop: "1rem" }}>
