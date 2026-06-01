@@ -5,6 +5,7 @@ WORKDIR /app
 
 COPY package.json yarn.lock ./
 COPY packages/shared ./packages/shared
+COPY packages/ui ./packages/ui
 COPY packages/web ./packages/web
 
 RUN yarn install --frozen-lockfile || (echo "Lockfile out of sync, updating..." && yarn install && echo "Lockfile updated")
