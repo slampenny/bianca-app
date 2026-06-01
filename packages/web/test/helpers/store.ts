@@ -3,6 +3,7 @@ import { authApi } from "../../src/services/api/authApi"
 import { alertApi } from "../../src/services/api/alertApi"
 import { clientApi } from "../../src/services/api/clientApi"
 import { conversationApi } from "../../src/services/api/conversationApi"
+import { orgApi } from "../../src/services/api/orgApi"
 import authReducer from "../../src/store/authSlice"
 import orgReducer from "../../src/store/orgSlice"
 import type { RootState } from "../../src/store/store"
@@ -14,6 +15,7 @@ const rootReducer = combineReducers({
   [alertApi.reducerPath]: alertApi.reducer,
   [clientApi.reducerPath]: clientApi.reducer,
   [conversationApi.reducerPath]: conversationApi.reducer,
+  [orgApi.reducerPath]: orgApi.reducer,
 })
 
 export type WebTestStore = ReturnType<typeof createWebTestStore>
@@ -33,6 +35,7 @@ export function createWebTestStore(preloaded?: Partial<RootState>) {
         alertApi.middleware,
         clientApi.middleware,
         conversationApi.middleware,
+        orgApi.middleware,
       ),
     preloadedState: preloaded as Partial<RootState> | undefined,
   })

@@ -1,6 +1,6 @@
 import { formatReportDateRange } from "./callCompletionReportPayload"
 import type { AlertAuditTrailResponse } from "../services/api/facilityReportsApi"
-import type { ReportPayload } from "../data/reportsMock"
+import type { ReportPayload } from "../data/reportCatalog"
 
 function formatRaisedDate(iso: string | null): string {
   if (!iso) return "—"

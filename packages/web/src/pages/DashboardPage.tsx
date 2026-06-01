@@ -5,12 +5,12 @@ import { Link } from "react-router-dom"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { ChartFigure } from "../components/ChartFigure"
 import { summarizeChartSeries } from "../lib/chartSummary"
+import { computeDashboardMetrics } from "../lib/dashboardMetrics"
 import { isAlertUnreadForCaregiver, mapClientToResident } from "../lib/liveData"
 import { formatActivityRowTime } from "../lib/timeFormat"
 import { useGetCallsByHourTodayQuery, useGetRecentActivityQuery } from "../services/api/activityApi"
 import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { useGetAllClientsQuery, useGetClientsOnboardingRollupsQuery } from "../services/api/clientApi"
-import { useDemo } from "../state/DemoContext"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { CheckIcon, PhoneIcon } from "../icons"
@@ -28,22 +28,13 @@ function emptyBusinessHourChart() {
   return BUSINESS_HOURS.map((h) => ({ hour: hourLabel12h(h), calls: 0 }))
 }
 
-const MS_DAY = 86_400_000
 const RECENT_ACTIVITY_LIMIT = 15
-
-function withinMs(iso: string | null | undefined, ms: number): boolean {
-  if (!iso) return false
-  const t = new Date(iso).getTime()
-  return !Number.isNaN(t) && Date.now() - t < ms
-}
 
 export function DashboardPage() {
   const { t } = useTranslation()
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const currentUser = useAppSelector(getCurrentUser)
   const org = useAppSelector((s) => s.org)
-  const { state: demo } = useDemo()
-  const { residents, activityFeed, alertTriggered, alerts: demoAlerts } = demo
 
   const superAdminNeedsOrg = currentUser?.role === "superAdmin"
   const skipHourlyChart = !authed || (superAdminNeedsOrg && !org?.id)
@@ -75,8 +66,18 @@ export function DashboardPage() {
 
   const clients = clientPages?.results ?? []
   const totalFromApi = clientPages?.totalResults
+  const metrics = useMemo(
+    () => computeDashboardMetrics(clients, totalFromApi),
+    [clients, totalFromApi],
+  )
+  const { totalResidents: c, activeToday, callsCompleted, answerRate: successRate } = {
+    totalResidents: metrics.totalResidents,
+    activeToday: metrics.activeToday,
+    callsCompleted: metrics.callsCompleted24h,
+    answerRate: metrics.answerRate24h,
+  }
 
-  /** Re-render periodically so rolling 24h client metrics (e.g. “active today”) update — not for fetching alerts (alerts use Socket.IO + RTK invalidation). */
+  /** Re-render periodically so rolling 24h client metrics update. */
   const [, force] = useState(0)
   const tick = useCallback(() => force((n) => n + 1), [])
   useEffect(() => {
@@ -84,42 +85,13 @@ export function DashboardPage() {
     return () => clearInterval(id)
   }, [tick])
 
-  const c = totalFromApi != null ? totalFromApi : clients.length || (!authed ? residents.length || 146 : 0)
-  const activeToday = useMemo(
-    () => (clients.length ? clients.filter((cl) => withinMs(cl.lastCallAttemptAt, MS_DAY)).length : Math.max(c - 4, 142)),
-    [clients, c],
-  )
-  const callsCompleted = useMemo(
-    () => (clients.length ? clients.filter((cl) => withinMs(cl.lastAnsweredCallAt, MS_DAY)).length : alertTriggered ? 140 : 139),
-    [clients, alertTriggered],
-  )
-  const attemptsToday = useMemo(
-    () => (clients.length ? clients.filter((cl) => withinMs(cl.lastCallAttemptAt, MS_DAY)).length : c),
-    [clients, c],
-  )
-  // lastAnsweredCallAt and lastCallAttemptAt are independent 24h windows — completed can exceed "attempts"
-  // in the API data, which would imply a rate >100%. Cap for display; denominator is best-effort.
-  const successRate = useMemo(() => {
-    if (clients.length && attemptsToday > 0) {
-      return Math.min(100, (callsCompleted / attemptsToday) * 100).toFixed(1)
-    }
-    if (clients.length && attemptsToday === 0 && callsCompleted > 0) {
-      return Math.min(100, (callsCompleted / Math.max(c, 1)) * 100).toFixed(1)
-    }
-    if (c > 0) {
-      return Math.min(100, ((alertTriggered ? 140 : 139) / c) * 100).toFixed(1)
-    }
-    return "95.2"
-  }, [clients.length, attemptsToday, callsCompleted, c, alertTriggered])
-
   const liveUnread = useMemo(
     () => (apiAlerts ?? []).filter((a) => isAlertUnreadForCaregiver(a, currentUser?.id)).length,
     [apiAlerts, currentUser?.id],
   )
-  const demoNewCount = demoAlerts.filter((a) => a.status === "new").length
-  const newCount = liveUnread + demoNewCount
+  const newCount = liveUnread
 
-  const showAlertBanner = alertTriggered || newCount > 0
+  const showAlertBanner = newCount > 0
   const recentRows = useMemo(
     () =>
       (recentActivity?.results ?? []).map((item) => ({
@@ -133,6 +105,16 @@ export function DashboardPage() {
   )
 
   const atRiskFromApi = useMemo(() => clients.filter((cl) => mapClientToResident(cl).status === "at_risk").length, [clients])
+
+  const lastLiveActivityAt = recentActivity?.results?.[0]?.occurredAt
+  const healthySubtitle = useMemo(() => {
+    if (lastLiveActivityAt) {
+      return t("dashboard.subAllOkWithActivity", {
+        time: formatActivityRowTime(new Date(lastLiveActivityAt)),
+      })
+    }
+    return t("dashboard.subAllOk")
+  }, [lastLiveActivityAt, t])
 
   const hourlyChartData = useMemo(() => {
     if (hourlyToday?.buckets?.length) {
@@ -203,6 +185,21 @@ export function DashboardPage() {
     )
   }
 
+  if (authed && clientPages !== undefined && !clientsListLoading && c === 0) {
+    return (
+      <div data-testid="dashboard-empty-org" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>{t("dashboard.metricsNoteLive")}</p>
+        <div className="va-card va-card-pad" style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
+          <p style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 600, color: "var(--va-navy)" }}>{t("dashboard.noResidentsTitle")}</p>
+          <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-500)", lineHeight: 1.5 }}>{t("dashboard.noResidentsBody")}</p>
+          <Link to="/residents" className="va-btn-primary" style={{ display: "inline-flex", marginTop: "1.25rem", textDecoration: "none" }}>
+            {t("dashboard.allResidents")}
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div data-testid="home-header" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", lineHeight: 1.45 }}>{t("dashboard.metricsNoteLive")}</p>
@@ -260,7 +257,7 @@ export function DashboardPage() {
               ? t("dashboard.subReviewAlerts")
               : atRiskFromApi > 0
                 ? t("dashboard.subAtRisk", { count: atRiskFromApi })
-                : t("dashboard.subAllOk")}
+                : healthySubtitle}
           </p>
         </div>
       </div>
@@ -276,7 +273,7 @@ export function DashboardPage() {
         <MetricCard icon={<UsersGlyph />} value={c} label={t("dashboard.totalResidents")} accent="rgba(37, 99, 235, 0.12)" iconC="var(--va-blue)" />
         <MetricCard icon={<ActivityGlyph />} value={activeToday} label={t("dashboard.activeToday")} accent="var(--va-emerald-100)" iconC="var(--va-emerald-600)" />
         <MetricCard icon={<PhoneIcon size={20} />} value={callsCompleted} label={t("dashboard.callsCompleted24h")} accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
-        <MetricCard icon={<ChartGlyph />} value={`${successRate}%`} label={t("dashboard.answerRate24h")} accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
+        <MetricCard icon={<ChartGlyph />} value={successRate} label={t("dashboard.answerRate24h")} accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
       </div>
 
       {authed ? (

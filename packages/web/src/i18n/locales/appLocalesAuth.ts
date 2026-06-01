@@ -7,6 +7,7 @@ export const appLocalesAuth = {
     checkConnection: "Check your connection.",
     checkConnectionApi: "Check your connection and API URL.",
     dismiss: "Dismiss",
+    mockDataBanner: "Mock data — for layout and development only. Not operational data.",
     emDash: "—",
     showPassword: "Show password",
     hidePassword: "Hide password",
@@ -198,7 +199,7 @@ export const appLocalesAuth = {
     toastFinancialRisk: "High-confidence financial risk detected — Margaret Thompson",
   },
   appShell: {
-    defaultFacility: "Sunrise Memory Care",
+    defaultFacility: "Your facility",
     locationLine: "Phoenix, AZ",
     skipToMain: "Skip to main content",
     pageTitleSuffix: "Bianca",

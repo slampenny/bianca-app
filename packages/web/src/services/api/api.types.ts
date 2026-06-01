@@ -51,6 +51,11 @@ export interface Org {
   isEmailVerified: boolean
   caregivers: string[]
   clients: string[]
+  timezone?: string | null
+  dailyDigestSettings?: {
+    enabled?: boolean
+    sendTime?: string | null
+  }
 }
 
 export interface RegisterResult {

@@ -2,13 +2,14 @@ import { skipToken } from "@reduxjs/toolkit/query"
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
-import { RiskSentimentReportLive } from "../components/RiskSentimentReportLive"
 import { ReportDocumentBody } from "../components/ReportDocumentBody"
-import { downloadReportPayloadCsv, getReportPayload, printReportFromPayload, reportTemplates, type ReportPayload, type ReportTemplateId } from "../data/reportsMock"
+import { RiskSentimentReportLive } from "../components/RiskSentimentReportLive"
+import { isReportTemplateId, type ReportPayload, type ReportTemplateId } from "../data/reportCatalog"
 import { buildCallCompletionReportPayload } from "../lib/callCompletionReportPayload"
 import { buildConsentRosterReportPayload } from "../lib/consentRosterReportPayload"
 import { filterClientsToCaregiverRoster, seesWholeFacilityInReports } from "../lib/caregiverClientFilter"
 import { buildAlertAuditReportPayload } from "../lib/alertAuditReportPayload"
+import { downloadReportPayloadCsv, printReportFromPayload } from "../lib/reportExport"
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import {
   useGetAlertAuditTrailQuery,
@@ -21,10 +22,6 @@ import { isAuthenticated, getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { ChevronLeftIcon, DownloadIcon, PrintIcon } from "../icons"
 import "../app.css"
-
-function isReportTemplateId(id: string | undefined): id is ReportTemplateId {
-  return id !== undefined && reportTemplates.some((t) => t.id === id)
-}
 
 const LIVE_CLIENT_TEMPLATES = new Set<ReportTemplateId>(["risk_sentiment", "consent_roster"])
 
@@ -122,8 +119,6 @@ export function ReportTemplateDetailPage() {
     return <Navigate to="/reports/daily-digest" replace />
   }
 
-  const mockPayload = useMemo(() => getReportPayload(validId), [validId])
-
   const scopeFullOrganization = seesWholeFacilityInReports(currentUser?.role)
 
   const sortedRiskClients = useMemo(() => {
@@ -145,7 +140,7 @@ export function ReportTemplateDetailPage() {
     }
     if (validId === "consent_roster") return buildConsentRosterReportPayload(pages.results, opts)
     return null
-  }, [loadLiveClients, validId, isLoading, isFetching, pages, org?.name])
+  }, [loadLiveClients, validId, isLoading, isFetching, pages, org?.name, t])
 
   const callLogPayload = useMemo((): ReportPayload | null => {
     if (!callLogData || validId !== "call_log") return null
@@ -154,7 +149,7 @@ export function ReportTemplateDetailPage() {
       generatedAtLabel: new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
       scopeFacilityWide: seesWholeFacilityInReports(currentUser?.role),
     })
-  }, [callLogData, validId, org?.name, currentUser?.role])
+  }, [callLogData, validId, org?.name, currentUser?.role, t])
 
   const alertAuditPayload = useMemo((): ReportPayload | null => {
     if (!alertAuditData || validId !== "alert_audit") return null
@@ -163,16 +158,14 @@ export function ReportTemplateDetailPage() {
       generatedAtLabel: new Date().toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }),
       scopeFacilityWide: seesWholeFacilityInReports(currentUser?.role),
     })
-  }, [alertAuditData, validId, org?.name, currentUser?.role])
+  }, [alertAuditData, validId, org?.name, currentUser?.role, t])
 
   const payload: ReportPayload | null = useMemo(() => {
     if (validId === "call_log" && authed) return callLogPayload
     if (validId === "alert_audit" && authed) return alertAuditPayload
     if (loadLiveClients && validId !== "risk_sentiment") return livePayload
-    return mockPayload
-  }, [validId, authed, callLogPayload, alertAuditPayload, loadLiveClients, mockPayload, livePayload])
-
-  const showSampleBanner = LIVE_CLIENT_TEMPLATES.has(validId) && !authed
+    return null
+  }, [validId, authed, callLogPayload, alertAuditPayload, loadLiveClients, livePayload])
 
   const showLiveError = loadLiveClients && authed && isError
   const showLiveLoading = loadLiveClients && authed && (isLoading || isFetching || !pages) && !isError
@@ -198,12 +191,6 @@ export function ReportTemplateDetailPage() {
         <ChevronLeftIcon size={16} />
         {t("reportDetail.backToReports")}
       </button>
-
-      {showSampleBanner ? (
-        <p className="va-no-print" style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)" }}>
-          {t("reportDetail.sampleBanner")}
-        </p>
-      ) : null}
 
       <div className="va-card va-card-pad">
         {showCallLogOrgHint ? (
@@ -298,6 +285,8 @@ export function ReportTemplateDetailPage() {
               </p>
             ) : null}
           </>
+        ) : authed ? (
+          <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("reportDetail.noData")}</p>
         ) : null}
       </div>
     </div>

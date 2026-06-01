@@ -28,6 +28,7 @@ import { callWorkflowApi } from "../services/api/callWorkflowApi"
 import { scheduleApi } from "../services/api/scheduleApi"
 import { paymentMethodApi } from "../services/api/paymentMethodApi"
 import { dailyDigestApi } from "../services/api/dailyDigestApi"
+import { orgApi } from "../services/api/orgApi"
 import { familyWeeklyDigestApi } from "../services/api/familyWeeklyDigestApi"
 import { facilityReportsApi } from "../services/api/facilityReportsApi"
 import { fraudAbuseAnalysisApi } from "../services/api/fraudAbuseAnalysisApi"
@@ -61,6 +62,7 @@ const rootReducer = combineReducers({
   [scheduleApi.reducerPath]: scheduleApi.reducer,
   [paymentMethodApi.reducerPath]: paymentMethodApi.reducer,
   [dailyDigestApi.reducerPath]: dailyDigestApi.reducer,
+  [orgApi.reducerPath]: orgApi.reducer,
   [familyWeeklyDigestApi.reducerPath]: familyWeeklyDigestApi.reducer,
   [facilityReportsApi.reducerPath]: facilityReportsApi.reducer,
   [fraudAbuseAnalysisApi.reducerPath]: fraudAbuseAnalysisApi.reducer,
@@ -89,6 +91,7 @@ export const store = configureStore({
       scheduleApi.middleware,
       paymentMethodApi.middleware,
       dailyDigestApi.middleware,
+      orgApi.middleware,
       familyWeeklyDigestApi.middleware,
       facilityReportsApi.middleware,
       fraudAbuseAnalysisApi.middleware,

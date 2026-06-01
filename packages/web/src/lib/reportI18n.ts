@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next"
-import { reportTemplates, type ReportTemplate, type ReportTemplateId } from "../data/reportsMock"
+import { reportTemplates, type ReportTemplate, type ReportTemplateId } from "../data/reportCatalog"
 
 /** Localized copy for report library cards (ids match `reports.templates.*` in en). */
 export function localizedReportTemplates(t: TFunction): ReportTemplate[] {

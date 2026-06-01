@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next"
 import { NavLink, Outlet, useNavigate } from "react-router-dom"
 import { isAlertUnreadForCaregiver } from "../lib/liveData"
 import { canManageCaregivers } from "../lib/roleAccess"
+import { isDevDemoEnabled } from "../lib/devDemo"
+import { useGetRecentActivityQuery } from "../services/api/activityApi"
 import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { useGetCaregiverQuery } from "../services/api/caregiverApi"
 import { useDemo, useDemoActions } from "../state/DemoContext"
@@ -54,6 +56,7 @@ export function AppShell() {
   const { t } = useTranslation()
   useDocumentTitle()
   const navigate = useNavigate()
+  const devDemo = isDevDemoEnabled()
   const currentUser = useAppSelector(getCurrentUser)
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const org = useAppSelector((s) => s.org)
@@ -73,31 +76,58 @@ export function AppShell() {
     [apiAlerts, currentUser?.id],
   )
 
-  const { state } = useDemo()
-  const { toggleSidebar, triggerAlert, dismissToast } = useDemoActions()
-  const { sidebarCollapsed, activityFeed, alerts, toastVisible, toastMessage } = state
-  const demoNew = alerts.filter((a) => a.status === "new").length
+  const { state: demoState } = useDemo()
+  const { triggerAlert, dismissToast } = useDemoActions()
+  const demoNew = devDemo ? demoState.alerts.filter((a) => a.status === "new").length : 0
   const newAlertCount = liveUnread + demoNew
+
+  const superAdminNeedsOrg = currentUser?.role === "superAdmin"
+  const skipRecentActivity = !authed || (superAdminNeedsOrg && !org?.id)
+  const { data: recentActivity, isLoading: activityLoading } = useGetRecentActivityQuery(
+    skipRecentActivity ? skipToken : superAdminNeedsOrg && org?.id ? { orgId: org.id, limit: 1, sinceDays: 30 } : { limit: 1, sinceDays: 30 },
+  )
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const toggleSidebar = () => setSidebarCollapsed((c) => !c)
+
   const navItems = useMemo(
     () =>
       NAV.filter((n) => !n.orgAdminOnly || canManageCaregivers(currentUser?.role)),
     [currentUser?.role],
   )
-  const first = activityFeed[0]
-  const [lastLabel, setLastLabel] = useState(
-    () => (first ? formatHeaderLastActivity(first.timestamp) : t("header.noActivity")),
-  )
+
+  const liveActivityAt = recentActivity?.results?.[0]?.occurredAt
+  const demoActivityAt = devDemo ? demoState.activityFeed[0]?.timestamp : undefined
+  const [lastLabel, setLastLabel] = useState(() => {
+    if (activityLoading) return t("header.activityLoading")
+    if (liveActivityAt) return formatHeaderLastActivity(new Date(liveActivityAt))
+    if (demoActivityAt) return formatHeaderLastActivity(demoActivityAt)
+    return t("header.noActivity")
+  })
 
   useEffect(() => {
     const tick = () => {
-      setLastLabel(
-        first ? formatHeaderLastActivity(first.timestamp) : t("header.noActivity"),
-      )
+      if (activityLoading) {
+        setLastLabel(t("header.activityLoading"))
+        return
+      }
+      if (liveActivityAt) {
+        setLastLabel(formatHeaderLastActivity(new Date(liveActivityAt)))
+        return
+      }
+      if (devDemo && demoActivityAt) {
+        setLastLabel(formatHeaderLastActivity(demoActivityAt))
+        return
+      }
+      setLastLabel(t("header.noActivity"))
     }
     tick()
     const id = setInterval(tick, 10_000)
     return () => clearInterval(id)
-  }, [first, t])
+  }, [liveActivityAt, demoActivityAt, devDemo, activityLoading, t])
+
+  const toastVisible = devDemo && demoState.toastVisible
+  const toastMessage = devDemo ? demoState.toastMessage : ""
 
   const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
@@ -167,12 +197,14 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="va-simulate-wrap">
-          <button type="button" className="va-simulate-btn" onClick={triggerAlert}>
-            <ZapIcon size={14} />
-            {!sidebarCollapsed && <span>{t("nav.simulateAlert")}</span>}
-          </button>
-        </div>
+        {devDemo ? (
+          <div className="va-simulate-wrap">
+            <button type="button" className="va-simulate-btn" data-testid="simulate-alert-btn" onClick={triggerAlert}>
+              <ZapIcon size={14} />
+              {!sidebarCollapsed && <span>{t("nav.simulateAlert")}</span>}
+            </button>
+          </div>
+        ) : null}
       </aside>
 
       <div className="va-main-col">
@@ -220,7 +252,7 @@ export function AppShell() {
         </main>
       </div>
 
-      {toastVisible && (
+      {toastVisible ? (
         <div className="va-toast" role="status">
           <div className="va-toast-inner">
             <AlertOctagonInline />
@@ -230,7 +262,7 @@ export function AppShell() {
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

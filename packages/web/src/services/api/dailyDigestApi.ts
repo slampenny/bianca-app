@@ -24,6 +24,12 @@ export type CaregiverDailyDigestPayload = {
   digestDayStartIso?: string
   /** @deprecated Legacy payloads only; prefer digestDayStartIso */
   digestDateUtc?: string
+  /** Org-local calendar date YYYY-MM-DD (also on digest root) */
+  localDateKey?: string
+  /** IANA timezone snapshot when payload was built */
+  timezone?: string
+  /** True when PHI was redacted for compliance */
+  phiRedacted?: boolean
   labels: {
     conversationSummary: string
     sentiment: string
@@ -40,6 +46,11 @@ export type CaregiverDailyDigest = {
   org: string
   caregiver: string
   digestDate: string
+  /** Org-local calendar date YYYY-MM-DD */
+  localDateKey?: string | null
+  /** IANA timezone snapshot when the digest was built */
+  timezoneAtBuild?: string | null
+  legacyUtcDay?: boolean
   version?: number
   builtAt?: string
   locale: string
@@ -54,6 +65,8 @@ export type CaregiverDailyDigest = {
   previousDigest?: string | null
   supersedesDigest?: string | null
   supersedesDigestMeta?: { id: string; version: number; status: string } | null
+  phiRedactedAt?: string | null
+  phiRedactedReason?: string | null
   listScope?: "latestPerDigestDate" | "allVersions" | string
   createdAt?: string
   updatedAt?: string

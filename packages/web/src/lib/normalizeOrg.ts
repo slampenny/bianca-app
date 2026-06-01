@@ -16,6 +16,17 @@ export function normalizeOrgForStore(raw: unknown): Org | null {
     isEmailVerified: o.isEmailVerified === true,
     caregivers: Array.isArray(o.caregivers) ? o.caregivers.map((x) => String(x)) : [],
     clients: Array.isArray(o.clients) ? o.clients.map((x) => String(x)) : [],
+    timezone: typeof o.timezone === "string" ? o.timezone : null,
+    dailyDigestSettings:
+      o.dailyDigestSettings && typeof o.dailyDigestSettings === "object"
+        ? {
+            enabled: (o.dailyDigestSettings as { enabled?: unknown }).enabled === true,
+            sendTime:
+              typeof (o.dailyDigestSettings as { sendTime?: unknown }).sendTime === "string"
+                ? (o.dailyDigestSettings as { sendTime: string }).sendTime
+                : null,
+          }
+        : undefined,
   }
 }
 

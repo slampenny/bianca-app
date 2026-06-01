@@ -1,4 +1,4 @@
-import type { ReportPayload } from "../data/reportsMock"
+import type { ReportPayload } from "../data/reportCatalog"
 import type { FamilyWeeklyDigestPreviewPayload } from "../services/api/familyWeeklyDigestApi"
 
 /**

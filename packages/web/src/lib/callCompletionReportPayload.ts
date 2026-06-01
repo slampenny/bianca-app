@@ -1,5 +1,5 @@
 import type { CallCompletionLogResponse } from "../services/api/facilityReportsApi"
-import type { ReportPayload } from "../data/reportsMock"
+import type { ReportPayload } from "../data/reportCatalog"
 
 export function formatReportDateRange(dateFromIso: string, dateToIso: string): string {
   const from = new Date(dateFromIso)

@@ -14,7 +14,8 @@ export const nav = {
 export const header = {
   systemActive: "System Active",
   lastActivity: "Last activity:",
-  noActivity: "No activity",
+  noActivity: "No recent activity",
+  activityLoading: "Loading activity…",
 } as const
 
 export const profile = {

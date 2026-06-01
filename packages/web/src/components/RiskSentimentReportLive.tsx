@@ -1,6 +1,6 @@
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
-import { downloadMockCsv } from "../data/reportsMock"
+import { downloadReportCsv } from "../lib/reportExport"
 import {
   buildRiskSentimentCsvExport,
   buildRiskSentimentTableRowStrings,
@@ -70,7 +70,7 @@ export function RiskSentimentReportLive({
   const onCsv = () => {
     const { headers, rows } = buildRiskSentimentCsvExport(clients, t)
     const day = new Date().toISOString().slice(0, 10)
-    downloadMockCsv(`${filenameBase}-${day}.csv`, headers, rows)
+    downloadReportCsv(`${filenameBase}-${day}.csv`, headers, rows)
   }
 
   return (

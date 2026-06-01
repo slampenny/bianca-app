@@ -53,7 +53,7 @@ export function FamilyWeeklyDigestHubPage() {
             return (
               <li key={id}>
                 <Link
-                  to={`/reports/family-weekly-digest/${id}`}
+                  to={`/reports/family_weekly_digest/clients/${id}`}
                   className="va-card va-card-pad"
                   style={{ display: "block", textDecoration: "none", color: "inherit" }}
                 >

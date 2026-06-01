@@ -7,6 +7,7 @@ import { AuthTextAreaField } from "../components/AuthTextAreaField"
 import { mapConversationToTranscript } from "../lib/mapConversationToTranscript"
 import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
+import { isDevDemoEnabled } from "../lib/devDemo"
 import {
   useGetAllAlertsQuery,
   useMarkAlertAsReadMutation,
@@ -47,6 +48,7 @@ export function AlertDetailPage() {
   const navigate = useNavigate()
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const currentUser = useAppSelector(getCurrentUser)
+  const devDemo = isDevDemoEnabled()
   const { state: demo } = useDemo()
   const { acknowledgeAlert } = useDemoActions()
   const [assigned, setAssigned] = useState<Set<number>>(() => new Set())
@@ -83,9 +85,9 @@ export function AlertDetailPage() {
     [rawApi, clientNameById, currentUser?.id],
   )
 
-  const demoAlert = demo.alerts.find((a) => a.id === alertId)
+  const demoAlert = devDemo ? demo.alerts.find((a) => a.id === alertId) : undefined
   const alert: FacilityAlert | null = facilityFromApi ?? demoAlert ?? null
-  const demoTranscript = demo.transcripts.find((t) => t.alertId === alertId)
+  const demoTranscript = devDemo ? demo.transcripts.find((t) => t.alertId === alertId) : undefined
   const fromApi = Boolean(facilityFromApi)
 
   const linkedConversationId = useMemo(() => {
@@ -98,7 +100,7 @@ export function AlertDetailPage() {
   }, [rawApi])
 
   const skipLiveTranscript =
-    !authed || !fromApi || !linkedConversationId || Boolean(demoTranscript)
+    !authed || !fromApi || !linkedConversationId || Boolean(devDemo && demoTranscript)
 
   const {
     data: conversationDetail,
@@ -148,7 +150,7 @@ export function AlertDetailPage() {
       } catch {
         /* refetch via invalidatesTags or show error — keep UI stable */
       }
-    } else {
+    } else if (devDemo) {
       acknowledgeAlert(alert.id)
     }
   }

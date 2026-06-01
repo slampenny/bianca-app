@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AdminSessionHandoffBridge } from "./auth/AdminSessionHandoffBridge"
 import { AuthSessionBridge } from "./auth/AuthSessionBridge"
@@ -5,7 +6,7 @@ import { RequireAuth } from "./auth/RequireAuth"
 import { RequireOnboardingComplete } from "./auth/RequireOnboardingComplete"
 import { RequireRole } from "./auth/RequireRole"
 import { SSOCallbackGate } from "./auth/SSOCallbackGate"
-import { DemoProvider } from "./state/DemoContext"
+import { isDevDemoEnabled } from "./lib/devDemo"
 import { AppShell } from "./layout/AppShell"
 import { LoginPage } from "./pages/LoginPage"
 import { MFAPage } from "./pages/MFAPage"
@@ -41,13 +42,12 @@ import { SettingsPhonePage } from "./pages/SettingsPhonePage"
 import { SettingsPrivacyPage } from "./pages/SettingsPrivacyPage"
 import { SettingsBillingPage } from "./pages/SettingsBillingPage"
 
-export default function App() {
+const DevDemoRoot = import.meta.env.DEV
+  ? lazy(() => import("./state/DevDemoRoot.dev").then((m) => ({ default: m.DevDemoRoot })))
+  : null
+
+function AppRoutes() {
   return (
-    <DemoProvider>
-      <BrowserRouter>
-        <SSOCallbackGate>
-          <AuthSessionBridge />
-          <AdminSessionHandoffBridge />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/login/mfa" element={<MFAPage />} />
@@ -106,8 +106,28 @@ export default function App() {
               </Route>
             </Route>
           </Routes>
-        </SSOCallbackGate>
-      </BrowserRouter>
-    </DemoProvider>
   )
+}
+
+export default function App() {
+  const routes = (
+    <BrowserRouter>
+      <SSOCallbackGate>
+        <AuthSessionBridge />
+        <AdminSessionHandoffBridge />
+        <AppRoutes />
+      </SSOCallbackGate>
+    </BrowserRouter>
+  )
+
+  if (isDevDemoEnabled() && DevDemoRoot) {
+    const Root = DevDemoRoot
+    return (
+      <Suspense fallback={routes}>
+        <Root>{routes}</Root>
+      </Suspense>
+    )
+  }
+
+  return routes
 }

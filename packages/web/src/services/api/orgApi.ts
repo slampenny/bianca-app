@@ -15,6 +15,10 @@ export type OrgUpdatePayload = {
     retryIntervalMinutes: number
     alertOnAllMissedCalls: boolean
   }
+  dailyDigestSettings?: {
+    enabled?: boolean
+    sendTime?: string | null
+  }
 }
 
 export const orgApi = createApi({

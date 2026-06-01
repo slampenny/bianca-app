@@ -1,4 +1,9 @@
-/** Illustrative data for Reports UI — replace with API when ready. */
+/** Dev-only illustrative report payloads — not imported by production pages. */
+
+import type { ReportPayload, ReportTemplateId } from "./reportCatalog"
+
+export type { ReportPayload, ReportTemplateId, ReportTemplate, ReportTable, ReportPayloadSourceId } from "./reportCatalog"
+export { reportTemplates } from "./reportCatalog"
 
 export const facilityReportStats = {
   generatedThisMonth: 186,
@@ -7,110 +12,6 @@ export const facilityReportStats = {
   lastFacilityReportLabel: "Mar 24, 2026 · 06:15",
   complianceScoreLabel: "Strong",
 }
-
-export type ReportTemplateId =
-  | "wellness_daily"
-  | "call_log"
-  | "alert_audit"
-  | "consent_roster"
-  | "family_weekly_digest"
-  | "risk_sentiment"
-
-/** Payloads generated outside the template library (e.g. per-resident care snapshot). */
-export type ReportPayloadSourceId = ReportTemplateId | "resident_care_snapshot"
-
-export interface ReportTemplate {
-  id: ReportTemplateId
-  title: string
-  subtitle: string
-  description: string
-  cadence: string
-  tags: string[]
-}
-
-export const reportTemplates: ReportTemplate[] = [
-  {
-    id: "wellness_daily",
-    title: "Daily wellness digest",
-    subtitle: "Per resident",
-    description:
-      "Narrative summary of check-in calls, mood cues, and follow-ups suggested by Bianca for handoff at shift change.",
-    cadence: "Daily · 06:00",
-    tags: ["Clinical", "Handoff"],
-  },
-  {
-    id: "call_log",
-    title: "Call completion log",
-    subtitle: "Facility or wing",
-    description:
-      "Attempted vs completed calls, duration buckets, and no-answer streaks for QA and staffing reviews.",
-    cadence: "Weekly",
-    tags: ["Operations", "QA"],
-  },
-  {
-    id: "alert_audit",
-    title: "Alert audit trail",
-    subtitle: "Facility-wide",
-    description:
-      "Every alert raised, severity, related resident, who acknowledged it, and timestamps for governance.",
-    cadence: "On demand",
-    tags: ["Compliance", "Risk"],
-  },
-  {
-    id: "consent_roster",
-    title: "Consent & program roster",
-    subtitle: "Directory",
-    description:
-      "Residents on Bianca schedules, consent on file, primary contact, and last successful engagement.",
-    cadence: "Monthly",
-    tags: ["Admin", "PII"],
-  },
-  {
-    id: "family_weekly_digest",
-    title: "Weekly family call digest",
-    subtitle: "One authorized recipient · one resident",
-    description:
-      "High-level recap of wellness check-in calls for the week: whether they connected, tone in plain language, and benign themes — no transcripts, no clinical detail.",
-    cadence: "Weekly · e.g. Sunday evening",
-    tags: ["Family", "Calls"],
-  },
-  {
-    id: "risk_sentiment",
-    title: "Risk & sentiment trend",
-    subtitle: "Per resident",
-    description:
-      "Rolling risk level, sentiment direction, and notable themes compared to the prior 30 days.",
-    cadence: "Weekly",
-    tags: ["Clinical", "Trend"],
-  },
-]
-
-export interface ReportTable {
-  caption?: string
-  headers: string[]
-  rows: string[][]
-}
-
-/** Single source for on-screen preview, print dialog, and CSV download. */
-export interface ReportPayload {
-  id: ReportPayloadSourceId
-  title: string
-  subtitle: string
-  facilityLine: string
-  generatedAtLabel: string
-  narrative?: string[]
-  tables: ReportTable[]
-}
-
-/** Shown on Reports — explains daily (staff) vs weekly (family) without implying unsafe blast sends. */
-export const staffVersusFamilyDigestCopy = {
-  title: "Why staff digests can be daily, but family updates are weekly",
-  body: [
-    "Daily handoff digests for care teams are meant to stay inside the facility’s authenticated tools. The audience is known: staff with role-based access to the resident record. Nothing is emailed to a broad list by default.",
-    "When you contact families, you cross a privacy boundary. A weekly digest is built for one authorized relationship at a time (verified on file, with consent). Content stays high-level — connected or not, general mood, safe themes — not raw transcripts or clinical detail.",
-    "If something urgent comes up, the safer pattern is a direct call or charted outreach from staff — not an automated daily blast to “family” where routing could be wrong.",
-  ],
-} as const
 
 const FACILITY = "Sunrise Memory Care (sample)"
 const NOW_LABEL = new Date().toLocaleString(undefined, {
@@ -367,27 +268,11 @@ export const residentReportSnapshots: ResidentReportSnapshot[] = [
   },
 ]
 
+export { downloadReportCsv as downloadMockCsv, downloadReportPayloadCsv, printReportFromPayload } from "../lib/reportExport"
+import { downloadReportCsv } from "../lib/reportExport"
+
 function escapeCsvCell(s: string): string {
   return `"${String(s).replace(/"/g, '""')}"`
-}
-
-export function downloadMockCsv(filename: string, headers: string[], rows: string[][]): void {
-  const lines = [headers.map(escapeCsvCell).join(","), ...rows.map((r) => r.map(escapeCsvCell).join(","))]
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-/** CSV from any report payload (live or mock). */
-export function downloadReportPayloadCsv(p: ReportPayload, filenameBase: string): void {
-  const day = new Date().toISOString().slice(0, 10)
-  const primary = p.tables[0]
-  if (!primary) return
-  downloadMockCsv(`${filenameBase}-${day}.csv`, primary.headers, primary.rows)
 }
 
 /** CSV from the same payload used for preview and print. */
@@ -403,99 +288,12 @@ export function downloadReportDataFile(id: ReportTemplateId): void {
         rows.push([label, r[0] ?? "", r[1] ?? "", r[2] ?? ""])
       }
     }
-    downloadMockCsv(`bianca-${id}-${day}.csv`, headers, rows)
+    downloadReportCsv(`bianca-${id}-${day}.csv`, headers, rows)
     return
   }
   const primary = p.tables[0]
   if (!primary) return
-  downloadMockCsv(`bianca-${id}-${day}.csv`, primary.headers, primary.rows)
-}
-
-function escapeHtml(s: string): string {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
-
-function payloadToPrintableHtml(p: ReportPayload): string {
-  const narrativeBlock =
-    p.narrative && p.narrative.length > 0
-      ? `<ul>${p.narrative.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}</ul>`
-      : ""
-  const tablesBlock = p.tables
-    .map((tab) => {
-      const cap = tab.caption ? `<p class="cap">${escapeHtml(tab.caption)}</p>` : ""
-      const head = `<tr>${tab.headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>`
-      const body = tab.rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("")
-      return `${cap}<table><thead>${head}</thead><tbody>${body}</tbody></table>`
-    })
-    .join("")
-
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><title>${escapeHtml(p.title)}</title>
-<style>
-  body { font-family: system-ui, -apple-system, Segoe UI, sans-serif; padding: 28px; color: #0f172a; max-width: 720px; margin: 0 auto; line-height: 1.45; }
-  .brand { font-weight: 700; font-size: 1.05rem; letter-spacing: 0.02em; margin-bottom: 20px; }
-  .brand .dot { color: #14b8a6; }
-  h1 { font-size: 1.35rem; margin: 0 0 6px; font-weight: 700; }
-  .meta { color: #64748b; font-size: 0.875rem; margin-bottom: 18px; }
-  .cap { font-weight: 600; font-size: 0.875rem; margin: 18px 0 8px; }
-  table { border-collapse: collapse; width: 100%; font-size: 0.8125rem; margin-bottom: 8px; }
-  th, td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; vertical-align: top; }
-  th { background: #f8fafc; font-weight: 600; }
-  ul { font-size: 0.875rem; margin: 0 0 16px; padding-left: 1.25rem; }
-</style></head><body>
-  <div class="brand">bianca<span class="dot">.</span></div>
-  <h1>${escapeHtml(p.title)}</h1>
-  <p class="meta">${escapeHtml(p.subtitle)} · ${escapeHtml(p.facilityLine)} · ${escapeHtml(p.generatedAtLabel)}</p>
-  ${narrativeBlock}
-  ${tablesBlock}
-</body></html>`
-}
-
-/** Same structured report as on screen; opens the browser print dialog (save as PDF from there). */
-export function printReportFromPayload(p: ReportPayload): void {
-  const html = payloadToPrintableHtml(p)
-  const iframe = document.createElement("iframe")
-  iframe.setAttribute("aria-hidden", "true")
-  Object.assign(iframe.style, {
-    position: "fixed",
-    right: "0",
-    bottom: "0",
-    width: "0",
-    height: "0",
-    border: "0",
-    opacity: "0",
-    pointerEvents: "none",
-  })
-  document.body.appendChild(iframe)
-  const doc = iframe.contentDocument
-  const win = iframe.contentWindow
-  if (!doc || !win) {
-    iframe.remove()
-    return
-  }
-  doc.open()
-  doc.write(html)
-  doc.close()
-  const cleanup = () => {
-    try {
-      iframe.remove()
-    } catch {
-      /* ignore */
-    }
-  }
-  win.addEventListener("afterprint", cleanup)
-  win.focus()
-  requestAnimationFrame(() => {
-    win.print()
-    setTimeout(cleanup, 2_000)
-  })
-}
-
-export function printReport(id: ReportTemplateId): void {
-  printReportFromPayload(getReportPayload(id))
+  downloadReportCsv(`bianca-${id}-${day}.csv`, primary.headers, primary.rows)
 }
 
 /** Optional combined CSV for managers — still derived from payloads. */
@@ -572,5 +370,5 @@ export function downloadResidentDigestCsv(r: ResidentReportSnapshot): void {
   const t = p.tables[0]
   if (!t) return
   const day = new Date().toISOString().slice(0, 10)
-  downloadMockCsv(`bianca-resident-${r.displayName.replace(/\s+/g, "-").toLowerCase()}-${day}.csv`, t.headers, t.rows)
+  downloadReportCsv(`bianca-resident-${r.displayName.replace(/\s+/g, "-").toLowerCase()}-${day}.csv`, t.headers, t.rows)
 }

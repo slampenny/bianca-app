@@ -1,19 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useParams } from "react-router-dom"
 import { ReportDocumentBody } from "../components/ReportDocumentBody"
-import {
-  downloadReportPayloadCsv,
-  getReportPayload,
-  printReportFromPayload,
-  type ReportPayload,
-} from "../data/reportsMock"
+import { isDevDemoEnabled } from "../lib/devDemo"
+import { downloadReportPayloadCsv, printReportFromPayload } from "../lib/reportExport"
 import { familyWeeklyDigestPreviewToReportPayload } from "../lib/familyWeeklyDigestReportPayload"
 import { usePreviewFamilyWeeklyDigestMutation } from "../services/api/familyWeeklyDigestApi"
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { ChevronLeftIcon, DownloadIcon, PrintIcon } from "../icons"
 import "../app.css"
+
+const FamilyWeeklyDigestSample = import.meta.env.DEV
+  ? lazy(() => import("./FamilyWeeklyDigestSample.dev").then((m) => ({ default: m.FamilyWeeklyDigestSample })))
+  : null
 
 function utcWeekReferenceFromDateInput(isoDate: string): string {
   const d = new Date(`${isoDate}T12:00:00.000Z`)
@@ -28,6 +28,36 @@ export function FamilyWeeklyDigestClientPage() {
   const authed = useAppSelector(isAuthenticated)
   const isSample = clientId === "sample"
 
+  if (!clientId) {
+    return <Navigate to="/reports/family_weekly_digest" replace />
+  }
+
+  if (isSample) {
+    if (!isDevDemoEnabled() || !FamilyWeeklyDigestSample) {
+      return <Navigate to="/reports/family_weekly_digest" replace />
+    }
+    const Sample = FamilyWeeklyDigestSample
+    return (
+      <Suspense fallback={null}>
+        <Sample />
+      </Suspense>
+    )
+  }
+
+  return <FamilyWeeklyDigestLive clientId={clientId} authed={authed} navigate={navigate} t={t} />
+}
+
+function FamilyWeeklyDigestLive({
+  clientId,
+  authed,
+  navigate,
+  t,
+}: {
+  clientId: string
+  authed: boolean
+  navigate: ReturnType<typeof useNavigate>
+  t: ReturnType<typeof useTranslation>["t"]
+}) {
   const [weekRef, setWeekRef] = useState(() => {
     const d = new Date()
     const y = d.getUTCFullYear()
@@ -39,33 +69,21 @@ export function FamilyWeeklyDigestClientPage() {
   const [preview, { data, isLoading, isError, reset }] = usePreviewFamilyWeeklyDigestMutation()
 
   const loadLive = useCallback(() => {
-    if (!clientId || isSample) return
     void preview({ clientId, weekStart: utcWeekReferenceFromDateInput(weekRef) })
-  }, [clientId, isSample, preview, weekRef])
+  }, [clientId, preview, weekRef])
 
   useEffect(() => {
-    if (isSample || !clientId || !authed) {
+    if (!clientId || !authed) {
       reset()
       return
     }
     loadLive()
-  }, [authed, clientId, isSample, loadLive, reset])
+  }, [authed, clientId, loadLive, reset])
 
-  const mockPayload = useMemo((): ReportPayload | null => {
-    if (!isSample) return null
-    return getReportPayload("family_weekly_digest")
-  }, [isSample])
-
-  const livePayload = useMemo((): ReportPayload | null => {
-    if (isSample || !data?.payload) return null
+  const livePayload = useMemo(() => {
+    if (!data?.payload) return null
     return familyWeeklyDigestPreviewToReportPayload(data.payload)
-  }, [data?.payload, isSample])
-
-  const payload = isSample ? mockPayload : livePayload
-
-  if (!clientId) {
-    return <Navigate to="/reports/family_weekly_digest" replace />
-  }
+  }, [data?.payload])
 
   return (
     <div
@@ -82,11 +100,7 @@ export function FamilyWeeklyDigestClientPage() {
         {t("familyWeeklyDigest.back")}
       </button>
 
-      {isSample ? (
-        <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--va-slate-600)" }}>{t("familyWeeklyDigest.sampleBanner")}</p>
-      ) : null}
-
-      {!isSample && authed ? (
+      {authed ? (
         <div className="va-card va-card-pad" style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-end" }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "0.75rem", color: "var(--va-slate-600)" }}>
             {t("familyWeeklyDigest.weekLabel")}
@@ -105,31 +119,31 @@ export function FamilyWeeklyDigestClientPage() {
       ) : null}
 
       <div className="va-card va-card-pad">
-        {!isSample && authed && isError ? (
+        {authed && isError ? (
           <p style={{ margin: 0, color: "var(--va-red-600)" }} role="alert">
             {t("familyWeeklyDigest.loadError")}
           </p>
-        ) : !isSample && authed && isLoading && !data ? (
+        ) : authed && isLoading && !data ? (
           <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("familyWeeklyDigest.loadingPreview")}</p>
-        ) : payload ? (
+        ) : livePayload ? (
           <>
-            <ReportDocumentBody payload={payload} />
+            <ReportDocumentBody payload={livePayload} />
             <div className="va-report-modal-actions">
-              <button type="button" className="va-btn-secondary" onClick={() => printReportFromPayload(payload)}>
+              <button type="button" className="va-btn-secondary" onClick={() => printReportFromPayload(livePayload)}>
                 <PrintIcon size={18} />
                 {t("reportDetail.printPdf")}
               </button>
               <button
                 type="button"
                 className="va-btn-secondary"
-                onClick={() => downloadReportPayloadCsv(payload, "bianca-weekly-family-digest")}
+                onClick={() => downloadReportPayloadCsv(livePayload, "bianca-weekly-family-digest")}
               >
                 <DownloadIcon size={18} />
                 {t("reportDetail.downloadCsv")}
               </button>
             </div>
           </>
-        ) : !isSample && authed ? (
+        ) : authed ? (
           <p style={{ margin: 0, color: "var(--va-slate-600)" }}>{t("familyWeeklyDigest.loadingPreview")}</p>
         ) : null}
       </div>

@@ -1,4 +1,4 @@
-import type { ReportPayload } from "../data/reportsMock"
+import type { ReportPayload } from "../data/reportCatalog"
 
 export function ReportDocumentBody({ payload }: { payload: ReportPayload }) {
   return (
