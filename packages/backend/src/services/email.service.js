@@ -993,6 +993,96 @@ ${closing}`;
   i18n.setLocale(previousLocale);
 };
 
+/**
+ * Send family digest email verification link to emergency contact.
+ * No PHI — facility/org name only.
+ * @param {string} to
+ * @param {string} orgName
+ * @param {string} verifyLink
+ * @param {string} [locale='en']
+ */
+const sendFamilyDigestEmailVerificationEmail = async (to, orgName, verifyLink, locale = 'en') => {
+  const previousLocale = i18n.getLocale();
+  i18n.setLocale(locale);
+
+  const translate = (key, fallback) => {
+    if (!i18n.__) return fallback;
+    const value = i18n.__(key);
+    return value && value !== key ? value : fallback;
+  };
+
+  const subject = translate(
+    'familyDigestEmailVerify.subject',
+    'Bianca Wellness - Verify weekly family digest email'
+  );
+  const intro = translate(
+    'familyDigestEmailVerify.intro',
+    `${orgName || 'Your care facility'} uses Bianca Wellness to send optional weekly email summaries of wellness check-in calls to family contacts.`
+  ).replace('%s', orgName || 'your care facility');
+  const scopeNote = translate(
+    'familyDigestEmailVerify.scopeNote',
+    'This link verifies your email address for weekly family digest emails only. It does not change emergency notifications or other communications. This message does not include health information.'
+  );
+  const buttonText = translate('familyDigestEmailVerify.buttonText', 'Verify email address');
+  const expiryNote = translate(
+    'familyDigestEmailVerify.expiryNote',
+    'This verification link expires in 24 hours for security.'
+  );
+  const contactInfo = translate(
+    'familyDigestEmailVerify.contactInfo',
+    'If you did not expect this email, you can ignore it or contact your care facility.'
+  );
+  const closing = translate('familyDigestEmailVerify.closing', 'Best regards,\nThe Bianca Wellness Team');
+  const title = translate('familyDigestEmailVerify.title', 'Verify your email for weekly family digests');
+
+  const text = `${title}
+
+${intro}
+
+${scopeNote}
+
+${buttonText}: ${verifyLink}
+
+${expiryNote}
+
+${contactInfo}
+
+${closing}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+      <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h2 style="color: #2c3e50; margin-top: 0;">${title}</h2>
+        <p style="color: #555; line-height: 1.6;">${intro}</p>
+        <p style="color: #555; line-height: 1.6;">${scopeNote}</p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${verifyLink}" style="background-color: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">${buttonText}</a>
+        </div>
+        <p style="color: #777; font-size: 14px;">${expiryNote}</p>
+        <p style="color: #555; line-height: 1.6;">${contactInfo}</p>
+        <p style="color: #555; line-height: 1.6; margin-top: 30px;">${closing.replace('\n', '<br>')}</p>
+        <hr style="border: 1px solid #eee; margin: 30px 0;">
+        <p style="color: #999; font-size: 12px; text-align: center;">Bianca Wellness - Secure Healthcare Communication<br>This email was sent from a verified domain: ${(config.email.from || 'no-reply@biancawellness.com').split('@')[1]}</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await sendEmail(to, subject, text, html);
+    logger.info(`[Email Service] Family digest email verification sent to ${to} (locale: ${locale})`);
+  } catch (error) {
+    logger.error(`[Email Service] Failed to send family digest email verification to ${to}`, {
+      errorMessage: error.message,
+      orgName,
+      locale,
+      verifyLink,
+    });
+    throw error;
+  } finally {
+    i18n.setLocale(previousLocale);
+  }
+};
+
 // Export functions
 module.exports = {
   initializeEmailTransport, // Call this at application startup
@@ -1003,6 +1093,7 @@ module.exports = {
   sendVerificationEmail,
   sendPrivacyDataEmail,
   sendClientConsentRequestEmail,
+  sendFamilyDigestEmailVerificationEmail,
   getStatus,
   isReady,
   forceEtherealInitialization,

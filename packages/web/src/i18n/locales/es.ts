@@ -702,7 +702,12 @@ export const es = {
   "familyWeeklyDigest": {
     "back": "Volver a residentes del resumen semanal",
     "sampleBanner": "Solo diseño de muestra ilustrativo. Use la lista de residentes para previsualizar datos de su cuenta.",
-    "weekLabel": "Semana (elija cualquier día de la semana, UTC)",
+    "weekLabel": "Fecha de referencia",
+    "weekDateHelper": "Elija cualquier día de la semana. La zona horaria del centro determina qué semana (lunes a domingo) se usa.",
+    "weekOfLabel": "Semana del {{date}}",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "Zona horaria: {{timezone}}",
+    "legacyUtcWeekBanner": "Esta vista previa usa límites semanales anteriores, de antes de las semanas locales de la organización.",
     "refreshPreview": "Actualizar vista previa",
     "loadingPreview": "Cargando vista previa…",
     "loadError": "No se pudo cargar la vista previa. Puede que no tenga acceso o el servidor no esté disponible."

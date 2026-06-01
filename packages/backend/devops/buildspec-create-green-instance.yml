@@ -40,28 +40,23 @@ phases:
           exit 1
         fi
         echo "Using launch template: $ACTUAL_LAUNCH_TEMPLATE_NAME, version: $LAUNCH_TEMPLATE_VERSION"
-        
-        # Cleanup: Terminate any existing green instances to prevent accumulation
-        echo "Checking for existing green instances to clean up..."
-        EXISTING_GREEN_INSTANCES=$(aws ec2 describe-instances \
-          --filters "Name=tag:Name,Values=${GREEN_TAG:-bianca-staging-green}" \
-                    "Name=instance-state-name,Values=running,pending" \
-          --query 'Reservations[*].Instances[*].InstanceId' \
-          --output text 2>/dev/null || echo "")
-        
-        if [ -n "$EXISTING_GREEN_INSTANCES" ] && [ "$EXISTING_GREEN_INSTANCES" != "None" ]; then
-          echo "Found existing green instances to terminate:"
-          for INSTANCE_ID in $EXISTING_GREEN_INSTANCES; do
-            echo "  - $INSTANCE_ID"
-          done
-          echo "Terminating existing green instances..."
-          aws ec2 terminate-instances --instance-ids $EXISTING_GREEN_INSTANCES --query 'TerminatingInstances[*].[InstanceId,CurrentState.Name]' --output table
-          echo "Waiting for instances to start terminating..."
-          sleep 10
-          echo "Note: Instances are terminating in background. New green instance will be created now."
-        else
-          echo "No existing green instances found - clean slate!"
+
+        PIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-}"
+        if [ -z "$PIPELINE_EXECUTION_ID" ] && [ -n "${CODEPIPELINE_BUILD_ID:-}" ]; then
+          PIPELINE_EXECUTION_ID="${CODEPIPELINE_BUILD_ID%%:*}"
         fi
+        if [ -z "$PIPELINE_EXECUTION_ID" ]; then
+          echo "WARNING: Pipeline execution ID not set — green instance will not be execution-scoped"
+        else
+          echo "Pipeline execution ID: $PIPELINE_EXECUTION_ID"
+        fi
+
+        # Cleanup: only this execution's green instances (plus untagged legacy orphans)
+        echo "Checking for existing green instances owned by this pipeline execution..."
+        export TERMINATE_LEGACY_GREEN=true
+        bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \
+          echo "WARNING: Green pre-cleanup failed (continuing)"
+        sleep 10
         
         BLUE_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=${BLUE_TAG:-bianca-staging}" "Name=instance-state-name,Values=running" --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || echo "")
         if [ -n "$BLUE_INSTANCE_ID" ] && [ "$BLUE_INSTANCE_ID" != "None" ]; then
@@ -70,7 +65,12 @@ phases:
         fi
         echo "Creating new green instance..."
         ENV_TAG="${ENVIRONMENT_TAG:-staging}"
-        GREEN_INSTANCE_ID=$(aws ec2 run-instances --launch-template LaunchTemplateName=$ACTUAL_LAUNCH_TEMPLATE_NAME,Version=$LAUNCH_TEMPLATE_VERSION --subnet-id ${SUBNET_ID} --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$GREEN_TAG},{Key=Environment,Value=$ENV_TAG},{Key=DeploymentType,Value=green}]" --query 'Instances[0].InstanceId' --output text 2>&1)
+        INSTANCE_TAGS="[{Key=Name,Value=$GREEN_TAG},{Key=Environment,Value=$ENV_TAG},{Key=DeploymentType,Value=green}"
+        if [ -n "$PIPELINE_EXECUTION_ID" ]; then
+          INSTANCE_TAGS="${INSTANCE_TAGS},{Key=PipelineExecutionId,Value=$PIPELINE_EXECUTION_ID}"
+        fi
+        INSTANCE_TAGS="${INSTANCE_TAGS}]"
+        GREEN_INSTANCE_ID=$(aws ec2 run-instances --launch-template LaunchTemplateName=$ACTUAL_LAUNCH_TEMPLATE_NAME,Version=$LAUNCH_TEMPLATE_VERSION --subnet-id ${SUBNET_ID} --tag-specifications "ResourceType=instance,Tags=$INSTANCE_TAGS" --query 'Instances[0].InstanceId' --output text 2>&1)
         if [ $? -ne 0 ] || [ -z "$GREEN_INSTANCE_ID" ] || [ "$GREEN_INSTANCE_ID" = "None" ]; then
           echo "ERROR: Failed to create green instance"
           echo "Output: $GREEN_INSTANCE_ID"
@@ -134,7 +134,7 @@ phases:
         fi
       - |
         if [ -f instance-info.txt ]; then
-          source instance-info.txt
+          . instance-info.txt
           if [ -n "$GREEN_INSTANCE_ID" ]; then
             INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids $GREEN_INSTANCE_ID --query 'Reservations[0].Instances[0].State.Name' --output text 2>/dev/null || echo "unknown")
             echo "Final instance state: $INSTANCE_STATE"

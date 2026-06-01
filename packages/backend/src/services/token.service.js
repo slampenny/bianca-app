@@ -9,6 +9,9 @@ const ApiError = require('../utils/ApiError');
 const { tokenTypes } = require('../config/tokens');
 const logger = require('../config/logger');
 
+const isClientScopedTokenType = (type) =>
+  type === tokenTypes.CLIENT_CONSENT || type === tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY;
+
 /**
  * Extract client ID from client object or string
  * Handles both Mongoose documents and plain objects
@@ -155,11 +158,11 @@ const generateToken = (
 /**
  * Save a token
  * @param {string} token
- * @param {ObjectId} caregiverId - Required for all token types except CLIENT_CONSENT
+ * @param {ObjectId} caregiverId - Required for caregiver-scoped token types
  * @param {Moment} expires
  * @param {string} type
  * @param {boolean} [blacklisted]
- * @param {ObjectId} [clientId] - Required only for CLIENT_CONSENT token type
+ * @param {ObjectId} [clientId] - Required for client-scoped token types
  * @returns {Promise<Token>}
  */
 const saveToken = async (token, caregiverId, expires, type, blacklisted = false, clientId = null) => {
@@ -173,11 +176,10 @@ const saveToken = async (token, caregiverId, expires, type, blacklisted = false,
       blacklisted,
     };
     
-    // For patient consent tokens, use client ID
-    if (type === tokenTypes.CLIENT_CONSENT) {
+    if (isClientScopedTokenType(type)) {
       const clientIdString = extractClientId(clientId);
       if (!clientIdString) {
-        throw new Error('Client ID is required for CLIENT_CONSENT token type');
+        throw new Error(`Client ID is required for ${type} token type`);
       }
       tokenData.client = clientIdString;
     } else {
@@ -196,8 +198,8 @@ const saveToken = async (token, caregiverId, expires, type, blacklisted = false,
     logger.error('[Token Service] Failed to save token:', {
       error: error.message,
       type,
-      caregiverId: type !== tokenTypes.CLIENT_CONSENT ? caregiverId : null,
-      client: type === tokenTypes.CLIENT_CONSENT ? clientId : null,
+      caregiverId: !isClientScopedTokenType(type) ? caregiverId : null,
+      client: isClientScopedTokenType(type) ? clientId : null,
       hasToken: !!token
     });
     throw error;
@@ -224,20 +226,20 @@ const verifyToken = async (token, type) => {
 
   // Build query based on token type
   const query = { token, type, blacklisted: false };
-  if (type === tokenTypes.CLIENT_CONSENT) {
+  if (isClientScopedTokenType(type)) {
     query.client = payload.sub;
   } else {
     query.caregiver = payload.sub;
   }
 
-  logger.debug(`[Token Service] Looking up token in database - token: ${token.substring(0, 20)}..., type: ${type}, ${type === tokenTypes.CLIENT_CONSENT ? 'client' : 'caregiver'}: ${payload.sub}`);
+  logger.debug(`[Token Service] Looking up token in database - token: ${token.substring(0, 20)}..., type: ${type}, ${isClientScopedTokenType(type) ? 'client' : 'caregiver'}: ${payload.sub}`);
   const tokenDoc = await Token.findOne(query);
   
   if (!tokenDoc) {
-    logger.warn(`[Token Service] Token not found in database - type: ${type}, ${type === tokenTypes.CLIENT_CONSENT ? 'client' : 'caregiver'}: ${payload.sub}`);
+    logger.warn(`[Token Service] Token not found in database - type: ${type}, ${isClientScopedTokenType(type) ? 'client' : 'caregiver'}: ${payload.sub}`);
     // Check if token exists but is blacklisted
     const blacklistedQuery = { token, type };
-    if (type === tokenTypes.CLIENT_CONSENT) {
+    if (isClientScopedTokenType(type)) {
       blacklistedQuery.client = payload.sub;
     } else {
       blacklistedQuery.caregiver = payload.sub;
@@ -374,6 +376,35 @@ const generateClientConsentToken = async (client) => {
   return consentToken;
 };
 
+/**
+ * Generate family digest email verification token (scoped to client + emergency contact email).
+ * @param {Client} client
+ * @param {string} email - Normalized emergency contact email
+ * @returns {Promise<string>}
+ */
+const generateFamilyDigestEmailVerifyToken = async (client, email) => {
+  const clientId = extractClientId(client);
+  const normalizedEmail = String(email).trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Email is required for verification token');
+  }
+
+  await Token.deleteMany({ client: clientId, type: tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY });
+
+  const expires = moment().add(config.jwt.verifyEmailExpirationMinutes, 'minutes');
+  const payload = {
+    sub: clientId,
+    email: normalizedEmail,
+    iat: moment().unix(),
+    exp: expires.unix(),
+    type: tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY,
+  };
+  const verifyToken = jwt.sign(payload, config.jwt.secret);
+  await saveToken(verifyToken, null, expires, tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY, false, clientId);
+  logger.info(`[Token Service] Family digest email verify token created for client ${clientId}`);
+  return verifyToken;
+};
+
 module.exports = {
   verifyToken,
   generateToken,
@@ -385,5 +416,6 @@ module.exports = {
   generateResetPasswordToken,
   generateVerifyEmailToken,
   generateClientConsentToken,
+  generateFamilyDigestEmailVerifyToken,
   extractClientId,
 };

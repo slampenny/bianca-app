@@ -1,4 +1,6 @@
 const httpStatus = require('http-status');
+const jwt = require('jsonwebtoken');
+const validator = require('validator');
 const { Caregiver, Client, Org, Token } = require('../models');
 const ApiError = require('../utils/ApiError');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
@@ -8,6 +10,7 @@ const tokenService = require('./token.service');
 const config = require('../config/config');
 const { tokenTypes } = require('../config/tokens');
 const { toIdString, assertCaregiverOrgAccess } = require('../utils/accessControl');
+const { normalizeEmail, getFamilyDigestEmailSettings } = require('../utils/familyDigestEligibility');
 
 const createClient = async (clientBody) => {
   return Client.create(clientBody);
@@ -37,6 +40,23 @@ const updateClientById = async (clientId, updateBody) => {
       client.emergencyContact && typeof client.emergencyContact.toObject === 'function'
         ? client.emergencyContact.toObject()
         : client.emergencyContact || {};
+    if (patch.emergencyContact.familyDigestEmail && typeof patch.emergencyContact.familyDigestEmail === 'object') {
+      patch.emergencyContact.familyDigestEmail = {
+        ...(prev.familyDigestEmail || {}),
+        ...patch.emergencyContact.familyDigestEmail,
+      };
+    }
+    if (patch.emergencyContact.email !== undefined) {
+      const prevEmail = normalizeEmail(prev.email);
+      const nextEmail = normalizeEmail(patch.emergencyContact.email);
+      if (nextEmail !== prevEmail) {
+        patch.emergencyContact.familyDigestEmail = {
+          ...(patch.emergencyContact.familyDigestEmail || prev.familyDigestEmail || {}),
+          verifiedAt: null,
+          verifiedEmail: null,
+        };
+      }
+    }
     patch.emergencyContact = { ...prev, ...patch.emergencyContact };
   }
   Object.assign(client, patch);
@@ -50,7 +70,9 @@ const deleteClientById = async (clientId) => {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
   const digestCleanup = require('./caregiverDailyDigestCleanup.service');
+  const familyDigestCleanup = require('./familyWeeklyDigestCleanup.service');
   await digestCleanup.cleanupDigestsForClient(clientId, 'client_deleted');
+  await familyDigestCleanup.cleanupDigestsForClient(clientId, 'client_deleted');
   await client.deleteOne();
   return client;
 };
@@ -279,6 +301,99 @@ const verifyConsentToken = async (consentToken) => {
   }
 };
 
+const sendFamilyDigestEmailVerification = async (caregiver, clientId) => {
+  if (caregiver.role !== 'orgAdmin' && caregiver.role !== 'superAdmin') {
+    throw new ApiError(
+      httpStatus.FORBIDDEN,
+      'Only organization administrators can send family digest verification emails'
+    );
+  }
+  const client = await Client.findById(clientId).populate('org');
+  if (!client) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  }
+  assertCaregiverOrgAccess(caregiver, client.org);
+  if (!client.org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
+  }
+  const email = normalizeEmail(client.emergencyContact?.email);
+  if (!email || !validator.isEmail(email)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'A valid emergency contact email is required before sending verification');
+  }
+  const verifyToken = await tokenService.generateFamilyDigestEmailVerifyToken(client, email);
+  const verifyLink = `${config.frontendUrl}/family-digest-email/verify?token=${encodeURIComponent(verifyToken)}`;
+  await emailService.sendFamilyDigestEmailVerificationEmail(
+    email,
+    client.org.name,
+    verifyLink,
+    client.preferredLanguage || 'en'
+  );
+  logger.info(`[Client Service] Family digest email verification sent for client ${clientId} (${email})`);
+  return {
+    success: true,
+    message: 'Verification email sent to the emergency contact address.',
+  };
+};
+
+const verifyFamilyDigestEmailToken = async (verifyToken) => {
+  let payload;
+  try {
+    payload = jwt.verify(verifyToken, config.jwt.secret);
+  } catch (err) {
+    logger.warn(`[Client Service] Family digest email verification JWT failed: ${err.message}`);
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid or expired verification token');
+  }
+  if (payload.type !== tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY) {
+    throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid verification token');
+  }
+  const tokenEmail = normalizeEmail(payload.email);
+  if (!tokenEmail) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid verification token');
+  }
+
+  await tokenService.verifyToken(verifyToken, tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY);
+
+  const clientId = payload.sub;
+  const client = await Client.findById(clientId).populate('org');
+  if (!client || !client.org) {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  }
+  const currentEmail = normalizeEmail(client.emergencyContact?.email);
+  if (!currentEmail || currentEmail !== tokenEmail) {
+    throw new ApiError(
+      httpStatus.UNAUTHORIZED,
+      'Emergency contact email has changed since this link was sent. Please request a new verification email.'
+    );
+  }
+
+  const digestSettings = getFamilyDigestEmailSettings(client.emergencyContact);
+  const alreadyVerified = Boolean(
+    digestSettings.verifiedAt && digestSettings.verifiedEmail === currentEmail
+  );
+
+  await Token.deleteMany({ client: client._id, type: tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY });
+
+  if (!alreadyVerified) {
+    await updateClientById(client._id, {
+      emergencyContact: {
+        familyDigestEmail: {
+          verifiedAt: new Date(),
+          verifiedEmail: currentEmail,
+        },
+      },
+    });
+  }
+
+  return {
+    success: true,
+    alreadyVerified,
+    message: alreadyVerified
+      ? 'This email address is already verified for weekly family digest emails.'
+      : 'Thank you. Your email is now verified to receive weekly family digest emails.',
+    client: await getClientById(client._id),
+  };
+};
+
 module.exports = {
   createClient,
   queryClients,
@@ -295,4 +410,6 @@ module.exports = {
   sendConsentEmailIfRequired,
   checkClientConsent,
   verifyConsentToken,
+  sendFamilyDigestEmailVerification,
+  verifyFamilyDigestEmailToken,
 };

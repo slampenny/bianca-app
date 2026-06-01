@@ -21,6 +21,7 @@ import { CheckEmailPage } from "./pages/CheckEmailPage"
 import { InviteSignupPage } from "./pages/InviteSignupPage"
 import { VerifyEmailPage } from "./pages/VerifyEmailPage"
 import { ClientConsentPage } from "./pages/ClientConsentPage"
+import { FamilyDigestEmailVerifyPage } from "./pages/FamilyDigestEmailVerifyPage"
 import { DashboardPage } from "./pages/DashboardPage"
 import { AddResidentPage } from "./pages/AddResidentPage"
 import { ResidentsPage } from "./pages/ResidentsPage"
@@ -64,6 +65,7 @@ function AppRoutes() {
             <Route path="/auth/verify-email" element={<VerifyEmailPage />} />
             <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/client/consent" element={<ClientConsentPage />} />
+            <Route path="/family-digest-email/verify" element={<FamilyDigestEmailVerifyPage />} />
             <Route element={<RequireAuth />}>
               <Route element={<RequireOnboardingComplete />}>
               <Route element={<AppShell />}>

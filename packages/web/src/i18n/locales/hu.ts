@@ -702,7 +702,12 @@ export const hu = {
   "familyWeeklyDigest": {
     "back": "Vissza a heti összefoglaló lakóihoz",
     "sampleBanner": "Csak illusztrációs minta. A lakólistából előnézet a fiók adataival.",
-    "weekLabel": "Hét (válasszon bármely napot, UTC)",
+    "weekLabel": "Referencia dátum",
+    "weekDateHelper": "Válasszon bármely napot a héten. Az intézmény időzónája határozza meg, melyik hét (hétfő–vasárnap) érvényes.",
+    "weekOfLabel": "{{date}} hete",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "Időzóna: {{timezone}}",
+    "legacyUtcWeekBanner": "Ez az előnézet a szervezeti helyi hetek bevezetése előtti régebbi hethatárokat használja.",
     "refreshPreview": "Előnézet frissítése",
     "loadingPreview": "Előnézet betöltése…",
     "loadError": "Nem sikerült betölteni az előnézetet. Nincs hozzáférés vagy a szerver nem elérhető."

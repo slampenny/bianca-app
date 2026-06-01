@@ -16,6 +16,7 @@ import {
   useGetClientQuery,
   useGetCallsByClientQuery,
   usePatchClientMutation,
+  useSendFamilyDigestEmailVerificationMutation,
   useUploadClientAvatarMutation,
 } from "../services/api/clientApi"
 import { useGetSentimentSummaryQuery, useGetSentimentTrendQuery } from "../services/api/sentimentApi"
@@ -86,6 +87,7 @@ export function ResidentDetailPage() {
   const [emergencyRelationship, setEmergencyRelationship] = useState("")
   const [emergencyPhone, setEmergencyPhone] = useState("")
   const [emergencyEmail, setEmergencyEmail] = useState("")
+  const [familyDigestEmailEnabled, setFamilyDigestEmailEnabled] = useState(false)
   const [residentAvatarFile, setResidentAvatarFile] = useState<File | null>(null)
   const [scheduleError, setScheduleError] = useState("")
   const [scheduleNotice, setScheduleNotice] = useState("")
@@ -105,6 +107,8 @@ export function ResidentDetailPage() {
   const [expandedConversationId, setExpandedConversationId] = useState<string | null>(null)
   const [confirmDeleteResidentOpen, setConfirmDeleteResidentOpen] = useState(false)
   const [scheduleDeleteConfirmId, setScheduleDeleteConfirmId] = useState<string | null>(null)
+  const [familyDigestVerificationNotice, setFamilyDigestVerificationNotice] = useState("")
+  const [familyDigestVerificationError, setFamilyDigestVerificationError] = useState("")
 
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const user = useAppSelector(getCurrentUser)
@@ -123,6 +127,8 @@ export function ResidentDetailPage() {
   const [createScheduleForClient, { isLoading: creatingSchedule }] = useCreateScheduleForClientMutation()
   const [updateSchedule, { isLoading: updatingSchedule }] = useUpdateScheduleMutation()
   const [deleteSchedule, { isLoading: deletingSchedule }] = useDeleteScheduleMutation()
+  const [sendFamilyDigestVerification, { isLoading: sendingFamilyDigestVerification }] =
+    useSendFamilyDigestEmailVerificationMutation()
 
   // Call-first list (GET /clients/:id/calls) so order matches billable Call.startTime; only fetch on Conversations tab.
   const { data: convPages, isLoading: convLoading } = useGetCallsByClientQuery(
@@ -161,6 +167,12 @@ export function ResidentDetailPage() {
   } = useGetMedicalAnalysisResultsQuery(clientIdForApi ? { clientId: clientIdForApi, limit: 1 } : skipToken)
 
   const resident = useMemo(() => (apiClient ? mapClientToResident(apiClient) : null), [apiClient])
+  const familyDigestEmailVerified = useMemo(() => {
+    const contactEmail = apiClient?.emergencyContact?.email?.trim().toLowerCase()
+    const fd = apiClient?.emergencyContact?.familyDigestEmail
+    if (!contactEmail || !fd?.verifiedAt || !fd.verifiedEmail) return false
+    return fd.verifiedEmail.trim().toLowerCase() === contactEmail
+  }, [apiClient])
   const residentMissing =
     !!clientFetchError &&
     typeof clientFetchError === "object" &&
@@ -192,6 +204,7 @@ export function ResidentDetailPage() {
     setEmergencyRelationship(apiClient.emergencyContact?.relationship || "")
     setEmergencyPhone(apiClient.emergencyContact?.phone || "")
     setEmergencyEmail(apiClient.emergencyContact?.email || "")
+    setFamilyDigestEmailEnabled(apiClient.emergencyContact?.familyDigestEmail?.enabled === true)
   }, [apiClient])
 
   const clientAlert = useMemo(
@@ -377,6 +390,18 @@ export function ResidentDetailPage() {
     return true
   }
 
+  const handleSendFamilyDigestVerification = async () => {
+    if (!apiClient?.id) return
+    setFamilyDigestVerificationNotice("")
+    setFamilyDigestVerificationError("")
+    try {
+      const res = await sendFamilyDigestVerification({ clientId: apiClient.id }).unwrap()
+      setFamilyDigestVerificationNotice(res.message || t("residentDetail.familyDigestEmailVerificationSent"))
+    } catch {
+      setFamilyDigestVerificationError(t("residentDetail.familyDigestEmailVerificationFailed"))
+    }
+  }
+
   const onSaveResident = async (e: FormEvent) => {
     e.preventDefault()
     if (!apiClient?.id) return
@@ -400,6 +425,7 @@ export function ResidentDetailPage() {
             relationship: emergencyRelationship.trim(),
             phone: emergencyPhone.trim(),
             email: emergencyEmail.trim().toLowerCase(),
+            familyDigestEmail: { enabled: familyDigestEmailEnabled },
           },
         },
       }).unwrap()
@@ -745,6 +771,66 @@ export function ResidentDetailPage() {
               value={emergencyEmail}
               onChange={(e) => setEmergencyEmail(e.target.value)}
             />
+            <label
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                fontSize: "0.875rem",
+                color: "var(--va-slate-700)",
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  data-testid="resident-family-digest-email-enabled"
+                  checked={familyDigestEmailEnabled}
+                  onChange={(e) => setFamilyDigestEmailEnabled(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                {t("residentDetail.familyDigestEmailEnabled")}
+              </span>
+              <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", lineHeight: 1.45 }}>
+                {t("residentDetail.familyDigestEmailEnabledHelp")}
+              </span>
+            </label>
+            {canManageResidents ? (
+              <div
+                data-testid="resident-family-digest-verification"
+                style={{ display: "grid", gap: 8, fontSize: "0.8125rem", color: "var(--va-slate-700)" }}
+              >
+                <p style={{ margin: 0 }}>
+                  {emergencyEmail.trim()
+                    ? familyDigestEmailVerified
+                      ? t("residentDetail.familyDigestEmailVerified")
+                      : t("residentDetail.familyDigestEmailUnverified")
+                    : t("residentDetail.familyDigestEmailNoAddress")}
+                </p>
+                {emergencyEmail.trim() && !familyDigestEmailVerified ? (
+                  <button
+                    type="button"
+                    className="va-btn-secondary"
+                    data-testid="resident-send-family-digest-verification"
+                    disabled={sendingFamilyDigestVerification}
+                    onClick={() => void handleSendFamilyDigestVerification()}
+                  >
+                    {sendingFamilyDigestVerification
+                      ? t("residentDetail.familyDigestEmailSendingVerification")
+                      : t("residentDetail.familyDigestEmailSendVerification")}
+                  </button>
+                ) : null}
+                {familyDigestVerificationNotice ? (
+                  <p data-testid="resident-family-digest-verification-success" style={{ margin: 0, color: "var(--va-emerald-700)" }}>
+                    {familyDigestVerificationNotice}
+                  </p>
+                ) : null}
+                {familyDigestVerificationError ? (
+                  <p data-testid="resident-family-digest-verification-error" style={{ margin: 0, color: "var(--va-red-600)" }}>
+                    {familyDigestVerificationError}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
             <AuthTextAreaField
               label={t("residentDetail.notes")}
               value={residentNotes}
@@ -955,6 +1041,49 @@ export function ResidentDetailPage() {
                     <>
                       <br />
                       {apiClient.emergencyContact.email}
+                    </>
+                  ) : null}
+                  <br />
+                  {apiClient.emergencyContact?.familyDigestEmail?.enabled
+                    ? t("residentDetail.familyDigestEmailStatusOn")
+                    : t("residentDetail.familyDigestEmailStatusOff")}
+                  <br />
+                  {apiClient.emergencyContact?.email
+                    ? familyDigestEmailVerified
+                      ? t("residentDetail.familyDigestEmailVerified")
+                      : t("residentDetail.familyDigestEmailUnverified")
+                    : t("residentDetail.familyDigestEmailNoAddress")}
+                  {canManageResidents && apiClient.emergencyContact?.email && !familyDigestEmailVerified ? (
+                    <>
+                      <br />
+                      <button
+                        type="button"
+                        className="va-link"
+                        data-testid="resident-send-family-digest-verification"
+                        style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
+                        disabled={sendingFamilyDigestVerification}
+                        onClick={() => void handleSendFamilyDigestVerification()}
+                      >
+                        {sendingFamilyDigestVerification
+                          ? t("residentDetail.familyDigestEmailSendingVerification")
+                          : t("residentDetail.familyDigestEmailSendVerification")}
+                      </button>
+                    </>
+                  ) : null}
+                  {familyDigestVerificationNotice ? (
+                    <>
+                      <br />
+                      <span data-testid="resident-family-digest-verification-success" style={{ color: "var(--va-emerald-700)" }}>
+                        {familyDigestVerificationNotice}
+                      </span>
+                    </>
+                  ) : null}
+                  {familyDigestVerificationError ? (
+                    <>
+                      <br />
+                      <span data-testid="resident-family-digest-verification-error" style={{ color: "var(--va-red-600)" }}>
+                        {familyDigestVerificationError}
+                      </span>
                     </>
                   ) : null}
                 </>

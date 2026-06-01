@@ -21,6 +21,28 @@ const emergencyContactSchema = new mongoose.Schema(
         }
       },
     },
+    /** Opt-in + verification for weekly family digest emails to this contact. */
+    familyDigestEmail: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      verifiedAt: {
+        type: Date,
+        default: null,
+      },
+      verifiedEmail: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: null,
+        validate(value) {
+          if (value != null && String(value).trim() !== '' && !validator.isEmail(value)) {
+            throw new Error('Invalid verified family digest email');
+          }
+        },
+      },
+    },
   },
   { _id: false }
 );

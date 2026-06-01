@@ -24,6 +24,7 @@ const ROUTE_TITLE_KEYS: Record<string, string> = {
   "/onboarding/org": "onboarding.orgInfo.title",
   "/onboarding/register": "onboarding.registration.title",
   "/client/consent": "clientConsent.titleMissing",
+  "/family-digest-email/verify": "familyDigestEmailVerify.titleMissing",
 }
 
 function titleKeyForPath(pathname: string): string | undefined {

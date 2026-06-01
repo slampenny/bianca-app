@@ -18,6 +18,11 @@ const emergencyContact = Joi.object()
         }
         return value;
       }),
+    familyDigestEmail: Joi.object()
+      .keys({
+        enabled: Joi.boolean().optional(),
+      })
+      .optional(),
   })
   .optional();
 
@@ -217,6 +222,22 @@ const assignUnassignedClients = {
   }),
 };
 
+const sendFamilyDigestEmailVerification = {
+  params: Joi.object().keys({
+    clientId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const verifyFamilyDigestEmail = {
+  query: Joi.object().keys({
+    token: Joi.string().optional(),
+    format: Joi.string().optional(),
+  }),
+  body: Joi.object().keys({
+    token: Joi.string().optional(),
+  }),
+};
+
 module.exports = {
   createClient,
   getConversationsByClient,
@@ -231,4 +252,6 @@ module.exports = {
   getCaregivers,
   getUnassignedClients,
   assignUnassignedClients,
+  sendFamilyDigestEmailVerification,
+  verifyFamilyDigestEmail,
 };

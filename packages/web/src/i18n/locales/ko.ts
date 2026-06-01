@@ -702,7 +702,12 @@ export const ko = {
   "familyWeeklyDigest": {
     "back": "주간 다이제스트 입주자 목록으로",
     "sampleBanner": "예시 레이아웃만 해당합니다. 입주자 목록에서 계정 데이터로 미리보기하세요.",
-    "weekLabel": "주(해당 주의 아무 날, UTC)",
+    "weekLabel": "기준 날짜",
+    "weekDateHelper": "해당 주의 아무 날짜나 선택하세요. 시설 시간대에 따라 월요일–일요일 주가 결정됩니다.",
+    "weekOfLabel": "{{date}} 주",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "시간대: {{timezone}}",
+    "legacyUtcWeekBanner": "이 미리보기는 조직 로컬 주 도입 이전의 이전 주 경계를 사용합니다.",
     "refreshPreview": "미리보기 새로고침",
     "loadingPreview": "미리보기 로딩 중…",
     "loadError": "미리보기를 불러올 수 없습니다. 접근 권한 또는 서버를 확인하세요."

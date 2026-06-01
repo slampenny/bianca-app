@@ -59,6 +59,16 @@
 		"versionLabel": "Consent Email Version:",
 		"closing": "Best regards,\nThe Bianca Wellness Team"
 	},
+	"familyDigestEmailVerify": {
+		"subject": "Bianca Wellness - Verify weekly family digest email",
+		"title": "Verify your email for weekly family digests",
+		"intro": "%s uses Bianca Wellness to send optional weekly email summaries of wellness check-in calls to family contacts.",
+		"scopeNote": "This link verifies your email address for weekly family digest emails only. It does not change emergency notifications or other communications. This message does not include health information.",
+		"buttonText": "Verify email address",
+		"expiryNote": "This verification link expires in 24 hours for security.",
+		"contactInfo": "If you did not expect this email, you can ignore it or contact your care facility.",
+		"closing": "Best regards,\nThe Bianca Wellness Team"
+	},
 	"caregiverDailyDigest": {
 		"title": "Daily care digest",
 		"subtitle": "Wellness check-ins for your assigned residents",

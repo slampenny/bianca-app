@@ -112,8 +112,21 @@ router
   .get(auth('readAny:caregiver'), validate(clientValidation.getCaregivers), clientController.getCaregivers);
 
 router
+  .route('/:clientId/family-digest-email/verification')
+  .post(
+    auth('updateAny:client'),
+    validate(clientValidation.sendFamilyDigestEmailVerification),
+    clientController.sendFamilyDigestEmailVerification
+  );
+
+router
   .route('/consent/verify')
   .post(clientController.verifyConsent)
   .get(clientController.verifyConsent);
+
+router
+  .route('/family-digest-email/verify')
+  .post(validate(clientValidation.verifyFamilyDigestEmail), clientController.verifyFamilyDigestEmail)
+  .get(validate(clientValidation.verifyFamilyDigestEmail), clientController.verifyFamilyDigestEmail);
 
 module.exports = router;

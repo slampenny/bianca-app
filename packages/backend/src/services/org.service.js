@@ -117,7 +117,9 @@ const deleteOrgById = async (orgId) => {
   }
 
   const digestCleanup = require('./caregiverDailyDigestCleanup.service');
+  const familyDigestCleanup = require('./familyWeeklyDigestCleanup.service');
   await digestCleanup.cleanupDigestsForOrg(orgId, 'org_deleted');
+  await familyDigestCleanup.cleanupDigestsForOrg(orgId, 'org_deleted');
 
   // Soft delete org
   await org.delete();

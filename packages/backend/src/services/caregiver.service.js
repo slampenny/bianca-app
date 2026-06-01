@@ -320,7 +320,9 @@ const deleteCaregiverById = async (caregiverId) => {
     }
 
     const digestCleanup = require('./caregiverDailyDigestCleanup.service');
+    const familyDigestCleanup = require('./familyWeeklyDigestCleanup.service');
     await digestCleanup.cleanupDigestsForCaregiver(caregiverId, 'caregiver_deleted');
+    await familyDigestCleanup.cleanupDigestsForCaregiver(caregiverId, 'caregiver_deleted');
 
     // Remove caregiver
     await caregiver.delete();

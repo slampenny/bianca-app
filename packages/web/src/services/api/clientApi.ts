@@ -69,6 +69,28 @@ export const clientApi = createApi({
         headers: { Accept: "application/json" },
       }),
     }),
+    /** Public — family digest email verification link from email. */
+    verifyFamilyDigestEmail: builder.mutation<
+      { success: boolean; message: string; alreadyVerified?: boolean },
+      { token: string }
+    >({
+      query: ({ token }) => ({
+        url: `/clients/family-digest-email/verify`,
+        method: "GET",
+        params: { token },
+        headers: { Accept: "application/json" },
+      }),
+    }),
+    sendFamilyDigestEmailVerification: builder.mutation<
+      { success: boolean; message: string },
+      { clientId: string }
+    >({
+      query: ({ clientId }) => ({
+        url: `/clients/${clientId}/family-digest-email/verification`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, { clientId }) => [{ type: "Client", id: clientId }],
+    }),
     createClient: builder.mutation<
       Client,
       {
@@ -182,6 +204,8 @@ export const {
   useGetClientOnboardingQuery,
   useGetClientsOnboardingRollupsQuery,
   useVerifyConsentMutation,
+  useVerifyFamilyDigestEmailMutation,
+  useSendFamilyDigestEmailVerificationMutation,
   useCreateClientMutation,
   usePatchClientMutation,
   useUploadClientAvatarMutation,

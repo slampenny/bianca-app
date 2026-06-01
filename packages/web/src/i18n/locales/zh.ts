@@ -702,7 +702,12 @@ export const zh = {
   "familyWeeklyDigest": {
     "back": "返回每周摘要住户列表",
     "sampleBanner": "仅为示例布局。请从住户列表预览您账户的数据。",
-    "weekLabel": "周（选择该周内任意一天，UTC）",
+    "weekLabel": "参考日期",
+    "weekDateHelper": "选择该周内任意一天。机构时区决定使用哪个周一至周日的周。",
+    "weekOfLabel": "{{date}} 所在周",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "时区：{{timezone}}",
+    "legacyUtcWeekBanner": "此预览使用机构本地周启用之前的旧周边界。",
     "refreshPreview": "刷新预览",
     "loadingPreview": "正在加载预览…",
     "loadError": "无法加载预览。您可能没有权限或服务器不可用。"

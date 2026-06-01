@@ -10,6 +10,7 @@
 const { getJurisdiction, getDataRetentionPeriod, shouldAutoDeleteData } = require('../utils/jurisdiction.utils');
 const { Org, Client, Call, Conversation, Message, MedicalAnalysis, ConsentRecord } = require('../models');
 const digestCleanup = require('./caregiverDailyDigestCleanup.service');
+const familyDigestCleanup = require('./familyWeeklyDigestCleanup.service');
 const logger = require('../config/logger');
 const httpStatus = require('http-status');
 const ApiError = require('../utils/ApiError');
@@ -257,14 +258,15 @@ async function deleteExpiredDigests(country) {
 
   if (!retention.autoDelete) {
     logger.info(`[Data Deletion] Skipping digest redaction for ${jurisdiction.jurisdiction} (retention required)`);
-    return { redacted: 0, deleted: 0 };
+    return { redacted: 0, deleted: 0, familyWeekly: { redacted: 0, deleted: 0 } };
   }
 
   const stats = await digestCleanup.deleteExpiredDigestsForCountry(country, retention.years);
+  const familyStats = await familyDigestCleanup.deleteExpiredDigestsForCountry(country, retention.years);
   logger.info(
-    `[Data Deletion] Digest cleanup for ${jurisdiction.jurisdiction}: redacted ${stats.redacted}, deleted ${stats.deleted} drafts (older than ${retention.years} years)`
+    `[Data Deletion] Digest cleanup for ${jurisdiction.jurisdiction}: daily redacted ${stats.redacted}, deleted ${stats.deleted} drafts; family redacted ${familyStats.redacted}, deleted ${familyStats.deleted} drafts (older than ${retention.years} years)`
   );
-  return stats;
+  return { ...stats, familyWeekly: familyStats };
 }
 
 /**
@@ -273,7 +275,12 @@ async function deleteExpiredDigests(country) {
  * @returns {Promise<Object>} - Cleanup statistics
  */
 async function cleanupOrphanedDigestsForCountry(country) {
-  return digestCleanup.cleanupOrphanedDigests(country);
+  const daily = await digestCleanup.cleanupOrphanedDigests(country);
+  const family = await familyDigestCleanup.cleanupOrphanedDigests(country);
+  return {
+    ...daily,
+    familyWeekly: family,
+  };
 }
 
 /**
@@ -305,7 +312,8 @@ async function processDataDeletionForOrg(country) {
     medicalAnalysis: 0,
     consentRecords: 0,
     dailyDigests: { redacted: 0, deleted: 0 },
-    orphanedDigests: { redacted: 0, deleted: 0, entriesStripped: 0 },
+    familyWeeklyDigests: { redacted: 0, deleted: 0 },
+    orphanedDigests: { redacted: 0, deleted: 0, entriesStripped: 0, familyWeekly: { redacted: 0, deleted: 0 } },
     total: 0
   };
   
@@ -315,6 +323,7 @@ async function processDataDeletionForOrg(country) {
     stats.medicalAnalysis = await deleteExpiredMedicalAnalysis(country);
     stats.consentRecords = await deleteExpiredConsentRecords(country);
     stats.dailyDigests = await deleteExpiredDigests(country);
+    stats.familyWeeklyDigests = stats.dailyDigests.familyWeekly || { redacted: 0, deleted: 0 };
     stats.orphanedDigests = await cleanupOrphanedDigestsForCountry(country);
     
     stats.total =
@@ -324,8 +333,12 @@ async function processDataDeletionForOrg(country) {
       stats.consentRecords +
       stats.dailyDigests.redacted +
       stats.dailyDigests.deleted +
+      stats.familyWeeklyDigests.redacted +
+      stats.familyWeeklyDigests.deleted +
       stats.orphanedDigests.redacted +
-      stats.orphanedDigests.deleted;
+      stats.orphanedDigests.deleted +
+      (stats.orphanedDigests.familyWeekly?.redacted || 0) +
+      (stats.orphanedDigests.familyWeekly?.deleted || 0);
     
     logger.info(`[Data Deletion] Completed deletion for ${jurisdiction.jurisdiction}:`, stats);
   } catch (error) {
@@ -459,6 +472,10 @@ async function handleDeletionRequest(userId, dataType = 'all') {
 
   if (dataType === 'all' || dataType === 'calls' || dataType === 'conversations') {
     result.deleted.dailyDigests = await digestCleanup.cleanupDigestsForClients(clientIds, 'erasure_request');
+    result.deleted.familyWeeklyDigests = await familyDigestCleanup.cleanupDigestsForClients(
+      clientIds,
+      'erasure_request'
+    );
   }
   
   result.deleted.total = Object.values(result.deleted).reduce((sum, count) => {

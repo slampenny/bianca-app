@@ -32,8 +32,10 @@ const emergencyPhraseRoute = require('../../src/routes/v1/emergencyPhrase.route'
 const mfaRoute = require('../../src/routes/v1/mfa.route');
 const phoneVerificationRoute = require('../../src/routes/v1/phoneVerification.route');
 const privacyRoute = require('../../src/routes/v1/privacy.route');
+const familyWeeklyDigestRoute = require('../../src/routes/v1/familyWeeklyDigest.route');
 const activityRoute = require('../../src/routes/v1/activity.route');
 const adminRoute = require('../../src/routes/v1/admin.route');
+const { auditMiddleware } = require('../../src/middlewares/auditLog');
 // const testRoute = require('../../src/routes/v1/test.route'); // Skip test route to avoid timeout issues
 
 const app = express();
@@ -105,10 +107,12 @@ router.use('/emergency-phrases', emergencyPhraseRoute);
 router.use('/mfa', mfaRoute);
 router.use('/phone-verification', phoneVerificationRoute);
 router.use('/privacy', privacyRoute);
+router.use('/family-weekly-digests', familyWeeklyDigestRoute);
 router.use('/activity', activityRoute);
 router.use('/admin', adminRoute);
 // router.use('/test', testRoute); // Skip test route to avoid timeout issues
 
+app.use('/v1', auditMiddleware);
 app.use('/v1', router);
 
 // 404 handler for unknown routes

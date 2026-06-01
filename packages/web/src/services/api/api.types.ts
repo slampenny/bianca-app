@@ -107,7 +107,17 @@ export interface Client {
   consentEmailVersion?: string | null
   room?: string | null
   moveInDate?: string | null
-  emergencyContact?: { name?: string; relationship?: string; phone?: string; email?: string } | null
+  emergencyContact?: {
+    name?: string
+    relationship?: string
+    phone?: string
+    email?: string
+    familyDigestEmail?: {
+      enabled?: boolean
+      verifiedAt?: string | null
+      verifiedEmail?: string | null
+    }
+  } | null
   lastCallAttemptAt?: string | null
   lastAnsweredCallAt?: string | null
   sentimentTrendDirection?: "improving" | "stable" | "declining" | null

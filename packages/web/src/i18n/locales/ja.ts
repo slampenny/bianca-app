@@ -702,7 +702,12 @@ export const ja = {
   "familyWeeklyDigest": {
     "back": "週次ダイジェストの入居者一覧に戻る",
     "sampleBanner": "説明用のサンプルレイアウトのみ。入居者一覧からアカウントデータでプレビューしてください。",
-    "weekLabel": "週（週内の任意の日を選択、UTC）",
+    "weekLabel": "基準日",
+    "weekDateHelper": "週内の任意の日を選んでください。施設のタイムゾーンに基づき、月曜日から日曜日の週が決まります。",
+    "weekOfLabel": "{{date}} の週",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "タイムゾーン: {{timezone}}",
+    "legacyUtcWeekBanner": "このプレビューは、組織ローカル週の導入前の古い週の範囲を使用しています。",
     "refreshPreview": "プレビューを更新",
     "loadingPreview": "プレビューを読み込み中…",
     "loadError": "プレビューを読み込めませんでした。アクセス権またはサーバーを確認してください。"

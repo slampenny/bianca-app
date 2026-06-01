@@ -702,7 +702,12 @@ export const fr = {
   "familyWeeklyDigest": {
     "back": "Retour aux résidents du digest hebdomadaire",
     "sampleBanner": "Exemple illustratif uniquement. Utilisez la liste pour prévisualiser avec vos données.",
-    "weekLabel": "Semaine (choisissez un jour de la semaine, UTC)",
+    "weekLabel": "Date de référence",
+    "weekDateHelper": "Choisissez n'importe quel jour de la semaine. Le fuseau horaire de l'établissement détermine quelle semaine (lundi–dimanche) est utilisée.",
+    "weekOfLabel": "Semaine du {{date}}",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "Fuseau horaire : {{timezone}}",
+    "legacyUtcWeekBanner": "Cet aperçu utilise d'anciennes limites hebdomadaires, d'avant les semaines locales de l'organisation.",
     "refreshPreview": "Actualiser l’aperçu",
     "loadingPreview": "Chargement de l’aperçu…",
     "loadError": "Impossible de charger l’aperçu. Accès ou serveur indisponible."

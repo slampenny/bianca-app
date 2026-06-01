@@ -12,6 +12,7 @@ const {
   endExclusiveOfOrgLocalDay,
 } = require('../utils/digestDay.utils');
 const { canReceiveDigestEmail } = require('../utils/digestEmailEligibility');
+const { isUnsafeDigestText } = require('../utils/digestContentSafety');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
@@ -39,27 +40,6 @@ const truncate = (s, max) => {
   const t = String(s).trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max - 1)}…`;
-};
-
-const isUnsafeDigestText = (value) => {
-  if (value == null || typeof value !== 'string') {
-    return false;
-  }
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return false;
-  }
-  const lower = trimmed.toLowerCase();
-  if (lower.includes('summary generation failed')) {
-    return true;
-  }
-  if (lower.includes('manual review needed')) {
-    return true;
-  }
-  if (lower.startsWith('error:') || lower.startsWith('internal error')) {
-    return true;
-  }
-  return false;
 };
 
 const sanitizeDigestText = (locale, value) => {

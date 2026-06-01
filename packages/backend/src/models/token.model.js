@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const { toJSON } = require('./plugins');
 const { tokenTypes } = require('../config/tokens');
 
+const isClientScopedTokenType = (type) =>
+  type === tokenTypes.CLIENT_CONSENT || type === tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY;
+
 const tokenSchema = mongoose.Schema(
   {
     token: {
@@ -13,15 +16,14 @@ const tokenSchema = mongoose.Schema(
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Caregiver',
       required: function() {
-        // Caregiver is required for all token types except CLIENT_CONSENT
-        return this.type !== tokenTypes.CLIENT_CONSENT;
+        return !isClientScopedTokenType(this.type);
       },
     },
     client: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Client',
       required: function() {
-        return this.type === tokenTypes.CLIENT_CONSENT;
+        return isClientScopedTokenType(this.type);
       },
     },
     type: {
@@ -33,6 +35,7 @@ const tokenSchema = mongoose.Schema(
         tokenTypes.INVITE,
         tokenTypes.SUPERADMIN_INVITE,
         tokenTypes.CLIENT_CONSENT,
+        tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY,
       ],
       required: true,
     },

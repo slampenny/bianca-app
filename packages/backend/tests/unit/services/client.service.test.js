@@ -137,4 +137,44 @@ describe('clientService', () => {
     const again = await clientService.getClientById(c1.id);
     expect(again.caregivers.map((id) => id.toString())).toContain(caregiver.id.toString());
   });
+
+  it('clears family digest verification when emergency contact email changes', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const created = await clientService.createClient({
+      ...clientOne,
+      org: org._id,
+      emergencyContact: {
+        ...clientOne.emergencyContact,
+        email: 'family@test.com',
+        familyDigestEmail: {
+          enabled: true,
+          verifiedAt: new Date('2026-01-01T00:00:00.000Z'),
+          verifiedEmail: 'family@test.com',
+        },
+      },
+    });
+    const updated = await clientService.updateClientById(created.id, {
+      emergencyContact: { email: 'newfamily@test.com' },
+    });
+    expect(updated.emergencyContact.email).toBe('newfamily@test.com');
+    expect(updated.emergencyContact.familyDigestEmail.verifiedAt).toBeNull();
+    expect(updated.emergencyContact.familyDigestEmail.verifiedEmail).toBeNull();
+    expect(updated.emergencyContact.familyDigestEmail.enabled).toBe(true);
+  });
+
+  it('defaults family digest opt-in to false on new clients', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const created = await clientService.createClient({
+      ...clientOne,
+      org: org._id,
+      emergencyContact: {
+        name: 'Bob',
+        relationship: 'Son',
+        phone: '+16045624299',
+        email: 'family@test.com',
+      },
+    });
+    expect(created.emergencyContact.familyDigestEmail.enabled).toBe(false);
+    expect(created.emergencyContact.familyDigestEmail.verifiedAt).toBeNull();
+  });
 });

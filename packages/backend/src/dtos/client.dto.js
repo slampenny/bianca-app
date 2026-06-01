@@ -2,6 +2,7 @@ const ScheduleDTO = require('./schedule.dto');
 const callService = require('../services/call.service');
 const clientHomeSnapshotService = require('../services/clientHomeSnapshot.service');
 const { splitFullName, fullNameFromParts } = require('../utils/clientName.util');
+const { normalizeEmail } = require('../utils/familyDigestEligibility');
 
 const toIsoOrNull = (d) => {
   if (d == null) return null;
@@ -91,12 +92,25 @@ const ClientDTO = (client) => {
     emergencyContact:
       emergencyContact &&
       typeof emergencyContact === 'object' &&
-      (emergencyContact.name || emergencyContact.relationship || emergencyContact.phone || emergencyContact.email)
+      (emergencyContact.name ||
+        emergencyContact.relationship ||
+        emergencyContact.phone ||
+        emergencyContact.email ||
+        emergencyContact.familyDigestEmail)
         ? {
             name: emergencyContact.name || '',
             relationship: emergencyContact.relationship || '',
             phone: emergencyContact.phone || '',
             email: emergencyContact.email ? String(emergencyContact.email).trim().toLowerCase() : '',
+            familyDigestEmail: emergencyContact.familyDigestEmail
+              ? {
+                  enabled: emergencyContact.familyDigestEmail.enabled === true,
+                  verifiedAt: toIsoOrNull(emergencyContact.familyDigestEmail.verifiedAt),
+                  verifiedEmail: emergencyContact.familyDigestEmail.verifiedEmail
+                    ? normalizeEmail(emergencyContact.familyDigestEmail.verifiedEmail)
+                    : null,
+                }
+              : { enabled: false, verifiedAt: null, verifiedEmail: null },
           }
         : null,
   };

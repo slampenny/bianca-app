@@ -702,7 +702,12 @@ export const it = {
   "familyWeeklyDigest": {
     "back": "Torna ai residenti del digest settimanale",
     "sampleBanner": "Solo layout di esempio. Usa l’elenco residenti per l’anteprima con i tuoi dati.",
-    "weekLabel": "Settimana (scegli un giorno della settimana, UTC)",
+    "weekLabel": "Data di riferimento",
+    "weekDateHelper": "Scegli un giorno qualsiasi della settimana. Il fuso orario della struttura determina quale settimana (lunedì–domenica) viene usata.",
+    "weekOfLabel": "Settimana del {{date}}",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "Fuso orario: {{timezone}}",
+    "legacyUtcWeekBanner": "Questa anteprima usa limiti settimanali precedenti, prima delle settimane locali dell'organizzazione.",
     "refreshPreview": "Aggiorna anteprima",
     "loadingPreview": "Caricamento anteprima…",
     "loadError": "Impossibile caricare l’anteprima. Accesso o server non disponibile."

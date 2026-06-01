@@ -90,7 +90,6 @@ describe('caregiverDailyDigest.service versioning and send', () => {
   const digestDate = '2026-06-01T12:00:00.000Z';
 
   beforeAll(async () => {
-    jest.setTimeout(60000);
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri(), {});
   });

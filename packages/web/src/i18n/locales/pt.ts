@@ -702,7 +702,12 @@ export const pt = {
   "familyWeeklyDigest": {
     "back": "Voltar aos residentes do resumo semanal",
     "sampleBanner": "Apenas layout de amostra. Use a lista de residentes para pré-visualizar com seus dados.",
-    "weekLabel": "Semana (escolha qualquer dia da semana, UTC)",
+    "weekLabel": "Data de referência",
+    "weekDateHelper": "Escolha qualquer dia da semana. O fuso horário da unidade determina qual semana (segunda–domingo) é usada.",
+    "weekOfLabel": "Semana de {{date}}",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "Fuso horário: {{timezone}}",
+    "legacyUtcWeekBanner": "Esta pré-visualização usa limites semanais anteriores, de antes das semanas locais da organização.",
     "refreshPreview": "Atualizar pré-visualização",
     "loadingPreview": "Carregando pré-visualização…",
     "loadError": "Não foi possível carregar a pré-visualização. Sem acesso ou servidor indisponível."

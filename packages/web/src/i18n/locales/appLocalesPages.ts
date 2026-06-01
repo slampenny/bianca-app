@@ -222,6 +222,18 @@ export const appLocalesPages = {
     emergencyRelationship: "Emergency contact relationship",
     emergencyPhone: "Emergency contact phone",
     emergencyEmail: "Emergency contact email",
+    familyDigestEmailEnabled: "Send weekly family digest emails to this contact",
+    familyDigestEmailEnabledHelp:
+      "Controls manual and automated family digest emails only. Does not affect emergency notifications.",
+    familyDigestEmailStatusOn: "Weekly family digest emails enabled",
+    familyDigestEmailStatusOff: "Weekly family digest emails not enabled",
+    familyDigestEmailVerified: "Emergency contact email verified for family digests",
+    familyDigestEmailUnverified: "Emergency contact email not verified — send a verification email before digests can be sent",
+    familyDigestEmailNoAddress: "Add an emergency contact email to enable verification",
+    familyDigestEmailSendVerification: "Send verification email",
+    familyDigestEmailSendingVerification: "Sending…",
+    familyDigestEmailVerificationSent: "Verification email sent to the emergency contact address.",
+    familyDigestEmailVerificationFailed: "Could not send verification email. Try again or check the contact email.",
     consentStatus: "Consent Status",
     onFile: "On file (API: consented)",
     viewDocument: "View document",
@@ -478,11 +490,52 @@ export const appLocalesPages = {
   familyWeeklyDigest: {
     back: "Back to weekly digest residents",
     sampleBanner: "Illustrative sample layout only. Use the resident list to preview digests from your account data.",
-    weekLabel: "Week (pick any day in the week, UTC)",
+    weekLabel: "Reference date",
+    weekDateHelper: "Pick any day in the week. The facility timezone determines which Monday–Sunday week is used.",
+    weekOfLabel: "Week of {{date}}",
+    weekRangeLabel: "{{range}}",
+    timezoneLabel: "Timezone: {{timezone}}",
+    legacyUtcWeekBanner: "This preview uses older week boundaries from before org-local weeks were enabled.",
+    eligibilityBlockedTitle: "Recipient not eligible for email",
+    eligibilityPreviewNote:
+      "Preview is for staff review. Sending is blocked until all requirements below are met, including a verified emergency contact email.",
     refreshPreview: "Refresh preview",
     loadingPreview: "Loading preview…",
     loadError:
       "Could not load this digest preview. You may not have access to this resident, or the server is unavailable.",
+    externalEmailNotice:
+      "This digest is emailed externally to the verified family contact below — not to staff. Sending requires opt-in and email verification on the resident profile.",
+    recipientLabel: "Verified family contact",
+    aiDisclaimer:
+      "This digest is automatically generated from wellness check-in calls. It is not clinical advice and should be reviewed alongside care-team updates when decisions are needed.",
+    createDraft: "Create draft",
+    creatingDraft: "Creating draft…",
+    createDraftSuccess: "Draft saved for this week.",
+    createDraftError: "Could not create draft. Refresh the preview and try again.",
+    sendToFamily: "Send to verified family contact",
+    sending: "Sending…",
+    sendConfirmTitle: "Send weekly family digest?",
+    sendConfirmBody:
+      "This will email the draft to {{email}}. The family contact must remain verified and opted in. This action cannot be undone.",
+    sendConfirmButton: "Send email",
+    sendSuccess: "Digest emailed to {{email}}.",
+    sendError: "Could not send digest. Confirm the family contact is still verified and opted in, then try again.",
+    sendAlreadySent: "This digest was already sent and cannot be emailed again.",
+    sendEligibilityChanged:
+      "Recipient eligibility changed since preview. Refresh and confirm verification before sending.",
+    savedForWeekTitle: "Saved digest for this week",
+    statusDraft: "Draft",
+    statusSent: "Sent",
+    statusRedacted: "Redacted",
+    sentAtLabel: "Sent {{at}}",
+    sentImmutableBanner:
+      "Sent — this weekly digest was emailed to the family contact and cannot be changed or sent again.",
+    phiRedactedBanner:
+      "Resident details in this saved digest were redacted for privacy or retention compliance. Preview content is hidden.",
+    recentTitle: "Recent saved digests",
+    listLoadError: "Could not load saved digests.",
+    noSavedForWeek: "No draft or sent digest saved for this week yet.",
+    listWeekStatus: "Week of {{week}} · {{status}}",
   },
   medicalAnalysis: {
     disclaimer:

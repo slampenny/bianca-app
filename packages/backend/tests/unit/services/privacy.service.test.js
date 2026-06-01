@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const privacyService = require('../../../src/services/privacy.service');
-const { PrivacyRequest, ConsentRecord, Caregiver, Client, Org, Conversation, MedicalAnalysis, Call } = require('../../../src/models');
+const { PrivacyRequest, ConsentRecord, Caregiver, Client, Org, Conversation, MedicalAnalysis, Call, FamilyWeeklyDigest } = require('../../../src/models');
 const ApiError = require('../../../src/utils/ApiError');
 const emailService = require('../../../src/services/email.service');
 
@@ -38,6 +38,7 @@ describe('Privacy Service', () => {
     await Conversation.deleteMany({});
     await Call.deleteMany({});
     await MedicalAnalysis.deleteMany({});
+    await FamilyWeeklyDigest.deleteMany({});
 
     // Create org first (required for caregiver)
     const org = await Org.create({
@@ -314,6 +315,47 @@ describe('Privacy Service', () => {
       await expect(
         privacyService.processAccessRequest(request._id, caregiverId)
       ).rejects.toThrow(ApiError);
+    });
+
+    it('includes metadata-only family weekly digest disclosures in export', async () => {
+      const client = await Client.findById(clientId);
+      await FamilyWeeklyDigest.create({
+        org: client.org,
+        client: clientId,
+        weekStart: new Date('2026-03-16T07:00:00.000Z'),
+        weekEnd: new Date('2026-03-23T06:59:59.999Z'),
+        localWeekKey: '2026-03-16',
+        status: 'sent',
+        sentAt: new Date('2026-03-25T12:00:00.000Z'),
+        sentPayloadHash: 'sent-hash-abc',
+        emailRecipient: 'family@test.com',
+        recipient: { name: 'Sarah', relationship: 'daughter', email: 'family@test.com' },
+        payload: { version: 1, title: 'Weekly digest', phiRedacted: false, callRows: [{ summary: 'secret phi' }] },
+      });
+
+      const request = await PrivacyRequest.create({
+        requestType: 'access',
+        requestorType: 'caregiver',
+        requestorId: caregiverId,
+        requestorModel: 'Caregiver',
+        informationRequested: 'All my data',
+      });
+
+      const sendSpy = jest.spyOn(emailService, 'sendPrivacyDataEmail').mockResolvedValue(undefined);
+
+      await privacyService.processAccessRequest(request._id, caregiverId);
+
+      expect(sendSpy).toHaveBeenCalled();
+      const jsonData = sendSpy.mock.calls[0][2];
+      const exported = JSON.parse(jsonData);
+      expect(exported.familyWeeklyDigests).toHaveLength(1);
+      expect(exported.familyWeeklyDigests[0].localWeekKey).toBe('2026-03-16');
+      expect(exported.familyWeeklyDigests[0].sentPayloadHash).toBe('sent-hash-abc');
+      expect(exported.familyWeeklyDigests[0].recipientEmailHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(jsonData).not.toContain('family@test.com');
+      expect(jsonData).not.toContain('secret phi');
+
+      sendSpy.mockRestore();
     });
   });
 

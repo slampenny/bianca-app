@@ -88,6 +88,15 @@ const PHI_ROUTES = {
     highRisk: true,
   },
 
+  // Family digest email verification (no PHI — consent/communication event)
+  'POST /v1/clients/:clientId/family-digest-email/verification': {
+    action: 'CREATE',
+    resource: 'client',
+    phiAccessed: false,
+    highRisk: false,
+    category: 'family_digest_verification',
+  },
+
   'POST /v1/caregiver-daily-digests': { action: 'CREATE', resource: 'caregiverDailyDigest', phiAccessed: true },
   'GET /v1/caregiver-daily-digests': { action: 'READ', resource: 'caregiverDailyDigest', phiAccessed: true },
   'GET /v1/caregiver-daily-digests/:digestId': { action: 'READ', resource: 'caregiverDailyDigest', phiAccessed: true },
@@ -189,12 +198,6 @@ function extractResourceId(req) {
  * Main audit logging middleware
  */
 const auditMiddleware = async (req, res, next) => {
-  // Skip if no user (unauthenticated routes)
-  if (!req.caregiver && !req.path.includes('/auth/login')) {
-    return next();
-  }
-
-  // Construct route key
   const routePath = normalizeRoutePath(req.baseUrl, req.route && req.route.path ? req.route.path : req.path);
   const routeKey = `${req.method} ${routePath}`;
 
@@ -215,6 +218,8 @@ const auditMiddleware = async (req, res, next) => {
   // Create audit log function
   const createAudit = async (outcome = 'SUCCESS', errorMessage = null) => {
     if (logged) return; // Prevent duplicate logs
+    // Route auth middleware runs after this global middleware; caregiver is set before the handler responds.
+    if (!req.caregiver) return;
     logged = true;
 
     try {
@@ -247,6 +252,7 @@ const auditMiddleware = async (req, res, next) => {
 
       // Add metadata for specific routes
       const metadata = {};
+      if (auditConfig.category) metadata.category = auditConfig.category;
       if (req.query.timeRange) metadata.timeRange = req.query.timeRange;
       if (req.query.startDate) metadata.startDate = req.query.startDate;
       if (req.query.endDate) metadata.endDate = req.query.endDate;

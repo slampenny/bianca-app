@@ -1,9 +1,42 @@
 const httpStatus = require('http-status');
-const { PrivacyRequest, ConsentRecord, PrivacyComplaint, Caregiver, Client, Org } = require('../models');
+const crypto = require('crypto');
+const { PrivacyRequest, ConsentRecord, PrivacyComplaint, Caregiver, Client, Org, FamilyWeeklyDigest } = require('../models');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const config = require('../config/config');
 const { getJurisdiction } = require('../utils/jurisdiction.utils');
+
+/**
+ * Hash recipient email for privacy exports — no cleartext in access-request bundles.
+ */
+const hashRecipientEmail = (email) => {
+  if (!email) return null;
+  return crypto.createHash('sha256').update(String(email).trim().toLowerCase()).digest('hex');
+};
+
+/**
+ * Metadata-only family weekly digest disclosure records for privacy access exports.
+ * Payload PHI is omitted — sentPayloadHash supports integrity/audit without re-disclosing content.
+ * Verification state at send time is not persisted on the digest document; current client opt-in
+ * state is exported separately on the client record when applicable.
+ */
+const mapFamilyDigestForPrivacyExport = (digest) => {
+  const recipientEmail = digest.emailRecipient || digest.recipient?.email || '';
+  const redacted = Boolean(digest.phiRedactedAt || digest.payload?.phiRedacted);
+  return {
+    id: digest._id,
+    clientId: digest.client,
+    localWeekKey: digest.localWeekKey,
+    weekStart: digest.weekStart,
+    weekEnd: digest.weekEnd,
+    status: digest.status,
+    sentAt: digest.sentAt,
+    phiRedactedAt: digest.phiRedactedAt,
+    sentPayloadHash: digest.sentPayloadHash,
+    recipientEmailHash: recipientEmail && !redacted ? hashRecipientEmail(recipientEmail) : null,
+    recipientRedacted: redacted,
+  };
+};
 
 /**
  * Create an access request
@@ -375,7 +408,8 @@ const processAccessRequest = async (requestId, processedBy) => {
     clients: [],
     conversations: [],
     medicalAnalysis: [],
-    consentHistory: []
+    consentHistory: [],
+    familyWeeklyDigests: [],
   };
   
   // Get all clients associated with this caregiver
@@ -391,8 +425,23 @@ const processAccessRequest = async (requestId, processedBy) => {
           preferredName: client.preferredName,
           age: client.age,
           preferredLanguage: client.preferredLanguage,
-          createdAt: client.createdAt
+          createdAt: client.createdAt,
+          familyDigestEmailOptIn: client.emergencyContact?.familyDigestEmail
+            ? {
+                enabled: client.emergencyContact.familyDigestEmail.enabled === true,
+                verifiedAt: client.emergencyContact.familyDigestEmail.verifiedAt,
+                verifiedEmailHash: client.emergencyContact.familyDigestEmail.verifiedEmail
+                  ? hashRecipientEmail(client.emergencyContact.familyDigestEmail.verifiedEmail)
+                  : null,
+              }
+            : null,
         });
+
+        const familyDigests = await FamilyWeeklyDigest.find({ client: client._id })
+          .sort({ weekStart: -1 })
+          .limit(100)
+          .lean();
+        userData.familyWeeklyDigests.push(...familyDigests.map(mapFamilyDigestForPrivacyExport));
         
         // Get conversations for this client
         const conversations = await Conversation.find({ clientId: client._id })

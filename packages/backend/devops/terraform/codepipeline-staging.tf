@@ -661,9 +661,7 @@ resource "aws_codebuild_project" "staging_tests" {
 # CODEPIPELINE FOR STAGING
 ################################################################################
 
-# Staging order matches production: RunTests + PostDeployValidation before SwapAndTerminate.
-# pipeline_type V2 + QUEUED: one execution at a time (avoids overlapping runs where swap fails
-# on execution B while RunTests from execution A still appears "in progress" in the console).
+# Staging order: validate green, swap, then RunTests on live. V2 + QUEUED prevents overlapping runs.
 resource "aws_codepipeline" "staging" {
   name            = "bianca-staging-pipeline"
   role_arn        = aws_iam_role.codepipeline_staging_role.arn
@@ -748,24 +746,6 @@ resource "aws_codepipeline" "staging" {
   }
 
   stage {
-    name = "RunTests"
-    action {
-      name             = "RunTests"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild"
-      version          = "1"
-      input_artifacts  = ["SourceOutput", "BuildOutput"]
-      output_artifacts = ["TestOutput"]
-      configuration = {
-        ProjectName   = aws_codebuild_project.staging_tests.name
-        PrimarySource = "SourceOutput"
-      }
-      run_order = 1
-    }
-  }
-
-  stage {
     name = "PostDeployValidation"
     action {
       name             = "ValidateDeployment"
@@ -795,6 +775,24 @@ resource "aws_codepipeline" "staging" {
       output_artifacts = ["SwapOutput"]
       configuration = {
         ProjectName   = aws_codebuild_project.staging_swap_and_terminate.name
+        PrimarySource = "SourceOutput"
+      }
+      run_order = 1
+    }
+  }
+
+  stage {
+    name = "RunTests"
+    action {
+      name             = "RunTests"
+      category         = "Build"
+      owner            = "AWS"
+      provider         = "CodeBuild"
+      version          = "1"
+      input_artifacts  = ["SourceOutput", "BuildOutput"]
+      output_artifacts = ["TestOutput"]
+      configuration = {
+        ProjectName   = aws_codebuild_project.staging_tests.name
         PrimarySource = "SourceOutput"
       }
       run_order = 1

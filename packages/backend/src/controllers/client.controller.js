@@ -1,4 +1,5 @@
 const httpStatus = require('http-status');
+const jwt = require('jsonwebtoken');
 const path = require('path');
 const pick = require('../utils/pick');
 const logger = require('../config/logger');
@@ -15,6 +16,10 @@ const {
   assertCaregiverClientAccess,
   restrictsClientListingToCaregiverRoster,
 } = require('../utils/accessControl');
+const {
+  logVerificationSucceeded,
+  logVerificationFailed,
+} = require('../utils/familyDigestVerificationAudit');
 
 /**
  * Staff may access a client's nested data if the client is on their roster, lists them as caregiver,
@@ -135,6 +140,18 @@ const updateClient = catchAsync(async (req, res) => {
   const caregiverDoc =
     caregiver.role === 'staff' ? await caregiverService.getCaregiverById(caregiver._id || caregiver.id) : null;
   assertCaregiverClientAccess(caregiver, caregiverDoc, existing, 'You do not have access to this client');
+  if (clientData.emergencyContact?.familyDigestEmail) {
+    if (caregiver.role !== 'orgAdmin' && caregiver.role !== 'superAdmin') {
+      delete clientData.emergencyContact.familyDigestEmail;
+    } else {
+      const { enabled } = clientData.emergencyContact.familyDigestEmail;
+      if (enabled === undefined) {
+        delete clientData.emergencyContact.familyDigestEmail;
+      } else {
+        clientData.emergencyContact.familyDigestEmail = { enabled: Boolean(enabled) };
+      }
+    }
+  }
   const client = await clientService.updateClientById(req.params.clientId, clientData);
   if (schedules) {
     for (const schedule of schedules) {
@@ -388,6 +405,56 @@ const verifyConsent = catchAsync(async (req, res) => {
   }
 });
 
+const sendFamilyDigestEmailVerification = catchAsync(async (req, res) => {
+  const result = await clientService.sendFamilyDigestEmailVerification(req.caregiver, req.params.clientId);
+  res.status(httpStatus.OK).send(result);
+});
+
+const verifyFamilyDigestEmail = catchAsync(async (req, res) => {
+  const wantsJson = (req.headers.accept && req.headers.accept.includes('application/json')) || req.query.format === 'json';
+  const token = req.query.token || req.body.token;
+  if (!token) {
+    await logVerificationFailed(null, req, 'Verification token is required', httpStatus.BAD_REQUEST);
+    if (wantsJson) {
+      return res.status(httpStatus.BAD_REQUEST).json({ success: false, error: 'Verification token is required' });
+    }
+    return res.status(httpStatus.BAD_REQUEST).send('Verification token is required');
+  }
+  try {
+    const result = await clientService.verifyFamilyDigestEmailToken(token);
+    const clientId = result.client?.id || result.client?._id;
+    await logVerificationSucceeded(clientId, req, { alreadyVerified: result.alreadyVerified });
+    if (wantsJson) {
+      return res.status(httpStatus.OK).json({
+        success: true,
+        message: result.message,
+        alreadyVerified: result.alreadyVerified,
+      });
+    }
+    const html = `<!DOCTYPE html><html><head><title>Email verified</title></head><body><h1>✓ Email verified</h1><p>${result.message}</p></body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(httpStatus.OK).send(html);
+  } catch (error) {
+    let clientId = error.clientId || null;
+    if (!clientId && token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded?.sub) clientId = decoded.sub;
+      } catch {
+        // ignore decode errors — audit uses unknown resourceId
+      }
+    }
+    await logVerificationFailed(clientId, req, error.message || 'Invalid or expired verification token', error.statusCode || httpStatus.UNAUTHORIZED);
+    if (wantsJson) {
+      return res
+        .status(error.statusCode || httpStatus.UNAUTHORIZED)
+        .json({ success: false, error: error.message || 'Invalid or expired verification token' });
+    }
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.status(error.statusCode || httpStatus.UNAUTHORIZED).send(error.message || 'Invalid or expired verification token');
+  }
+});
+
 module.exports = {
   createClient,
   getClients,
@@ -398,6 +465,8 @@ module.exports = {
   getCallsByClient,
   updateClient,
   verifyConsent,
+  sendFamilyDigestEmailVerification,
+  verifyFamilyDigestEmail,
   uploadClientAvatar,
   deleteClient,
   assignCaregiver,

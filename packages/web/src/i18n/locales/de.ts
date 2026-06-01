@@ -702,7 +702,12 @@ export const de = {
   "familyWeeklyDigest": {
     "back": "Zurück zur wöchentlichen Digest-Liste",
     "sampleBanner": "Nur Beispiel-Layout. Nutzen Sie die Residentenliste für eine Vorschau mit Ihren Daten.",
-    "weekLabel": "Woche (beliebiger Tag der Woche, UTC)",
+    "weekLabel": "Referenzdatum",
+    "weekDateHelper": "Wählen Sie einen beliebigen Tag in der Woche. Die Zeitzone der Einrichtung bestimmt, welche Woche (Montag–Sonntag) verwendet wird.",
+    "weekOfLabel": "Woche vom {{date}}",
+    "weekRangeLabel": "{{range}}",
+    "timezoneLabel": "Zeitzone: {{timezone}}",
+    "legacyUtcWeekBanner": "Diese Vorschau nutzt ältere Wochengrenzen von vor der organisationslokalen Wochenlogik.",
     "refreshPreview": "Vorschau aktualisieren",
     "loadingPreview": "Vorschau wird geladen…",
     "loadError": "Vorschau konnte nicht geladen werden. Kein Zugriff oder Server nicht verfügbar."

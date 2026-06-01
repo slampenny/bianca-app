@@ -60,7 +60,6 @@ describe('caregiverDailyDigestCleanup.service', () => {
   let requester;
 
   beforeAll(async () => {
-    jest.setTimeout(60000);
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri(), {});
   });
