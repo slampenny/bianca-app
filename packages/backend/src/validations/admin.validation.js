@@ -199,6 +199,26 @@ const updateBreachLogStatus = {
   }),
 };
 
+const listBackups = {
+  query: Joi.object().keys({
+    prefix: Joi.string().trim().max(200).optional(),
+    limit: Joi.number().integer().min(1).max(500).default(100),
+  }),
+};
+
+const triggerBackup = {
+  body: Joi.object().keys({
+    backupType: Joi.string().valid('daily', 'weekly', 'monthly').default('daily'),
+  }),
+};
+
+const restoreBackup = {
+  body: Joi.object().keys({
+    backupKey: Joi.string().trim().min(3).max(500).required(),
+    confirmRestore: Joi.string().valid('YES_I_WANT_TO_RESTORE').required(),
+  }),
+};
+
 module.exports = {
   searchCaregivers,
   impersonate,
@@ -214,4 +234,7 @@ module.exports = {
   listBreachLogs,
   breachLogIdParam,
   updateBreachLogStatus,
+  listBackups,
+  triggerBackup,
+  restoreBackup,
 };

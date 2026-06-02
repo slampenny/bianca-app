@@ -267,3 +267,37 @@ export interface UpdateBreachLogStatusBody {
   resolutionNotes?: string
   resolutionReason?: string
 }
+
+export interface HipaaBackupRow {
+  key: string
+  backupType: string
+  fileName: string
+  sizeBytes: number
+  lastModified: string | null
+  storageClass: string
+}
+
+export interface HipaaBackupsListResponse {
+  environment: string
+  bucket: string
+  backups: HipaaBackupRow[]
+  total: number
+}
+
+export interface HipaaBackupTriggerResponse {
+  environment: string
+  backupType: string
+  success?: boolean
+  backupId?: string
+  s3Key?: string
+  sizeMB?: string
+  timestamp?: string
+}
+
+export interface HipaaBackupRestoreResponse {
+  environment: string
+  backupKey: string
+  success?: boolean
+  backupRestored?: string
+  timestamp?: string
+}

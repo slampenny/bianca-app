@@ -436,28 +436,19 @@ chmod +x /opt/bianca-production/monitor.sh
 # Add cron job for monitoring - check every minute
 echo "* * * * * /opt/bianca-production/monitor.sh" | crontab -u ec2-user -
 
-# Create backup script
+# HIPAA backups: scripts installed by CodeDeploy after_install.sh
 cat > /opt/bianca-production/backup.sh <<'EOF'
 #!/bin/bash
-
-# Backup script for production
-BACKUP_DIR="/opt/bianca-production/backups"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p "$BACKUP_DIR"
-
-# Backup MongoDB
-docker-compose exec -T mongodb mongodump --archive | gzip > "$BACKUP_DIR/mongodb_$DATE.gz"
-
-# Keep only last 7 days of backups
-find "$BACKUP_DIR" -name "mongodb_*.gz" -mtime +7 -delete
-
-echo "$(date): Backup completed" >> /var/log/bianca-production.log
+if [ -x /opt/bianca-production/hipaa-backup.sh ]; then
+  /opt/bianca-production/hipaa-backup.sh daily
+else
+  echo "$(date): hipaa-backup.sh not deployed yet" >> /var/log/bianca-production.log
+fi
 EOF
 
 chmod +x /opt/bianca-production/backup.sh
 
-# Add daily backup cron job
-echo "0 2 * * * /opt/bianca-production/backup.sh" | crontab -u ec2-user -
+# Daily HIPAA backup cron (script deployed via CodeDeploy)
+(crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup.sh; echo "0 2 * * * /opt/bianca-production/hipaa-backup.sh daily >> /var/log/bianca-production.log 2>&1") | crontab -u ec2-user -
 
 echo "Production environment setup completed!"

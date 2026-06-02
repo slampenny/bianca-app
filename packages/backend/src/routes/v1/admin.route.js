@@ -127,4 +127,25 @@ router.patch(
   adminController.updateBreachLogStatus,
 );
 
+router.get(
+  '/backups',
+  auth(),
+  validate(adminValidation.listBackups),
+  adminController.listBackups,
+);
+
+router.post(
+  '/backups/trigger',
+  auth(),
+  validate(adminValidation.triggerBackup),
+  adminController.triggerBackup,
+);
+
+router.post(
+  '/backups/restore',
+  auth(),
+  validate(adminValidation.restoreBackup),
+  adminController.restoreBackup,
+);
+
 module.exports = router;

@@ -1,9 +1,8 @@
-import { Link, useNavigate } from "react-router-dom"
-import { useLogoutMutation } from "../services/api/authApi"
 import { useGetObservabilityQuery } from "../services/api/adminApi"
-import { clearAuth, getAuthTokens, getCurrentUser, isAuthenticated } from "../store/authSlice"
-import { useAppDispatch, useAppSelector } from "../store/store"
+import { isAuthenticated } from "../store/authSlice"
+import { useAppSelector } from "../store/store"
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 import {
   HealthStatusBanner,
   ProcessMemoryChart,
@@ -29,11 +28,6 @@ function formatUptime(sec: number): string {
 
 export function ObservabilityPage() {
   const authed = useAppSelector(isAuthenticated)
-  const user = useAppSelector(getCurrentUser)
-  const tokens = useAppSelector(getAuthTokens)
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const [logout] = useLogoutMutation()
 
   const { data, isLoading, isFetching, isError, error, refetch } = useGetObservabilityQuery(undefined, {
     skip: !authed,
@@ -49,17 +43,6 @@ export function ObservabilityPage() {
 
   const grafanaUrl = import.meta.env.VITE_GRAFANA_URL?.trim()
 
-  const handleSignOut = async () => {
-    const rt = tokens?.refresh?.token
-    try {
-      if (rt) await logout({ refreshToken: rt }).unwrap()
-    } catch {
-      /* ignore */
-    }
-    dispatch(clearAuth())
-    navigate("/login", { replace: true })
-  }
-
   return (
     <div className="admin-app">
       <header className="admin-header">
@@ -69,34 +52,11 @@ export function ObservabilityPage() {
           <p className="admin-header-sub">API health, process stats, and deployment metadata</p>
         </div>
         <div className="admin-header-actions">
-          <span className="admin-muted admin-header-user">{user?.email}</span>
-          <Link to="/scim" className="admin-btn admin-btn--ghost">
-            SCIM
-          </Link>
-          <Link to="/org-flags" className="admin-btn admin-btn--ghost">
-            Org flags
-          </Link>
-          <Link to="/voice-onboarding" className="admin-btn admin-btn--ghost">
-            Voice onboarding
-          </Link>
-          <Link to="/embedding-anchors" className="admin-btn admin-btn--ghost">
-            Embedding anchors
-          </Link>
-          <Link to="/corp-email" className="admin-btn admin-btn--ghost">
-            Corp email
-          </Link>
-          <Link to="/security-events" className="admin-btn admin-btn--ghost">
-            Security events
-          </Link>
-          <Link to="/impersonate" className="admin-btn admin-btn--ghost">
-            Sign in as user
-          </Link>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refetch()} disabled={isFetching}>
-            {isFetching ? "Refreshing…" : "Refresh"}
-          </button>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void handleSignOut()}>
-            Sign out
-          </button>
+          <AdminHeaderNav>
+            <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refetch()} disabled={isFetching}>
+              {isFetching ? "Refreshing…" : "Refresh"}
+            </button>
+          </AdminHeaderNav>
         </div>
       </header>
 

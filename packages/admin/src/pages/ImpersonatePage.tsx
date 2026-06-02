@@ -1,5 +1,4 @@
 import { type FormEvent, useCallback, useState } from "react"
-import { Link } from "react-router-dom"
 import { SESSION_HANDOFF_MESSAGE_TYPE } from "../sessionHandoff"
 import {
   useImpersonateCaregiverMutation,
@@ -8,6 +7,7 @@ import {
   useUpdateCaregiverRoleMutation,
 } from "../services/api/adminApi"
 import type { AdminCaregiverSearchRow } from "../services/api/api.types"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 
 function facilityAppUrl(): string {
   const u = import.meta.env.VITE_FACILITY_APP_URL || "http://localhost:5173/"
@@ -114,12 +114,7 @@ export function ImpersonatePage() {
           </p>
         </div>
         <div className="admin-header-actions">
-          <Link to="/scim" className="admin-btn admin-btn--ghost">
-            SCIM
-          </Link>
-          <Link to="/" className="admin-btn admin-btn--ghost">
-            Observability
-          </Link>
+          <AdminHeaderNav />
         </div>
       </header>
 

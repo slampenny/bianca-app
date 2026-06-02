@@ -1,23 +1,17 @@
 import { type FormEvent, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { useLogoutMutation } from "../services/api/authApi"
 import {
   useDisableOrgScimMutation,
   useGetOrgScimStatusQuery,
   useIssueOrgScimTokenMutation,
   useLazySearchOrgsQuery,
 } from "../services/api/adminApi"
-import { clearAuth, getAuthTokens, getCurrentUser, isAuthenticated } from "../store/authSlice"
-import { useAppDispatch, useAppSelector } from "../store/store"
+import { isAuthenticated } from "../store/authSlice"
+import { useAppSelector } from "../store/store"
 import type { AdminOrgSearchRow } from "../services/api/api.types"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 
 export function ScimProvisioningPage() {
   const authed = useAppSelector(isAuthenticated)
-  const user = useAppSelector(getCurrentUser)
-  const tokens = useAppSelector(getAuthTokens)
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const [logout] = useLogoutMutation()
 
   const [q, setQ] = useState("")
   const [rows, setRows] = useState<AdminOrgSearchRow[]>([])
@@ -99,17 +93,6 @@ export function ScimProvisioningPage() {
     }
   }
 
-  const handleSignOut = async () => {
-    const rt = tokens?.refresh?.token
-    try {
-      if (rt) await logout({ refreshToken: rt }).unwrap()
-    } catch {
-      /* ignore */
-    }
-    dispatch(clearAuth())
-    navigate("/login", { replace: true })
-  }
-
   return (
     <div className="admin-app">
       <header className="admin-header">
@@ -121,22 +104,7 @@ export function ScimProvisioningPage() {
           </p>
         </div>
         <div className="admin-header-actions">
-          <span className="admin-muted admin-header-user">{user?.email}</span>
-          <Link to="/" className="admin-btn admin-btn--ghost">
-            Observability
-          </Link>
-          <Link to="/org-flags" className="admin-btn admin-btn--ghost">
-            Org flags
-          </Link>
-          <Link to="/embedding-anchors" className="admin-btn admin-btn--ghost">
-            Embedding anchors
-          </Link>
-          <Link to="/impersonate" className="admin-btn admin-btn--ghost">
-            Sign in as user
-          </Link>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void handleSignOut()}>
-            Sign out
-          </button>
+          <AdminHeaderNav />
         </div>
       </header>
 

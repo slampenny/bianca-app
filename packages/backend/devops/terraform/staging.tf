@@ -237,7 +237,18 @@ resource "aws_iam_role_policy" "staging_instance_policy" {
 
           # EC2 permissions for reading instance tags (needed by validate_service.sh to detect green instances)
           "ec2:DescribeInstances",
-          "ec2:DescribeTags"
+          "ec2:DescribeTags",
+
+          # HIPAA backup uploads + admin portal Lambda invoke
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:DeleteObject",
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey",
+          "lambda:InvokeFunction"
         ]
         Resource = "*"
       }
@@ -327,16 +338,31 @@ resource "aws_instance" "staging" {
     AutoStop    = "true"
   }
 
-  # On-demand instances can be stopped and restarted to apply user_data changes
-  # To apply user_data changes: terraform taint aws_instance.staging && terraform apply
-  # Or manually: stop instance, update user_data, start instance
-  # NOTE: lifecycle block removed to allow userdata updates via taint
+  # Blue/green swap replaces the live instance via CodePipeline; do not recreate on apply.
+  lifecycle {
+    ignore_changes = [
+      launch_template,
+      ami,
+      monitoring,
+      subnet_id,
+      instance_type,
+      key_name,
+      vpc_security_group_ids,
+      root_block_device,
+      ebs_block_device,
+      iam_instance_profile,
+    ]
+  }
 }
 
 # Associate Elastic IP with staging instance
 resource "aws_eip_association" "staging" {
   instance_id   = aws_instance.staging.id
   allocation_id = aws_eip.staging.id
+
+  lifecycle {
+    ignore_changes = [instance_id]
+  }
 }
 
 # EBS Volume for MongoDB data persistence.
@@ -427,12 +453,20 @@ resource "aws_lb_target_group_attachment" "staging_api" {
   target_group_arn = aws_lb_target_group.staging_api.arn
   target_id        = aws_instance.staging.id
   port             = 3000
+
+  lifecycle {
+    ignore_changes = [target_id]
+  }
 }
 
 resource "aws_lb_target_group_attachment" "staging_frontend" {
   target_group_arn = aws_lb_target_group.staging_frontend.arn
   target_id        = aws_instance.staging.id
   port             = 80
+
+  lifecycle {
+    ignore_changes = [target_id]
+  }
 }
 
 # ALB Listener for HTTP to HTTPS redirect

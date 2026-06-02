@@ -1,10 +1,10 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react"
-import { Link } from "react-router-dom"
 import {
   useGetCorpEmailForwardsQuery,
   useSaveCorpEmailForwardsMutation,
 } from "../services/api/adminApi"
 import type { CorpEmailForwardStaffRow, SaveCorpEmailForwardsResult } from "../services/api/api.types"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 
 type EditableRow = CorpEmailForwardStaffRow & {
   forwardToDraft: string
@@ -102,12 +102,7 @@ export function CorpEmailForwardsPage() {
           </p>
         </div>
         <div className="admin-header-actions">
-          <Link to="/" className="admin-btn admin-btn--ghost">
-            Observability
-          </Link>
-          <Link to="/impersonate" className="admin-btn admin-btn--ghost">
-            Sign in as user
-          </Link>
+          <AdminHeaderNav />
         </div>
       </header>
 

@@ -11,6 +11,9 @@ import type {
   EmbeddingAnchorMergeResponse,
   EmbeddingAnchorPhraseRow,
   ImpersonateResponse,
+  HipaaBackupRestoreResponse,
+  HipaaBackupsListResponse,
+  HipaaBackupTriggerResponse,
   ObservabilityPayload,
   SaveCorpEmailForwardsResponse,
   ScimAdminStatus,
@@ -24,7 +27,7 @@ import baseQueryWithAuth from "./baseQueryWithAuth"
 export const adminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: baseQueryWithAuth(),
-  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards", "BreachLogs"],
+  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards", "BreachLogs", "Backups"],
   endpoints: (builder) => ({
     getObservability: builder.query<ObservabilityPayload, void>({
       query: () => ({
@@ -230,6 +233,33 @@ export const adminApi = createApi({
       }),
       invalidatesTags: (_r, _e, { id }) => [{ type: "BreachLogs", id }, "BreachLogs"],
     }),
+    listBackups: builder.query<HipaaBackupsListResponse, { prefix?: string; limit?: number } | void>({
+      query: (params) => ({
+        url: "/admin/backups",
+        method: "GET",
+        params: params || {},
+      }),
+      providesTags: ["Backups"],
+    }),
+    triggerBackup: builder.mutation<HipaaBackupTriggerResponse, { backupType?: "daily" | "weekly" | "monthly" }>({
+      query: (body) => ({
+        url: "/admin/backups/trigger",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Backups"],
+    }),
+    restoreBackup: builder.mutation<
+      HipaaBackupRestoreResponse,
+      { backupKey: string; confirmRestore: "YES_I_WANT_TO_RESTORE" }
+    >({
+      query: (body) => ({
+        url: "/admin/backups/restore",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Backups"],
+    }),
   }),
 })
 
@@ -257,4 +287,7 @@ export const {
   useListBreachLogsQuery,
   useGetBreachLogQuery,
   useUpdateBreachLogStatusMutation,
+  useListBackupsQuery,
+  useTriggerBackupMutation,
+  useRestoreBackupMutation,
 } = adminApi

@@ -167,4 +167,21 @@ echo "   =========================================="
 echo "   Docker-compose.yml image references:"
 grep -E "image:.*bianca-app" "$DEPLOY_DIR/docker-compose.yml" || echo "   (No image references found)"
 
+# Install HIPAA backup/restore scripts (mongodump on EC2 → encrypted S3)
+HIPAA_SRC="/opt/bianca-deployment/devops/scripts"
+if [ -f "$HIPAA_SRC/hipaa-backup.sh" ] && [ -f "$HIPAA_SRC/hipaa-restore.sh" ]; then
+  echo "   Installing HIPAA backup scripts to $DEPLOY_DIR..."
+  cp "$HIPAA_SRC/hipaa-backup.sh" "$DEPLOY_DIR/hipaa-backup.sh"
+  cp "$HIPAA_SRC/hipaa-restore.sh" "$DEPLOY_DIR/hipaa-restore.sh"
+  chmod +x "$DEPLOY_DIR/hipaa-backup.sh" "$DEPLOY_DIR/hipaa-restore.sh"
+  chown ec2-user:ec2-user "$DEPLOY_DIR/hipaa-backup.sh" "$DEPLOY_DIR/hipaa-restore.sh" || true
+  if [ -x "$DEPLOY_DIR/install-hipaa-backup-cron.sh" ]; then
+    bash "$DEPLOY_DIR/install-hipaa-backup-cron.sh" || true
+  elif [ "$DETECTED_ENV" = "staging" ] || [ "$DETECTED_ENV" = "production" ]; then
+    (crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup.sh; echo "0 2 * * * $DEPLOY_DIR/hipaa-backup.sh daily >> /var/log/bianca-${DETECTED_ENV}.log 2>&1") | crontab -u ec2-user - || true
+  fi
+else
+  echo "   ⚠️  HIPAA scripts not found at $HIPAA_SRC (skip)"
+fi
+
 echo "✅ AfterInstall completed"

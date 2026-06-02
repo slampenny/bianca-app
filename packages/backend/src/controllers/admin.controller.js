@@ -11,6 +11,7 @@ const logger = require('../config/logger');
 const embeddingAnchorPhraseService = require('../services/embeddingAnchorPhrase.service');
 const corpEmailForwardService = require('../services/corpEmailForward.service');
 const breachLogService = require('../services/breachLog.service');
+const hipaaBackupService = require('../services/hipaaBackup.service');
 
 function assertSuperAdmin(req) {
   if (req.caregiver.role !== 'superAdmin') {
@@ -372,6 +373,75 @@ const updateBreachLogStatus = catchAsync(async (req, res) => {
   res.send(breach);
 });
 
+const listBackups = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const result = await hipaaBackupService.listBackups(req.query);
+  res.send(result);
+});
+
+const triggerBackup = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const result = await hipaaBackupService.triggerBackup(req.body);
+
+  const metadata = new Map();
+  metadata.set('backupType', String(req.body.backupType || 'daily'));
+  metadata.set('s3Key', String(result.s3Key || ''));
+
+  await AuditLog.create({
+    timestamp: new Date(),
+    userId: req.caregiver._id || req.caregiver.id,
+    userRole: 'superAdmin',
+    action: 'BACKUP',
+    resource: 'database',
+    resourceId: String(result.backupId || result.s3Key || 'manual-backup'),
+    outcome: 'SUCCESS',
+    ipAddress: req.ip || req.connection.remoteAddress,
+    userAgent: req.get('user-agent'),
+    metadata,
+    complianceFlags: {
+      phiAccessed: false,
+      highRiskAction: true,
+      requiresReview: false,
+    },
+  });
+
+  res.send(result);
+});
+
+const restoreBackup = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const { backupKey, confirmRestore } = req.body;
+  const result = await hipaaBackupService.restoreBackup({ backupKey, confirmRestore });
+
+  const metadata = new Map();
+  metadata.set('backupKey', backupKey);
+
+  await AuditLog.create({
+    timestamp: new Date(),
+    userId: req.caregiver._id || req.caregiver.id,
+    userRole: 'superAdmin',
+    action: 'RESTORE',
+    resource: 'database',
+    resourceId: backupKey,
+    outcome: 'SUCCESS',
+    ipAddress: req.ip || req.connection.remoteAddress,
+    userAgent: req.get('user-agent'),
+    metadata,
+    complianceFlags: {
+      phiAccessed: false,
+      highRiskAction: true,
+      requiresReview: true,
+    },
+  });
+
+  logger.warn('[Admin] Database restore completed via admin portal', {
+    backupKey,
+    actingSuperAdminId: String(req.caregiver._id || req.caregiver.id),
+  });
+
+  res.send(result);
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -393,4 +463,7 @@ module.exports = {
   listBreachLogs,
   getBreachLog,
   updateBreachLogStatus,
+  listBackups,
+  triggerBackup,
+  restoreBackup,
 };

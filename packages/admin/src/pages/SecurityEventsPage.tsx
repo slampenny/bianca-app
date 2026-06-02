@@ -1,10 +1,10 @@
-import { Link, useNavigate } from "react-router-dom"
+import { Link } from "react-router-dom"
 import { useState } from "react"
-import { useLogoutMutation } from "../services/api/authApi"
 import { useListBreachLogsQuery } from "../services/api/adminApi"
-import { clearAuth, getAuthTokens, getCurrentUser, isAuthenticated } from "../store/authSlice"
-import { useAppDispatch, useAppSelector } from "../store/store"
+import { isAuthenticated } from "../store/authSlice"
+import { useAppSelector } from "../store/store"
 import type { BreachLogStatus } from "../services/api/api.types"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 
 const STATUS_OPTIONS: BreachLogStatus[] = [
   "INVESTIGATING",
@@ -29,11 +29,6 @@ function statusClass(status: string) {
 
 export function SecurityEventsPage() {
   const authed = useAppSelector(isAuthenticated)
-  const user = useAppSelector(getCurrentUser)
-  const tokens = useAppSelector(getAuthTokens)
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const [logout] = useLogoutMutation()
 
   const [status, setStatus] = useState<string>("")
   const [type, setType] = useState<string>("")
@@ -51,17 +46,6 @@ export function SecurityEventsPage() {
     { skip: !authed },
   )
 
-  const handleSignOut = async () => {
-    const rt = tokens?.refresh?.token
-    try {
-      if (rt) await logout({ refreshToken: rt }).unwrap()
-    } catch {
-      /* ignore */
-    }
-    dispatch(clearAuth())
-    navigate("/login", { replace: true })
-  }
-
   return (
     <div className="admin-app">
       <header className="admin-header">
@@ -71,19 +55,11 @@ export function SecurityEventsPage() {
           <p className="admin-header-sub">Triage automated HIPAA / security detector alerts</p>
         </div>
         <div className="admin-header-actions">
-          <span className="admin-muted admin-header-user">{user?.email}</span>
-          <Link to="/" className="admin-btn admin-btn--ghost">
-            Observability
-          </Link>
-          <Link to="/security-events" className="admin-btn admin-btn--ghost">
-            Security events
-          </Link>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refetch()} disabled={isFetching}>
-            {isFetching ? "Refreshing…" : "Refresh"}
-          </button>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void handleSignOut()}>
-            Sign out
-          </button>
+          <AdminHeaderNav>
+            <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refetch()} disabled={isFetching}>
+              {isFetching ? "Refreshing…" : "Refresh"}
+            </button>
+          </AdminHeaderNav>
         </div>
       </header>
 

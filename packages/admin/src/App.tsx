@@ -14,6 +14,7 @@ import { CorpEmailForwardsPage } from "./pages/CorpEmailForwardsPage"
 import { InviteSignupPage } from "./pages/InviteSignupPage"
 import { SecurityEventsPage } from "./pages/SecurityEventsPage"
 import { SecurityEventDetailPage } from "./pages/SecurityEventDetailPage"
+import { BackupsPage } from "./pages/BackupsPage"
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="corp-email" element={<CorpEmailForwardsPage />} />
           <Route path="security-events" element={<SecurityEventsPage />} />
           <Route path="security-events/:id" element={<SecurityEventDetailPage />} />
+          <Route path="backups" element={<BackupsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

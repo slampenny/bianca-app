@@ -360,15 +360,31 @@ resource "aws_instance" "production" {
     Environment = "production"
   }
 
-  # On-demand instances can be stopped and restarted to apply user_data changes
-  # To apply user_data changes: terraform taint aws_instance.production && terraform apply
-  # Or manually: stop instance, update user_data, start instance
+  # Blue/green swap replaces the live instance via CodePipeline; do not recreate on apply.
+  lifecycle {
+    ignore_changes = [
+      launch_template,
+      ami,
+      monitoring,
+      subnet_id,
+      instance_type,
+      key_name,
+      vpc_security_group_ids,
+      root_block_device,
+      ebs_block_device,
+      iam_instance_profile,
+    ]
+  }
 }
 
 # Associate Elastic IP with production instance
 resource "aws_eip_association" "production" {
   instance_id   = aws_instance.production.id
   allocation_id = aws_eip.production.id
+
+  lifecycle {
+    ignore_changes = [instance_id]
+  }
 }
 
 # MongoDB data volume attachment is NOT managed here: blue/green swap detaches/reattaches
@@ -475,12 +491,20 @@ resource "aws_lb_target_group_attachment" "production_app" {
   target_group_arn = aws_lb_target_group.production_app.arn
   target_id        = aws_instance.production.id
   port             = 80
+
+  lifecycle {
+    ignore_changes = [target_id]
+  }
 }
 
 resource "aws_lb_target_group_attachment" "production_api" {
   target_group_arn = aws_lb_target_group.production_api.arn
   target_id        = aws_instance.production.id
   port             = 3000
+
+  lifecycle {
+    ignore_changes = [target_id]
+  }
 }
 
 # HTTP listener (redirect to HTTPS)

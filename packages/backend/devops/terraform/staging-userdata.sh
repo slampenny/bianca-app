@@ -182,3 +182,13 @@ echo "Infrastructure setup complete!"
 echo "Waiting for CodeDeploy to handle application deployment..."
 echo "==================================="
 
+# HIPAA backup cron (scripts installed by CodeDeploy after_install; cron ready for first deploy)
+mkdir -p /opt/bianca-staging
+cat > /opt/bianca-staging/install-hipaa-backup-cron.sh <<'CRON_EOF'
+#!/bin/bash
+if [ -x /opt/bianca-staging/hipaa-backup.sh ]; then
+  (crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup.sh; echo "0 2 * * * /opt/bianca-staging/hipaa-backup.sh daily >> /var/log/bianca-staging.log 2>&1") | crontab -u ec2-user -
+fi
+CRON_EOF
+chmod +x /opt/bianca-staging/install-hipaa-backup-cron.sh
+

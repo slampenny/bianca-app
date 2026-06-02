@@ -1,6 +1,4 @@
-import { Link, useNavigate } from "react-router-dom"
 import { useState } from "react"
-import { useLogoutMutation } from "../services/api/authApi"
 import {
   useCreateEmbeddingAnchorPhraseMutation,
   useDeleteEmbeddingAnchorPhraseMutation,
@@ -8,9 +6,10 @@ import {
   useMergeEmbeddingAnchorDefaultsMutation,
   useUpdateEmbeddingAnchorPhraseMutation,
 } from "../services/api/adminApi"
-import { clearAuth, getAuthTokens, getCurrentUser, isAuthenticated } from "../store/authSlice"
-import { useAppDispatch, useAppSelector } from "../store/store"
+import { isAuthenticated } from "../store/authSlice"
+import { useAppSelector } from "../store/store"
 import type { EmbeddingAnchorDetector, EmbeddingAnchorPhraseRow } from "../services/api/api.types"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 
 const DETECTORS: { value: EmbeddingAnchorDetector; label: string }[] = [
   { value: "emergencyDetector", label: "Emergency" },
@@ -23,11 +22,6 @@ const ABUSE_CATS = ["physical", "emotional", "neglect"] as const
 
 export function EmbeddingAnchorsPage() {
   const authed = useAppSelector(isAuthenticated)
-  const user = useAppSelector(getCurrentUser)
-  const tokens = useAppSelector(getAuthTokens)
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const [logout] = useLogoutMutation()
 
   const [filterDetector, setFilterDetector] = useState<string>("")
   const { data: rows = [], isLoading, error, refetch } = useGetEmbeddingAnchorPhrasesQuery(
@@ -49,17 +43,6 @@ export function EmbeddingAnchorsPage() {
     emergencySeverity: "HIGH" as "CRITICAL" | "HIGH" | "MEDIUM",
     emergencyCategory: "",
   })
-
-  const handleSignOut = async () => {
-    const rt = tokens?.refresh?.token
-    try {
-      if (rt) await logout({ refreshToken: rt }).unwrap()
-    } catch {
-      /* ignore */
-    }
-    dispatch(clearAuth())
-    navigate("/login", { replace: true })
-  }
 
   const resetForm = () => {
     setForm({
@@ -154,30 +137,16 @@ export function EmbeddingAnchorsPage() {
           <p className="admin-header-sub">OpenAI text-embedding-3-large — edit phrases used for similarity in fraud &amp; safety detectors</p>
         </div>
         <div className="admin-header-actions">
-          <span className="admin-muted admin-header-user">{user?.email}</span>
-          <Link to="/" className="admin-btn admin-btn--ghost">
-            Observability
-          </Link>
-          <Link to="/scim" className="admin-btn admin-btn--ghost">
-            SCIM
-          </Link>
-          <Link to="/org-flags" className="admin-btn admin-btn--ghost">
-            Org flags
-          </Link>
-          <Link to="/impersonate" className="admin-btn admin-btn--ghost">
-            Sign in as user
-          </Link>
-          <button
-            type="button"
-            className="admin-btn admin-btn--ghost"
-            onClick={() => void refetch()}
-            disabled={isLoading}
-          >
-            Refresh
-          </button>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void handleSignOut()}>
-            Sign out
-          </button>
+          <AdminHeaderNav>
+            <button
+              type="button"
+              className="admin-btn admin-btn--ghost"
+              onClick={() => void refetch()}
+              disabled={isLoading}
+            >
+              Refresh
+            </button>
+          </AdminHeaderNav>
         </div>
       </header>
 

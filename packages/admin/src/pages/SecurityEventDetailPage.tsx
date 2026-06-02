@@ -1,13 +1,13 @@
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { useEffect, useState } from "react"
-import { useLogoutMutation } from "../services/api/authApi"
 import {
   useGetBreachLogQuery,
   useUpdateBreachLogStatusMutation,
 } from "../services/api/adminApi"
-import { clearAuth, getAuthTokens, getCurrentUser, isAuthenticated } from "../store/authSlice"
-import { useAppDispatch, useAppSelector } from "../store/store"
+import { isAuthenticated } from "../store/authSlice"
+import { useAppSelector } from "../store/store"
 import type { BreachLogStatus } from "../services/api/api.types"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 
 const RESOLUTION_REASONS = [
   { value: "timezone_false_positive", label: "Timezone false positive" },
@@ -27,11 +27,6 @@ function formatDate(value: string | null | undefined) {
 export function SecurityEventDetailPage() {
   const { id } = useParams<{ id: string }>()
   const authed = useAppSelector(isAuthenticated)
-  const user = useAppSelector(getCurrentUser)
-  const tokens = useAppSelector(getAuthTokens)
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const [logout] = useLogoutMutation()
 
   const { data, isLoading, isError, refetch } = useGetBreachLogQuery(id!, { skip: !authed || !id })
   const [updateStatus, { isLoading: saving }] = useUpdateBreachLogStatusMutation()
@@ -53,17 +48,6 @@ export function SecurityEventDetailPage() {
       setSelectedStatus(data.status as BreachLogStatus)
     }
   }, [data])
-
-  const handleSignOut = async () => {
-    const rt = tokens?.refresh?.token
-    try {
-      if (rt) await logout({ refreshToken: rt }).unwrap()
-    } catch {
-      /* ignore */
-    }
-    dispatch(clearAuth())
-    navigate("/login", { replace: true })
-  }
 
   const submitStatus = async (status: BreachLogStatus) => {
     if (!id) return
@@ -94,9 +78,11 @@ export function SecurityEventDetailPage() {
           <p className="admin-header-sub">{id}</p>
         </div>
         <div className="admin-header-actions">
-          <span className="admin-muted admin-header-user">{user?.email}</span>
-          <Link to="/security-events" className="admin-btn admin-btn--ghost">Back to list</Link>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void handleSignOut()}>Sign out</button>
+          <AdminHeaderNav>
+            <Link to="/security-events" className="admin-btn admin-btn--ghost">
+              Back to list
+            </Link>
+          </AdminHeaderNav>
         </div>
       </header>
 

@@ -1,15 +1,14 @@
 import { type FormEvent, useEffect, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { useLogoutMutation } from "../services/api/authApi"
 import {
   useGetDefaultVoiceOnboardingPlanQuery,
   useGetOrgQuery,
   useLazySearchOrgsQuery,
   usePatchOrgMutation,
 } from "../services/api/adminApi"
-import { clearAuth, getAuthTokens, getCurrentUser, isAuthenticated } from "../store/authSlice"
-import { useAppDispatch, useAppSelector } from "../store/store"
+import { isAuthenticated } from "../store/authSlice"
+import { useAppSelector } from "../store/store"
 import type { AdminOrgSearchRow, VoiceOnboardingDay } from "../services/api/api.types"
+import { AdminHeaderNav } from "../components/AdminHeaderNav"
 
 function cloneDays(days: VoiceOnboardingDay[]): VoiceOnboardingDay[] {
   return days.map((day, index) => ({
@@ -35,11 +34,6 @@ function emptyDay(dayNumber: number): VoiceOnboardingDay {
 
 export function OrgVoiceOnboardingPage() {
   const authed = useAppSelector(isAuthenticated)
-  const user = useAppSelector(getCurrentUser)
-  const tokens = useAppSelector(getAuthTokens)
-  const dispatch = useAppDispatch()
-  const navigate = useNavigate()
-  const [logout] = useLogoutMutation()
 
   const [q, setQ] = useState("")
   const [rows, setRows] = useState<AdminOrgSearchRow[]>([])
@@ -174,17 +168,6 @@ export function OrgVoiceOnboardingPage() {
     }
   }
 
-  const handleSignOut = async () => {
-    const rt = tokens?.refresh?.token
-    try {
-      if (rt) await logout({ refreshToken: rt }).unwrap()
-    } catch {
-      /* ignore */
-    }
-    dispatch(clearAuth())
-    navigate("/login", { replace: true })
-  }
-
   const defaultDayCount = defaultPlanData?.plan?.totalDays ?? 4
 
   return (
@@ -196,19 +179,7 @@ export function OrgVoiceOnboardingPage() {
           <p className="admin-header-sub">Per-organization resident call onboarding plans (super admin).</p>
         </div>
         <div className="admin-header-actions">
-          <span className="admin-muted admin-header-user">{user?.email}</span>
-          <Link to="/" className="admin-btn admin-btn--ghost">
-            Observability
-          </Link>
-          <Link to="/org-flags" className="admin-btn admin-btn--ghost">
-            Org flags
-          </Link>
-          <Link to="/scim" className="admin-btn admin-btn--ghost">
-            SCIM
-          </Link>
-          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void handleSignOut()}>
-            Sign out
-          </button>
+          <AdminHeaderNav />
         </div>
       </header>
 
