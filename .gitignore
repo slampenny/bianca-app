@@ -1,6 +1,12 @@
 # Dependencies
 logs
 node_modules
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+!.yarn/releases
+!.yarn/plugins
 
 # Vite / web package build output
 packages/web/dist
