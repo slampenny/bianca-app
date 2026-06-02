@@ -15,6 +15,36 @@ case "$DEPLOY_DIR" in
 esac
 
 MONGO_CONTAINER="${CONTAINER_PREFIX}_mongodb"
+export HOME="${HOME:-/root}"
+mkdir -p "$HOME/.aws" 2>/dev/null || true
+
+start_compose_stack_after_mongo() {
+  cd "$DEPLOY_DIR"
+  local svc
+  for svc in redis asterisk app frontend admin nginx; do
+    if ! docker-compose config --services 2>/dev/null | grep -qx "$svc"; then
+      continue
+    fi
+    docker-compose stop "$svc" 2>/dev/null || true
+    docker rm -f "${CONTAINER_PREFIX}_${svc}" 2>/dev/null || true
+    docker-compose rm -sf "$svc" 2>/dev/null || true
+  done
+  sleep 2
+  for svc in redis asterisk app frontend admin nginx; do
+    if ! docker-compose config --services 2>/dev/null | grep -qx "$svc"; then
+      continue
+    fi
+    echo "Starting $svc..."
+    if ! docker-compose up -d --no-deps --force-recreate "$svc"; then
+      echo "FATAL: failed to start $svc"
+      docker-compose ps 2>&1 || true
+      docker logs "${CONTAINER_PREFIX}_${svc}" 2>&1 | tail -40 || true
+      return 1
+    fi
+    sleep 3
+  done
+}
+
 echo "Remount MongoDB on $(hostname) DEPLOY_DIR=$DEPLOY_DIR container=$MONGO_CONTAINER"
 
 cd "$DEPLOY_DIR"
@@ -83,10 +113,8 @@ if [ "$MONGO_OK" != "true" ]; then
   exit 1
 fi
 
-docker rm -f "${CONTAINER_PREFIX}_app" 2>/dev/null || true
-docker-compose rm -sf app 2>/dev/null || true
-if ! docker-compose up -d --remove-orphans; then
-  echo "FATAL: docker-compose up -d failed"
+if ! start_compose_stack_after_mongo; then
+  echo "FATAL: docker-compose stack startup failed"
   docker-compose ps 2>&1 || true
   exit 1
 fi
