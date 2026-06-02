@@ -700,8 +700,8 @@ phases:
         if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
           echo "Swap failed — rolling MongoDB volume back to blue if needed..."
           export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
-          case "${CODEPIPELINE_NAME}" in
-            bianca-production-pipeline) ROLLBACK_ENV=production ;;
+          case "${CODEPIPELINE_NAME}:${BLUE_TAG:-}" in
+            bianca-production-pipeline:*|*:bianca-production) ROLLBACK_ENV=production ;;
             *) ROLLBACK_ENV=staging ;;
           esac
           bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/rollback-mongodb-volume-to-blue.sh" "$ROLLBACK_ENV" || \

@@ -134,6 +134,10 @@ resource "aws_codebuild_project" "production_swap_and_terminate" {
       name  = "ADMIN_URL"
       value = "https://admin.biancawellness.com"
     }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-production-pipeline"
+    }
   }
 
   source {

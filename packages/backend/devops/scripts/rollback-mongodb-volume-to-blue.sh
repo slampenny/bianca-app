@@ -38,6 +38,43 @@ else
     --query 'Volumes[0].VolumeId' \
     --output text 2>/dev/null || echo "None")
   if [ -z "$VOLUME_ID" ] || [ "$VOLUME_ID" = "None" ]; then
+    # Volume may still be attached to a leftover green after Step 0 partial failure.
+    GREEN_TAG="${BLUE_TAG}-green"
+    GREEN_INSTANCE_ID=$(aws ec2 describe-instances \
+      --region "$REGION" \
+      --filters "Name=tag:Name,Values=$GREEN_TAG" "Name=instance-state-name,Values=running" \
+      --query 'Reservations[0].Instances[0].InstanceId' \
+      --output text 2>/dev/null || echo "")
+    if [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+      VOLUME_ID=$(aws ec2 describe-volumes \
+        --region "$REGION" \
+        --filters "Name=attachment.instance-id,Values=$GREEN_INSTANCE_ID" "Name=tag:Name,Values=$VOLUME_NAME" \
+        --query 'Volumes[0].VolumeId' \
+        --output text 2>/dev/null || echo "None")
+    fi
+    if [ -n "$VOLUME_ID" ] && [ "$VOLUME_ID" != "None" ] && [ -n "$GREEN_INSTANCE_ID" ] && [ "$GREEN_INSTANCE_ID" != "None" ]; then
+      echo "Volume $VOLUME_ID is on green $GREEN_INSTANCE_ID — stopping green and detaching..."
+      aws ssm send-command \
+        --region "$REGION" \
+        --instance-ids "$GREEN_INSTANCE_ID" \
+        --document-name "AWS-RunShellScript" \
+        --parameters "{\"commands\":[\"cd $DEPLOY_DIR && (docker-compose stop 2>/dev/null || true)\",\"sleep 3\",\"sudo umount /opt/mongodb-data 2>/dev/null || true\"]}" \
+        --timeout-seconds 120 \
+        --query 'Command.CommandId' \
+        --output text >/dev/null 2>&1 || true
+      sleep 15
+      VSTATE=$(aws ec2 describe-volumes --region "$REGION" --volume-ids "$VOLUME_ID" --query 'Volumes[0].State' --output text 2>/dev/null || echo "")
+      if [ "$VSTATE" != "available" ]; then
+        aws ec2 detach-volume --region "$REGION" --volume-id "$VOLUME_ID" || true
+        for i in $(seq 1 36); do
+          VSTATE=$(aws ec2 describe-volumes --region "$REGION" --volume-ids "$VOLUME_ID" --query 'Volumes[0].State' --output text 2>/dev/null || echo "")
+          [ "$VSTATE" = "available" ] && break
+          sleep 5
+        done
+      fi
+    fi
+  fi
+  if [ -z "$VOLUME_ID" ] || [ "$VOLUME_ID" = "None" ]; then
     echo "No available volume with Name=$VOLUME_NAME — nothing to rollback"
     exit 0
   fi

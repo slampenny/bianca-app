@@ -83,5 +83,11 @@ if [ "$MONGO_OK" != "true" ]; then
   exit 1
 fi
 
-(docker compose up -d 2>/dev/null || docker-compose up -d)
+docker rm -f "${CONTAINER_PREFIX}_app" 2>/dev/null || true
+docker-compose rm -sf app 2>/dev/null || true
+if ! docker-compose up -d --remove-orphans; then
+  echo "FATAL: docker-compose up -d failed"
+  docker-compose ps 2>&1 || true
+  exit 1
+fi
 echo "Remount complete — stack started"
