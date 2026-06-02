@@ -18,8 +18,7 @@ This document summarizes all deployment optimizations implemented to reduce stag
 ### 2. Terraform Drift Fixes ✅
 **Locations**: 
 - `bianca-app-backend/devops/terraform/staging-monitoring.tf`
-- `bianca-app-backend/devops/terraform/staging.tf`
-- `bianca-app-backend/devops/terraform/staging-schedule.tf`
+- `bianca-app-backend/devops/terraform/staging.tf` (includes `bianca-staging-auto-stop` Lambda)
 
 **Changes**:
 - CloudWatch Dashboard: Added `lifecycle { ignore_changes = [dashboard_body] }` to prevent updates when instance ID changes

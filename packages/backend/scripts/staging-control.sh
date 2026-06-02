@@ -74,39 +74,8 @@ show_status() {
         --region $REGION 2>/dev/null || echo "false")
     
     echo -e "Always-on mode: ${YELLOW}$always_on${NC}"
-
-    local hourly=$(aws ssm get-parameter \
-        --name "/bianca/staging/hourly-ec2-schedule-enabled" \
-        --query 'Parameter.Value' \
-        --output text \
-        --profile $AWS_PROFILE \
-        --region $REGION 2>/dev/null || echo "(unset)")
-    echo -e "Hourly EC2 schedule (SSM): ${YELLOW}$hourly${NC}  (true=Lambda may start/stop; false=manual)"
-}
-
-# Enable hourly Lambda start/stop for staging (Terraform also manages this parameter when applied)
-enable_hourly_ec2_schedule() {
-    echo -e "${BLUE}Enabling staging hourly EC2 schedule (SSM)...${NC}"
-    aws ssm put-parameter \
-        --name "/bianca/staging/hourly-ec2-schedule-enabled" \
-        --value "true" \
-        --type "String" \
-        --overwrite \
-        --profile $AWS_PROFILE \
-        --region $REGION
-    echo -e "${GREEN}✅ Hourly schedule enabled${NC}"
-}
-
-disable_hourly_ec2_schedule() {
-    echo -e "${BLUE}Disabling staging hourly EC2 schedule (SSM)...${NC}"
-    aws ssm put-parameter \
-        --name "/bianca/staging/hourly-ec2-schedule-enabled" \
-        --value "false" \
-        --type "String" \
-        --overwrite \
-        --profile $AWS_PROFILE \
-        --region $REGION
-    echo -e "${GREEN}✅ Hourly schedule disabled — use ./scripts/staging-control.sh start/stop manually${NC}"
+    echo -e "Auto-stop Lambda: ${YELLOW}bianca-staging-auto-stop${NC} (every 30m if idle — stop only, never starts)"
+    echo -e "Start staging: ${YELLOW}manual only${NC} (yarn staging:up or staging-control.sh start)"
 }
 
 # Start staging instance
@@ -248,8 +217,6 @@ show_usage() {
     echo "  deploy     - Deploy to staging (starts instance if needed)"
     echo "  always-on  - Enable always-on mode (24/7)"
     echo "  schedule   - Disable always-on mode (business hours only)"
-    echo "  hourly-on  - Allow hourly Lambda to start/stop staging EC2 (SSM)"
-    echo "  hourly-off - Block hourly Lambda from changing staging EC2 (default after Terraform apply)"
     echo "  help       - Show this help message"
     echo ""
     echo "Examples:"
@@ -278,12 +245,6 @@ case "${1:-help}" in
         ;;
     schedule)
         disable_always_on
-        ;;
-    hourly-on)
-        enable_hourly_ec2_schedule
-        ;;
-    hourly-off)
-        disable_hourly_ec2_schedule
         ;;
     help|--help|-h)
         show_usage

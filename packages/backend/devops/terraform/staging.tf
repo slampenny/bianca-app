@@ -726,17 +726,9 @@ resource "aws_iam_role_policy" "staging_lambda_policy" {
         Action = [
           "ec2:DescribeInstances",
           "ec2:StopInstances",
-          "ec2:StartInstances",
           "cloudwatch:GetMetricStatistics"
         ]
         Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "ssm:GetParameter"
-        ]
-        Resource = "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter/bianca/staging/hourly-ec2-schedule-enabled"
       },
       {
         Effect = "Allow"

@@ -9,6 +9,7 @@ const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client
 const logger = require('./logger'); // Assuming logger is available for loadSecrets
 const { AwsContext } = require('twilio/lib/rest/accounts/v1/credential/aws');
 const { buildAllConfigs, applyAllSecrets } = require('./domains');
+const { buildAudioTurnDetectionConfig } = require('./audioTurn.config');
 
 // Load .env file only in development and test. In staging/production we use process.env (CodeBuild/Docker) + AWS Secrets only.
 const nodeEnv = process.env.NODE_ENV;
@@ -161,6 +162,23 @@ const envVarsSchema = Joi.object({
   /** "true" = use legacy keyword/DB phrase/regex detectors; "false" (default) = embedding-first for fraud + emergency */
   USE_KEYWORD_BASED_DETECTORS: Joi.string().valid('true', 'false').optional(),
 
+  // Voice turn / server_vad personalization (non-secret; may also live in docker-compose or Secrets Manager JSON)
+  AUDIO_TURN_PERSONALIZATION_ENABLED: Joi.string().valid('true', 'false').optional(),
+  AUDIO_TURN_DEFAULT_SILENCE_DURATION_MS: Joi.number().integer().min(200).max(4000).optional(),
+  AUDIO_TURN_MIN_SILENCE_DURATION_MS: Joi.number().integer().min(200).max(4000).optional(),
+  AUDIO_TURN_MAX_SILENCE_DURATION_MS: Joi.number().integer().min(200).max(4000).optional(),
+  AUDIO_TURN_INTERRUPTION_BUMP_MS: Joi.number().integer().min(1).optional(),
+  AUDIO_TURN_SUCCESS_DECAY_MS: Joi.number().integer().min(1).optional(),
+  AUDIO_TURN_SUCCESS_DECAY_MIN_TURNS: Joi.number().integer().min(1).optional(),
+  AUDIO_TURN_SUCCESS_DECAY_MIN_CALLS: Joi.number().integer().min(0).optional(),
+  AUDIO_TURN_PROFILE_ALPHA: Joi.number().min(0).max(1).optional(),
+  AUDIO_TURN_DETECTION_SILENCE_DURATION_MS: Joi.number().integer().min(200).max(4000).optional(),
+  AUDIO_TURN_DETECTION_THRESHOLD: Joi.number().min(0).max(1).optional(),
+  AUDIO_TURN_DETECTION_PREFIX_PADDING_MS: Joi.number().integer().min(0).optional(),
+  AUDIO_TURN_ADAPTIVE_SILENCE: Joi.string().valid('true', 'false').optional(),
+  AUDIO_TURN_ADAPTIVE_SILENCE_STEP_MS: Joi.number().integer().min(1).optional(),
+  AUDIO_TURN_ADAPTIVE_SILENCE_MAX_MS: Joi.number().integer().min(1).optional(),
+
   DAILY_DIGEST_SCHEDULER_ENABLED: Joi.string().valid('true', 'false').optional(),
   DAILY_DIGEST_COORDINATOR_INTERVAL_MINUTES: Joi.number().integer().min(1).max(1440).optional(),
   DAILY_DIGEST_DEFAULT_SEND_TIME: Joi.string().optional(),
@@ -253,31 +271,8 @@ const baselineConfig = {
     },
     // OpenAI built-in noise reduction (for gpt-realtime GA model); API expects { type: 'near_field' | 'far_field' }
     openaiNoiseReduction: process.env.AUDIO_OPENAI_NOISE_REDUCTION || 'near_field', // near_field | far_field; use 'null' to disable (env string)
-    // Turn detection settings (controls when Bianca responds after user stops speaking)
-    turnDetection: {
-      threshold: parseFloat(process.env.AUDIO_TURN_DETECTION_THRESHOLD) || 0.6, // Default: 0.6 (higher = more selective, ignores quiet background)
-      prefixPaddingMs: parseInt(process.env.AUDIO_TURN_DETECTION_PREFIX_PADDING_MS) || 200, // Default: 200ms (captures speech start)
-      // OpenAI server_vad: how long the caller must be silent before end-of-speech (ms). Docs default 500; floor avoids ultra-aggressive VAD.
-      silenceDurationMs: (() => {
-        const raw = parseInt(process.env.AUDIO_TURN_DETECTION_SILENCE_DURATION_MS, 10);
-        const base = Number.isFinite(raw) && raw > 0 ? raw : 500;
-        return Math.min(4000, Math.max(200, base));
-      })(),
-      // Per call: if assistant output starts while user is still in speaking state (VAD), bump toward max (session.update)
-      adaptiveSilence: {
-        enabled: process.env.AUDIO_TURN_ADAPTIVE_SILENCE === 'false' ? false : true,
-        stepMs: (() => {
-          const s = parseInt(process.env.AUDIO_TURN_ADAPTIVE_SILENCE_STEP_MS, 10);
-          return Number.isFinite(s) && s > 0 ? s : 200;
-        })(),
-        maxMs: (() => {
-          const m = parseInt(process.env.AUDIO_TURN_ADAPTIVE_SILENCE_MAX_MS, 10);
-          return Number.isFinite(m) && m > 0 ? m : 2000;
-        })(),
-      },
-      // OpenAI turn_detection.create_response — only "true" enables auto response on VAD stop (see OPENAI_REALTIME_VAD_CREATE_RESPONSE).
-      createResponse: process.env.OPENAI_REALTIME_VAD_CREATE_RESPONSE === 'true',
-    },
+    // Turn detection (rebuilt from env after Secrets Manager merge via refreshAudioTurnDetectionConfig)
+    turnDetection: buildAudioTurnDetectionConfig(process.env),
   },
   google: {
     language: 'en-US',
@@ -461,6 +456,9 @@ baselineConfig.loadSecrets = async () => {
 
     // Apply secrets using domain modules (this will override config with AWS secrets)
     applyAllSecrets(baselineConfig, secrets);
+
+    // Re-read voice-turn / VAD env (may be in Secrets Manager JSON or docker-compose; merged into process.env above)
+    baselineConfig.audio.turnDetection = buildAudioTurnDetectionConfig(process.env);
     
     // CRITICAL: Ensure config.env matches runtime NODE_ENV (never override from secrets)
     // This ensures that even if secrets contained NODE_ENV, we use the runtime value

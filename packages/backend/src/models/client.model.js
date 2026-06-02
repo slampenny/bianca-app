@@ -152,6 +152,24 @@ const clientSchema = mongoose.Schema(
         ref: 'Schedule',
       },
     ],
+    /** Per-resident OpenAI server_vad silence tuning (timing stats only — no audio/transcripts). */
+    voiceTurnProfile: {
+      vadSilenceDurationMs: { type: Number, min: 200, max: 4000 },
+      minSilenceDurationMs: { type: Number, min: 200, max: 4000 },
+      maxSilenceDurationMs: { type: Number, min: 200, max: 4000 },
+      totalCallsObserved: { type: Number, default: 0, min: 0 },
+      totalTurnsObserved: { type: Number, default: 0, min: 0 },
+      totalInterruptionsObserved: { type: Number, default: 0, min: 0 },
+      consecutiveCleanTurns: { type: Number, default: 0, min: 0 },
+      lastCallStartedAt: { type: Date },
+      lastCallEndedAt: { type: Date },
+      lastUpdatedAt: { type: Date },
+      source: {
+        type: String,
+        enum: ['default', 'adaptive', 'manual'],
+        default: 'default',
+      },
+    },
   },
   {
     timestamps: true,
@@ -160,6 +178,7 @@ const clientSchema = mongoose.Schema(
       virtuals: true,
       transform: (doc, ret) => {
         delete ret.deleted;
+        delete ret.voiceTurnProfile;
         return ret;
       },
     },

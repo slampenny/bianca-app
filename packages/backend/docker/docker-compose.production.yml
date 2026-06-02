@@ -20,6 +20,16 @@ services:
       # Asterisk configuration (will be loaded from AWS Secrets Manager)
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_ENABLED=true
+      # Voice turn personalization (production elderly tuning — override via Secrets Manager if needed)
+      - AUDIO_TURN_PERSONALIZATION_ENABLED=true
+      - AUDIO_TURN_DEFAULT_SILENCE_DURATION_MS=450
+      - AUDIO_TURN_MIN_SILENCE_DURATION_MS=300
+      - AUDIO_TURN_MAX_SILENCE_DURATION_MS=2500
+      - AUDIO_TURN_INTERRUPTION_BUMP_MS=300
+      - AUDIO_TURN_SUCCESS_DECAY_MS=25
+      - AUDIO_TURN_SUCCESS_DECAY_MIN_TURNS=6
+      - AUDIO_TURN_SUCCESS_DECAY_MIN_CALLS=1
+      - AUDIO_TURN_PROFILE_ALPHA=0.25
     # Mount AWS credentials for secrets access
     volumes:
       - ~/.aws:/root/.aws:ro

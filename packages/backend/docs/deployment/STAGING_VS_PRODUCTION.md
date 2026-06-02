@@ -83,19 +83,18 @@ After apply, `terraform output production_ec2_schedule_summary` shows the resolv
 
 Lightsail + separate Terraform state: **`packages/backend/devops/terraform-marketing-wordpress/`** (not the main `devops/terraform/` stack). SSH uses the same **`~/.ssh/bianca-key-pair.pem`** as EC2 (imported into Lightsail by Terraform). WordPress source and `deploy-to-lightsail.sh` remain in **`~/code/wp-dev`** — see `sites/biancawellness/LIGHTSAIL.md` there.
 
-### Staging — hourly Lambda (off by default)
+### Staging — manual start, idle auto-stop
 
-`devops/terraform/staging-schedule.tf` + `staging.tf`: the hourly `bianca-staging-scheduler` Lambda checks SSM **`/bianca/staging/hourly-ec2-schedule-enabled`**.
+Staging EC2 is **started only by you** (`yarn staging:up` or `staging-control.sh start`). Nothing in AWS will start it on a schedule.
 
-- Terraform creates this parameter as **`false`**, so the Lambda **no-ops** (no automatic starts/stops) after apply.
-- To re-enable automatic hourly start/stop: set the parameter to **`true`** (e.g. `packages/backend/scripts/staging-control.sh hourly-on`, or SSM console).
-- If the parameter **does not exist** (legacy account before this change), the Lambda keeps the **old** behavior (may start/stop by UTC hour) until you create the parameter.
+**`bianca-staging-auto-stop`** (`staging.tf`) runs every **30 minutes** and **stops** the instance if network traffic looks idle (~30 min). It never starts the instance.
 
-Start/stop the staging box manually when needed:
+The old hourly **`bianca-staging-scheduler`** Lambda (clock-based start/stop) was **removed** from Terraform — run `terraform apply` in `devops/terraform` to delete it from AWS if still deployed.
 
 ```bash
-bash packages/backend/scripts/staging-control.sh start
-bash packages/backend/scripts/staging-control.sh stop
+bash packages/backend/scripts/staging-control.sh start   # or yarn staging:up
+bash packages/backend/scripts/staging-control.sh stop    # or yarn staging:down
+bash packages/backend/scripts/staging-control.sh status
 ```
 
-Root `yarn staging:down` / `yarn staging:status` still work; **`yarn staging:up` was removed** so staging is not started from a root script by accident.
+Root `yarn staging:down` / `yarn staging:status` / `yarn staging:up` wrap the same script.

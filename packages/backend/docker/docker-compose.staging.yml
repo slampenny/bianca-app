@@ -22,6 +22,16 @@ services:
       - EMAIL_FROM=no-reply@biancawellness.com
       # Enable EC2 metadata service for IAM role credentials
       - AWS_EC2_METADATA_DISABLED=false
+      # Voice turn personalization (staging/demo tuning)
+      - AUDIO_TURN_PERSONALIZATION_ENABLED=true
+      - AUDIO_TURN_DEFAULT_SILENCE_DURATION_MS=300
+      - AUDIO_TURN_MIN_SILENCE_DURATION_MS=225
+      - AUDIO_TURN_MAX_SILENCE_DURATION_MS=2000
+      - AUDIO_TURN_INTERRUPTION_BUMP_MS=250
+      - AUDIO_TURN_SUCCESS_DECAY_MS=50
+      - AUDIO_TURN_SUCCESS_DECAY_MIN_TURNS=6
+      - AUDIO_TURN_SUCCESS_DECAY_MIN_CALLS=1
+      - AUDIO_TURN_PROFILE_ALPHA=0.35
     # Don't mount ~/.aws - use EC2 instance IAM role via metadata service
     # Using host network to access EC2 metadata at 169.254.169.254
     network_mode: host

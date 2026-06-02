@@ -35,6 +35,8 @@ async function startServer() {
     await config.loadSecrets();
     logger.info(`[Startup] config.env after loadSecrets: ${config.env}`);
     logger.info(`[Startup] process.env.NODE_ENV after loadSecrets: ${process.env.NODE_ENV || 'NOT_SET'}`);
+    const { logVoiceTurnStartupConfig } = require('./utils/voiceTurnProfile.util');
+    logVoiceTurnStartupConfig(logger, config);
     logger.info(`[Startup] ===== END ENVIRONMENT DEBUG =====`);
     logger.info(`Environment: ${config.env}`);
 

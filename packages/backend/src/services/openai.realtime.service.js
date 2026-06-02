@@ -60,6 +60,13 @@ const AudioProcessor = require('./ai/realtime/audio.processor');
 const ConnectionManager = require('./ai/realtime/connection.manager');
 const MessageHandler = require('./ai/realtime/message.handler');
 const { isFiller } = require('./ai/realtime/filler-words');
+const voiceTurnProfileService = require('./voiceTurnProfile.service');
+const {
+  getVoiceTurnConfig,
+  applyInterruptionBump,
+  applyCleanTurn,
+  recordTurnSpeechDuration,
+} = require('../utils/voiceTurnProfile.util');
 
 // STRANGLER FIG: Keep old constants for backward compatibility
 // These will be removed once all code is migrated
@@ -457,16 +464,17 @@ class OpenAIRealtimeService {
     }
 
     let preferredLanguage = 'en';
-    if (clientId) {
-      try {
-        const client = await Client.findById(clientId).select('preferredLanguage').lean();
-        if (client?.preferredLanguage) {
-          preferredLanguage = client.preferredLanguage;
-        }
-        logger.info(`[OpenAI Realtime] Input transcription language (client preferred): ${preferredLanguage}`);
-      } catch (err) {
-        logger.warn(`[OpenAI Realtime] Could not load client preferredLanguage for ${clientId}: ${err.message}`);
-      }
+    let vadSilenceDurationMs;
+    let voiceTurnTracking = null;
+
+    const voiceTurnPrep = await voiceTurnProfileService.prepareCallVoiceTurn(clientId);
+    vadSilenceDurationMs = voiceTurnPrep.vadSilenceDurationMs;
+    voiceTurnTracking = voiceTurnPrep.voiceTurnTracking;
+    if (voiceTurnPrep.preferredLanguage) {
+      preferredLanguage = voiceTurnPrep.preferredLanguage;
+      logger.info(`[OpenAI Realtime] Input transcription language (client preferred): ${preferredLanguage}`);
+    } else if (clientId) {
+      logger.info(`[OpenAI Realtime] Input transcription language (client preferred): ${preferredLanguage}`);
     }
 
     // Ensure Conversation exists (for outbound calls, it might not exist yet)
@@ -539,6 +547,8 @@ class OpenAIRealtimeService {
       clientId,
       orgId,
       debugAudioUploadEnabled,
+      vadSilenceDurationMs,
+      voiceTurnTracking,
       onboardingDay,
       onboardingTotalDays,
       onboardingCallMongoId,
@@ -758,17 +768,70 @@ class OpenAIRealtimeService {
   }
 
   /**
+   * Push updated server_vad silence_duration_ms to OpenAI for this call.
+   * @returns {Promise<boolean>}
+   */
+  async _applyVoiceTurnVadUpdate(callId, conn, nextMs, reason) {
+    const prev = conn.vadSilenceDurationMs;
+    try {
+      conn.vadSilenceDurationMs = nextMs;
+      await this.sendJsonMessage(callId, MessageHandler.buildSessionUpdateForVad(conn));
+      logger.info(
+        `[VoiceTurn] vad update ${prev ?? 'default'}→${nextMs} reason=${reason} callId=${callId} clientId=${conn.clientId || 'none'}`
+      );
+      return true;
+    } catch (e) {
+      if (Number.isFinite(prev) && prev > 0) {
+        conn.vadSilenceDurationMs = prev;
+      } else {
+        delete conn.vadSilenceDurationMs;
+      }
+      logger.error(`[VoiceTurn] session.update failed for ${callId}: ${e?.message || e}`);
+      return false;
+    }
+  }
+
+  /**
+   * Record a completed user turn for per-resident VAD learning (clean turn + optional in-call decay).
+   */
+  async _recordVoiceTurnUserTurnCompleted(callId, conn, turnSpeechDurationMs) {
+    if (!conn?.voiceTurnTracking) return;
+
+    recordTurnSpeechDuration(conn.voiceTurnTracking, turnSpeechDurationMs);
+    const vtConfig = getVoiceTurnConfig(config);
+    const { nextMs, changed } = applyCleanTurn(conn.voiceTurnTracking, vtConfig);
+
+    if (changed && conn.sessionReady) {
+      await this._applyVoiceTurnVadUpdate(callId, conn, nextMs, 'clean_turn_decay');
+    }
+  }
+
+  /**
    * Increase server VAD `silence_duration_ms` for this call when the first assistant audio chunk arrives
    * while OpenAI still considers the user to be in the "speaking" state (turn overlap / premature end-of-utterance).
    */
   async _bumpVadOnAssistantOverUser(callId, conn) {
     if (!callId || !conn) return;
-    const { adaptiveSilence, silenceDurationMs: baseMs } = config.audio?.turnDetection || {};
-    if (adaptiveSilence?.enabled === false) return;
     if (!conn.sessionReady || !conn._userIsSpeaking) return;
 
+    const vtConfig = getVoiceTurnConfig(config);
+    const { adaptiveSilence, silenceDurationMs: baseMs } = config.audio?.turnDetection || {};
+    if (!vtConfig.enabled && adaptiveSilence?.enabled === false) return;
+
+    if (conn.voiceTurnTracking) {
+      const { nextMs, changed } = applyInterruptionBump(conn.voiceTurnTracking, vtConfig);
+      if (!changed) return;
+      await this._applyVoiceTurnVadUpdate(callId, conn, nextMs, 'interruption_bump');
+      logger.info(
+        `[RealtimeRC] adaptive VAD: silence_duration_ms bump (assistant audio while user_speaking) callId=${callId}`
+      );
+      return;
+    }
+
+    // Legacy in-call bump when no client / tracking (backward compatible)
+    if (adaptiveSilence?.enabled === false) return;
+
     const stepMs = Math.max(1, adaptiveSilence?.stepMs ?? 200);
-    // Ceiling is at least the static base so a high `AUDIO_TURN_DETECTION_SILENCE_DURATION_MS` is never stuck under `maxMs`.
     const maxMs = Math.max(baseMs ?? 500, Math.max(200, adaptiveSilence?.maxMs ?? 2000));
     const current = Number.isFinite(conn.vadSilenceDurationMs)
       ? conn.vadSilenceDurationMs
@@ -777,23 +840,10 @@ class OpenAIRealtimeService {
     const next = Math.min(maxMs, current + stepMs);
     if (next <= current) return;
 
-    const prev = conn.vadSilenceDurationMs;
-    try {
-      conn.vadSilenceDurationMs = next;
-      await this.sendJsonMessage(callId, MessageHandler.buildSessionUpdateForVad(conn));
-      logger.info(
-        `[RealtimeRC] adaptive VAD: silence_duration_ms ${current}→${next} (assistant audio while user_speaking) callId=${callId}`
-      );
-    } catch (e) {
-      if (Number.isFinite(prev) && prev > 0) {
-        conn.vadSilenceDurationMs = prev;
-      } else {
-        delete conn.vadSilenceDurationMs;
-      }
-      logger.error(
-        `[OpenAI Realtime] Adaptive VAD session.update failed for ${callId}: ${e?.message || e}`
-      );
-    }
+    await this._applyVoiceTurnVadUpdate(callId, conn, next, 'legacy_interruption_bump');
+    logger.info(
+      `[RealtimeRC] adaptive VAD: silence_duration_ms ${current}→${next} (assistant audio while user_speaking) callId=${callId}`
+    );
   }
 
   _clearResponseStuckRecoveryTimers(conn) {
@@ -1568,6 +1618,9 @@ class OpenAIRealtimeService {
             if (!alreadyUserSpeaking) {
               conn._pendingUserResponseAfterAiStops = false;
               conn._userTurnResponseCreateSent = false;
+              if (conn.voiceTurnTracking) {
+                conn.voiceTurnTracking.currentTurnHadInterruption = false;
+              }
               if (conn._processedTranscriptItemIds) {
                 // FIX: Bug 1 (next utterance) — new turn; per-call Set also cleared in cleanup
                 conn._processedTranscriptItemIds.clear();
@@ -2087,6 +2140,9 @@ class OpenAIRealtimeService {
                   stateBefore: stateBeforeAiResponding,
                 });
                 logger.info(`[OpenAI Realtime] User finished speaking - will trigger AI response for ${callId}`);
+
+                const turnDur = Number.isFinite(conn._turnSpeechDurationMs) ? conn._turnSpeechDurationMs : 0;
+                void this._recordVoiceTurnUserTurnCompleted(callId, conn, turnDur);
 
                 // Timer hierarchy (Scenario B — canonical): this 200ms debounce is the primary send for normal turns.
                 // OpenAI Realtime already has the user's audio in the server-side buffer; response.create does not wait
@@ -5302,6 +5358,14 @@ class OpenAIRealtimeService {
             logger.debug(`[Context Window] Cleared context for patient ${conn.clientId} at call end`);
           } catch (error) {
             logger.warn(`[Context Window] Failed to clear context: ${error.message}`);
+          }
+        }
+
+        if (conn.clientId && conn.voiceTurnTracking) {
+          try {
+            await voiceTurnProfileService.persistCallVoiceTurn(conn.clientId, conn.voiceTurnTracking);
+          } catch (vtErr) {
+            logger.warn(`[VoiceTurn] persist on call end failed: ${vtErr.message}`);
           }
         }
 
