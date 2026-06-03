@@ -76,7 +76,8 @@ phases:
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm install 20
         nvm use 20
-        echo "✅ Node.js 20 installed"
+        corepack enable
+        echo "✅ Node.js $(node --version), Yarn $(yarn --version)"
       - echo "Locating source code for Playwright tests..."
       - |
         # Source code is in CODEBUILD_SRC_DIR (from SourceOutput)
@@ -94,13 +95,15 @@ phases:
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
         cd "$CODEBUILD_SRC_DIR" || exit 1
-        yarn install --frozen-lockfile --ignore-scripts || yarn install --ignore-scripts || exit 1
+        corepack enable
+        yarn install --immutable --ignore-scripts || yarn install --ignore-scripts || exit 1
         echo "✅ Yarn install complete"
       - echo "Installing Playwright browser for packages/web E2E..."
       - |
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
+        corepack enable
         cd "$CODEBUILD_SRC_DIR/packages/web" || exit 1
         yarn playwright install --with-deps chromium || exit 1
         echo "✅ Playwright chromium ready"
@@ -335,6 +338,7 @@ phases:
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
+        corepack enable
         # Re-export variables (they may not persist from pre_build)
         FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
         BACKEND_DIR="$CODEBUILD_SRC_DIR/packages/backend"
@@ -352,6 +356,8 @@ phases:
         # Track overall test status
         OVERALL_EXIT_CODE=0
         
+        _yarn_ci='export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; nvm use 20; corepack enable'
+        
         # Step 1: Run backend unit tests
         echo ""
         echo "=========================================="
@@ -360,7 +366,7 @@ phases:
         cd "$BACKEND_DIR" || exit 1
         set +e  # Don't exit on error, we'll handle it
         # Stream logs and cap runtime to avoid silent hangs (use bash for pipefail)
-        bash -lc 'set -o pipefail; NODE_NO_IOURING=1 timeout 40m yarn test:unit --forceExit 2>&1 | tee /tmp/backend-unit-tests.log'
+        bash -lc "$_yarn_ci; set -o pipefail; NODE_NO_IOURING=1 timeout 40m yarn test:unit --forceExit 2>&1 | tee /tmp/backend-unit-tests.log"
         BACKEND_TEST_EXIT_CODE=$?
         set -e  # Re-enable exit on error
         
@@ -384,7 +390,7 @@ phases:
         cd "$FRONTEND_DIR" || exit 1
         set +e  # Don't exit on error, we'll handle it
         # Stream logs and cap runtime to avoid silent hangs (use bash for pipefail)
-        bash -lc 'set -o pipefail; NODE_ENV=test timeout 20m yarn test 2>&1 | tee /tmp/frontend-unit-tests.log'
+        bash -lc "$_yarn_ci; set -o pipefail; NODE_ENV=test timeout 20m yarn test 2>&1 | tee /tmp/frontend-unit-tests.log"
         FRONTEND_TEST_EXIT_CODE=$?
         set -e  # Re-enable exit on error
         
@@ -407,7 +413,7 @@ phases:
         echo "=========================================="
         cd "$FRONTEND_DIR" || exit 1
         set +e
-        bash -lc 'set -o pipefail; NODE_ENV=test timeout 40m yarn test:cucumber 2>&1 | tee /tmp/cucumber-tests.log'
+        bash -lc "$_yarn_ci; set -o pipefail; NODE_ENV=test timeout 40m yarn test:cucumber 2>&1 | tee /tmp/cucumber-tests.log"
         CUCUMBER_TEST_EXIT_CODE=$?
         set -e
         cat /tmp/cucumber-tests.log
@@ -427,7 +433,7 @@ phases:
         echo "=========================================="
         cd "$FRONTEND_DIR" || exit 1
         set +e
-        bash -lc 'set -o pipefail; NODE_ENV=test timeout 15m npx playwright test test/e2e/openai-voice-connection.e2e.test.ts --reporter=list 2>&1 | tee /tmp/openai-voice-test.log'
+        bash -lc "$_yarn_ci; set -o pipefail; NODE_ENV=test timeout 15m npx playwright test test/e2e/openai-voice-connection.e2e.test.ts --reporter=list 2>&1 | tee /tmp/openai-voice-test.log"
         OPENAI_TEST_EXIT_CODE=$?
         set -e
         cat /tmp/openai-voice-test.log
@@ -447,7 +453,7 @@ phases:
         echo "=========================================="
         cd "$FRONTEND_DIR" || exit 1
         set +e
-        bash -lc 'set -o pipefail; NODE_ENV=test timeout 15m yarn test:a11y --reporter=list 2>&1 | tee /tmp/a11y-smoke-test.log'
+        bash -lc "$_yarn_ci; set -o pipefail; NODE_ENV=test timeout 15m yarn test:a11y --reporter=list 2>&1 | tee /tmp/a11y-smoke-test.log"
         A11Y_TEST_EXIT_CODE=$?
         set -e
         cat /tmp/a11y-smoke-test.log

@@ -18,7 +18,8 @@ phases:
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm install 20
         nvm use 20
-        echo "✅ Node.js 20 installed"
+        corepack enable
+        echo "✅ Node.js $(node --version), Yarn $(yarn --version)"
       - echo "Locating monorepo root and packages/web..."
       - |
         FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
@@ -34,7 +35,8 @@ phases:
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
         cd "$CODEBUILD_SRC_DIR" || exit 1
-        yarn install --frozen-lockfile || (echo "⚠️  Lockfile out of sync, updating..." && yarn install)
+        corepack enable
+        yarn install --immutable || (echo "⚠️  Lockfile out of sync, updating..." && yarn install)
         echo "✅ Dependencies installed"
 
   build:
@@ -44,6 +46,7 @@ phases:
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
+        corepack enable
         FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
         cd "$CODEBUILD_SRC_DIR" || exit 1
         if [ "$BUILD_ENV" = "staging" ] || [ -z "$BUILD_ENV" ]; then
@@ -62,6 +65,7 @@ phases:
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
         nvm use 20
+        corepack enable
         FRONTEND_DIR="$CODEBUILD_SRC_DIR/packages/web"
         cd "$FRONTEND_DIR" || exit 1
         npx --yes serve dist -l $FRONTEND_PORT > /tmp/frontend-server.log 2>&1 &
