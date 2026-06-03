@@ -19,9 +19,9 @@ phases:
       - echo Source directory is $CODEBUILD_SRC_DIR
       - ls -la | head -10
       - |
-        # Build backend image
+        # Build backend image (monorepo root context — yarn.lock lives at repo root)
         echo "🔨 Building backend image..."
-        cd packages/backend
+        cd "$CODEBUILD_SRC_DIR"
         # Use --no-cache to ensure we always get the latest code from main branch
         # This prevents Docker layer caching from using old source code
         echo "   Building with --no-cache to ensure latest code from main branch..."
@@ -31,8 +31,7 @@ phases:
                      -t $ECR_REGISTRY/bianca-app-backend:latest \
                      -t $ECR_REGISTRY/bianca-app-backend:production \
                      -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION \
-                     -f docker/Dockerfile .
-        cd ../..
+                     -f packages/backend/docker/Dockerfile .
         echo "✅ Backend build complete"
       - |
         # Build asterisk image
