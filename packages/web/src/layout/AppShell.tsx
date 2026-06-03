@@ -21,6 +21,7 @@ import {
   ZapIcon,
 } from "../icons"
 import { formatHeaderLastActivity } from "../lib/timeFormat"
+import { formatOrgDisplayName } from "../lib/orgDisplayName"
 import { LocaleSync } from "../i18n/LocaleSync"
 import { useDocumentTitle } from "../hooks/useDocumentTitle"
 import { RealtimeSocketBridge } from "../realtime/RealtimeSocketBridge"
@@ -60,7 +61,7 @@ export function AppShell() {
   const currentUser = useAppSelector(getCurrentUser)
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const org = useAppSelector((s) => s.org)
-  const facilityName = org?.name || t("appShell.defaultFacility")
+  const facilityName = formatOrgDisplayName(org?.name, t)
   const userId = currentUser?.id != null ? String(currentUser.id) : ""
   const { data: caregiverFresh } = useGetCaregiverQuery({ id: userId }, { skip: !authed || !userId })
   const avatarLabel = useMemo(() => userInitials(currentUser?.name), [currentUser?.name])
@@ -100,8 +101,8 @@ export function AppShell() {
   const demoActivityAt = devDemo ? demoState.activityFeed[0]?.timestamp : undefined
   const [lastLabel, setLastLabel] = useState(() => {
     if (activityLoading) return t("header.activityLoading")
-    if (liveActivityAt) return formatHeaderLastActivity(new Date(liveActivityAt))
-    if (demoActivityAt) return formatHeaderLastActivity(demoActivityAt)
+    if (liveActivityAt) return formatHeaderLastActivity(new Date(liveActivityAt), t)
+    if (demoActivityAt) return formatHeaderLastActivity(demoActivityAt, t)
     return t("header.noActivity")
   })
 
@@ -112,11 +113,11 @@ export function AppShell() {
         return
       }
       if (liveActivityAt) {
-        setLastLabel(formatHeaderLastActivity(new Date(liveActivityAt)))
+        setLastLabel(formatHeaderLastActivity(new Date(liveActivityAt), t))
         return
       }
       if (devDemo && demoActivityAt) {
-        setLastLabel(formatHeaderLastActivity(demoActivityAt))
+        setLastLabel(formatHeaderLastActivity(demoActivityAt, t))
         return
       }
       setLastLabel(t("header.noActivity"))

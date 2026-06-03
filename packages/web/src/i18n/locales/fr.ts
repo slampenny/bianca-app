@@ -14,7 +14,8 @@ export const fr = {
   "header": {
     "systemActive": "Système actif",
     "lastActivity": "Dernière activité :",
-    "noActivity": "Aucune activité"
+    "noActivity": "Aucune activité",
+    "activityLoading": "Loading activity…"
   },
   "profile": {
     "title": "Profil",
@@ -105,7 +106,8 @@ export const fr = {
     "wordsAnalyzed": "{{count}} mots analysés",
     "confidenceBadge": "{{level}} confiance",
     "warningsHeading": "Avertissements",
-    "recommendationFallback": "Recommandation"
+    "recommendationFallback": "Recommandation",
+    "mockDataBanner": "Mock data — for layout and development only. Not operational data."
   },
   "auth": {
     "passwordErrors": {
@@ -351,7 +353,10 @@ export const fr = {
     "subNoUnread": "{{count}} résidents dans l'annuaire — aucune alerte non lue pour votre compte",
     "chartSummaryItem": "{{hour}} : {{count}} appels",
     "chartSummary": "Appels par heure : {{items}}",
-    "chartSummaryEmpty": "Aucune donnée d'appels par heure."
+    "chartSummaryEmpty": "Aucune donnée d'appels par heure.",
+    "subAllOkWithActivity": "All systems operational — last activity {{time}}",
+    "noResidentsTitle": "No residents yet",
+    "noResidentsBody": "Add residents to see live monitoring metrics, call activity, and onboarding progress here."
   },
   "alerts": {
     "loading": "Chargement des alertes…",
@@ -665,7 +670,18 @@ export const fr = {
     "sentimentNegative": "Négatif",
     "sentimentMixed": "Mixte",
     "distChip": "{{label}} : {{count}}",
-    "sparklineEmpty": "Aucun appel marqué dans cette plage"
+    "sparklineEmpty": "Aucun appel marqué dans cette plage",
+    "familyDigestEmailEnabled": "Send weekly family digest emails to this contact",
+    "familyDigestEmailEnabledHelp": "Controls manual and automated family digest emails only. Does not affect emergency notifications.",
+    "familyDigestEmailStatusOn": "Weekly family digest emails enabled",
+    "familyDigestEmailStatusOff": "Weekly family digest emails not enabled",
+    "familyDigestEmailVerified": "Emergency contact email verified for family digests",
+    "familyDigestEmailUnverified": "Emergency contact email not verified — send a verification email before digests can be sent",
+    "familyDigestEmailNoAddress": "Add an emergency contact email to enable verification",
+    "familyDigestEmailSendVerification": "Send verification email",
+    "familyDigestEmailSendingVerification": "Sending…",
+    "familyDigestEmailVerificationSent": "Verification email sent to the emergency contact address.",
+    "familyDigestEmailVerificationFailed": "Could not send verification email. Try again or check the contact email."
   },
   "dailyDigest": {
     "backToReports": "← Retour aux rapports",
@@ -697,7 +713,51 @@ export const fr = {
     "colMood": "Humeur / ton",
     "colSummary": "Résumé et notes",
     "callsPlacedAnswered": "{{placed}} passés · {{answered}} répondus",
-    "callsTimeUtc": "· {{time}}UTC"
+    "callsTimeUtc": "· {{time}}UTC",
+    "digestDateHelper": "The day is interpreted in your organization's timezone (see metadata on each digest).",
+    "emailWhenBuildHelper": "Optional: sends this digest to your profile email immediately after building.",
+    "scheduledEmailHint": "Automated daily digest emails are controlled in Settings — they are separate from manual sends on this page.",
+    "manualEmailHint": "Manual email sends this draft now.",
+    "refreshDraftNote": "Build / refresh creates a new draft version. Previously emailed versions stay preserved as sent.",
+    "emptyNoCalls": "No wellness check-in calls were recorded for your residents on this digest day. Resident rows below show no activity for the day.",
+    "listLoadError": "Could not load saved digests.",
+    "versionLabel": "Version {{version}}",
+    "sentImmutableNote": "This version was emailed and is preserved as sent.",
+    "sentImmutableBanner": "Sent digest — this version was emailed and is preserved. Use Build / refresh to create a new draft for the same day.",
+    "listSupersedesSent": "· draft supersedes emailed v{{version}}",
+    "showAllVersions": "Show all versions (admin)",
+    "aiDisclaimer": "Automatically generated from wellness check-in calls — not clinical advice. Review the original call record when decisions are needed.",
+    "phiRedactedBanner": "Resident details in this digest were redacted for privacy or retention compliance. Only day metadata is shown.",
+    "localDateKeyLabel": "Local day: {{date}}",
+    "timezoneLabel": "Timezone: {{timezone}}",
+    "digestDayStartLabel": "Day starts (UTC): {{iso}}",
+    "automationTitle": "Automated email status",
+    "automationReady": "Ready",
+    "automationNotReady": "Not ready",
+    "automationManualSendStatus": "Manual send: {{status}}",
+    "automationManualCopy": "Manual email sends this draft now.",
+    "automationScheduledCopy": "Automated email sends once per day when all checks are enabled.",
+    "automationCheckOrgScheduling": "Organization scheduling",
+    "automationCheckEmail": "Your email",
+    "automationCheckAccount": "Your account",
+    "automationCheckPreference": "Daily digest emails",
+    "automationCheckSendTime": "Send time",
+    "automationCheckTimezone": "Timezone",
+    "automationEnabled": "Enabled",
+    "automationDisabled": "Disabled",
+    "automationActive": "Active",
+    "automationInactive": "Inactive",
+    "automationEmailVerified": "Verified",
+    "automationEmailUnverified": "Not verified",
+    "automationEmailMissing": "Missing",
+    "automationLoading": "Loading…",
+    "automationOrgSchedulingUnavailable": "Unavailable",
+    "automationSendTimeValue": "{{time}}, org-local ({{timezone}})",
+    "automationTimezoneUnset": "Not set",
+    "automationOrgUnavailableNote": "Organization scheduling status is unavailable for your role. Ask an administrator whether automated digests are enabled for your organization.",
+    "automationEnableInSettings": "Enable daily digest emails in Settings → Email notifications",
+    "automationVerifyEmailInSettings": "Verify your email in Settings",
+    "automationAskAdminEnableScheduling": "Ask an administrator to enable automated digests for your organization."
   },
   "familyWeeklyDigest": {
     "back": "Retour aux résidents du digest hebdomadaire",
@@ -710,7 +770,36 @@ export const fr = {
     "legacyUtcWeekBanner": "Cet aperçu utilise d'anciennes limites hebdomadaires, d'avant les semaines locales de l'organisation.",
     "refreshPreview": "Actualiser l’aperçu",
     "loadingPreview": "Chargement de l’aperçu…",
-    "loadError": "Impossible de charger l’aperçu. Accès ou serveur indisponible."
+    "loadError": "Impossible de charger l’aperçu. Accès ou serveur indisponible.",
+    "eligibilityBlockedTitle": "Recipient not eligible for email",
+    "eligibilityPreviewNote": "Preview is for staff review. Sending is blocked until all requirements below are met, including a verified emergency contact email.",
+    "externalEmailNotice": "This digest is emailed externally to the verified family contact below — not to staff. Sending requires opt-in and email verification on the resident profile.",
+    "recipientLabel": "Verified family contact",
+    "aiDisclaimer": "This digest is automatically generated from wellness check-in calls. It is not clinical advice and should be reviewed alongside care-team updates when decisions are needed.",
+    "createDraft": "Create draft",
+    "creatingDraft": "Creating draft…",
+    "createDraftSuccess": "Draft saved for this week.",
+    "createDraftError": "Could not create draft. Refresh the preview and try again.",
+    "sendToFamily": "Send to verified family contact",
+    "sending": "Sending…",
+    "sendConfirmTitle": "Send weekly family digest?",
+    "sendConfirmBody": "This will email the draft to {{email}}. The family contact must remain verified and opted in. This action cannot be undone.",
+    "sendConfirmButton": "Send email",
+    "sendSuccess": "Digest emailed to {{email}}.",
+    "sendError": "Could not send digest. Confirm the family contact is still verified and opted in, then try again.",
+    "sendAlreadySent": "This digest was already sent and cannot be emailed again.",
+    "sendEligibilityChanged": "Recipient eligibility changed since preview. Refresh and confirm verification before sending.",
+    "savedForWeekTitle": "Saved digest for this week",
+    "statusDraft": "Draft",
+    "statusSent": "Sent",
+    "statusRedacted": "Redacted",
+    "sentAtLabel": "Sent {{at}}",
+    "sentImmutableBanner": "Sent — this weekly digest was emailed to the family contact and cannot be changed or sent again.",
+    "phiRedactedBanner": "Resident details in this saved digest were redacted for privacy or retention compliance. Preview content is hidden.",
+    "recentTitle": "Recent saved digests",
+    "listLoadError": "Could not load saved digests.",
+    "noSavedForWeek": "No draft or sent digest saved for this week yet.",
+    "listWeekStatus": "Week of {{week}} · {{status}}"
   },
   "medicalAnalysis": {
     "disclaimer": "Cette analyse est à titre informatif uniquement et ne remplace pas un avis médical professionnel.",
@@ -941,7 +1030,26 @@ export const fr = {
     "viewDigest": "Voir le digest",
     "activityChartSummaryItem": "{{day}} : {{count}} exécutions",
     "activityChartSummary": "Exécutions de rapports par jour : {{items}}",
-    "activityChartSummaryEmpty": "Aucune donnée d'exécution de rapports."
+    "activityChartSummaryEmpty": "Aucune donnée d'exécution de rapports.",
+    "introLive": "Read each report on screen first. Print and CSV use live facility data where available. The weekly family digest is scoped to one authorized recipient; the care-team daily digest stays in the facility boundary.",
+    "csvExportUnavailable": "Facility CSV export is unavailable until live report data is loaded.",
+    "csvExportDisabled": "Live export is unavailable until report summary and resident data have loaded.",
+    "notAvailable": "Not available",
+    "residentLiveIntro": "Live roster metrics from your account. Sentiment insights load when analysis exists for the selected resident.",
+    "residentLoading": "Loading residents…",
+    "residentNoClients": "No residents in your roster yet. Add residents from the Residents page.",
+    "residentStatus": "Status",
+    "residentStatusActive": "Active",
+    "residentStatusInactive": "Inactive",
+    "residentStatusAtRisk": "At risk",
+    "residentLastCall": "Last call activity",
+    "residentOpenAlerts": "Open alerts",
+    "residentRisk": "Risk level",
+    "residentSentiment": "Sentiment trend",
+    "residentInsights": "Sentiment insights",
+    "residentSentimentLoading": "Loading sentiment summary…",
+    "residentRoomLine": "Room {{room}}",
+    "residentViewProfile": "View resident profile"
   },
   "reportDetail": {
     "backToReports": "← Retour aux rapports",
@@ -962,7 +1070,8 @@ export const fr = {
     "paginationPage": "Page {{page}} sur {{totalPages}}",
     "previous": "Précédent",
     "next": "Suivant",
-    "defaultOrgName": "Votre organisation"
+    "defaultOrgName": "Votre organisation",
+    "noData": "No report data is available for your account yet."
   },
   "caregivers": {
     "title": "Soignants",
@@ -1018,7 +1127,13 @@ export const fr = {
     "formSave": "Sauver le soignant",
     "formAdd": "Ajouter un soignant",
     "formUpdateError": "Impossible de mettre à jour le soignant.",
-    "formAddError": "Impossible d'ajouter le soignant."
+    "formAddError": "Impossible d'ajouter le soignant.",
+    "roleStaff": "Staff",
+    "roleOrgAdmin": "Organization admin",
+    "roleSuperAdmin": "Super admin",
+    "roleInvited": "Invited",
+    "roleAdmin": "Admin",
+    "roleUnverified": "Unverified"
   },
   "orgSettings": {
     "langSaveError": "Impossible d'enregistrer la langue.",
@@ -1064,7 +1179,13 @@ export const fr = {
     "billingBody": "Gérez les moyens de paiement de l’organisation et la source de prélèvement par défaut.",
     "billingLink": "Moyens de paiement",
     "backToSettings": "Retour aux paramètres",
-    "adminOnlyCalls": "Seuls les administrateurs d’organisation et super administrateurs peuvent lancer des appels."
+    "adminOnlyCalls": "Seuls les administrateurs d’organisation et super administrateurs peuvent lancer des appels.",
+    "notificationsTitle": "Email notifications",
+    "dailyDigestEmailLabel": "Daily wellness digest emails",
+    "dailyDigestEmailHelper": "When enabled, Bianca sends an automated daily email summary of wellness check-ins. This does not affect manual digest sends from the Daily Digest page.",
+    "dailyDigestEmailSaving": "Saving…",
+    "dailyDigestEmailSaved": "Notification preference saved.",
+    "dailyDigestEmailSaveFailed": "Could not save notification preference."
   },
   "residentCall": {
     "back": "Retour",
@@ -1352,5 +1473,54 @@ export const fr = {
     "countries": {
       "OTHER": "Autre"
     }
+  },
+  "timeFormat": {
+    "justNow": "just now",
+    "justNowTitle": "Just now",
+    "secondsAgo": "{{count}}s ago",
+    "oneMinuteAgo": "1 min ago",
+    "minutesAgo": "{{count}} min ago",
+    "oneHourAgo": "1 hr ago",
+    "hoursAgo": "{{count}} hr ago",
+    "hoursAgoCompact": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
+  "orgDisplay": {
+    "ssoDefaultName": "{{name}}'s Organization"
+  },
+  "familyDigestEmailVerify": {
+    "missingToken": "Verification token is missing. Please use the link from your email.",
+    "successDefault": "Your email has been verified for weekly family digest emails. Thank you.",
+    "errorDefault": "We could not complete email verification.",
+    "expiredLink": "Invalid or expired verification link. Ask your care facility to send a new verification email.",
+    "titleVerifying": "Verifying email",
+    "titleSuccess": "Email verified",
+    "titleMissing": "Email verification",
+    "titleError": "Could not verify email",
+    "verifying": "Please wait while we confirm your email address…",
+    "closeWindow": "You can close this window.",
+    "needNewLink": "Contact your care facility if you need a new verification link.",
+    "staffSignIn": "Staff sign in"
+  },
+  "storedAlertMessages": {
+    "wellnessVoicemail": "Wellness check call went to voicemail",
+    "wellnessBusy": "Wellness check call received busy signal",
+    "wellnessNoAnswer": "Wellness check call was not answered",
+    "wellnessFailedConnect": "Wellness check call failed to connect",
+    "wellnessFailedStatus": "Wellness check call failed: {{status}}",
+    "scheduledCheckIn": "Called {{name}} for their scheduled check-in at {{time}}",
+    "scheduledCheckInError": "Call to {{name}} for their scheduled check-in at {{time}} generated an error: {{error}}",
+    "consentSkipped": "Scheduled call to {{name}} was skipped because client consent is required but has not been obtained. Please obtain consent from the client before the next scheduled call.",
+    "urgencyCRITICAL": "🚨 CRITICAL",
+    "urgencyHIGH": "⚠️ HIGH PRIORITY",
+    "urgencyMEDIUM": "📢 ALERT",
+    "categoryMedical": "Medical",
+    "categorySafety": "Safety",
+    "categoryPhysical": "Physical",
+    "categoryRequest": "Request",
+    "emergencyWord": "Emergency",
+    "reported": "reported",
+    "originalMessage": "Original message",
+    "emergencyLine": "{{urgency}} {{category}} {{emergency}}: {{name}} {{reported}} \"{{phrase}}\". {{originalMessage}}: \"{{text}}\""
   }
 } as const

@@ -8,6 +8,7 @@ import { summarizeChartSeries } from "../lib/chartSummary"
 import { computeDashboardMetrics } from "../lib/dashboardMetrics"
 import { isAlertUnreadForCaregiver, mapClientToResident } from "../lib/liveData"
 import { formatActivityRowTime } from "../lib/timeFormat"
+import { formatStoredAlertMessage } from "../lib/storedAlertMessage"
 import { useGetCallsByHourTodayQuery, useGetRecentActivityQuery } from "../services/api/activityApi"
 import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
 import { useGetAllClientsQuery, useGetClientsOnboardingRollupsQuery } from "../services/api/clientApi"
@@ -31,7 +32,7 @@ function emptyBusinessHourChart() {
 const RECENT_ACTIVITY_LIMIT = 15
 
 export function DashboardPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const currentUser = useAppSelector(getCurrentUser)
   const org = useAppSelector((s) => s.org)
@@ -99,9 +100,9 @@ export function DashboardPage() {
         type: item.type,
         residentName: item.residentName,
         timestamp: new Date(item.occurredAt),
-        message: item.alertSummary ?? "",
+        message: formatStoredAlertMessage(item.alertSummary ?? "", t, i18n.language),
       })),
-    [recentActivity?.results],
+    [recentActivity?.results, t, i18n.language],
   )
 
   const atRiskFromApi = useMemo(() => clients.filter((cl) => mapClientToResident(cl).status === "at_risk").length, [clients])
@@ -110,7 +111,7 @@ export function DashboardPage() {
   const healthySubtitle = useMemo(() => {
     if (lastLiveActivityAt) {
       return t("dashboard.subAllOkWithActivity", {
-        time: formatActivityRowTime(new Date(lastLiveActivityAt)),
+        time: formatActivityRowTime(new Date(lastLiveActivityAt), t),
       })
     }
     return t("dashboard.subAllOk")
@@ -398,7 +399,7 @@ export function DashboardPage() {
                         : t("dashboard.callCompleted", { name: e.residentName })}
                     </p>
                     <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", marginTop: 4 }}>
-                      {formatActivityRowTime(e.timestamp)}
+                      {formatActivityRowTime(e.timestamp, t)}
                     </p>
                   </div>
                 </div>

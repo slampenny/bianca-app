@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@bianca-app/ui"
 import { skipToken } from "@reduxjs/toolkit/query"
 import { useCallback, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
+import type { TFunction } from "i18next"
 import { Link } from "react-router-dom"
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 import { ChartFigure } from "../components/ChartFigure"
@@ -175,8 +176,8 @@ function CheckDot({ ok }: { ok: boolean }) {
   )
 }
 
-function mapActivityToReportRow(item: ActivityFeedItem, t: (key: string, opts?: Record<string, unknown>) => string): RecentReportActivityRow {
-  const whenLabel = formatActivityRowTime(new Date(item.occurredAt))
+function mapActivityToReportRow(item: ActivityFeedItem, t: TFunction): RecentReportActivityRow {
+  const whenLabel = formatActivityRowTime(new Date(item.occurredAt), t)
   if (item.type === "alert") {
     return {
       id: item.id,
@@ -353,9 +354,6 @@ export function ReportsPage() {
         >
           <div>
             <h1 className="va-page-title">{t("reports.title")}</h1>
-            <p style={{ fontSize: "0.875rem", color: "var(--va-slate-500)", marginTop: 6, maxWidth: 600, lineHeight: 1.55 }}>
-              {t("reports.introLive")}
-            </p>
           </div>
           {devDemo ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem", maxWidth: 280 }}>

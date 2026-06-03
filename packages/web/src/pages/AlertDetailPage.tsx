@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router-dom"
 import { AuthTextAreaField } from "../components/AuthTextAreaField"
 import { mapConversationToTranscript } from "../lib/mapConversationToTranscript"
+import { formatStoredAlertMessage } from "../lib/storedAlertMessage"
 import { clientDisplayName } from "../lib/clientDisplayName"
 import { apiRecordId, mapApiAlertToFacilityAlert } from "../lib/liveData"
 import { isDevDemoEnabled } from "../lib/devDemo"
@@ -43,7 +44,7 @@ function sentimentLabel(t: (key: string) => string, key: string): string {
 }
 
 export function AlertDetailPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { alertId } = useParams()
   const navigate = useNavigate()
   const authed = useAppSelector((s) => !!s.auth.tokens)
@@ -263,7 +264,9 @@ export function AlertDetailPage() {
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ color: "var(--va-red-500)" }}>⚠</span> {t("alertDetail.riskSummary")}
         </h2>
-        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, marginBottom: 16 }}>{alert.summary}</p>
+        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", lineHeight: 1.6, marginBottom: 16 }}>
+          {formatStoredAlertMessage(alert.summary, t, i18n.language)}
+        </p>
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {alert.riskIndicators.map((line) => (
             <li key={line} style={{ display: "flex", gap: 10, marginBottom: 8, fontSize: "0.875rem", color: "var(--va-slate-700)" }}>

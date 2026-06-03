@@ -8,6 +8,7 @@ import { ChartFigure } from "../components/ChartFigure"
 import { summarizeChartSeries } from "../lib/chartSummary"
 import { clientInitialsFromClient } from "../lib/clientDisplayName"
 import { apiRecordId, mapClientToResident, splitName } from "../lib/liveData"
+import { formatStoredAlertMessage } from "../lib/storedAlertMessage"
 import { intervalsForDraft, weekdayShortLabel } from "../lib/scheduleDraft"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
@@ -64,7 +65,7 @@ type AnalysisTab = "medical" | "sentiment" | "security"
 type MainTab = "overview" | "analysis" | "conversations"
 
 export function ResidentDetailPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { residentId } = useParams()
   const navigate = useNavigate()
   const [consentOpen, setConsentOpen] = useState(false)
@@ -1377,7 +1378,9 @@ export function ResidentDetailPage() {
                 <div style={{ display: "grid", gap: 8 }}>
                   {unresolvedResidentAlerts.slice(0, 6).map((a) => {
                     const id = apiRecordId(a as { id?: string; _id?: string })
-                    const label = a.message || t("residentDetail.defaultAlertLabel")
+                    const label = a.message
+                      ? formatStoredAlertMessage(a.message, t, i18n.language)
+                      : t("residentDetail.defaultAlertLabel")
                     return (
                       <div
                         key={id || label}

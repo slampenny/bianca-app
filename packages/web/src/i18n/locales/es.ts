@@ -14,7 +14,22 @@ export const es = {
   "header": {
     "systemActive": "Sistema activo",
     "lastActivity": "Última actividad:",
-    "noActivity": "Sin actividad"
+    "noActivity": "Sin actividad",
+    "activityLoading": "Cargando actividad…"
+  },
+  "timeFormat": {
+    "justNow": "ahora mismo",
+    "justNowTitle": "Ahora mismo",
+    "secondsAgo": "hace {{count}} s",
+    "oneMinuteAgo": "hace 1 min",
+    "minutesAgo": "hace {{count}} min",
+    "oneHourAgo": "hace 1 h",
+    "hoursAgo": "hace {{count}} h",
+    "hoursAgoCompact": "hace {{count}} h",
+    "daysAgo": "hace {{count}} d"
+  },
+  "orgDisplay": {
+    "ssoDefaultName": "Organización de {{name}}"
   },
   "profile": {
     "title": "Perfil",
@@ -105,7 +120,8 @@ export const es = {
     "wordsAnalyzed": "{{count}} palabras analizadas",
     "confidenceBadge": "{{level}} confianza",
     "warningsHeading": "Advertencias",
-    "recommendationFallback": "Recomendación"
+    "recommendationFallback": "Recomendación",
+    "mockDataBanner": "Mock data — for layout and development only. Not operational data."
   },
   "auth": {
     "passwordErrors": {
@@ -351,7 +367,10 @@ export const es = {
     "subNoUnread": "{{count}} residentes en el directorio: no hay alertas no leídas para su cuenta",
     "chartSummaryItem": "{{hour}}: {{count}} llamadas",
     "chartSummary": "Llamadas por hora: {{items}}",
-    "chartSummaryEmpty": "No hay datos de llamadas por hora."
+    "chartSummaryEmpty": "No hay datos de llamadas por hora.",
+    "subAllOkWithActivity": "All systems operational — last activity {{time}}",
+    "noResidentsTitle": "No residents yet",
+    "noResidentsBody": "Add residents to see live monitoring metrics, call activity, and onboarding progress here."
   },
   "alerts": {
     "loading": "Cargando alertas…",
@@ -367,6 +386,27 @@ export const es = {
     "detected": "Detectado {{time}} · {{date}}",
     "statusNew": "Nuevo",
     "statusAck": "Admitido"
+  },
+  "storedAlertMessages": {
+    "wellnessVoicemail": "La llamada de bienestar fue al buzón de voz",
+    "wellnessBusy": "La llamada de bienestar recibió señal de ocupado",
+    "wellnessNoAnswer": "La llamada de bienestar no fue contestada",
+    "wellnessFailedConnect": "La llamada de bienestar no pudo conectarse",
+    "wellnessFailedStatus": "La llamada de bienestar falló: {{status}}",
+    "scheduledCheckIn": "Llamada a {{name}} para su control programado a las {{time}}",
+    "scheduledCheckInError": "La llamada a {{name}} para su control programado a las {{time}} generó un error: {{error}}",
+    "consentSkipped": "Se omitió la llamada programada a {{name}} porque se requiere consentimiento del cliente y aún no se ha obtenido. Obtenga el consentimiento antes de la próxima llamada programada.",
+    "urgencyCRITICAL": "🚨 CRÍTICO",
+    "urgencyHIGH": "⚠️ ALTA PRIORIDAD",
+    "urgencyMEDIUM": "📢 ALERTA",
+    "categoryMedical": "Médico",
+    "categorySafety": "Seguridad",
+    "categoryPhysical": "Físico",
+    "categoryRequest": "Solicitud",
+    "emergencyWord": "Emergencia",
+    "reported": "reportó",
+    "originalMessage": "Mensaje original",
+    "emergencyLine": "{{urgency}} {{category}} {{emergency}}: {{name}} {{reported}} \"{{phrase}}\". {{originalMessage}}: \"{{text}}\""
   },
   "alertDetail": {
     "notFound": "Alerta no encontrada.",
@@ -665,7 +705,18 @@ export const es = {
     "sentimentNegative": "Negativo",
     "sentimentMixed": "Mezclado",
     "distChip": "{{label}}: {{count}}",
-    "sparklineEmpty": "No hay llamadas puntuadas en este rango"
+    "sparklineEmpty": "No hay llamadas puntuadas en este rango",
+    "familyDigestEmailEnabled": "Send weekly family digest emails to this contact",
+    "familyDigestEmailEnabledHelp": "Controls manual and automated family digest emails only. Does not affect emergency notifications.",
+    "familyDigestEmailStatusOn": "Weekly family digest emails enabled",
+    "familyDigestEmailStatusOff": "Weekly family digest emails not enabled",
+    "familyDigestEmailVerified": "Emergency contact email verified for family digests",
+    "familyDigestEmailUnverified": "Emergency contact email not verified — send a verification email before digests can be sent",
+    "familyDigestEmailNoAddress": "Add an emergency contact email to enable verification",
+    "familyDigestEmailSendVerification": "Send verification email",
+    "familyDigestEmailSendingVerification": "Sending…",
+    "familyDigestEmailVerificationSent": "Verification email sent to the emergency contact address.",
+    "familyDigestEmailVerificationFailed": "Could not send verification email. Try again or check the contact email."
   },
   "dailyDigest": {
     "backToReports": "← Volver a informes",
@@ -697,7 +748,51 @@ export const es = {
     "colMood": "Estado de ánimo / tono",
     "colSummary": "Resumen y notas",
     "callsPlacedAnswered": "{{placed}} realizadas · {{answered}} contestadas",
-    "callsTimeUtc": "· {{time}}UTC"
+    "callsTimeUtc": "· {{time}}UTC",
+    "digestDateHelper": "The day is interpreted in your organization's timezone (see metadata on each digest).",
+    "emailWhenBuildHelper": "Optional: sends this digest to your profile email immediately after building.",
+    "scheduledEmailHint": "Automated daily digest emails are controlled in Settings — they are separate from manual sends on this page.",
+    "manualEmailHint": "Manual email sends this draft now.",
+    "refreshDraftNote": "Build / refresh creates a new draft version. Previously emailed versions stay preserved as sent.",
+    "emptyNoCalls": "No wellness check-in calls were recorded for your residents on this digest day. Resident rows below show no activity for the day.",
+    "listLoadError": "Could not load saved digests.",
+    "versionLabel": "Version {{version}}",
+    "sentImmutableNote": "This version was emailed and is preserved as sent.",
+    "sentImmutableBanner": "Sent digest — this version was emailed and is preserved. Use Build / refresh to create a new draft for the same day.",
+    "listSupersedesSent": "· draft supersedes emailed v{{version}}",
+    "showAllVersions": "Show all versions (admin)",
+    "aiDisclaimer": "Automatically generated from wellness check-in calls — not clinical advice. Review the original call record when decisions are needed.",
+    "phiRedactedBanner": "Resident details in this digest were redacted for privacy or retention compliance. Only day metadata is shown.",
+    "localDateKeyLabel": "Local day: {{date}}",
+    "timezoneLabel": "Timezone: {{timezone}}",
+    "digestDayStartLabel": "Day starts (UTC): {{iso}}",
+    "automationTitle": "Automated email status",
+    "automationReady": "Ready",
+    "automationNotReady": "Not ready",
+    "automationManualSendStatus": "Manual send: {{status}}",
+    "automationManualCopy": "Manual email sends this draft now.",
+    "automationScheduledCopy": "Automated email sends once per day when all checks are enabled.",
+    "automationCheckOrgScheduling": "Organization scheduling",
+    "automationCheckEmail": "Your email",
+    "automationCheckAccount": "Your account",
+    "automationCheckPreference": "Daily digest emails",
+    "automationCheckSendTime": "Send time",
+    "automationCheckTimezone": "Timezone",
+    "automationEnabled": "Enabled",
+    "automationDisabled": "Disabled",
+    "automationActive": "Active",
+    "automationInactive": "Inactive",
+    "automationEmailVerified": "Verified",
+    "automationEmailUnverified": "Not verified",
+    "automationEmailMissing": "Missing",
+    "automationLoading": "Loading…",
+    "automationOrgSchedulingUnavailable": "Unavailable",
+    "automationSendTimeValue": "{{time}}, org-local ({{timezone}})",
+    "automationTimezoneUnset": "Not set",
+    "automationOrgUnavailableNote": "Organization scheduling status is unavailable for your role. Ask an administrator whether automated digests are enabled for your organization.",
+    "automationEnableInSettings": "Enable daily digest emails in Settings → Email notifications",
+    "automationVerifyEmailInSettings": "Verify your email in Settings",
+    "automationAskAdminEnableScheduling": "Ask an administrator to enable automated digests for your organization."
   },
   "familyWeeklyDigest": {
     "back": "Volver a residentes del resumen semanal",
@@ -710,7 +805,36 @@ export const es = {
     "legacyUtcWeekBanner": "Esta vista previa usa límites semanales anteriores, de antes de las semanas locales de la organización.",
     "refreshPreview": "Actualizar vista previa",
     "loadingPreview": "Cargando vista previa…",
-    "loadError": "No se pudo cargar la vista previa. Puede que no tenga acceso o el servidor no esté disponible."
+    "loadError": "No se pudo cargar la vista previa. Puede que no tenga acceso o el servidor no esté disponible.",
+    "eligibilityBlockedTitle": "Recipient not eligible for email",
+    "eligibilityPreviewNote": "Preview is for staff review. Sending is blocked until all requirements below are met, including a verified emergency contact email.",
+    "externalEmailNotice": "This digest is emailed externally to the verified family contact below — not to staff. Sending requires opt-in and email verification on the resident profile.",
+    "recipientLabel": "Verified family contact",
+    "aiDisclaimer": "This digest is automatically generated from wellness check-in calls. It is not clinical advice and should be reviewed alongside care-team updates when decisions are needed.",
+    "createDraft": "Create draft",
+    "creatingDraft": "Creating draft…",
+    "createDraftSuccess": "Draft saved for this week.",
+    "createDraftError": "Could not create draft. Refresh the preview and try again.",
+    "sendToFamily": "Send to verified family contact",
+    "sending": "Sending…",
+    "sendConfirmTitle": "Send weekly family digest?",
+    "sendConfirmBody": "This will email the draft to {{email}}. The family contact must remain verified and opted in. This action cannot be undone.",
+    "sendConfirmButton": "Send email",
+    "sendSuccess": "Digest emailed to {{email}}.",
+    "sendError": "Could not send digest. Confirm the family contact is still verified and opted in, then try again.",
+    "sendAlreadySent": "This digest was already sent and cannot be emailed again.",
+    "sendEligibilityChanged": "Recipient eligibility changed since preview. Refresh and confirm verification before sending.",
+    "savedForWeekTitle": "Saved digest for this week",
+    "statusDraft": "Draft",
+    "statusSent": "Sent",
+    "statusRedacted": "Redacted",
+    "sentAtLabel": "Sent {{at}}",
+    "sentImmutableBanner": "Sent — this weekly digest was emailed to the family contact and cannot be changed or sent again.",
+    "phiRedactedBanner": "Resident details in this saved digest were redacted for privacy or retention compliance. Preview content is hidden.",
+    "recentTitle": "Recent saved digests",
+    "listLoadError": "Could not load saved digests.",
+    "noSavedForWeek": "No draft or sent digest saved for this week yet.",
+    "listWeekStatus": "Week of {{week}} · {{status}}"
   },
   "medicalAnalysis": {
     "disclaimer": "Este análisis es solo informativo y no sustituye el consejo médico profesional. Consulte siempre a profesionales de la salud.",
@@ -941,7 +1065,26 @@ export const es = {
     "viewDigest": "Ver digest",
     "activityChartSummaryItem": "{{day}}: {{count}} ejecuciones",
     "activityChartSummary": "Ejecuciones de informes por día: {{items}}",
-    "activityChartSummaryEmpty": "No hay datos de ejecución de informes."
+    "activityChartSummaryEmpty": "No hay datos de ejecución de informes.",
+    "introLive": "Read each report on screen first. Print and CSV use live facility data where available. The weekly family digest is scoped to one authorized recipient; the care-team daily digest stays in the facility boundary.",
+    "csvExportUnavailable": "Facility CSV export is unavailable until live report data is loaded.",
+    "csvExportDisabled": "Live export is unavailable until report summary and resident data have loaded.",
+    "notAvailable": "Not available",
+    "residentLiveIntro": "Live roster metrics from your account. Sentiment insights load when analysis exists for the selected resident.",
+    "residentLoading": "Loading residents…",
+    "residentNoClients": "No residents in your roster yet. Add residents from the Residents page.",
+    "residentStatus": "Status",
+    "residentStatusActive": "Active",
+    "residentStatusInactive": "Inactive",
+    "residentStatusAtRisk": "At risk",
+    "residentLastCall": "Last call activity",
+    "residentOpenAlerts": "Open alerts",
+    "residentRisk": "Risk level",
+    "residentSentiment": "Sentiment trend",
+    "residentInsights": "Sentiment insights",
+    "residentSentimentLoading": "Loading sentiment summary…",
+    "residentRoomLine": "Room {{room}}",
+    "residentViewProfile": "View resident profile"
   },
   "reportDetail": {
     "backToReports": "← Volver a informes",
@@ -962,7 +1105,8 @@ export const es = {
     "paginationPage": "Página {{page}} de {{totalPages}}",
     "previous": "Anterior",
     "next": "Siguiente",
-    "defaultOrgName": "Su organización"
+    "defaultOrgName": "Su organización",
+    "noData": "No report data is available for your account yet."
   },
   "caregivers": {
     "title": "Cuidadores",
@@ -975,7 +1119,13 @@ export const es = {
     "colName": "Nombre",
     "colEmail": "Correo electrónico",
     "colPhone": "Teléfono",
-    "colRole": "Role",
+    "colRole": "Rol",
+    "roleStaff": "Personal",
+    "roleOrgAdmin": "Administrador de la organización",
+    "roleSuperAdmin": "Superadministrador",
+    "roleInvited": "Invitado",
+    "roleAdmin": "Administrador",
+    "roleUnverified": "Sin verificar",
     "colStatus": "Estado",
     "colActions": "Comportamiento",
     "expandClients": "Ampliar clientes asignados",
@@ -1064,7 +1214,13 @@ export const es = {
     "billingBody": "Gestione los métodos de pago de la organización y la fuente de cargo predeterminada.",
     "billingLink": "Métodos de pago",
     "backToSettings": "Volver a configuración",
-    "adminOnlyCalls": "Solo los administradores de la organización y superadministradores pueden iniciar llamadas."
+    "adminOnlyCalls": "Solo los administradores de la organización y superadministradores pueden iniciar llamadas.",
+    "notificationsTitle": "Notificaciones por correo",
+    "dailyDigestEmailLabel": "Correos diarios de bienestar",
+    "dailyDigestEmailHelper": "Si está activado, Bianca envía un resumen diario automatizado por correo de los controles de bienestar. No afecta los envíos manuales desde la página de resumen diario.",
+    "dailyDigestEmailSaving": "Guardando…",
+    "dailyDigestEmailSaved": "Preferencia de notificación guardada.",
+    "dailyDigestEmailSaveFailed": "No se pudo guardar la preferencia de notificación."
   },
   "residentCall": {
     "back": "Atrás",
@@ -1352,5 +1508,19 @@ export const es = {
     "countries": {
       "OTHER": "Otro"
     }
+  },
+  "familyDigestEmailVerify": {
+    "missingToken": "Verification token is missing. Please use the link from your email.",
+    "successDefault": "Your email has been verified for weekly family digest emails. Thank you.",
+    "errorDefault": "We could not complete email verification.",
+    "expiredLink": "Invalid or expired verification link. Ask your care facility to send a new verification email.",
+    "titleVerifying": "Verifying email",
+    "titleSuccess": "Email verified",
+    "titleMissing": "Email verification",
+    "titleError": "Could not verify email",
+    "verifying": "Please wait while we confirm your email address…",
+    "closeWindow": "You can close this window.",
+    "needNewLink": "Contact your care facility if you need a new verification link.",
+    "staffSignIn": "Staff sign in"
   }
 } as const
