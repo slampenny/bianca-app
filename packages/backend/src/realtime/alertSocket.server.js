@@ -72,6 +72,12 @@ async function initAlertSocketServer(httpServer) {
   if (redisUrl) {
     pubClient = createClient({ url: redisUrl });
     subClient = pubClient.duplicate();
+    pubClient.on('error', (err) => {
+      logger.error('[AlertSocket] Redis pub client error:', err);
+    });
+    subClient.on('error', (err) => {
+      logger.error('[AlertSocket] Redis sub client error:', err);
+    });
     await Promise.all([pubClient.connect(), subClient.connect()]);
     io.adapter(createAdapter(pubClient, subClient));
     logger.info('[AlertSocket] Redis adapter enabled (multi-instance alert broadcast)');

@@ -10,6 +10,7 @@
  */
 
 const moment = require('moment-timezone');
+const mongoose = require('mongoose');
 const logger = require('../config/logger');
 const { AuditLog, BreachLog, Caregiver, Org } = require('../models');
 const emailService = require('./email.service');
@@ -580,6 +581,18 @@ ${pipedaNotice ? `<p style="color: red;"><strong>${pipedaNotice}</strong></p>` :
    * Run all detection checks
    */
   async runAllDetections() {
+    if (mongoose.connection.readyState !== 1) {
+      logger.debug('[BREACH] Skipping detection cycle: MongoDB not connected');
+      return {
+        skipped: true,
+        failedLogins: 0,
+        dataAccessVolume: 0,
+        offHoursAccess: 0,
+        rapidDataAccess: 0,
+        timestamp: new Date(),
+      };
+    }
+
     logger.info('[BREACH] Running breach detection checks...');
 
     const results = {
@@ -616,12 +629,12 @@ ${pipedaNotice ? `<p style="color: red;"><strong>${pipedaNotice}</strong></p>` :
 // Singleton instance
 const breachDetectionService = new BreachDetectionService();
 
-// Start periodic detection (every 5 minutes)
+// Start periodic detection (every 5 minutes) once MongoDB is connected
 const DETECTION_INTERVAL = parseInt(process.env.BREACH_DETECTION_INTERVAL || '300000'); // 5 minutes
 
-if (process.env.NODE_ENV !== 'test') {
+const startPeriodicDetection = () => {
   logger.info(`[BREACH] Starting breach detection service (interval: ${DETECTION_INTERVAL / 1000}s)`);
-  
+
   setInterval(async () => {
     try {
       await breachDetectionService.runAllDetections();
@@ -629,6 +642,14 @@ if (process.env.NODE_ENV !== 'test') {
       logger.error('[BREACH] Detection cycle failed:', error);
     }
   }, DETECTION_INTERVAL);
+};
+
+if (process.env.NODE_ENV !== 'test') {
+  if (mongoose.connection.readyState === 1) {
+    startPeriodicDetection();
+  } else {
+    mongoose.connection.once('connected', startPeriodicDetection);
+  }
 }
 
 module.exports = breachDetectionService;
