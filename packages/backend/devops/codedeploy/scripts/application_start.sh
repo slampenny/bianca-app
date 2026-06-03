@@ -213,7 +213,7 @@ MONGODB_URL="mongodb://mongodb:27017/bianca-service"
 
 # Run migrations using docker compose run (automatically connects to correct network)
 # This uses the app service definition but runs a one-off command
-# Working directory in container is /usr/src/bianca-app (set in Dockerfile)
+# Working directory in container is /app/packages/backend (see packages/backend/docker/Dockerfile)
 echo "   Running: yarn migrate:up"
 if [ "$DOCKER_COMPOSE_CMD" = "docker compose" ]; then
   if docker compose run --rm \
