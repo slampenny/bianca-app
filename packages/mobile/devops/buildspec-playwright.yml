@@ -96,7 +96,8 @@ phases:
         nvm use 20
         cd "$CODEBUILD_SRC_DIR" || exit 1
         corepack enable
-        yarn install --immutable --ignore-scripts || yarn install --ignore-scripts || exit 1
+        export YARN_ENABLE_SCRIPTS=false
+        yarn install --immutable || yarn install || exit 1
         echo "✅ Yarn install complete"
       - echo "Installing Playwright browser for packages/web E2E..."
       - |
