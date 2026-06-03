@@ -726,7 +726,8 @@ resource "aws_iam_role_policy" "staging_lambda_policy" {
         Action = [
           "ec2:DescribeInstances",
           "ec2:StopInstances",
-          "cloudwatch:GetMetricStatistics"
+          "cloudwatch:GetMetricStatistics",
+          "ssm:GetParameter"
         ]
         Resource = "*"
       },
@@ -755,7 +756,9 @@ resource "aws_lambda_function" "staging_auto_stop" {
 
   environment {
     variables = {
-      INSTANCE_ID = aws_instance.staging.id
+      # Live staging instance ID changes on each blue/green swap; resolve by Name tag at runtime.
+      INSTANCE_NAME_TAG = "bianca-staging"
+      ALWAYS_ON_PARAM   = "/bianca/staging/always-on"
     }
   }
 
@@ -774,14 +777,52 @@ data "archive_file" "staging_auto_stop" {
 import boto3
 import os
 from datetime import datetime, timedelta
+from botocore.exceptions import ClientError
+
+def find_live_staging_instance_id(ec2, name_tag):
+    """Return the newest running instance with the given Name tag (matches staging-control.sh)."""
+    resp = ec2.describe_instances(
+        Filters=[
+            {'Name': 'tag:Name', 'Values': [name_tag]},
+            {'Name': 'instance-state-name', 'Values': ['running']},
+        ]
+    )
+    instances = [
+        inst
+        for reservation in resp.get('Reservations', [])
+        for inst in reservation.get('Instances', [])
+    ]
+    if not instances:
+        return None
+    instances.sort(key=lambda inst: inst['LaunchTime'], reverse=True)
+    return instances[0]['InstanceId']
+
+def is_always_on(ssm, param_name):
+    try:
+        value = ssm.get_parameter(Name=param_name)['Parameter']['Value']
+        return str(value).lower() == 'true'
+    except ClientError as err:
+        if err.response['Error']['Code'] == 'ParameterNotFound':
+            return False
+        raise
 
 def handler(event, context):
     ec2 = boto3.client('ec2')
     cloudwatch = boto3.client('cloudwatch')
-    
-    instance_id = os.environ['INSTANCE_ID']
-    
-    # Check if instance has been idle for 30 minutes
+    ssm = boto3.client('ssm')
+
+    name_tag = os.environ.get('INSTANCE_NAME_TAG', 'bianca-staging')
+    always_on_param = os.environ.get('ALWAYS_ON_PARAM', '/bianca/staging/always-on')
+
+    if is_always_on(ssm, always_on_param):
+        print('Always-on mode enabled; skipping auto-stop')
+        return {'statusCode': 200, 'body': 'Always-on enabled'}
+
+    instance_id = find_live_staging_instance_id(ec2, name_tag)
+    if not instance_id:
+        print(f'No running instance with Name={name_tag}; nothing to stop')
+        return {'statusCode': 200, 'body': 'No running instance'}
+
     metrics = cloudwatch.get_metric_statistics(
         Namespace='AWS/EC2',
         MetricName='NetworkIn',
@@ -791,12 +832,14 @@ def handler(event, context):
         Period=1800,
         Statistics=['Sum']
     )
-    
-    if not metrics['Datapoints'] or sum(dp['Sum'] for dp in metrics['Datapoints']) < 1048576:
-        print(f"Stopping idle staging instance {instance_id}")
+
+    network_in = sum(dp['Sum'] for dp in metrics.get('Datapoints', []))
+    if network_in < 1048576:
+        print(f'Stopping idle staging instance {instance_id} (Name={name_tag}, NetworkIn={network_in})')
         ec2.stop_instances(InstanceIds=[instance_id])
-        return {'statusCode': 200, 'body': 'Instance stopped'}
-    
+        return {'statusCode': 200, 'body': f'Instance {instance_id} stopped'}
+
+    print(f'Instance {instance_id} still active (NetworkIn={network_in})')
     return {'statusCode': 200, 'body': 'Instance still active'}
 EOF
     filename = "index.py"
@@ -807,6 +850,7 @@ EOF
 resource "aws_cloudwatch_event_rule" "staging_auto_stop" {
   name                = "staging-auto-stop-check"
   schedule_expression = "rate(30 minutes)"
+  state               = "ENABLED"
 }
 
 resource "aws_cloudwatch_event_target" "staging_auto_stop" {
