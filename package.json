@@ -14,7 +14,7 @@
   },
   "resolutions": {
     "afinn-165": "1.0.4",
-    "uuid": "9.0.1"
+    "uuid": "7.0.3"
   },
   "scripts": {
     "dev": "bash scripts/dev-web.sh",

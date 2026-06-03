@@ -1,7 +1,7 @@
 // app/services/api/__tests__/paymentApiWithFixtures.test.ts
 import { paymentApi, conversationApi, orgApi } from "../"
 import { store as appStore, RootState } from "../../../store/store"
-import { registerNewOrgAndCaregiver, createClientInOrg, generateUniqueEmail } from "../../../../test/helpers"
+import { registerNewOrgAndCaregiver, createClientInOrg, generateUniqueEmail, expectError } from "../../../../test/helpers"
 import { newCaregiver } from "../../../../test/fixtures/caregiver.fixture"
 import { newConversation } from "../../../../test/fixtures/conversation.fixture"
 import { Org } from "../api.types"
@@ -269,13 +269,7 @@ describe("paymentApi", () => {
         clientId: nonExistentClientId,
       })(store.dispatch, store.getState, {})
 
-      if ("data" in result && result.data) {
-        expect(result.data).toBeDefined()
-        expect(Array.isArray(result.data)).toBe(true)
-        expect(result.data.length).toBe(0)
-      } else {
-        throw new Error(`Get invoices failed with error: ${JSON.stringify(result.error)}`)
-      }
+      expectError(result, 404, "Client not found")
     })
 
     it("should handle unauthorized error", async () => {
@@ -432,13 +426,8 @@ describe("paymentApi", () => {
         orgId: nonExistentOrgId,
       })(store.dispatch, store.getState, {})
 
-      if ("data" in result && result.data) {
-        expect(result.data).toBeDefined()
-        expect(Array.isArray(result.data)).toBe(true)
-        expect(result.data.length).toBe(0)
-      } else {
-        throw new Error(`Get org invoices failed with error: ${JSON.stringify(result.error)}`)
-      }
+      // Access check runs before org lookup — non-member org ids return 403, not an empty list.
+      expectError(result, 403, "You do not have access to this organization")
     })
 
     it("should handle unauthorized error", async () => {
@@ -681,16 +670,7 @@ describe("paymentApi", () => {
         days: 30,
       })(store.dispatch, store.getState, {})
 
-      expect("error" in result).toBe(true)
-      if ("error" in result && result.error) {
-        const error = result.error as any
-        if (error.status) {
-          expect(error.status).toBe(404)
-        }
-        if (error.data?.message) {
-          expect(error.data.message).toBe("Organization not found")
-        }
-      }
+      expectError(result, 403, "You do not have access to this organization")
     })
 
     it("should handle unauthorized error", async () => {
