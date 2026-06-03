@@ -47,11 +47,13 @@ COPY --chown=node:node packages/backend/src ./packages/backend/src/
 COPY --chown=node:node packages/backend/tests/fixtures/*.fixture.js ./packages/backend/tests/fixtures/
 COPY --chown=node:node packages/backend/migrations ./packages/backend/migrations/
 COPY --chown=node:node packages/backend/migrate-mongo-config.js ./packages/backend/
+COPY --chown=node:node packages/backend/scripts/check-migration-status.js ./packages/backend/scripts/
 
 FROM base AS production
 COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/packages/backend ./packages/backend
 WORKDIR /app/packages/backend
+ENV PATH="/app/node_modules/.bin:${PATH}"
 USER node
 
 EXPOSE 3000
@@ -59,4 +61,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-CMD ["yarn", "start"]
+CMD ["pm2", "start", "ecosystem.config.json", "--no-daemon"]

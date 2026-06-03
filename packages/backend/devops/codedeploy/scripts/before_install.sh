@@ -76,7 +76,7 @@ if [ -n "$DETECTED_ENV" ]; then
     FRONTEND_URL="https://staging.biancawellness.com"
     SERVER_NAME_FRONTEND="staging.biancawellness.com"
     SERVER_NAME_API="staging-api.biancawellness.com"
-    YARN_COMMAND="yarn dev:staging"
+    YARN_COMMAND="yarn start"
     CLOUDWATCH_LOG_PREFIX="/bianca/staging"
   elif [ "$DETECTED_ENV_LOWER" = "demo" ]; then
     ENVIRONMENT="demo"
@@ -126,7 +126,7 @@ elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-staging" ]; then
   FRONTEND_URL="https://staging.biancawellness.com"
   SERVER_NAME_FRONTEND="staging.biancawellness.com"
   SERVER_NAME_API="staging-api.biancawellness.com"
-  YARN_COMMAND="yarn dev:staging"
+  YARN_COMMAND="yarn start"
   CLOUDWATCH_LOG_PREFIX="/bianca/staging"
 elif [ -z "$DETECTED_ENV" ] && [ -d "/opt/bianca-demo" ]; then
   echo "   ✅ Found /opt/bianca-demo directory - using demo"
@@ -211,7 +211,7 @@ elif [ -z "$DETECTED_ENV" ]; then
     FRONTEND_URL="https://staging.biancawellness.com"
     SERVER_NAME_FRONTEND="staging.biancawellness.com"
     SERVER_NAME_API="staging-api.biancawellness.com"
-    YARN_COMMAND="yarn dev:staging"
+    YARN_COMMAND="yarn start"
     CLOUDWATCH_LOG_PREFIX="/bianca/staging"
   elif [ "$ENVIRONMENT_TAG" = "demo" ] || echo "$INSTANCE_NAME" | grep -qi "demo"; then
     echo "   ✅ Detected demo from tags"
