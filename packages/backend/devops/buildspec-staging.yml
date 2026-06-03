@@ -42,9 +42,9 @@ phases:
       - echo Source directory is $CODEBUILD_SRC_DIR
       - ls -la | head -10
       - |
-        # Build backend image
+        # Build backend image (monorepo root context — yarn.lock lives at repo root)
         echo "🔨 Building backend image..."
-        cd packages/backend
+        cd "$CODEBUILD_SRC_DIR"
         # Use --no-cache for staging to ensure we always get fresh code
         # Staging should always rebuild with latest code, not use any cached layers
         echo "   Building with --no-cache to ensure fresh code..."
@@ -54,8 +54,7 @@ phases:
                      -t $ECR_REGISTRY/bianca-app-backend:latest \
                      -t $ECR_REGISTRY/bianca-app-backend:staging \
                      -t $ECR_REGISTRY/bianca-app-backend:$CODEBUILD_RESOLVED_SOURCE_VERSION \
-                     -f docker/Dockerfile .; then
-          cd ../..
+                     -f packages/backend/docker/Dockerfile .; then
           echo "✅ Backend build complete"
           # Verify ecosystem.config.json doesn't have hardcoded NODE_ENV (only if build succeeded)
           echo "🔍 Verifying ecosystem.config.json in built image..."
@@ -73,7 +72,6 @@ phases:
             exit 1
           fi
         else
-          cd ../..
           echo "❌ Backend build FAILED!"
           exit 1
         fi

@@ -1,16 +1,12 @@
 # Multi-stage build for better caching and smaller final image
+# Build context: monorepo root (see buildspec-staging.yml / buildspec-production.yml)
 # syntax=docker/dockerfile:1.4
-# Note: Run 'docker logout' before building to avoid credential issues in WSL2
-# Try ECR Public first (no rate limits), fall back to Docker Hub
-# The buildspec pre_build phase will pre-pull the image to avoid rate limits
-# Use ECR Public to avoid Docker Hub rate limits
 FROM public.ecr.aws/docker/library/node:20-bullseye AS base
 
-# Create app directory
-RUN mkdir -p /usr/src/bianca-app && chown -R node:node /usr/src/bianca-app
-WORKDIR /usr/src/bianca-app
+RUN mkdir -p /app && chown -R node:node /app
+RUN mkdir -p /home/node/.yarn && chown -R node:node /home/node
+WORKDIR /app
 
-# Install system dependencies in a single layer
 RUN apt-get update && apt-get install -y \
   libssl-dev \
   ca-certificates \
@@ -23,7 +19,6 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/* \
   && apt-get clean
 
-# Pre-download MongoDB binary
 RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-debian11-6.0.9.tgz && \
     tar -xvf mongodb.tgz && \
     mv mongodb-linux-x86_64-debian11-6.0.9/bin/* /usr/local/bin/ && \
@@ -31,59 +26,37 @@ RUN curl -o mongodb.tgz https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-de
     /usr/local/bin/mongod --version && \
     rm -rf mongodb-linux-x86_64-debian11-6.0.9 mongodb.tgz
 
-# Set environment variable for MongoMemoryServer
 ENV MONGOMS_SYSTEM_BINARY=/usr/local/bin/mongod
 
-# Install Yarn 1.x (Classic) - use --force to overwrite if it already exists
-RUN npm install -g yarn@1.22.22 --force || yarn --version
+RUN corepack enable
 
-# Dependencies stage - this layer will be cached unless package.json changes
 FROM base AS dependencies
-COPY --chown=node:node package.json yarn.lock ./
+COPY --chown=node:node package.json yarn.lock .yarnrc.yml ./
+COPY --chown=node:node .yarn ./.yarn
+COPY --chown=node:node packages/backend/package.json ./packages/backend/package.json
 USER node
-RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
-    yarn install --frozen-lockfile --ignore-scripts
+RUN yarn workspaces focus @bianca-app/backend --production
 
-# Build stage - copy source and build if needed
 FROM dependencies AS build
-# Build arg to bust cache when code changes
 ARG BUILD_TIMESTAMP
 ARG GIT_COMMIT
-# Use build args in a way that busts cache when they change
-# This ensures we always get the latest code even with Docker layer caching
+USER root
 RUN echo "Build timestamp: ${BUILD_TIMESTAMP:-unknown}, Git commit: ${GIT_COMMIT:-unknown}"
+COPY --chown=node:node packages/backend/.eslintrc.json packages/backend/.prettierrc.json packages/backend/jest.config.js packages/backend/nodemon.json packages/backend/.editorconfig packages/backend/.eslintignore packages/backend/.gitattributes packages/backend/.lintstagedrc.json packages/backend/.prettierignore packages/backend/.nvmrc packages/backend/LICENSE packages/backend/ecosystem.config.json ./packages/backend/
+COPY --chown=node:node packages/backend/src ./packages/backend/src/
+COPY --chown=node:node packages/backend/tests/fixtures/*.fixture.js ./packages/backend/tests/fixtures/
+COPY --chown=node:node packages/backend/migrations ./packages/backend/migrations/
+COPY --chown=node:node packages/backend/migrate-mongo-config.js ./packages/backend/
 
-# Copy static config files (rarely change)
-# NOTE: .env files are NOT copied - Docker containers should get config from environment variables only
-COPY --chown=node:node .eslintrc.json .prettierrc.json jest.config.js nodemon.json .editorconfig .eslintignore .gitattributes .lintstagedrc.json .prettierignore .nvmrc LICENSE ecosystem.config.json ./
-
-# Copy source code (cache will be busted if files change)
-# Using GIT_COMMIT in a comment to help with cache invalidation
-# Build: ${GIT_COMMIT:-unknown}
-COPY --chown=node:node src/ ./src/
-# Only copy test fixtures (needed by seeders), explicitly exclude test files to prevent Jest globals errors
-# Note: .dockerignore should exclude *.test.js, but we copy fixtures explicitly to ensure test files are excluded
-COPY --chown=node:node tests/fixtures/*.fixture.js ./tests/fixtures/
-# Copy migrations directory and config for database migrations
-COPY --chown=node:node migrations/ ./migrations/
-COPY --chown=node:node migrate-mongo-config.js ./
-# Note: devops/ directory not needed in container - used only for infrastructure deployment
-
-# Production stage - minimal final image
 FROM base AS production
-# Copy dependencies from build stage
-COPY --from=dependencies --chown=node:node /usr/src/bianca-app/node_modules ./node_modules
-# Copy built application
-COPY --from=build --chown=node:node /usr/src/bianca-app ./
-
+COPY --from=dependencies --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/packages/backend ./packages/backend
+WORKDIR /app/packages/backend
 USER node
 
-# Expose the port the app runs on
 EXPOSE 3000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-# Command to run your application
 CMD ["yarn", "start"]
