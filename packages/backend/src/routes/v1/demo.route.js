@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const seedDatabaseDemo = require('../../scripts/seedDatabaseDemo');
 const logger = require('../../config/logger');
 const config = require('../../config/config');
+
+function getSeedDatabaseDemo() {
+  return require('../../scripts/seedDatabaseDemo');
+}
 
 const allowedDemoHosts = new Set([
   `demo.${config.primaryDomain}`,
@@ -87,7 +90,7 @@ router.post('/reset', async (req, res) => {
   try {
     logger.info('Demo database reset requested');
     
-    const result = await seedDatabaseDemo();
+    const result = await getSeedDatabaseDemo()();
     
     logger.info('Demo database reset completed successfully');
     
