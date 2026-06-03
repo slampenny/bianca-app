@@ -3,12 +3,15 @@ FROM public.ecr.aws/docker/library/node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json yarn.lock ./
+RUN corepack enable
+
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn ./.yarn
 COPY packages/shared ./packages/shared
 COPY packages/ui ./packages/ui
 COPY packages/web ./packages/web
 
-RUN yarn install --frozen-lockfile || (echo "Lockfile out of sync, updating..." && yarn install && echo "Lockfile updated")
+RUN yarn install --immutable || (echo "Lockfile out of sync, updating..." && yarn install && echo "Lockfile updated")
 
 ARG BUILD_ENV=production
 ARG VITE_API_URL=
