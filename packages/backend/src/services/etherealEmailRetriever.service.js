@@ -1,5 +1,9 @@
-const imap = require('imap-simple');
 const { simpleParser } = require('mailparser');
+
+function getImap() {
+  // imap-simple is a devDependency (Ethereal inbox testing only); lazy-load so production startup does not require it.
+  return require('imap-simple');
+}
 const emailService = require('./email.service');
 const logger = require('../config/logger');
 
@@ -193,7 +197,7 @@ async function retrieveLastEmail(recipientEmail, timeoutMs = 30000) {
     try {
       logger.info(`[Ethereal Email Retriever] Connecting to Ethereal IMAP to retrieve email for ${recipientEmail} (attempt ${4 - retries}/3)`);
       
-      connection = await imap.connect(config);
+      connection = await getImap().connect(config);
       break; // Success, exit retry loop
     } catch (connectError) {
       lastError = connectError;

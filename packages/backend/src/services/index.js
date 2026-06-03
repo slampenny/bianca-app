@@ -63,7 +63,7 @@ module.exports.smsVerificationService = require('./smsVerification.service');
 
 // Other Services
 module.exports.channelTracker = require('./channel.tracker');
-module.exports.etherealEmailRetriever = require('./etherealEmailRetriever.service');
+// etherealEmailRetriever is dev/test-only (requires imap-simple); import directly from test routes.
 module.exports.analysisService = require('./analysis.service');
 module.exports.reportService = require('./report.service');
 module.exports.familyWeeklyDigestService = require('./familyWeeklyDigest.service');
