@@ -79,7 +79,9 @@ export const ko = {
     "signOut": "로그아웃",
     "signingOut": "로그아웃 중…",
     "webVersion": "웹 앱 v{{version}}",
-    "ariaProfile": "내 프로필"
+    "ariaProfile": "내 프로필",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "기본 언어",

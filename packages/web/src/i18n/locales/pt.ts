@@ -79,7 +79,9 @@ export const pt = {
     "signOut": "Sair",
     "signingOut": "Saindo…",
     "webVersion": "App web v{{version}}",
-    "ariaProfile": "Seu perfil"
+    "ariaProfile": "Seu perfil",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "Idioma preferido",

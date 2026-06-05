@@ -21,6 +21,7 @@ import { SSOLoginButtons } from "../components/SSOLoginButtons"
 import { consumeSsoRedirectError } from "../services/webSsoService"
 import { useDocumentTitle } from "../hooks/useDocumentTitle"
 import type { AuthTokens, Caregiver, Org } from "../services/api/api.types"
+import { shouldShowLoginApiHint } from "../config/api"
 import "../app.css"
 
 type LoginLocationState = {
@@ -205,10 +206,12 @@ export function LoginPage() {
           <Link to="/signup">{t("login.acceptInvite")}</Link>
         </div>
 
-        <p className="va-login-hint">
-          {t("login.apiLabel")}{" "}
-          <code className="va-login-code">{import.meta.env.VITE_API_URL || "http://localhost:3000/v1"}</code>
-        </p>
+        {shouldShowLoginApiHint() ? (
+          <p className="va-login-hint">
+            {t("login.apiLabel")}{" "}
+            <code className="va-login-code">{import.meta.env.VITE_API_URL || "http://localhost:3000/v1"}</code>
+          </p>
+        ) : null}
       </div>
     </div>
   )

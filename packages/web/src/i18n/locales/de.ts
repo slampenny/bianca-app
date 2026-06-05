@@ -79,7 +79,9 @@ export const de = {
     "signOut": "Abmelden",
     "signingOut": "Abmelden…",
     "webVersion": "Web-App v{{version}}",
-    "ariaProfile": "Ihr Profil"
+    "ariaProfile": "Ihr Profil",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "Bevorzugte Sprache",

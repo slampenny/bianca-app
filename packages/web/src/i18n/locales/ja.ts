@@ -79,7 +79,9 @@ export const ja = {
     "signOut": "ログアウト",
     "signingOut": "ログアウト中…",
     "webVersion": "Webアプリ v{{version}}",
-    "ariaProfile": "あなたのプロフィール"
+    "ariaProfile": "あなたのプロフィール",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "優先言語",

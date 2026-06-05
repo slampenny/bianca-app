@@ -137,6 +137,7 @@ if [ "$HTTP_CODE" = "200" ]; then
     echo -e "   Password: ${YELLOW}Password1${NC}"
     echo ""
     echo -e "${GREEN}✅ Demo environment is up and ready!${NC}"
+    echo -e "${BLUE}💡 Idle demo EC2 is auto-stopped every ~30 minutes (same Lambda as staging). Run yarn demo:up again to restart.${NC}"
 else
     echo -e "${RED}❌ Failed to reset demo database${NC}"
     echo -e "   HTTP Code: $HTTP_CODE"

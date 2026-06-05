@@ -79,7 +79,9 @@ export const zh = {
     "signOut": "退出登录",
     "signingOut": "正在退出…",
     "webVersion": "Web 应用 v{{version}}",
-    "ariaProfile": "您的个人资料"
+    "ariaProfile": "您的个人资料",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "首选语言",

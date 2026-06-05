@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 
 type AvatarPickerProps = {
   label: string
@@ -8,7 +9,10 @@ type AvatarPickerProps = {
 }
 
 export function AvatarPicker({ label, initialsSource, existingAvatarUrl, onPick }: AvatarPickerProps) {
+  const { t } = useTranslation()
+  const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
 
   useEffect(() => {
     return () => {
@@ -21,6 +25,7 @@ export function AvatarPicker({ label, initialsSource, existingAvatarUrl, onPick 
   const pickFile = (f: File | null) => {
     if (preview) URL.revokeObjectURL(preview)
     setPreview(f ? URL.createObjectURL(f) : null)
+    setFileName(f?.name ?? null)
     onPick(f)
   }
 
@@ -46,19 +51,30 @@ export function AvatarPicker({ label, initialsSource, existingAvatarUrl, onPick 
             color: "var(--va-slate-500)",
           }}
         >
-          {(initialsSource || "?").slice(0, 1).toUpperCase()
-          }
+          {(initialsSource || "?").slice(0, 1).toUpperCase()}
         </div>
       )}
-      <label style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
+      <div style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
         <span style={{ display: "block", marginBottom: 6 }}>{label}</span>
         <input
+          ref={inputRef}
           type="file"
           accept="image/*"
           onChange={(ev) => pickFile(ev.target.files?.[0] ?? null)}
-          style={{ fontSize: "0.75rem" }}
+          style={{ display: "none" }}
         />
-      </label>
+        <button
+          type="button"
+          className="va-btn-secondary"
+          style={{ padding: "0.35rem 0.65rem", fontSize: "0.75rem" }}
+          onClick={() => inputRef.current?.click()}
+        >
+          {t("profile.choosePhoto")}
+        </button>
+        <p style={{ fontSize: "0.75rem", margin: "6px 0 0", color: "var(--va-slate-500)" }}>
+          {fileName ?? t("profile.noPhotoSelected")}
+        </p>
+      </div>
     </div>
   )
 }

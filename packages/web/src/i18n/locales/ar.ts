@@ -79,7 +79,9 @@ export const ar = {
     "signOut": "تسجيل الخروج",
     "signingOut": "جارٍ تسجيل الخروج…",
     "webVersion": "تطبيق الويب v{{version}}",
-    "ariaProfile": "ملفك الشخصي"
+    "ariaProfile": "ملفك الشخصي",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "اللغة المفضلة",

@@ -79,7 +79,9 @@ export const ru = {
     "signOut": "Выйти",
     "signingOut": "Выход…",
     "webVersion": "Веб-приложение v{{version}}",
-    "ariaProfile": "Ваш профиль"
+    "ariaProfile": "Ваш профиль",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "Предпочитаемый язык",

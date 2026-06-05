@@ -45,6 +45,8 @@ export const profile = {
   sectionYourDetails: "Your details",
   loadingProfile: "Loading profile…",
   photo: "Photo",
+  choosePhoto: "Choose photo",
+  noPhotoSelected: "No photo selected",
   name: "Name",
   email: "Email",
   ssoEmailHelper: "Email is managed by your sign-in provider.",

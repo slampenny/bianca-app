@@ -79,7 +79,9 @@ export const hu = {
     "signOut": "Kijelentkezés",
     "signingOut": "Kijelentkezés…",
     "webVersion": "Webalkalmazás v{{version}}",
-    "ariaProfile": "Az Ön profilja"
+    "ariaProfile": "Az Ön profilja",
+    "choosePhoto": "Fénykép kiválasztása",
+    "noPhotoSelected": "Nincs kiválasztott fénykép"
   },
   "settingsLanguage": {
     "title": "Előnyben részesített nyelv",
