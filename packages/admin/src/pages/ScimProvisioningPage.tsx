@@ -8,7 +8,7 @@ import {
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { AdminOrgSearchRow } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 export function ScimProvisioningPage() {
   const authed = useAppSelector(isAuthenticated)
@@ -94,19 +94,11 @@ export function ScimProvisioningPage() {
   }
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">SCIM provisioning</h1>
-          <p className="admin-header-sub">
-            Enable SCIM 2.0 for an organization so their IdP can provision facility users (caregivers).
-          </p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav />
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="SCIM provisioning"
+        subtitle="Enable SCIM 2.0 for an organization so their IdP can provision facility users (caregivers)."
+      />
 
       <main className="admin-main">
         <div className="admin-card admin-card--wide" style={{ marginBottom: "1rem" }}>
@@ -253,6 +245,6 @@ export function ScimProvisioningPage() {
           </div>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }

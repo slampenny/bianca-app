@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom"
 import { RequireAuth } from "./auth/RequireAuth"
 import { RequireSuperAdmin } from "./auth/RequireSuperAdmin"
+import { AdminLayout } from "./layout/AdminLayout"
 import { ForbiddenPage } from "./pages/ForbiddenPage"
 import { LoginPage } from "./pages/LoginPage"
 import { MFAPage } from "./pages/MFAPage"
@@ -25,16 +26,18 @@ export default function App() {
       <Route path="/forbidden" element={<ForbiddenPage />} />
       <Route element={<RequireAuth />}>
         <Route element={<RequireSuperAdmin />}>
-          <Route index element={<ObservabilityPage />} />
-          <Route path="impersonate" element={<ImpersonatePage />} />
-          <Route path="scim" element={<ScimProvisioningPage />} />
-          <Route path="org-flags" element={<OrgFlagsPage />} />
-          <Route path="voice-onboarding" element={<OrgVoiceOnboardingPage />} />
-          <Route path="embedding-anchors" element={<EmbeddingAnchorsPage />} />
-          <Route path="corp-email" element={<CorpEmailForwardsPage />} />
-          <Route path="security-events" element={<SecurityEventsPage />} />
-          <Route path="security-events/:id" element={<SecurityEventDetailPage />} />
-          <Route path="backups" element={<BackupsPage />} />
+          <Route element={<AdminLayout />}>
+            <Route index element={<ObservabilityPage />} />
+            <Route path="impersonate" element={<ImpersonatePage />} />
+            <Route path="scim" element={<ScimProvisioningPage />} />
+            <Route path="org-flags" element={<OrgFlagsPage />} />
+            <Route path="voice-onboarding" element={<OrgVoiceOnboardingPage />} />
+            <Route path="embedding-anchors" element={<EmbeddingAnchorsPage />} />
+            <Route path="corp-email" element={<CorpEmailForwardsPage />} />
+            <Route path="security-events" element={<SecurityEventsPage />} />
+            <Route path="security-events/:id" element={<SecurityEventDetailPage />} />
+            <Route path="backups" element={<BackupsPage />} />
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -4,7 +4,7 @@ import {
   useSaveCorpEmailForwardsMutation,
 } from "../services/api/adminApi"
 import type { CorpEmailForwardStaffRow, SaveCorpEmailForwardsResult } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 type EditableRow = CorpEmailForwardStaffRow & {
   forwardToDraft: string
@@ -91,20 +91,16 @@ export function CorpEmailForwardsPage() {
   }
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Corp email forwarding</h1>
-          <p className="admin-header-sub">
+    <>
+      <AdminPageHeader
+        title="Corp email forwarding"
+        subtitle={
+          <>
             Forward <code className="admin-code">@{data?.domain || "biancatechnologies.com"}</code> mailboxes to
             personal inboxes (Gmail, etc.)
-          </p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav />
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="admin-main">
         {isLoading ? <p className="admin-muted">Loading staff…</p> : null}
@@ -222,6 +218,6 @@ export function CorpEmailForwardsPage() {
           </section>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }

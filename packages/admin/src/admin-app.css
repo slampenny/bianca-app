@@ -14,17 +14,82 @@
   flex-direction: column;
 }
 
-.admin-header {
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.admin-topbar-brand {
+  flex-shrink: 0;
+}
+
+.admin-topbar-brand .admin-badge {
+  margin-bottom: 0;
+}
+
+.admin-topbar-nav {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+
+.admin-topbar-nav::-webkit-scrollbar {
+  height: 4px;
+}
+
+.admin-topbar-nav::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+
+.admin-btn--nav {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.admin-btn--nav[aria-current="page"] {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+}
+
+.admin-page-header {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  /* Minimal horizontal inset so title/actions don’t touch the viewport edge */
-  padding: 1.25rem 0.5rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(8px);
+  padding: 1.25rem 0.5rem 0.5rem;
+}
+
+.admin-page-header-text {
+  min-width: 0;
+}
+
+.admin-page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.admin-btn--refresh {
+  min-width: 6.5rem;
 }
 
 .admin-header-title {
@@ -40,16 +105,13 @@
   color: #94a3b8;
 }
 
-.admin-header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
 .admin-header-user {
   font-size: 0.75rem;
-  margin-right: 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .admin-main {

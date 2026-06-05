@@ -1,4 +1,3 @@
-import type { ReactNode } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useLogoutMutation } from "../services/api/authApi"
 import { clearAuth, getAuthTokens, getCurrentUser } from "../store/authSlice"
@@ -21,11 +20,7 @@ function navActive(pathname: string, to: string, end?: boolean) {
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
-type AdminHeaderNavProps = {
-  children?: ReactNode
-}
-
-export function AdminHeaderNav({ children }: AdminHeaderNavProps) {
+export function AdminHeaderNav() {
   const user = useAppSelector(getCurrentUser)
   const tokens = useAppSelector(getAuthTokens)
   const dispatch = useAppDispatch()
@@ -45,25 +40,24 @@ export function AdminHeaderNav({ children }: AdminHeaderNavProps) {
   }
 
   return (
-    <>
-      <span className="admin-muted admin-header-user">{user?.email}</span>
+    <nav className="admin-topbar-nav" aria-label="Admin">
+      <span className="admin-muted admin-header-user">{user?.email ?? ""}</span>
       {NAV_LINKS.map(({ to, label, end }) => {
         const active = navActive(location.pathname, to, end)
         return (
           <Link
             key={to}
             to={to}
-            className="admin-btn admin-btn--ghost"
+            className="admin-btn admin-btn--ghost admin-btn--nav"
             aria-current={active ? "page" : undefined}
           >
             {label}
           </Link>
         )
       })}
-      {children}
-      <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void handleSignOut()}>
+      <button type="button" className="admin-btn admin-btn--ghost admin-btn--nav" onClick={() => void handleSignOut()}>
         Sign out
       </button>
-    </>
+    </nav>
   )
 }

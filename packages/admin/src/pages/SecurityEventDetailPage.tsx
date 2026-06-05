@@ -7,7 +7,7 @@ import {
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { BreachLogStatus } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 const RESOLUTION_REASONS = [
   { value: "timezone_false_positive", label: "Timezone false positive" },
@@ -70,21 +70,16 @@ export function SecurityEventDetailPage() {
   }
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Security event detail</h1>
-          <p className="admin-header-sub">{id}</p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav>
-            <Link to="/security-events" className="admin-btn admin-btn--ghost">
-              Back to list
-            </Link>
-          </AdminHeaderNav>
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="Security event detail"
+        subtitle={id}
+        actions={
+          <Link to="/security-events" className="admin-btn admin-btn--ghost">
+            Back to list
+          </Link>
+        }
+      />
 
       <main className="admin-main">
         {isLoading ? <p className="admin-muted">Loading…</p> : null}
@@ -224,6 +219,6 @@ export function SecurityEventDetailPage() {
           </div>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }

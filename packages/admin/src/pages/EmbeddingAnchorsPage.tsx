@@ -9,7 +9,7 @@ import {
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { EmbeddingAnchorDetector, EmbeddingAnchorPhraseRow } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 const DETECTORS: { value: EmbeddingAnchorDetector; label: string }[] = [
   { value: "emergencyDetector", label: "Emergency" },
@@ -129,26 +129,21 @@ export function EmbeddingAnchorsPage() {
   }
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Embedding anchor phrases</h1>
-          <p className="admin-header-sub">OpenAI text-embedding-3-large — edit phrases used for similarity in fraud &amp; safety detectors</p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav>
-            <button
-              type="button"
-              className="admin-btn admin-btn--ghost"
-              onClick={() => void refetch()}
-              disabled={isLoading}
-            >
-              Refresh
-            </button>
-          </AdminHeaderNav>
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="Embedding anchor phrases"
+        subtitle="OpenAI text-embedding-3-large — edit phrases used for similarity in fraud & safety detectors"
+        actions={
+          <button
+            type="button"
+            className="admin-btn admin-btn--ghost admin-btn--refresh"
+            onClick={() => void refetch()}
+            disabled={isLoading}
+          >
+            Refresh
+          </button>
+        }
+      />
 
       <main className="admin-main">
         {error && (
@@ -454,6 +449,6 @@ export function EmbeddingAnchorsPage() {
         .admin-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
         .admin-modal { z-index: 101; }
       `}</style>
-    </div>
+    </>
   )
 }

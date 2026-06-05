@@ -8,7 +8,7 @@ import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
 import type { HipaaBackupRow } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -83,21 +83,21 @@ export function BackupsPage() {
   }
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Database backups</h1>
-          <p className="admin-header-sub">HIPAA encrypted MongoDB backups (S3) — list, trigger, and restore</p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav>
-            <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refetch()} disabled={isFetching}>
-              {isFetching ? "Refreshing…" : "Refresh"}
-            </button>
-          </AdminHeaderNav>
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="Database backups"
+        subtitle="HIPAA encrypted MongoDB backups (S3) — list, trigger, and restore"
+        actions={
+          <button
+            type="button"
+            className="admin-btn admin-btn--ghost admin-btn--refresh"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+          >
+            {isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        }
+      />
 
       <main className="admin-main">
         {isLoading ? <p className="admin-muted">Loading…</p> : null}
@@ -256,6 +256,6 @@ export function BackupsPage() {
           </div>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }

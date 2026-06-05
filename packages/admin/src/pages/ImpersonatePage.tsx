@@ -7,7 +7,7 @@ import {
   useUpdateCaregiverRoleMutation,
 } from "../services/api/adminApi"
 import type { AdminCaregiverSearchRow } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 function facilityAppUrl(): string {
   const u = import.meta.env.VITE_FACILITY_APP_URL || "http://localhost:5173/"
@@ -102,21 +102,17 @@ export function ImpersonatePage() {
   )
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Users &amp; impersonation</h1>
-          <p className="admin-header-sub">
+    <>
+      <AdminPageHeader
+        title="Users & impersonation"
+        subtitle={
+          <>
             Search for a caregiver by name or email, then open the facility app as them (audited as IMPERSONATION) or change
             super-admin access (audited as SUPERADMIN_ROLE_CHANGE). Facility app must allow this admin origin (dev:{" "}
             <code className="admin-code">localhost:5174</code>; prod: <code className="admin-code">VITE_ADMIN_APP_ORIGIN</code>).
-          </p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav />
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="admin-main">
         <div className="admin-card admin-card--wide" style={{ marginBottom: "1rem" }}>
@@ -315,6 +311,6 @@ export function ImpersonatePage() {
           </div>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }

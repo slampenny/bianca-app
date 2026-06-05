@@ -2,7 +2,7 @@ import { useGetObservabilityQuery } from "../services/api/adminApi"
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 import {
   HealthStatusBanner,
   ProcessMemoryChart,
@@ -44,21 +44,21 @@ export function ObservabilityPage() {
   const grafanaUrl = import.meta.env.VITE_GRAFANA_URL?.trim()
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Observability</h1>
-          <p className="admin-header-sub">API health, process stats, and deployment metadata</p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav>
-            <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refetch()} disabled={isFetching}>
-              {isFetching ? "Refreshing…" : "Refresh"}
-            </button>
-          </AdminHeaderNav>
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="Observability"
+        subtitle="API health, process stats, and deployment metadata"
+        actions={
+          <button
+            type="button"
+            className="admin-btn admin-btn--ghost admin-btn--refresh"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+          >
+            {isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        }
+      />
 
       <main className="admin-main">
         {isLoading ? <p className="admin-muted">Loading…</p> : null}
@@ -175,6 +175,6 @@ export function ObservabilityPage() {
           </div>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }

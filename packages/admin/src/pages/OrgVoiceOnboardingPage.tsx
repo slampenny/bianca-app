@@ -8,7 +8,7 @@ import {
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { AdminOrgSearchRow, VoiceOnboardingDay } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 function cloneDays(days: VoiceOnboardingDay[]): VoiceOnboardingDay[] {
   return days.map((day, index) => ({
@@ -171,17 +171,11 @@ export function OrgVoiceOnboardingPage() {
   const defaultDayCount = defaultPlanData?.plan?.totalDays ?? 4
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Voice onboarding</h1>
-          <p className="admin-header-sub">Per-organization resident call onboarding plans (super admin).</p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav />
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="Voice onboarding"
+        subtitle="Per-organization resident call onboarding plans (super admin)."
+      />
 
       <main className="admin-main">
         <div className="admin-card admin-card--wide" style={{ marginBottom: "1rem" }}>
@@ -444,6 +438,6 @@ export function OrgVoiceOnboardingPage() {
           </div>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }
