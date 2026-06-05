@@ -1,3 +1,4 @@
+import type { TFunction } from "i18next"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   formatActivityRowTime,
@@ -6,6 +7,24 @@ import {
   formatDetectedTime,
   formatHeaderLastActivity,
 } from "../timeFormat"
+
+const enTimeFormat: Record<string, string> = {
+  "timeFormat.justNow": "just now",
+  "timeFormat.justNowTitle": "Just now",
+  "timeFormat.secondsAgo": "{{count}}s ago",
+  "timeFormat.oneMinuteAgo": "1 min ago",
+  "timeFormat.minutesAgo": "{{count}} min ago",
+  "timeFormat.oneHourAgo": "1 hr ago",
+  "timeFormat.hoursAgo": "{{count}} hr ago",
+  "timeFormat.hoursAgoCompact": "{{count}}h ago",
+  "timeFormat.daysAgo": "{{count}}d ago",
+}
+
+const t = ((key: string, opts?: { count?: number }) => {
+  let value = enTimeFormat[key] ?? key
+  if (opts?.count != null) value = value.replace("{{count}}", String(opts.count))
+  return value
+}) as TFunction
 
 describe("formatActivityRowTime", () => {
   beforeEach(() => {
@@ -17,15 +36,15 @@ describe("formatActivityRowTime", () => {
   })
 
   it("returns Just now within 30s", () => {
-    expect(formatActivityRowTime(new Date("2026-03-27T11:59:40.000Z"))).toBe("Just now")
+    expect(formatActivityRowTime(new Date("2026-03-27T11:59:40.000Z"), t)).toBe("Just now")
   })
 
   it("returns seconds ago under a minute", () => {
-    expect(formatActivityRowTime(new Date("2026-03-27T11:59:15.000Z"))).toMatch(/s ago/)
+    expect(formatActivityRowTime(new Date("2026-03-27T11:59:15.000Z"), t)).toMatch(/s ago/)
   })
 
   it("returns minutes ago under an hour", () => {
-    expect(formatActivityRowTime(new Date("2026-03-27T11:30:00.000Z"))).toMatch(/min ago/)
+    expect(formatActivityRowTime(new Date("2026-03-27T11:30:00.000Z"), t)).toMatch(/min ago/)
   })
 })
 
@@ -39,7 +58,7 @@ describe("formatHeaderLastActivity", () => {
   })
 
   it("returns just now for very recent", () => {
-    expect(formatHeaderLastActivity(new Date("2026-03-27T11:59:55.000Z"))).toBe("just now")
+    expect(formatHeaderLastActivity(new Date("2026-03-27T11:59:55.000Z"), t)).toBe("just now")
   })
 })
 

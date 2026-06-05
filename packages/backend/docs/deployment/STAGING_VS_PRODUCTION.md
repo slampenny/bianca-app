@@ -87,7 +87,12 @@ Lightsail + separate Terraform state: **`packages/backend/devops/terraform-marke
 
 Staging EC2 is **started only by you** (`yarn staging:up` or `staging-control.sh start`). Nothing in AWS will start it on a schedule.
 
-**`bianca-staging-auto-stop`** (`staging.tf`) runs every **30 minutes** and **stops** the instance if network traffic looks idle (~30 min). It never starts the instance. The Lambda resolves the live instance by EC2 tag **`Name=bianca-staging`** (newest running), not a baked-in instance ID, so blue/green swaps do not break auto-stop.
+**`bianca-staging-auto-stop`** (`staging.tf`) runs every **30 minutes** and **stops** idle EC2 instances. It never starts instances. Targets (newest running instance per tag):
+
+- **`Name=bianca-staging`** — staging blue/green safe
+- **`Name=bianca-demo`** — demo (`yarn demo:up` / `yarn demo:down`)
+
+Skip auto-stop per environment with SSM **`/bianca/staging/always-on`** or **`/bianca/demo/always-on`** set to `true` (staging: `staging-control.sh always-on`).
 
 The old hourly **`bianca-staging-scheduler`** Lambda (clock-based start/stop) was **removed** from Terraform — run `terraform apply` in `devops/terraform` to delete it from AWS if still deployed.
 

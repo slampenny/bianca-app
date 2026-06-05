@@ -4,7 +4,7 @@ import { useListBreachLogsQuery } from "../services/api/adminApi"
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { BreachLogStatus } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 const STATUS_OPTIONS: BreachLogStatus[] = [
   "INVESTIGATING",
@@ -47,21 +47,21 @@ export function SecurityEventsPage() {
   )
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Security events</h1>
-          <p className="admin-header-sub">Triage automated HIPAA / security detector alerts</p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav>
-            <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refetch()} disabled={isFetching}>
-              {isFetching ? "Refreshing…" : "Refresh"}
-            </button>
-          </AdminHeaderNav>
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="Security events"
+        subtitle="Triage automated HIPAA / security detector alerts"
+        actions={
+          <button
+            type="button"
+            className="admin-btn admin-btn--ghost admin-btn--refresh"
+            onClick={() => void refetch()}
+            disabled={isFetching}
+          >
+            {isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        }
+      />
 
       <main className="admin-main">
         <section className="admin-card admin-card--wide">
@@ -144,6 +144,6 @@ export function SecurityEventsPage() {
           ) : null}
         </section>
       </main>
-    </div>
+    </>
   )
 }

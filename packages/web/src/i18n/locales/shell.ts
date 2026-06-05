@@ -18,6 +18,23 @@ export const header = {
   activityLoading: "Loading activity…",
 } as const
 
+export const timeFormat = {
+  justNow: "just now",
+  justNowTitle: "Just now",
+  secondsAgo: "{{count}}s ago",
+  oneMinuteAgo: "1 min ago",
+  minutesAgo: "{{count}} min ago",
+  oneHourAgo: "1 hr ago",
+  hoursAgo: "{{count}} hr ago",
+  hoursAgoCompact: "{{count}}h ago",
+  daysAgo: "{{count}}d ago",
+} as const
+
+/** Display labels for stored org names (e.g. SSO default "{name}'s Organization"). */
+export const orgDisplay = {
+  ssoDefaultName: "{{name}}'s Organization",
+} as const
+
 export const profile = {
   title: "Profile",
   subtitle: "Your account, security, and how the app looks on this device.",
@@ -28,6 +45,8 @@ export const profile = {
   sectionYourDetails: "Your details",
   loadingProfile: "Loading profile…",
   photo: "Photo",
+  choosePhoto: "Choose photo",
+  noPhotoSelected: "No photo selected",
   name: "Name",
   email: "Email",
   ssoEmailHelper: "Email is managed by your sign-in provider.",

@@ -744,7 +744,7 @@ resource "aws_iam_role_policy" "staging_lambda_policy" {
   })
 }
 
-# Lambda for auto-stop (saves money)
+# Lambda for auto-stop (saves money) — staging + demo EC2 when idle
 resource "aws_lambda_function" "staging_auto_stop" {
   filename         = data.archive_file.staging_auto_stop.output_path
   function_name    = "bianca-staging-auto-stop"
@@ -756,9 +756,8 @@ resource "aws_lambda_function" "staging_auto_stop" {
 
   environment {
     variables = {
-      # Live staging instance ID changes on each blue/green swap; resolve by Name tag at runtime.
-      INSTANCE_NAME_TAG = "bianca-staging"
-      ALWAYS_ON_PARAM   = "/bianca/staging/always-on"
+      # Comma-separated EC2 Name tags; resolves newest running instance per tag (blue/green safe for staging).
+      INSTANCE_NAME_TAGS = "bianca-staging,bianca-demo"
     }
   }
 
@@ -779,8 +778,25 @@ import os
 from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
 
-def find_live_staging_instance_id(ec2, name_tag):
-    """Return the newest running instance with the given Name tag (matches staging-control.sh)."""
+IDLE_NETWORK_IN_BYTES = 1048576  # 1 MiB over 30 minutes
+IDLE_WINDOW_MINUTES = 30
+
+
+def parse_name_tags():
+    raw = os.environ.get('INSTANCE_NAME_TAGS', '').strip()
+    if raw:
+        return [tag.strip() for tag in raw.split(',') if tag.strip()]
+    legacy = os.environ.get('INSTANCE_NAME_TAG', 'bianca-staging').strip()
+    return [legacy] if legacy else []
+
+
+def always_on_param_for_name_tag(name_tag):
+    suffix = name_tag.replace('bianca-', '', 1) if name_tag.startswith('bianca-') else name_tag
+    return f'/bianca/{suffix}/always-on'
+
+
+def find_running_instance_id(ec2, name_tag):
+    """Return the newest running instance with the given Name tag."""
     resp = ec2.describe_instances(
         Filters=[
             {'Name': 'tag:Name', 'Values': [name_tag]},
@@ -797,6 +813,7 @@ def find_live_staging_instance_id(ec2, name_tag):
     instances.sort(key=lambda inst: inst['LaunchTime'], reverse=True)
     return instances[0]['InstanceId']
 
+
 def is_always_on(ssm, param_name):
     try:
         value = ssm.get_parameter(Name=param_name)['Parameter']['Value']
@@ -806,41 +823,48 @@ def is_always_on(ssm, param_name):
             return False
         raise
 
-def handler(event, context):
-    ec2 = boto3.client('ec2')
-    cloudwatch = boto3.client('cloudwatch')
-    ssm = boto3.client('ssm')
 
-    name_tag = os.environ.get('INSTANCE_NAME_TAG', 'bianca-staging')
-    always_on_param = os.environ.get('ALWAYS_ON_PARAM', '/bianca/staging/always-on')
-
+def maybe_stop_idle_instance(ec2, cloudwatch, ssm, name_tag):
+    always_on_param = always_on_param_for_name_tag(name_tag)
     if is_always_on(ssm, always_on_param):
-        print('Always-on mode enabled; skipping auto-stop')
-        return {'statusCode': 200, 'body': 'Always-on enabled'}
+        print(f'Always-on mode enabled for {name_tag} ({always_on_param}); skipping auto-stop')
+        return {'name_tag': name_tag, 'action': 'skipped', 'reason': 'always-on'}
 
-    instance_id = find_live_staging_instance_id(ec2, name_tag)
+    instance_id = find_running_instance_id(ec2, name_tag)
     if not instance_id:
         print(f'No running instance with Name={name_tag}; nothing to stop')
-        return {'statusCode': 200, 'body': 'No running instance'}
+        return {'name_tag': name_tag, 'action': 'none', 'reason': 'not-running'}
 
     metrics = cloudwatch.get_metric_statistics(
         Namespace='AWS/EC2',
         MetricName='NetworkIn',
         Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
-        StartTime=datetime.utcnow() - timedelta(minutes=30),
+        StartTime=datetime.utcnow() - timedelta(minutes=IDLE_WINDOW_MINUTES),
         EndTime=datetime.utcnow(),
-        Period=1800,
+        Period=IDLE_WINDOW_MINUTES * 60,
         Statistics=['Sum']
     )
 
     network_in = sum(dp['Sum'] for dp in metrics.get('Datapoints', []))
-    if network_in < 1048576:
-        print(f'Stopping idle staging instance {instance_id} (Name={name_tag}, NetworkIn={network_in})')
+    if network_in < IDLE_NETWORK_IN_BYTES:
+        print(f'Stopping idle instance {instance_id} (Name={name_tag}, NetworkIn={network_in})')
         ec2.stop_instances(InstanceIds=[instance_id])
-        return {'statusCode': 200, 'body': f'Instance {instance_id} stopped'}
+        return {'name_tag': name_tag, 'action': 'stopped', 'instance_id': instance_id, 'network_in': network_in}
 
-    print(f'Instance {instance_id} still active (NetworkIn={network_in})')
-    return {'statusCode': 200, 'body': 'Instance still active'}
+    print(f'Instance {instance_id} still active (Name={name_tag}, NetworkIn={network_in})')
+    return {'name_tag': name_tag, 'action': 'active', 'instance_id': instance_id, 'network_in': network_in}
+
+
+def handler(event, context):
+    ec2 = boto3.client('ec2')
+    cloudwatch = boto3.client('cloudwatch')
+    ssm = boto3.client('ssm')
+
+    results = []
+    for name_tag in parse_name_tags():
+        results.append(maybe_stop_idle_instance(ec2, cloudwatch, ssm, name_tag))
+
+    return {'statusCode': 200, 'body': results}
 EOF
     filename = "index.py"
   }

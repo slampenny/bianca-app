@@ -1,3 +1,11 @@
+const PRODUCTION_API_URL = "https://api.biancawellness.com/v1"
+
+/** Show the configured API URL on the login page (dev/staging only). */
+export function shouldShowLoginApiHint(): boolean {
+  if (import.meta.env.DEV) return true
+  return import.meta.env.VITE_API_URL !== PRODUCTION_API_URL
+}
+
 /**
  * Backend API base URL (same shape as mobile: …/v1).
  * Override with VITE_API_URL at build time, e.g. https://api.example.com/v1

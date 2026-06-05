@@ -74,7 +74,7 @@ show_status() {
         --region $REGION 2>/dev/null || echo "false")
     
     echo -e "Always-on mode: ${YELLOW}$always_on${NC}"
-    echo -e "Auto-stop Lambda: ${YELLOW}bianca-staging-auto-stop${NC} (every 30m if idle — stop only, never starts)"
+    echo -e "Auto-stop Lambda: ${YELLOW}bianca-staging-auto-stop${NC} (every 30m if idle — stops bianca-staging + bianca-demo; never starts)"
     echo -e "Start staging: ${YELLOW}manual only${NC} (yarn staging:up or staging-control.sh start)"
 }
 

@@ -8,11 +8,12 @@ import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/al
 import { useGetAllClientsQuery } from "../services/api/clientApi"
 import { getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
+import { formatStoredAlertMessage } from "../lib/storedAlertMessage"
 import { formatAlertType, formatDetectedDate, formatDetectedTime } from "../lib/timeFormat"
 import { AlertOctagonIcon, ChevronRightIcon, ClockIcon, InboxIcon } from "../icons"
 
 export function AlertsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const currentUser = useAppSelector(getCurrentUser)
   const authed = useAppSelector((s) => !!s.auth.tokens)
@@ -137,7 +138,9 @@ export function AlertsPage() {
             <p style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", marginTop: 4 }}>
               {t("alerts.clientId", { id: a.residentId || t("common.emDash") })}
             </p>
-            <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginTop: 10, lineHeight: 1.5 }}>{a.summary}</p>
+            <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginTop: 10, lineHeight: 1.5 }}>
+              {formatStoredAlertMessage(a.summary, t, i18n.language)}
+            </p>
             <div
               style={{
                 display: "flex",

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import { ConfirmDialog } from "@bianca-app/ui"
 import { AuthSelectField } from "../components/AuthSelectField"
 import { canManageCaregivers } from "../lib/roleAccess"
+import { formatCaregiverRole } from "../lib/formatCaregiverRole"
 import { ChevronDownIcon, PencilIcon, TrashIcon } from "../icons"
 import { useDeleteCaregiverMutation, useGetCaregiverClientsQuery, useGetCaregiversQuery } from "../services/api/caregiverApi"
 import { mapClientToResident } from "../lib/liveData"
@@ -136,7 +137,7 @@ export function CaregiversPage() {
                         </td>
                         <td>{c.email}</td>
                         <td>{c.phone}</td>
-                        <td>{c.role}</td>
+                        <td>{formatCaregiverRole(c.role, t)}</td>
                         <td>
                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             <button

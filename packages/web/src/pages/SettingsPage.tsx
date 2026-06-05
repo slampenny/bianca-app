@@ -16,6 +16,7 @@ import { useGetCaregiverQuery, useUpdateCaregiverMutation, useUploadAvatarMutati
 import { useGetMFAStatusQuery } from "../services/api/mfaApi"
 import { AuthSelectField } from "../components/AuthSelectField"
 import { AuthTextField } from "../components/AuthTextField"
+import { AvatarPicker } from "../components/AvatarPicker"
 import { clearAuth, getAuthTokens, getCurrentUser } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
@@ -51,16 +52,15 @@ export function SettingsPage() {
   const [phone, setPhone] = useState("")
   const [preferredLanguage, setPreferredLanguage] = useState("en")
   const [dailyDigestEmail, setDailyDigestEmail] = useState(false)
-  const [notifBanner, setNotifBanner] = useState("")
+  const [notifBannerKey, setNotifBannerKey] = useState<"dailyDigestEmailSaved" | "dailyDigestEmailSaveFailed" | null>(null)
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
 
   const [themeMode, setThemeMode] = useState<WebThemeMode>(() => getStoredThemeMode())
   const [fontPct, setFontPct] = useState(() => getStoredFontScalePct())
 
   const [formError, setFormError] = useState("")
-  const [formSuccess, setFormSuccess] = useState("")
-  const [emailBanner, setEmailBanner] = useState("")
+  const [profileSaved, setProfileSaved] = useState(false)
+  const [emailBannerKey, setEmailBannerKey] = useState<"verificationEmailSent" | "verificationEmailFailed" | null>(null)
 
   const isSsoUser = Boolean(profile?.ssoProvider)
   const isEmailVerified = Boolean(profile?.isEmailVerified || isSsoUser)
@@ -75,20 +75,7 @@ export function SettingsPage() {
     setPreferredLanguage(profile.preferredLanguage || "en")
     setDailyDigestEmail(profile.notificationPreferences?.dailyDigestEmail === true)
     setAvatarFile(null)
-    setAvatarPreview(null)
   }, [profile])
-
-  useEffect(() => {
-    return () => {
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-    }
-  }, [avatarPreview])
-
-  const onAvatarPick = (f: File | null) => {
-    setAvatarFile(f)
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-    setAvatarPreview(f ? URL.createObjectURL(f) : null)
-  }
 
   const onThemeChange = (mode: WebThemeMode) => {
     setThemeMode(mode)
@@ -101,7 +88,7 @@ export function SettingsPage() {
   }
 
   const handleDailyDigestEmailChange = async (enabled: boolean) => {
-    setNotifBanner("")
+    setNotifBannerKey(null)
     setDailyDigestEmail(enabled)
     if (!id) return
     try {
@@ -109,27 +96,27 @@ export function SettingsPage() {
         id,
         caregiver: { notificationPreferences: { dailyDigestEmail: enabled } },
       }).unwrap()
-      setNotifBanner(t("settings.dailyDigestEmailSaved"))
+      setNotifBannerKey("dailyDigestEmailSaved")
     } catch {
       setDailyDigestEmail(!enabled)
-      setNotifBanner(t("settings.dailyDigestEmailSaveFailed"))
+      setNotifBannerKey("dailyDigestEmailSaveFailed")
     }
   }
 
   const handleResendEmail = async () => {
-    setEmailBanner("")
+    setEmailBannerKey(null)
     try {
       await resendVerification({ email: email.trim() || profile?.email || "" }).unwrap()
-      setEmailBanner(t("profile.verificationEmailSent"))
+      setEmailBannerKey("verificationEmailSent")
     } catch {
-      setEmailBanner(t("profile.verificationEmailFailed"))
+      setEmailBannerKey("verificationEmailFailed")
     }
   }
 
   const handleSaveProfile = async (e: FormEvent) => {
     e.preventDefault()
     setFormError("")
-    setFormSuccess("")
+    setProfileSaved(false)
     if (!id || !profile) return
 
     if (!name.trim()) {
@@ -158,10 +145,8 @@ export function SettingsPage() {
           preferredLanguage,
         },
       }).unwrap()
-      setFormSuccess(t("profile.profileUpdated"))
+      setProfileSaved(true)
       setAvatarFile(null)
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
-      setAvatarPreview(null)
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
       setFormError(typeof msg === "string" ? msg : t("profile.updateFailed"))
@@ -182,8 +167,6 @@ export function SettingsPage() {
     dispatch(setOrg(null))
     navigate("/login", { replace: true })
   }
-
-  const displayAvatar = avatarPreview || profile?.avatar
 
   return (
     <div data-testid="settings-page" className="va-page-wrap">
@@ -223,40 +206,12 @@ export function SettingsPage() {
           <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("profile.loadingProfile")}</p>
         ) : (
           <form onSubmit={handleSaveProfile} className="va-login-form">
-            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
-              {displayAvatar ? (
-                <img
-                  src={displayAvatar}
-                  alt=""
-                  style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--va-slate-200)" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 72,
-                    height: 72,
-                    borderRadius: "50%",
-                    background: "var(--va-slate-200)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "1.25rem",
-                    color: "var(--va-slate-500)",
-                  }}
-                >
-                  {(name || profile?.name || "?").slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <label style={{ fontSize: "0.8125rem", color: "var(--va-slate-600)" }}>
-                <span style={{ display: "block", marginBottom: 6 }}>{t("profile.photo")}</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(ev) => onAvatarPick(ev.target.files?.[0] ?? null)}
-                  style={{ fontSize: "0.75rem" }}
-                />
-              </label>
-            </div>
+            <AvatarPicker
+              label={t("profile.photo")}
+              initialsSource={name || profile?.name || "?"}
+              existingAvatarUrl={profile?.avatar}
+              onPick={setAvatarFile}
+            />
 
             <AuthTextField
               label={t("profile.name")}
@@ -295,8 +250,8 @@ export function SettingsPage() {
                   </button>
                 </div>
               )}
-              {emailBanner ? (
-                <p style={{ fontSize: "0.75rem", marginTop: 6, color: "var(--va-slate-600)" }}>{emailBanner}</p>
+              {emailBannerKey ? (
+                <p style={{ fontSize: "0.75rem", marginTop: 6, color: "var(--va-slate-600)" }}>{t(`profile.${emailBannerKey}`)}</p>
               ) : null}
             </div>
 
@@ -325,9 +280,9 @@ export function SettingsPage() {
                 {formError}
               </div>
             ) : null}
-            {formSuccess ? (
+            {profileSaved ? (
               <div className="va-login-success" role="status">
-                {formSuccess}
+                {t("profile.profileUpdated")}
               </div>
             ) : null}
 
@@ -381,9 +336,9 @@ export function SettingsPage() {
             </span>
           </span>
         </label>
-        {notifBanner ? (
+        {notifBannerKey ? (
           <p style={{ fontSize: "0.8125rem", marginTop: 10, color: "var(--va-slate-600)" }} role="status">
-            {notifBanner}
+            {t(`settings.${notifBannerKey}`)}
           </p>
         ) : null}
       </div>

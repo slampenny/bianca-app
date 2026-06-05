@@ -1,4 +1,4 @@
-import { nav, header, profile, settingsLanguage } from "./shell"
+import { nav, header, timeFormat, orgDisplay, profile, settingsLanguage } from "./shell"
 import { appLocalesAuth } from "./appLocalesAuth"
 import { appLocalesPages } from "./appLocalesPages"
 import { geo } from "./appLocalesGeo"
@@ -7,6 +7,8 @@ import { geo } from "./appLocalesGeo"
 export const en = {
   nav,
   header,
+  timeFormat,
+  orgDisplay,
   profile,
   settingsLanguage,
   geo,

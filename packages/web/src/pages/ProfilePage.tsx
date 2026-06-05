@@ -57,8 +57,8 @@ export function ProfilePage() {
   const [fontPct, setFontPct] = useState(() => getStoredFontScalePct())
 
   const [formError, setFormError] = useState("")
-  const [formSuccess, setFormSuccess] = useState("")
-  const [emailBanner, setEmailBanner] = useState("")
+  const [profileSaved, setProfileSaved] = useState(false)
+  const [emailBannerKey, setEmailBannerKey] = useState<"verificationEmailSent" | "verificationEmailFailed" | null>(null)
 
   const isSsoUser = Boolean(profile?.ssoProvider)
   const isEmailVerified = Boolean(profile?.isEmailVerified || isSsoUser)
@@ -84,19 +84,19 @@ export function ProfilePage() {
   }
 
   const handleResendEmail = async () => {
-    setEmailBanner("")
+    setEmailBannerKey(null)
     try {
       await resendVerification({ email: email.trim() || profile?.email || "" }).unwrap()
-      setEmailBanner(t("profile.verificationEmailSent"))
+      setEmailBannerKey("verificationEmailSent")
     } catch {
-      setEmailBanner(t("profile.verificationEmailFailed"))
+      setEmailBannerKey("verificationEmailFailed")
     }
   }
 
   const handleSaveProfile = async (e: FormEvent) => {
     e.preventDefault()
     setFormError("")
-    setFormSuccess("")
+    setProfileSaved(false)
     if (!id || !profile) return
 
     if (!name.trim()) {
@@ -125,7 +125,7 @@ export function ProfilePage() {
           preferredLanguage,
         },
       }).unwrap()
-      setFormSuccess(t("profile.profileUpdated"))
+      setProfileSaved(true)
       setAvatarFile(null)
     } catch (err: unknown) {
       const msg = (err as { data?: { message?: string } })?.data?.message
@@ -236,8 +236,8 @@ export function ProfilePage() {
                   </button>
                 </div>
               )}
-              {emailBanner ? (
-                <p style={{ fontSize: "0.75rem", marginTop: 6, color: "var(--va-slate-600)" }}>{emailBanner}</p>
+              {emailBannerKey ? (
+                <p style={{ fontSize: "0.75rem", marginTop: 6, color: "var(--va-slate-600)" }}>{t(`profile.${emailBannerKey}`)}</p>
               ) : null}
             </div>
 
@@ -352,9 +352,9 @@ export function ProfilePage() {
               {formError}
             </div>
           ) : null}
-          {formSuccess ? (
+          {profileSaved ? (
             <div className="va-login-success" role="status" style={{ marginBottom: "0.75rem" }}>
-              {formSuccess}
+              {t("profile.profileUpdated")}
             </div>
           ) : null}
           <button

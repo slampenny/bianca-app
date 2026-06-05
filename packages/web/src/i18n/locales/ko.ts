@@ -14,7 +14,8 @@ export const ko = {
   "header": {
     "systemActive": "시스템 정상",
     "lastActivity": "최근 활동:",
-    "noActivity": "활동 없음"
+    "noActivity": "활동 없음",
+    "activityLoading": "Loading activity…"
   },
   "profile": {
     "title": "프로필",
@@ -78,7 +79,9 @@ export const ko = {
     "signOut": "로그아웃",
     "signingOut": "로그아웃 중…",
     "webVersion": "웹 앱 v{{version}}",
-    "ariaProfile": "내 프로필"
+    "ariaProfile": "내 프로필",
+    "choosePhoto": "Choose photo",
+    "noPhotoSelected": "No photo selected"
   },
   "settingsLanguage": {
     "title": "기본 언어",
@@ -105,7 +108,8 @@ export const ko = {
     "wordsAnalyzed": "{{count}} 단어가 분석되었습니다.",
     "confidenceBadge": "{{level}} 자신감",
     "warningsHeading": "경고",
-    "recommendationFallback": "추천"
+    "recommendationFallback": "추천",
+    "mockDataBanner": "Mock data — for layout and development only. Not operational data."
   },
   "auth": {
     "passwordErrors": {
@@ -351,7 +355,10 @@ export const ko = {
     "subNoUnread": "{{count}} 주민 디렉토리에 — 귀하의 계정에 읽지 않은 알림이 없습니다",
     "chartSummaryItem": "{{hour}}: {{count}}통",
     "chartSummary": "시간별 통화: {{items}}",
-    "chartSummaryEmpty": "시간별 통화 데이터가 없습니다."
+    "chartSummaryEmpty": "시간별 통화 데이터가 없습니다.",
+    "subAllOkWithActivity": "All systems operational — last activity {{time}}",
+    "noResidentsTitle": "No residents yet",
+    "noResidentsBody": "Add residents to see live monitoring metrics, call activity, and onboarding progress here."
   },
   "alerts": {
     "loading": "알림 로드 중…",
@@ -665,7 +672,18 @@ export const ko = {
     "sentimentNegative": "부정적인",
     "sentimentMixed": "혼합",
     "distChip": "{{label}}: {{count}}",
-    "sparklineEmpty": "이 범위에는 점수가 매겨진 통화가 없습니다."
+    "sparklineEmpty": "이 범위에는 점수가 매겨진 통화가 없습니다.",
+    "familyDigestEmailEnabled": "Send weekly family digest emails to this contact",
+    "familyDigestEmailEnabledHelp": "Controls manual and automated family digest emails only. Does not affect emergency notifications.",
+    "familyDigestEmailStatusOn": "Weekly family digest emails enabled",
+    "familyDigestEmailStatusOff": "Weekly family digest emails not enabled",
+    "familyDigestEmailVerified": "Emergency contact email verified for family digests",
+    "familyDigestEmailUnverified": "Emergency contact email not verified — send a verification email before digests can be sent",
+    "familyDigestEmailNoAddress": "Add an emergency contact email to enable verification",
+    "familyDigestEmailSendVerification": "Send verification email",
+    "familyDigestEmailSendingVerification": "Sending…",
+    "familyDigestEmailVerificationSent": "Verification email sent to the emergency contact address.",
+    "familyDigestEmailVerificationFailed": "Could not send verification email. Try again or check the contact email."
   },
   "dailyDigest": {
     "backToReports": "← 보고서로",
@@ -697,7 +715,51 @@ export const ko = {
     "colMood": "기분 / 톤",
     "colSummary": "요약 및 메모",
     "callsPlacedAnswered": "{{placed}} 발신 · {{answered}} 응답",
-    "callsTimeUtc": "· {{time}} UTC"
+    "callsTimeUtc": "· {{time}} UTC",
+    "digestDateHelper": "The day is interpreted in your organization's timezone (see metadata on each digest).",
+    "emailWhenBuildHelper": "Optional: sends this digest to your profile email immediately after building.",
+    "scheduledEmailHint": "Automated daily digest emails are controlled in Settings — they are separate from manual sends on this page.",
+    "manualEmailHint": "Manual email sends this draft now.",
+    "refreshDraftNote": "Build / refresh creates a new draft version. Previously emailed versions stay preserved as sent.",
+    "emptyNoCalls": "No wellness check-in calls were recorded for your residents on this digest day. Resident rows below show no activity for the day.",
+    "listLoadError": "Could not load saved digests.",
+    "versionLabel": "Version {{version}}",
+    "sentImmutableNote": "This version was emailed and is preserved as sent.",
+    "sentImmutableBanner": "Sent digest — this version was emailed and is preserved. Use Build / refresh to create a new draft for the same day.",
+    "listSupersedesSent": "· draft supersedes emailed v{{version}}",
+    "showAllVersions": "Show all versions (admin)",
+    "aiDisclaimer": "Automatically generated from wellness check-in calls — not clinical advice. Review the original call record when decisions are needed.",
+    "phiRedactedBanner": "Resident details in this digest were redacted for privacy or retention compliance. Only day metadata is shown.",
+    "localDateKeyLabel": "Local day: {{date}}",
+    "timezoneLabel": "Timezone: {{timezone}}",
+    "digestDayStartLabel": "Day starts (UTC): {{iso}}",
+    "automationTitle": "Automated email status",
+    "automationReady": "Ready",
+    "automationNotReady": "Not ready",
+    "automationManualSendStatus": "Manual send: {{status}}",
+    "automationManualCopy": "Manual email sends this draft now.",
+    "automationScheduledCopy": "Automated email sends once per day when all checks are enabled.",
+    "automationCheckOrgScheduling": "Organization scheduling",
+    "automationCheckEmail": "Your email",
+    "automationCheckAccount": "Your account",
+    "automationCheckPreference": "Daily digest emails",
+    "automationCheckSendTime": "Send time",
+    "automationCheckTimezone": "Timezone",
+    "automationEnabled": "Enabled",
+    "automationDisabled": "Disabled",
+    "automationActive": "Active",
+    "automationInactive": "Inactive",
+    "automationEmailVerified": "Verified",
+    "automationEmailUnverified": "Not verified",
+    "automationEmailMissing": "Missing",
+    "automationLoading": "Loading…",
+    "automationOrgSchedulingUnavailable": "Unavailable",
+    "automationSendTimeValue": "{{time}}, org-local ({{timezone}})",
+    "automationTimezoneUnset": "Not set",
+    "automationOrgUnavailableNote": "Organization scheduling status is unavailable for your role. Ask an administrator whether automated digests are enabled for your organization.",
+    "automationEnableInSettings": "Enable daily digest emails in Settings → Email notifications",
+    "automationVerifyEmailInSettings": "Verify your email in Settings",
+    "automationAskAdminEnableScheduling": "Ask an administrator to enable automated digests for your organization."
   },
   "familyWeeklyDigest": {
     "back": "주간 다이제스트 입주자 목록으로",
@@ -710,7 +772,36 @@ export const ko = {
     "legacyUtcWeekBanner": "이 미리보기는 조직 로컬 주 도입 이전의 이전 주 경계를 사용합니다.",
     "refreshPreview": "미리보기 새로고침",
     "loadingPreview": "미리보기 로딩 중…",
-    "loadError": "미리보기를 불러올 수 없습니다. 접근 권한 또는 서버를 확인하세요."
+    "loadError": "미리보기를 불러올 수 없습니다. 접근 권한 또는 서버를 확인하세요.",
+    "eligibilityBlockedTitle": "Recipient not eligible for email",
+    "eligibilityPreviewNote": "Preview is for staff review. Sending is blocked until all requirements below are met, including a verified emergency contact email.",
+    "externalEmailNotice": "This digest is emailed externally to the verified family contact below — not to staff. Sending requires opt-in and email verification on the resident profile.",
+    "recipientLabel": "Verified family contact",
+    "aiDisclaimer": "This digest is automatically generated from wellness check-in calls. It is not clinical advice and should be reviewed alongside care-team updates when decisions are needed.",
+    "createDraft": "Create draft",
+    "creatingDraft": "Creating draft…",
+    "createDraftSuccess": "Draft saved for this week.",
+    "createDraftError": "Could not create draft. Refresh the preview and try again.",
+    "sendToFamily": "Send to verified family contact",
+    "sending": "Sending…",
+    "sendConfirmTitle": "Send weekly family digest?",
+    "sendConfirmBody": "This will email the draft to {{email}}. The family contact must remain verified and opted in. This action cannot be undone.",
+    "sendConfirmButton": "Send email",
+    "sendSuccess": "Digest emailed to {{email}}.",
+    "sendError": "Could not send digest. Confirm the family contact is still verified and opted in, then try again.",
+    "sendAlreadySent": "This digest was already sent and cannot be emailed again.",
+    "sendEligibilityChanged": "Recipient eligibility changed since preview. Refresh and confirm verification before sending.",
+    "savedForWeekTitle": "Saved digest for this week",
+    "statusDraft": "Draft",
+    "statusSent": "Sent",
+    "statusRedacted": "Redacted",
+    "sentAtLabel": "Sent {{at}}",
+    "sentImmutableBanner": "Sent — this weekly digest was emailed to the family contact and cannot be changed or sent again.",
+    "phiRedactedBanner": "Resident details in this saved digest were redacted for privacy or retention compliance. Preview content is hidden.",
+    "recentTitle": "Recent saved digests",
+    "listLoadError": "Could not load saved digests.",
+    "noSavedForWeek": "No draft or sent digest saved for this week yet.",
+    "listWeekStatus": "Week of {{week}} · {{status}}"
   },
   "medicalAnalysis": {
     "disclaimer": "본 분석은 정보 제공 목적이며 전문 의료 상담을 대체하지 않습니다.",
@@ -941,7 +1032,26 @@ export const ko = {
     "viewDigest": "다이제스트 보기",
     "activityChartSummaryItem": "{{day}}: {{count}}회 실행",
     "activityChartSummary": "일별 보고서 실행: {{items}}",
-    "activityChartSummaryEmpty": "보고서 실행 데이터가 없습니다."
+    "activityChartSummaryEmpty": "보고서 실행 데이터가 없습니다.",
+    "introLive": "Read each report on screen first. Print and CSV use live facility data where available. The weekly family digest is scoped to one authorized recipient; the care-team daily digest stays in the facility boundary.",
+    "csvExportUnavailable": "Facility CSV export is unavailable until live report data is loaded.",
+    "csvExportDisabled": "Live export is unavailable until report summary and resident data have loaded.",
+    "notAvailable": "Not available",
+    "residentLiveIntro": "Live roster metrics from your account. Sentiment insights load when analysis exists for the selected resident.",
+    "residentLoading": "Loading residents…",
+    "residentNoClients": "No residents in your roster yet. Add residents from the Residents page.",
+    "residentStatus": "Status",
+    "residentStatusActive": "Active",
+    "residentStatusInactive": "Inactive",
+    "residentStatusAtRisk": "At risk",
+    "residentLastCall": "Last call activity",
+    "residentOpenAlerts": "Open alerts",
+    "residentRisk": "Risk level",
+    "residentSentiment": "Sentiment trend",
+    "residentInsights": "Sentiment insights",
+    "residentSentimentLoading": "Loading sentiment summary…",
+    "residentRoomLine": "Room {{room}}",
+    "residentViewProfile": "View resident profile"
   },
   "reportDetail": {
     "backToReports": "← 보고서로",
@@ -962,7 +1072,8 @@ export const ko = {
     "paginationPage": "{{totalPages}}페이지 중 {{page}}",
     "previous": "이전",
     "next": "다음",
-    "defaultOrgName": "귀하의 조직"
+    "defaultOrgName": "귀하의 조직",
+    "noData": "No report data is available for your account yet."
   },
   "caregivers": {
     "title": "간병인",
@@ -1018,7 +1129,13 @@ export const ko = {
     "formSave": "간병인 저장",
     "formAdd": "간병인 추가",
     "formUpdateError": "간병인을 업데이트할 수 없습니다.",
-    "formAddError": "간병인을 추가할 수 없습니다."
+    "formAddError": "간병인을 추가할 수 없습니다.",
+    "roleStaff": "Staff",
+    "roleOrgAdmin": "Organization admin",
+    "roleSuperAdmin": "Super admin",
+    "roleInvited": "Invited",
+    "roleAdmin": "Admin",
+    "roleUnverified": "Unverified"
   },
   "orgSettings": {
     "langSaveError": "언어를 저장할 수 없습니다.",
@@ -1064,7 +1181,13 @@ export const ko = {
     "billingBody": "조직 결제 수단 및 기본 청구 소스를 관리합니다.",
     "billingLink": "결제 수단",
     "backToSettings": "설정으로 돌아가기",
-    "adminOnlyCalls": "조직 관리자와 슈퍼 관리자만 통화를 시작할 수 있습니다."
+    "adminOnlyCalls": "조직 관리자와 슈퍼 관리자만 통화를 시작할 수 있습니다.",
+    "notificationsTitle": "Email notifications",
+    "dailyDigestEmailLabel": "Daily wellness digest emails",
+    "dailyDigestEmailHelper": "When enabled, Bianca sends an automated daily email summary of wellness check-ins. This does not affect manual digest sends from the Daily Digest page.",
+    "dailyDigestEmailSaving": "Saving…",
+    "dailyDigestEmailSaved": "Notification preference saved.",
+    "dailyDigestEmailSaveFailed": "Could not save notification preference."
   },
   "residentCall": {
     "back": "뒤로",
@@ -1352,5 +1475,54 @@ export const ko = {
     "countries": {
       "OTHER": "기타"
     }
+  },
+  "timeFormat": {
+    "justNow": "just now",
+    "justNowTitle": "Just now",
+    "secondsAgo": "{{count}}s ago",
+    "oneMinuteAgo": "1 min ago",
+    "minutesAgo": "{{count}} min ago",
+    "oneHourAgo": "1 hr ago",
+    "hoursAgo": "{{count}} hr ago",
+    "hoursAgoCompact": "{{count}}h ago",
+    "daysAgo": "{{count}}d ago"
+  },
+  "orgDisplay": {
+    "ssoDefaultName": "{{name}}'s Organization"
+  },
+  "familyDigestEmailVerify": {
+    "missingToken": "Verification token is missing. Please use the link from your email.",
+    "successDefault": "Your email has been verified for weekly family digest emails. Thank you.",
+    "errorDefault": "We could not complete email verification.",
+    "expiredLink": "Invalid or expired verification link. Ask your care facility to send a new verification email.",
+    "titleVerifying": "Verifying email",
+    "titleSuccess": "Email verified",
+    "titleMissing": "Email verification",
+    "titleError": "Could not verify email",
+    "verifying": "Please wait while we confirm your email address…",
+    "closeWindow": "You can close this window.",
+    "needNewLink": "Contact your care facility if you need a new verification link.",
+    "staffSignIn": "Staff sign in"
+  },
+  "storedAlertMessages": {
+    "wellnessVoicemail": "Wellness check call went to voicemail",
+    "wellnessBusy": "Wellness check call received busy signal",
+    "wellnessNoAnswer": "Wellness check call was not answered",
+    "wellnessFailedConnect": "Wellness check call failed to connect",
+    "wellnessFailedStatus": "Wellness check call failed: {{status}}",
+    "scheduledCheckIn": "Called {{name}} for their scheduled check-in at {{time}}",
+    "scheduledCheckInError": "Call to {{name}} for their scheduled check-in at {{time}} generated an error: {{error}}",
+    "consentSkipped": "Scheduled call to {{name}} was skipped because client consent is required but has not been obtained. Please obtain consent from the client before the next scheduled call.",
+    "urgencyCRITICAL": "🚨 CRITICAL",
+    "urgencyHIGH": "⚠️ HIGH PRIORITY",
+    "urgencyMEDIUM": "📢 ALERT",
+    "categoryMedical": "Medical",
+    "categorySafety": "Safety",
+    "categoryPhysical": "Physical",
+    "categoryRequest": "Request",
+    "emergencyWord": "Emergency",
+    "reported": "reported",
+    "originalMessage": "Original message",
+    "emergencyLine": "{{urgency}} {{category}} {{emergency}}: {{name}} {{reported}} \"{{phrase}}\". {{originalMessage}}: \"{{text}}\""
   }
 } as const

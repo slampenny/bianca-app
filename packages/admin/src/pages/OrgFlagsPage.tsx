@@ -3,7 +3,7 @@ import { useGetOrgQuery, useLazySearchOrgsQuery, usePatchOrgMutation } from "../
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { AdminOrgSearchRow } from "../services/api/api.types"
-import { AdminHeaderNav } from "../components/AdminHeaderNav"
+import { AdminPageHeader } from "../components/AdminPageHeader"
 
 export function OrgFlagsPage() {
   const authed = useAppSelector(isAuthenticated)
@@ -72,17 +72,11 @@ export function OrgFlagsPage() {
   }
 
   return (
-    <div className="admin-app">
-      <header className="admin-header">
-        <div>
-          <span className="admin-badge">Admin</span>
-          <h1 className="admin-header-title">Organization flags</h1>
-          <p className="admin-header-sub">Per-organization feature toggles (super admin).</p>
-        </div>
-        <div className="admin-header-actions">
-          <AdminHeaderNav />
-        </div>
-      </header>
+    <>
+      <AdminPageHeader
+        title="Organization flags"
+        subtitle="Per-organization feature toggles (super admin)."
+      />
 
       <main className="admin-main">
         <div className="admin-card admin-card--wide" style={{ marginBottom: "1rem" }}>
@@ -197,6 +191,6 @@ export function OrgFlagsPage() {
           </div>
         ) : null}
       </main>
-    </div>
+    </>
   )
 }

@@ -291,8 +291,7 @@ resource "aws_launch_template" "demo" {
     tags = {
       Name        = "bianca-demo"
       Environment = "demo"
-      Purpose     = "Sales demonstrations"
-      # NOTE: Demo does NOT have AutoStop - it should be always available
+      Purpose     = "Sales demonstrations - on-demand via yarn demo:up; auto-stopped when idle"
     }
   }
 }
@@ -336,7 +335,7 @@ resource "aws_instance" "demo" {
   tags = {
     Name        = "bianca-demo"
     Environment = "demo"
-    Purpose     = "Sales demonstrations - always available"
+    Purpose     = "Sales demonstrations - on-demand via yarn demo:up; auto-stopped when idle"
   }
 }
 
