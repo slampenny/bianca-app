@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useState } from "react"
 import {
   useGetDefaultVoiceOnboardingPlanQuery,
   useGetOrgQuery,
@@ -9,6 +9,7 @@ import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import type { AdminOrgSearchRow, VoiceOnboardingDay } from "../services/api/api.types"
 import { AdminPageHeader } from "../components/AdminPageHeader"
+import { VoiceOnboardingPlanEditor } from "../components/VoiceOnboardingPlanEditor"
 
 function cloneDays(days: VoiceOnboardingDay[]): VoiceOnboardingDay[] {
   return days.map((day, index) => ({
@@ -23,12 +24,20 @@ function cloneDays(days: VoiceOnboardingDay[]): VoiceOnboardingDay[] {
   }))
 }
 
+function nextQuestionId(dayNumber: number, questions: { id: string }[]): string {
+  const prefix = `day${dayNumber}_topic_`
+  const used = new Set(questions.map((q) => q.id))
+  let n = 1
+  while (used.has(`${prefix}${n}`)) n += 1
+  return `${prefix}${n}`
+}
+
 function emptyDay(dayNumber: number): VoiceOnboardingDay {
   return {
     dayNumber,
     theme: "",
     opening: "",
-    questions: [{ id: `day${dayNumber}_topic_1`, prompt: "", compressionPriority: false }],
+    questions: [{ id: nextQuestionId(dayNumber, []), prompt: "", compressionPriority: false }],
   }
 }
 
@@ -46,23 +55,56 @@ export function OrgVoiceOnboardingPage() {
   const { data: orgDetail, isFetching: orgLoading } = useGetOrgQuery(selectedOrgId!, {
     skip: !authed || !selectedOrgId,
   })
-  const { data: defaultPlanData } = useGetDefaultVoiceOnboardingPlanQuery(undefined, { skip: !authed })
+  const { data: defaultPlanData, isLoading: defaultPlanLoading } = useGetDefaultVoiceOnboardingPlanQuery(undefined, {
+    skip: !authed,
+  })
   const [patchOrg, { isLoading: saving }] = usePatchOrgMutation()
 
   const [useDefault, setUseDefault] = useState(true)
   const [days, setDays] = useState<VoiceOnboardingDay[]>([])
   const [saveError, setSaveError] = useState("")
 
+  const defaultDays = useMemo(() => defaultPlanData?.plan?.days ?? [], [defaultPlanData?.plan?.days])
+  const defaultDayCount = defaultPlanData?.plan?.totalDays ?? (defaultDays.length || 4)
+  const onboardingDisabled = !useDefault && days.length === 0
+
   useEffect(() => {
     if (!orgDetail) return
     const vo = orgDetail.voiceOnboarding
-    setUseDefault(vo?.useDefault !== false)
-    if (vo?.useDefault === false && vo.days && vo.days.length > 0) {
+    const orgUsesDefault = vo?.useDefault !== false
+
+    if (!orgUsesDefault && vo?.days && vo.days.length > 0) {
+      setUseDefault(false)
       setDays(cloneDays(vo.days))
-    } else {
-      setDays([])
+      return
     }
-  }, [orgDetail])
+
+    if (!orgUsesDefault) {
+      setUseDefault(false)
+      setDays([])
+      return
+    }
+
+    setUseDefault(true)
+    if (defaultDays.length > 0) {
+      setDays(cloneDays(defaultDays))
+    }
+  }, [orgDetail, defaultPlanData])
+
+  const markCustomized = () => {
+    if (useDefault) setUseDefault(false)
+  }
+
+  const resetToDefault = () => {
+    if (!defaultDays.length) return
+    setUseDefault(true)
+    setDays(cloneDays(defaultDays))
+  }
+
+  const disableOnboarding = () => {
+    setUseDefault(false)
+    setDays([])
+  }
 
   const handleSearch = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -95,23 +137,13 @@ export function OrgVoiceOnboardingPage() {
     setSaveError("")
   }
 
-  const loadDefaultAsCustom = () => {
-    const template = defaultPlanData?.plan
-    if (!template?.days?.length) return
-    setUseDefault(false)
-    setDays(cloneDays(template.days))
-  }
-
-  const disableOnboarding = () => {
-    setUseDefault(false)
-    setDays([])
-  }
-
   const updateDay = (index: number, patch: Partial<VoiceOnboardingDay>) => {
+    markCustomized()
     setDays((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)))
   }
 
   const updateQuestion = (dayIndex: number, qIndex: number, patch: Partial<VoiceOnboardingDay["questions"][0]>) => {
+    markCustomized()
     setDays((prev) =>
       prev.map((d, i) =>
         i !== dayIndex
@@ -125,34 +157,47 @@ export function OrgVoiceOnboardingPage() {
   }
 
   const addDay = () => {
+    markCustomized()
     setDays((prev) => [...prev, emptyDay(prev.length + 1)])
-    setUseDefault(false)
   }
 
   const removeDay = (index: number) => {
+    markCustomized()
     setDays((prev) => cloneDays(prev.filter((_, i) => i !== index)))
-    setUseDefault(false)
   }
 
   const addQuestion = (dayIndex: number) => {
+    markCustomized()
     setDays((prev) =>
       prev.map((d, i) => {
         if (i !== dayIndex) return d
-        const n = d.questions.length + 1
+        const dayNumber = d.dayNumber || i + 1
         return {
           ...d,
-          questions: [...d.questions, { id: `day${d.dayNumber || i + 1}_topic_${n}`, prompt: "", compressionPriority: false }],
+          questions: [
+            ...d.questions,
+            { id: nextQuestionId(dayNumber, d.questions), prompt: "", compressionPriority: false },
+          ],
         }
       })
     )
   }
 
   const removeQuestion = (dayIndex: number, qIndex: number) => {
+    markCustomized()
     setDays((prev) =>
       prev.map((d, i) =>
         i !== dayIndex ? d : { ...d, questions: d.questions.filter((_, qi) => qi !== qIndex) }
       )
     )
+  }
+
+  const handleUseDefaultChange = (checked: boolean) => {
+    if (checked) {
+      resetToDefault()
+      return
+    }
+    setUseDefault(false)
   }
 
   const handleSave = async () => {
@@ -168,7 +213,29 @@ export function OrgVoiceOnboardingPage() {
     }
   }
 
-  const defaultDayCount = defaultPlanData?.plan?.totalDays ?? 4
+  const planStatusBanner = (() => {
+    if (onboardingDisabled) {
+      return (
+        <div className="admin-plan-banner admin-plan-banner--disabled" role="status">
+          <strong>Onboarding disabled.</strong> Saving will skip voice onboarding for this organization. New calls use
+          the regular wellness format only.
+        </div>
+      )
+    }
+    if (useDefault) {
+      return (
+        <div className="admin-plan-banner admin-plan-banner--default" role="status">
+          <strong>Built-in default plan.</strong> This org uses the shared {defaultDayCount}-day plan. You can review
+          and edit it below — any change saves as a custom plan for this organization.
+        </div>
+      )
+    }
+    return (
+      <div className="admin-plan-banner admin-plan-banner--custom" role="status">
+        <strong>Custom plan.</strong> Changes apply only to this organization.
+      </div>
+    )
+  })()
 
   return (
     <>
@@ -255,26 +322,12 @@ export function OrgVoiceOnboardingPage() {
             ) : (
               <div style={{ maxWidth: 920 }}>
                 <p className="admin-muted" style={{ fontSize: "0.9rem", lineHeight: 1.5, marginBottom: "1rem" }}>
-                  The built-in default is a {defaultDayCount}-day plan (safety, routine, emotional, preferences). Custom
-                  plans can add or remove days and change questions. To turn off onboarding entirely, uncheck the default
-                  plan and remove all custom days — outbound calls will go straight to wellness checks.
+                  The built-in default is a {defaultDayCount}-day plan (safety, routine, emotional, preferences). Review
+                  each day&apos;s theme, opening script, and questions below. To turn off onboarding entirely, use
+                  &quot;Disable onboarding&quot; or remove all days.
                 </p>
 
-                {!useDefault && days.length === 0 ? (
-                  <div
-                    style={{
-                      marginBottom: "1rem",
-                      padding: "0.75rem 1rem",
-                      borderRadius: 8,
-                      background: "#fef3c7",
-                      border: "1px solid #fcd34d",
-                      fontSize: "0.9rem",
-                    }}
-                  >
-                    <strong>Onboarding disabled.</strong> Saving will skip voice onboarding for this organization. New
-                    calls use the regular wellness format only.
-                  </div>
-                ) : null}
+                {planStatusBanner}
 
                 <label
                   style={{
@@ -289,141 +342,34 @@ export function OrgVoiceOnboardingPage() {
                   <input
                     type="checkbox"
                     checked={useDefault}
-                    onChange={(e) => setUseDefault(e.target.checked)}
+                    onChange={(e) => handleUseDefaultChange(e.target.checked)}
+                    disabled={defaultPlanLoading || defaultDays.length === 0}
                   />
-                  <span>Use default {defaultDayCount}-day onboarding plan</span>
+                  <span>Use built-in default {defaultDayCount}-day plan</span>
                 </label>
 
-                {!useDefault ? (
-                  <div style={{ marginBottom: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <button type="button" className="admin-btn admin-btn--ghost" onClick={addDay}>
-                      Add day
-                    </button>
-                    <button type="button" className="admin-btn admin-btn--ghost" onClick={loadDefaultAsCustom}>
-                      Copy default plan as starting point
-                    </button>
-                    <button type="button" className="admin-btn admin-btn--ghost" onClick={disableOnboarding}>
-                      Disable onboarding (remove all days)
+                {defaultPlanLoading && days.length === 0 ? (
+                  <p className="admin-muted">Loading default plan…</p>
+                ) : onboardingDisabled ? (
+                  <div style={{ marginBottom: "1rem" }}>
+                    <button type="button" className="admin-btn admin-btn--ghost" onClick={resetToDefault}>
+                      Re-enable with default plan
                     </button>
                   </div>
                 ) : (
-                  <div style={{ marginBottom: "1rem" }}>
-                    <button type="button" className="admin-btn admin-btn--ghost" onClick={disableOnboarding}>
-                      Disable onboarding for this org
-                    </button>
-                  </div>
+                  <VoiceOnboardingPlanEditor
+                    days={days}
+                    onUpdateDay={updateDay}
+                    onUpdateQuestion={updateQuestion}
+                    onAddDay={addDay}
+                    onRemoveDay={removeDay}
+                    onAddQuestion={addQuestion}
+                    onRemoveQuestion={removeQuestion}
+                    onResetToDefault={resetToDefault}
+                    onDisable={disableOnboarding}
+                    showResetToDefault={!useDefault}
+                  />
                 )}
-
-                {!useDefault
-                  ? days.map((day, dayIndex) => (
-                      <div
-                        key={`day-${dayIndex}`}
-                        style={{
-                          border: "1px solid var(--admin-border, #d1d5db)",
-                          borderRadius: 8,
-                          padding: "1rem",
-                          marginBottom: "1rem",
-                          background: "#fafafa",
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                          <strong>Day {dayIndex + 1}</strong>
-                          <button type="button" className="admin-btn admin-btn--ghost" onClick={() => removeDay(dayIndex)}>
-                            Remove day
-                          </button>
-                        </div>
-
-                        <label className="admin-label" style={{ marginTop: "0.75rem", display: "block" }}>
-                          Theme
-                          <input
-                            className="admin-input"
-                            value={day.theme || ""}
-                            onChange={(e) => updateDay(dayIndex, { theme: e.target.value })}
-                            placeholder="e.g. Safety & Orientation"
-                          />
-                        </label>
-
-                        <label className="admin-label" style={{ marginTop: "0.75rem", display: "block" }}>
-                          Opening script (optional)
-                          <textarea
-                            className="admin-input"
-                            rows={2}
-                            value={day.opening || ""}
-                            onChange={(e) => updateDay(dayIndex, { opening: e.target.value })}
-                            placeholder="Hi {resident_name}, it's Bianca from {facility_name}…"
-                            style={{ width: "100%", resize: "vertical" }}
-                          />
-                        </label>
-
-                        <p style={{ marginTop: "1rem", marginBottom: "0.5rem", fontWeight: 600, fontSize: "0.9rem" }}>
-                          Questions
-                        </p>
-                        {day.questions.map((question, qIndex) => (
-                          <div
-                            key={`q-${dayIndex}-${qIndex}`}
-                            style={{
-                              border: "1px solid #e5e7eb",
-                              borderRadius: 6,
-                              padding: "0.75rem",
-                              marginBottom: "0.5rem",
-                              background: "#fff",
-                            }}
-                          >
-                            <label className="admin-label" style={{ display: "block" }}>
-                              Question id
-                              <input
-                                className="admin-input"
-                                value={question.id}
-                                onChange={(e) => updateQuestion(dayIndex, qIndex, { id: e.target.value })}
-                                placeholder="day1_fall_history"
-                              />
-                            </label>
-                            <label className="admin-label" style={{ display: "block", marginTop: "0.5rem" }}>
-                              Prompt (what Bianca asks)
-                              <textarea
-                                className="admin-input"
-                                rows={2}
-                                value={question.prompt}
-                                onChange={(e) => updateQuestion(dayIndex, qIndex, { prompt: e.target.value })}
-                                style={{ width: "100%", resize: "vertical" }}
-                              />
-                            </label>
-                            <label
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                                marginTop: "0.5rem",
-                                fontSize: "0.85rem",
-                              }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={question.compressionPriority === true}
-                                onChange={(e) =>
-                                  updateQuestion(dayIndex, qIndex, { compressionPriority: e.target.checked })
-                                }
-                              />
-                              Priority if call runs long
-                            </label>
-                            {day.questions.length > 1 ? (
-                              <button
-                                type="button"
-                                className="admin-btn admin-btn--ghost"
-                                style={{ marginTop: "0.5rem" }}
-                                onClick={() => removeQuestion(dayIndex, qIndex)}
-                              >
-                                Remove question
-                              </button>
-                            ) : null}
-                          </div>
-                        ))}
-                        <button type="button" className="admin-btn admin-btn--ghost" onClick={() => addQuestion(dayIndex)}>
-                          Add question
-                        </button>
-                      </div>
-                    ))
-                  : null}
 
                 {saveError ? (
                   <p className="admin-error" role="alert" style={{ marginBottom: "0.75rem" }}>
