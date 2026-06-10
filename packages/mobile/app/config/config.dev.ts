@@ -10,4 +10,9 @@ const PRIMARY_DOMAIN = "localhost";
 export default {
   PRIMARY_DOMAIN,
   API_URL: "http://localhost:3000/v1",
+  /** Seeded by yarn seed / POST /v1/test/seed — use for local mobile (B2C) dev. */
+  devLogin: {
+    email: "parent@example.org",
+    password: "Password1",
+  },
 }

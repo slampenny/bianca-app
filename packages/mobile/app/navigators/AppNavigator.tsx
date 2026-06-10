@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from "react"
 import { NavigationContainer, getStateFromPath as getStateFromPathDefault } from "@react-navigation/native"
 import { useSelector, useDispatch } from "react-redux"
-import { isAuthenticated, getCurrentUser, getInviteToken, getPendingOnboarding } from "app/store/authSlice"
+import { isAuthenticated, getCurrentUser, getInviteToken, getPendingOnboarding, getLovedOneSetupComplete } from "app/store/authSlice"
+import { getClientsForCaregiver } from "app/store/clientSlice"
 import { clearAuth } from "app/store/authSlice"
 import { clearOrg } from "app/store/orgSlice"
 import { getOrg } from "app/store/orgSlice"
@@ -16,6 +17,7 @@ import {
 import { AuthStack, UnauthStack, OnboardingStackNavigator } from "./AppNavigators"
 import { getNavigationTheme } from "./NavigationConfig"
 import { NavigationProps } from "./navigationTypes"
+import { RootState } from "../store/store"
 import * as storage from "../utils/storage"
 import { logger } from "../utils/logger"
 
@@ -26,6 +28,11 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
   const currentUser = useSelector(getCurrentUser)
   const inviteToken = useSelector(getInviteToken)
   const pendingOnboarding = useSelector(getPendingOnboarding)
+  const lovedOneSetupComplete = useSelector(getLovedOneSetupComplete)
+  const clientCount = useSelector((state: RootState) => {
+    if (!currentUser?.id) return 0
+    return getClientsForCaregiver(state, currentUser.id).length
+  })
   const currentOrg = useSelector(getOrg)
   const { currentTheme, colors } = useTheme()
   const shouldNavigateToRegister = useRef(false)
@@ -338,6 +345,9 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
 
   // Force a remount when logging out to ensure UnauthStack starts fresh
   // Use justLoggedOut in the key to force a remount when logout happens
+  const needsProfileOnboarding = !!(currentUser && currentUser.onboardingComplete === false && pendingOnboarding)
+  const needsLovedOneSetup = !!(currentUser?.onboardingComplete && !lovedOneSetupComplete && clientCount === 0)
+  const onboardingInitialRoute = needsProfileOnboarding ? "OnboardingAboutYou" : "OnboardingAddLovedOne"
   const containerKey = isLoggedIn ? 'auth' : (justLoggedOut ? `unauth-${Date.now()}` : 'unauth')
   
   return (
@@ -351,8 +361,8 @@ export const AppNavigator: React.FC<NavigationProps> = (props) => {
       {...otherProps}
     >
       {isLoggedIn ? (
-        currentUser && currentUser.onboardingComplete === false && pendingOnboarding ? (
-          <OnboardingStackNavigator />
+        needsProfileOnboarding || needsLovedOneSetup ? (
+          <OnboardingStackNavigator initialRouteName={onboardingInitialRoute} />
         ) : (
           <AuthStack />
         )

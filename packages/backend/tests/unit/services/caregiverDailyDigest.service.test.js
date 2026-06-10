@@ -295,6 +295,62 @@ describe('caregiverDailyDigest.service versioning and send', () => {
     expect(reloaded.sentAt).toBeNull();
   });
 
+  it('includes required question answers from primary conversation analyzedData', async () => {
+    callCounter += 1;
+    const call = await Call.create({
+      callSid: `CA${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+      clientId: client._id,
+      status: 'completed',
+      callOutcome: 'answered',
+      duration: 120,
+      startTime: new Date(`2026-06-01T${String(10 + callCounter).padStart(2, '0')}:00:00.000Z`),
+    });
+    await Conversation.create({
+      callId: call._id,
+      clientId: client._id,
+      summary: 'Check-in completed.',
+      history: 'Check-in completed.',
+      analyzedData: {
+        requiredQuestions: {
+          answers: [
+            {
+              questionId: 'med',
+              prompt: 'Have you taken your medication today?',
+              answer: 'Yes, this morning',
+              asked: true,
+            },
+          ],
+        },
+        sentiment: {
+          overallSentiment: 'positive',
+          sentimentScore: 0.5,
+          confidence: 0.9,
+          summary: 'Generally upbeat',
+        },
+      },
+    });
+
+    const caregiverDoc = await Caregiver.findById(caregiver._id);
+    const { localDateKey, digestDate: dayStart, timezone } = resolveOrgLocalDigestDay(
+      org.timezone,
+      digestDate
+    );
+    const { payload } = await buildPayloadForCaregiverDay(caregiverDoc, {
+      digestDateStart: dayStart,
+      orgTimezone: timezone,
+      localDateKey,
+    });
+
+    expect(payload.entries[0].requiredQuestionAnswers).toEqual([
+      {
+        question: 'Have you taken your medication today?',
+        answer: 'Yes, this morning',
+        asked: true,
+      },
+    ]);
+    expect(payload.labels.requiredQuestions).toBeTruthy();
+  });
+
   it('filters failure placeholder summaries from digest payload', async () => {
     await seedCompletedCall({ summary: 'Summary generation failed - manual review needed' });
     const caregiverDoc = await Caregiver.findById(caregiver._id);

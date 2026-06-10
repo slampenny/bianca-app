@@ -279,19 +279,19 @@ describe('Sentiment Analysis API', () => {
               overallSentiment: 'negative',
               sentimentScore: -0.5,
               confidence: 0.8,
-              clientMood: 'frustrated',
-              keyEmotions: ['frustration', 'concern'],
+              clientMood: 'anxious and concerned',
+              keyEmotions: ['anxiety', 'concern'],
               concernLevel: 'medium',
-              summary: 'Patient shows negative sentiment',
-              recommendations: 'Consider additional support'
+              satisfactionIndicators: {
+                positive: [],
+                negative: ['expressed worry', 'mentioned anxiety'],
+              },
+              summary: 'Patient shows negative sentiment with moderate confidence',
+              recommendations: 'Consider additional support',
             })
           }
         }]
       };
-
-      const OpenAI = require('openai').OpenAI;
-      const mockOpenAI = new OpenAI();
-      mockOpenAI.chat.completions.create.mockResolvedValue(mockResponse);
 
       // Create a call first
       const { Call } = require('../../src/models');
@@ -341,6 +341,20 @@ describe('Sentiment Analysis API', () => {
       conversationToAnalyze.messages = messages.map(m => m._id);
       await conversationToAnalyze.save();
 
+      const { resetInstance } = require('../../src/services/openai.sentiment.service');
+      resetInstance();
+      const OpenAI = require('openai').OpenAI;
+      OpenAI.mockImplementationOnce(() => ({
+        chat: {
+          completions: {
+            create: jest.fn().mockResolvedValue(mockResponse),
+          },
+        },
+        embeddings: {
+          create: jest.fn().mockResolvedValue({ data: [{ embedding: [1, 0, 0] }] }),
+        },
+      }));
+
       const res = await request(app)
         .post(`/v1/sentiment/conversation/${conversationToAnalyze._id}/analyze`)
         .set('Authorization', `Bearer ${accessToken}`)
@@ -357,7 +371,7 @@ describe('Sentiment Analysis API', () => {
       expect(res.body.sentiment).toHaveProperty('summary');
       expect(res.body.sentiment).toHaveProperty('recommendations');
 
-      // API response validation complete - database updates are mocked in integration tests
+      // API response validation complete
     });
 
     it('should handle conversation without messages gracefully', async () => {
@@ -387,11 +401,9 @@ describe('Sentiment Analysis API', () => {
       const res = await request(app)
         .post(`/v1/sentiment/conversation/${conversationWithoutMessages._id}/analyze`)
         .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200);
-      
-      // Should handle empty conversations gracefully
-      expect(res.body).toHaveProperty('success', true);
-      expect(res.body).toHaveProperty('conversationId');
+        .expect(400);
+
+      expect(res.body.message).toMatch(/No messages found/);
     });
 
     it('should return 400 for incomplete conversation', async () => {

@@ -221,7 +221,13 @@ Please provide your analysis in the following JSON format:`;
         .lean();
 
       if (!messages || messages.length === 0) {
-        throw new Error(`No messages found for conversation ${conversationId}`);
+        return {
+          success: false,
+          code: 'NO_MESSAGES',
+          error: 'No messages found for this conversation',
+          conversationId,
+          analyzedAt: new Date(),
+        };
       }
 
       // Format conversation text

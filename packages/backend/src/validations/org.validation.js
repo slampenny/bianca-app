@@ -26,6 +26,18 @@ const voiceOnboardingSchema = Joi.object().keys({
   }),
 });
 
+const MAX_REQUIRED_CALL_QUESTIONS = 10;
+
+const requiredCallQuestionSchema = Joi.object().keys({
+  id: Joi.string().trim().min(1).max(100).required(),
+  prompt: Joi.string().trim().min(1).max(1000).required(),
+});
+
+const requiredCallQuestionsSchema = Joi.object().keys({
+  enabled: Joi.boolean().required(),
+  questions: Joi.array().items(requiredCallQuestionSchema).max(MAX_REQUIRED_CALL_QUESTIONS).required(),
+});
+
 const createOrg = {
   body: Joi.object().keys({
     org: Joi.object().keys({
@@ -99,8 +111,10 @@ const updateOrg = {
       requireClientConsent: Joi.boolean().optional(),
       /** Super admin / org admin: allow S3 debug audio for this org's Realtime calls */
       debugAudioUploadEnabled: Joi.boolean().optional(),
-      /** Super admin: per-org resident voice onboarding plan */
+      /** Org admin / super admin: per-org resident voice onboarding plan */
       voiceOnboarding: voiceOnboardingSchema.optional(),
+      /** Org admin: questions Bianca asks on every wellness call */
+      requiredCallQuestions: requiredCallQuestionsSchema.optional(),
       dailyDigestSettings: Joi.object()
         .keys({
           enabled: Joi.boolean().optional(),

@@ -421,12 +421,18 @@ Note: Use this context naturally for short-term continuity only. Do not treat su
     // Add call context - Bianca always initiates calls, clients cannot call Bianca
     enhancedPrompt += `\n\nCall Context: You initiated this call to the client for a wellness check. Wait for them to speak first when they answer, then introduce yourself with "This is Bianca" and ask about their general well-being. Keep it conversational and friendly. Listen to what they need and provide appropriate support while maintaining your warm, empathetic personality.`;
 
-    // Add subtle health metric nudge (one at a time, gently)
-    const healthMetrics = ['sleep', 'appetite', 'pain', 'energy', 'medication adherence', 'social connection'];
-    // Rotate through metrics based on conversation count or time
-    const metricIndex = lastContactTime ? Math.floor(Date.now() / 86400000) % healthMetrics.length : 0;
-    const suggestedMetric = healthMetrics[metricIndex];
-    enhancedPrompt += `\n\nHealth Metrics: If the conversation flows naturally, consider gently asking about their ${suggestedMetric}. Don't force it - only if it feels natural. One metric per conversation, not a checklist.`;
+    const requiredCallQuestionsService = require('./requiredCallQuestions.service');
+    const { enabled: requiredQuestionsEnabled, questions: requiredQuestions, facilityName } =
+      await requiredCallQuestionsService.getQuestionsForClient(clientId);
+    if (requiredQuestionsEnabled && requiredQuestions.length > 0) {
+      enhancedPrompt += requiredCallQuestionsService.buildPromptSection(requiredQuestions, facilityName);
+    } else {
+      // Add subtle health metric nudge only when no org-required questions (avoid duplicate medication checks)
+      const healthMetrics = ['sleep', 'appetite', 'pain', 'energy', 'medication adherence', 'social connection'];
+      const metricIndex = lastContactTime ? Math.floor(Date.now() / 86400000) % healthMetrics.length : 0;
+      const suggestedMetric = healthMetrics[metricIndex];
+      enhancedPrompt += `\n\nHealth Metrics: If the conversation flows naturally, consider gently asking about their ${suggestedMetric}. Don't force it - only if it feels natural. One metric per conversation, not a checklist.`;
+    }
 
     logger.info(`[Enhanced Prompt] Built prompt for client ${client.name} (${callType} call)`);
     return enhancedPrompt;
@@ -656,6 +662,30 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
         ...conversationEngagement,
         computedAt: new Date(),
       };
+    }
+
+    const requiredCallQuestionsService = require('./requiredCallQuestions.service');
+    const clientIdForRequired =
+      conversation.clientId && (conversation.clientId._id || conversation.clientId);
+    if (clientIdForRequired && conversationText && conversationText !== 'No conversation content recorded.') {
+      try {
+        const { enabled, questions } = await requiredCallQuestionsService.getQuestionsForClient(clientIdForRequired);
+        if (enabled && questions.length > 0) {
+          const answers = await requiredCallQuestionsService.extractAnswersFromTranscript(
+            conversationText,
+            questions
+          );
+          updateData['analyzedData.requiredQuestions'] = {
+            answers,
+            capturedAt: new Date(),
+            callId: conversation.callId || undefined,
+          };
+        }
+      } catch (reqErr) {
+        logger.error(
+          `[Finalize] Required question extraction failed for conversation ${conversationId}: ${reqErr.message}`
+        );
+      }
     }
 
     await Conversation.findByIdAndUpdate(conversationId, updateData);

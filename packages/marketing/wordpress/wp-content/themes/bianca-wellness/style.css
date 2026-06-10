@@ -1,0 +1,48 @@
+/*
+Theme Name: Bianca Wellness
+Theme URI: https://biancawellness.com
+Author: Bianca Wellness
+Description: B2B marketing theme matching the Bianca landing experience. Page content lives in the block editor (database), not in PHP templates.
+Requires at least: 6.4
+Tested up to: 6.8
+Requires PHP: 7.4
+Version: 1.0.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: bianca-wellness
+Tags: full-width-template, custom-logo, editor-style, block-patterns, featured-images, wide-blocks
+*/
+
+/* Base reset & variables — extended in assets/css/main.css */
+:root {
+	--bianca-bg-deep: #070b12;
+	--bianca-bg: #0c111c;
+	--bianca-surface: #121a2a;
+	--bianca-surface-2: #1a2438;
+	--bianca-border: rgba(148, 163, 184, 0.12);
+	--bianca-text: #f1f5f9;
+	--bianca-muted: #94a3b8;
+	--bianca-accent: #38bdf8;
+	--bianca-accent-2: #a78bfa;
+	--bianca-success: #34d399;
+	--bianca-warning: #fbbf24;
+	--bianca-danger: #f87171;
+	--bianca-radius: 12px;
+	--bianca-font: "DM Sans", system-ui, -apple-system, sans-serif;
+}
+
+body.bianca-wellness-theme {
+	margin: 0;
+	background: var(--bianca-bg-deep);
+	color: var(--bianca-text);
+	font-family: var(--bianca-font);
+	-webkit-font-smoothing: antialiased;
+}
+
+.bianca-site a {
+	color: var(--bianca-accent);
+}
+
+.bianca-site a:hover {
+	color: #7dd3fc;
+}

@@ -121,6 +121,8 @@ const analyzeConversationSentiment = catchAsync(async (req, res) => {
       sentiment: analysisResult.data,
       analyzedAt: new Date().toISOString()
     });
+  } else if (analysisResult.code === 'NO_MESSAGES') {
+    throw new ApiError(httpStatus.BAD_REQUEST, analysisResult.error);
   } else {
     throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Sentiment analysis failed: ${analysisResult.error}`);
   }

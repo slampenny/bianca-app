@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, createElement } fr
 import { StyleSheet, View, ScrollView, Platform } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRegisterMutation } from "../services/api/authApi"
-import { Button, Text, TextField, PasswordField, PhoneInputWeb, Screen, CountryPicker } from "app/components"
+import { Button, Text, TextField, PasswordField, PhoneInputWeb, CountryPicker, AuthScreenLayout } from "app/components"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
@@ -42,15 +42,9 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   // Don't return null - render a loading state instead to prevent navigation issues
   if (themeLoading) {
     return (
-      <Screen 
-        testID="register-screen"
-        accessibilityLabel="Register"
-        style={{ backgroundColor: colors.palette?.biancaBackground || '#FFFFFF', flex: 1 }}
-      >
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text>Loading...</Text>
-        </View>
-      </Screen>
+      <AuthScreenLayout testID="register-screen" accessibilityLabel="Register">
+        <Text>{translate("common.loading")}</Text>
+      </AuthScreenLayout>
     )
   }
 
@@ -58,18 +52,9 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerShown: true,
-      headerBackTitleVisible: false,
-      headerTintColor: colors.palette.biancaHeader || colors.text,
-      headerStyle: {
-        backgroundColor: colors.palette.biancaBackground,
-      },
-      headerTitleStyle: {
-        color: colors.palette.biancaHeader || colors.text,
-      },
-      title: translate("registerScreen.title") || translate("headers.register"),
+      headerShown: false,
     })
-  }, [navigation, colors])
+  }, [navigation])
 
   const [register, { isLoading }] = useRegisterMutation()
 
@@ -236,61 +221,14 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
   }
 
   return (
-    <Screen 
+    <AuthScreenLayout
       testID="register-screen"
       accessibilityLabel="Register"
-      preset="scroll"
-      style={{ backgroundColor: colors.palette.biancaBackground, flex: 1 }}
-      KeyboardAvoidingViewProps={Platform.OS === 'web' ? { enabled: false } : undefined}
-      ScrollViewProps={{
-        ref: scrollRef,
-        contentContainerStyle: { padding: 20 },
-        testID: "register-form",
-        showsVerticalScrollIndicator: true,
-        scrollEnabled: true,
-        nestedScrollEnabled: true,
-        ...(Platform.OS === 'web' && {
-          style: {
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            WebkitOverflowScrolling: 'touch',
-            height: '100vh',
-            maxHeight: '100vh',
-            flex: 1,
-          } as any,
-        }),
-      } as import("react-native").ScrollViewProps & { ref?: React.RefObject<ScrollView> }}
+      contentContainerStyle={{ justifyContent: "flex-start", paddingVertical: 24 }}
     >
         <RegisterFormWrapper onSubmit={handleRegister}>
-        {/* Error message block MOVED FROM HERE */}
-
-        {!fromOnboarding && (
-          <>
-            <View style={styles.buttonContainer}>
-              <Button
-                testID="register-individual-toggle"
-                accessibilityLabel={translate("registerScreen.individualButton") || "Individual"}
-                tx="registerScreen.individualButton"
-                onPress={() => setAccountType("individual")}
-                style={accountType === "individual" ? styles.selectedButton : styles.button}
-                preset={accountType === "individual" ? "filled" : "default"}
-              />
-              <Button
-                testID="register-organization-toggle"
-                accessibilityLabel={translate("registerScreen.organizationButton") || "Organization"}
-                tx="registerScreen.organizationButton"
-                onPress={() => setAccountType("organization")}
-                style={accountType === "organization" ? styles.selectedButton : styles.button}
-                preset={accountType === "organization" ? "filled" : "default"}
-              />
-            </View>
-            <Text style={styles.explanationText}>
-              {accountType === "individual"
-                ? translate("registerScreen.individualExplanation")
-                : translate("registerScreen.organizationExplanation")}
-            </Text>
-          </>
-        )}
+        <View testID="register-form">
+        <Text style={styles.screenTitle} tx="registerScreen.title" />
 
         {/* Form Fields */}
         {accountType === "organization" && (
@@ -455,10 +393,10 @@ export const RegisterScreen = (props: StackScreenProps<LoginStackParamList, "Reg
           </Text>
         </View>
 
-        {/* Add extra space at the bottom to ensure scrollability */}
-        <View style={{ height: 100 }} />
+        <View style={{ height: 24 }} />
+        </View>
         </RegisterFormWrapper>
-    </Screen>
+    </AuthScreenLayout>
   )
 }
 
@@ -524,8 +462,13 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   registerButton: {
     marginTop: 10,
     width: "100%",
-    borderRadius: 20,
-    paddingVertical: 14,
+  },
+  screenTitle: {
+    color: colors.palette.biancaHeader,
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 20,
+    textAlign: "center",
   },
   selectedButton: {
     flex: 1,

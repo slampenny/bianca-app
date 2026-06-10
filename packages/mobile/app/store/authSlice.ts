@@ -13,6 +13,8 @@ interface AuthState {
   inviteToken: string | null // Store invite token for invited users
   /** True only when user just completed registration (verify-email) or first-time SSO; never true after normal email/password login */
   pendingOnboarding: boolean
+  /** B2C first-run wizard completed or skipped */
+  lovedOneSetupComplete: boolean
 }
 
 const initialState: AuthState = {
@@ -21,6 +23,7 @@ const initialState: AuthState = {
   currentUser: null,
   inviteToken: null,
   pendingOnboarding: false,
+  lovedOneSetupComplete: false,
 }
 
 export const authSlice = createSlice({
@@ -42,12 +45,16 @@ export const authSlice = createSlice({
       state.currentUser = null
       state.inviteToken = null
       state.pendingOnboarding = false
+      state.lovedOneSetupComplete = false
     },
     setInviteToken(state, action: PayloadAction<string | null>) {
       state.inviteToken = action.payload
     },
     setPendingOnboarding(state, action: PayloadAction<boolean>) {
       state.pendingOnboarding = action.payload
+    },
+    setLovedOneSetupComplete(state) {
+      state.lovedOneSetupComplete = true
     },
   },
   extraReducers: (builder) => {
@@ -61,8 +68,10 @@ export const authSlice = createSlice({
       if ('caregiver' in payload && 'tokens' in payload) {
         state.currentUser = payload.caregiver
         state.tokens = payload.tokens
-        // Normal email/password login: never show onboarding (only Register or first-time SSO should)
         state.pendingOnboarding = false
+        if (payload.caregiver.clients?.length) {
+          state.lovedOneSetupComplete = true
+        }
       }
     })
     builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
@@ -77,6 +86,7 @@ export const authSlice = createSlice({
       state.currentUser = null
       state.inviteToken = null
       state.pendingOnboarding = false
+      state.lovedOneSetupComplete = false
     })
     // Also clear local state if logout fails (e.g., network error, expired token)
     // This ensures users can always log out locally even if the API is down
@@ -87,6 +97,7 @@ export const authSlice = createSlice({
       state.currentUser = null
       state.inviteToken = null
       state.pendingOnboarding = false
+      state.lovedOneSetupComplete = false
     })
     builder.addMatcher(authApi.endpoints.refreshTokens.matchFulfilled, (state, { payload }) => {
       logger.debug("refreshed tokens", JSON.stringify(payload.tokens))
@@ -112,6 +123,7 @@ export const authSlice = createSlice({
         state.currentUser = payload.caregiver
       }
       state.pendingOnboarding = false
+      state.lovedOneSetupComplete = false
     })
     // Verify-email (after registration): allow onboarding flow only when backend says incomplete
     builder.addMatcher(authApi.endpoints.verifyEmail.matchFulfilled, (state, { payload }) => {
@@ -158,7 +170,7 @@ export const authSlice = createSlice({
   },
 })
 
-export const { setAuthTokens, setAuthEmail, setCurrentUser, clearAuth, setInviteToken, setPendingOnboarding } = authSlice.actions
+export const { setAuthTokens, setAuthEmail, setCurrentUser, clearAuth, setInviteToken, setPendingOnboarding, setLovedOneSetupComplete } = authSlice.actions
 
 export const isAuthenticated = (state: RootState) => {
   return !!state.auth.tokens
@@ -181,5 +193,6 @@ export const getInviteToken = (state: RootState) => {
   return state.auth.inviteToken
 }
 export const getPendingOnboarding = (state: RootState) => state.auth.pendingOnboarding
+export const getLovedOneSetupComplete = (state: RootState) => state.auth.lovedOneSetupComplete
 
 export default authSlice.reducer

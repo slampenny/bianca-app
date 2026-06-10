@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react"
-import { View, StyleSheet, Pressable, Dimensions, Modal, TouchableWithoutFeedback, ScrollView } from "react-native"
+import { View, StyleSheet, Pressable, Modal, TouchableWithoutFeedback, ScrollView } from "react-native"
 import { useTheme } from "app/theme/ThemeContext"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
@@ -8,11 +8,53 @@ import { getCurrentUser } from "../store/authSlice"
 import { getClientsForCaregiver, setClient } from "../store/clientSlice"
 import { Client } from "../services/api/api.types"
 import { translate } from "../i18n"
-import { Button, Text } from "app/components"
-import { logger } from "../utils/logger"
+import { Button, Text, Card } from "app/components"
+type ReportKey = "sentiment" | "medical" | "fraudAbuse"
 
-const { width } = Dimensions.get('window')
-const buttonSize = Math.min((width - 60) / 2, 160) // Max 160px width, responsive
+type ReportDef = {
+  key: ReportKey
+  titleKey: import("../i18n").TxKeyPath
+  hintKey?: import("../i18n").TxKeyPath
+  icon: keyof typeof Ionicons.glyphMap
+  accent: string
+  iconColor: string
+  testID: string
+  primary?: boolean
+}
+
+const PRIMARY_REPORTS: ReportDef[] = [
+  {
+    key: "sentiment",
+    titleKey: "reportsScreen.sentiment",
+    hintKey: "reportsScreen.sentimentHint",
+    icon: "sparkles",
+    accent: "rgba(37, 99, 235, 0.12)",
+    iconColor: "#2563EB",
+    testID: "sentiment-reports-button",
+    primary: true,
+  },
+]
+
+const SECONDARY_REPORTS: ReportDef[] = [
+  {
+    key: "medical",
+    titleKey: "reportsScreen.medicalAnalysis",
+    hintKey: "reportsScreen.medicalHint",
+    icon: "heart-outline",
+    accent: "rgba(20, 184, 166, 0.12)",
+    iconColor: "#0F766E",
+    testID: "health-reports-button",
+  },
+  {
+    key: "fraudAbuse",
+    titleKey: "reportsScreen.fraudAbuseAnalysis",
+    hintKey: "reportsScreen.fraudHint",
+    icon: "shield-outline",
+    accent: "rgba(245, 158, 11, 0.1)",
+    iconColor: "#D97706",
+    testID: "fraud-abuse-reports-button",
+  },
+]
 
 export function ReportsScreen() {
   const navigation = useNavigation()
@@ -26,34 +68,22 @@ export function ReportsScreen() {
     () => (state: any) => {
       return currentUser && currentUser.id ? getClientsForCaregiver(state, currentUser.id) : []
     },
-    [currentUser?.id]
+    [currentUser?.id],
   )
   const clients = useSelector(clientsSelector)
 
-  const handleSentimentPress = () => {
-    if (selectedClient) {
-      dispatch(setClient(selectedClient))
-      navigation.navigate("SentimentReport" as never)
+  useEffect(() => {
+    if (clients.length === 1 && !selectedClient) {
+      setSelectedClient(clients[0])
     }
-  }
+  }, [clients, selectedClient])
 
-  const handleHealthPress = () => {
-    if (selectedClient) {
-      dispatch(setClient(selectedClient))
-      navigation.navigate("MedicalAnalysis" as never)
-    }
-  }
-
-  const handleFraudAbusePress = () => {
-    if (selectedClient) {
-      dispatch(setClient(selectedClient))
-      navigation.navigate("FraudAbuseAnalysis" as never)
-    }
-  }
-
-  const handleComingSoonPress = () => {
-    // TODO: Show coming soon message
-    logger.debug("Coming soon pressed")
+  const openReport = (key: ReportKey) => {
+    if (!selectedClient) return
+    dispatch(setClient(selectedClient))
+    if (key === "sentiment") navigation.navigate("SentimentReport" as never)
+    else if (key === "medical") navigation.navigate("MedicalAnalysis" as never)
+    else navigation.navigate("FraudAbuseAnalysis" as never)
   }
 
   if (themeLoading) {
@@ -61,119 +91,84 @@ export function ReportsScreen() {
   }
 
   const styles = createStyles(colors)
+  const clientPickerHidden = clients.length <= 1
+
+  const renderReportCard = (report: ReportDef) => {
+    const disabled = !selectedClient
+    return (
+      <Card
+        key={report.key}
+        testID={report.testID}
+        accessibilityLabel={translate(report.titleKey)}
+        accessibilityHint={disabled ? undefined : `Opens ${translate(report.titleKey)}`}
+        onPress={disabled ? undefined : () => openReport(report.key)}
+        style={[
+          styles.reportCard,
+          report.primary ? styles.reportCardPrimary : styles.reportCardSecondary,
+          disabled && styles.reportCardDisabled,
+        ]}
+        ContentComponent={
+          <View style={styles.reportCardInner}>
+            <View style={[styles.iconCircle, { backgroundColor: report.accent }]}>
+              <Ionicons name={report.icon} size={report.primary ? 24 : 20} color={report.iconColor} />
+            </View>
+            <View style={styles.reportTextBlock}>
+              <Text
+                style={[styles.reportTitle, report.primary ? undefined : styles.reportTitleSecondary]}
+                text={translate(report.titleKey)}
+              />
+              {report.hintKey ? (
+                <Text style={styles.reportHint} text={translate(report.hintKey)} />
+              ) : null}
+            </View>
+          </View>
+        }
+      />
+    )
+  }
 
   return (
-    <View style={styles.container} testID="reports-screen" accessibilityLabel="reports-screen">
-      <View style={styles.clientSelector}>
-        <Text style={styles.selectorLabel}>{translate("reportsScreen.selectClient")}</Text>
-        <Pressable
-          style={styles.clientPicker}
-          onPress={() => setShowClientPicker(true)}
-          testID="client-picker-button"
-          accessibilityRole="button"
-          accessibilityLabel={selectedClient ? `Selected client: ${selectedClient.name}` : translate("reportsScreen.chooseClient") || "Choose client"}
-          accessibilityHint="Opens client selection dialog"
-        >
-          <Text style={styles.clientPickerText}>
-            {selectedClient ? selectedClient.name : translate("reportsScreen.chooseClient")}
-          </Text>
-          <Ionicons name="chevron-down" size={20} color={colors.palette.neutral600} />
-        </Pressable>
-      </View>
-
-      <View style={styles.grid}>
-        {/* Top Row */}
-        <View style={styles.row}>
-          <Button 
-            preset="primary"
-            style={[
-              styles.button, 
-              { width: buttonSize, height: buttonSize },
-              !selectedClient && styles.buttonDisabled
-            ]} 
-            onPress={handleSentimentPress}
-            disabled={!selectedClient}
-            testID="sentiment-reports-button"
-            accessibilityHint="Opens sentiment analysis report for the selected client"
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      testID="reports-screen"
+      accessibilityLabel="reports-screen"
+    >
+      {!clientPickerHidden ? (
+        <View style={styles.clientSelector}>
+          <Text style={styles.selectorLabel}>{translate("reportsScreen.selectClient")}</Text>
+          <Pressable
+            style={styles.clientPicker}
+            onPress={() => setShowClientPicker(true)}
+            testID="client-picker-button"
+            accessibilityRole="button"
+            accessibilityLabel={
+              selectedClient
+                ? `Selected client: ${selectedClient.name}`
+                : translate("reportsScreen.chooseClient") || "Choose client"
+            }
           >
-            <View style={styles.buttonContent}>
-              <Ionicons 
-                name="trending-up" 
-                size={32} 
-                color={colors.palette.neutral100}
-              />
-              <Text style={styles.buttonText}>{translate("reportsScreen.sentiment")}</Text>
-            </View>
-          </Button>
-          
-          <Button 
-            preset="primary"
-            style={[
-              styles.button, 
-              { width: buttonSize, height: buttonSize },
-              !selectedClient && styles.buttonDisabled
-            ]} 
-            onPress={handleHealthPress}
-            disabled={!selectedClient}
-            testID="health-reports-button"
-          >
-            <View style={styles.buttonContent}>
-              <Ionicons 
-                name="heart" 
-                size={32} 
-                color={colors.palette.neutral100}
-              />
-              <Text style={styles.buttonText}>{translate("reportsScreen.medicalAnalysis")}</Text>
-            </View>
-          </Button>
+            <Text style={styles.clientPickerText}>
+              {selectedClient ? selectedClient.name : translate("reportsScreen.chooseClient")}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color={colors.palette.neutral600} />
+          </Pressable>
         </View>
+      ) : selectedClient ? (
+        <Text style={styles.singleClientLabel}>{selectedClient.name}</Text>
+      ) : null}
 
-        {/* Bottom Row */}
-        <View style={styles.row}>
-          <Button 
-            preset="primary"
-            style={[
-              styles.button, 
-              { width: buttonSize, height: buttonSize },
-              !selectedClient && styles.buttonDisabled
-            ]} 
-            onPress={handleFraudAbusePress}
-            disabled={!selectedClient}
-            testID="fraud-abuse-reports-button"
-            accessibilityHint="Opens fraud and abuse analysis report for the selected client"
-          >
-            <View style={styles.buttonContent}>
-              <Ionicons 
-                name="shield" 
-                size={32} 
-                color={colors.palette.neutral100}
-              />
-              <Text style={styles.buttonText}>{translate("reportsScreen.fraudAbuseAnalysis")}</Text>
-            </View>
-          </Button>
-          
-          <Button 
-            preset="default"
-            style={[styles.button, styles.comingSoonButton, { width: buttonSize, height: buttonSize }]} 
-            onPress={handleComingSoonPress}
-            testID="coming-soon-button-2"
-          >
-            <View style={styles.buttonContent}>
-              <Ionicons 
-                name="add-circle" 
-                size={32} 
-                color={colors.palette.neutral600}
-              />
-              <Text style={[styles.buttonText, styles.comingSoonText]}>{translate("reportsScreen.comingSoon")}</Text>
-            </View>
-          </Button>
-        </View>
-      </View>
+      <Text style={styles.intro} tx="reportsScreen.intro" />
 
-      {/* Client Picker Modal */}
+      <Text style={styles.sectionLabel} tx="reportsScreen.primarySection" />
+      <View style={styles.grid}>{PRIMARY_REPORTS.map(renderReportCard)}</View>
+
+      <Text style={styles.sectionLabelSecondary} tx="reportsScreen.secondarySection" />
+      <View style={styles.grid}>{SECONDARY_REPORTS.map(renderReportCard)}</View>
+
       <Modal
         visible={showClientPicker}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setShowClientPicker(false)}
       >
@@ -188,7 +183,7 @@ export function ReportsScreen() {
                       key={client.id}
                       style={[
                         styles.clientItem,
-                        selectedClient?.id === client.id && styles.selectedClientItem
+                        selectedClient?.id === client.id && styles.selectedClientItem,
                       ]}
                       onPress={() => {
                         setSelectedClient(client)
@@ -197,160 +192,182 @@ export function ReportsScreen() {
                       testID={`client-option-${client.id}`}
                     >
                       <Text style={styles.clientItemText}>{client.name}</Text>
-                      {selectedClient?.id === client.id && (
-                        <Ionicons name="checkmark" size={20} color={colors.palette.biancaButtonSelected} />
-                      )}
+                      {selectedClient?.id === client.id ? (
+                        <Ionicons name="checkmark" size={20} color={colors.palette.primary500} />
+                      ) : null}
                     </Pressable>
                   ))}
                 </ScrollView>
-                  <Button
+                <Button
                   preset="default"
                   text={translate("reportsScreen.modalCancel")}
                   onPress={() => setShowClientPicker(false)}
-                  style={styles.modalCloseButton}
                 />
               </View>
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-    </View>
+    </ScrollView>
   )
 }
 
-const createStyles = (colors: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.palette.biancaBackground,
-    padding: 20,
-  },
-  clientSelector: {
-    marginBottom: 20,
-  },
-  selectorLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.palette.biancaHeader,
-    marginBottom: 8,
-  },
-  clientPicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.palette.neutral100,
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.palette.neutral300,
-  },
-  clientPickerText: {
-    fontSize: 16,
-    color: colors.palette.biancaHeader,
-    flex: 1,
-  },
-  grid: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    width: '100%',
-    maxWidth: 400, // Limit max width for larger screens
-  },
-  button: {
-    backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 12,
-    elevation: 3,
-    shadowColor: colors.palette.neutral900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    minHeight: 120,
-    minWidth: 120,
-  },
-  comingSoonButton: {
-    backgroundColor: colors.palette.neutral200,
-    borderWidth: 2,
-    borderColor: colors.palette.neutral300,
-    borderStyle: 'dashed',
-  },
-  buttonContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  buttonText: {
-    color: colors.palette.neutral100,
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  comingSoonText: {
-    color: colors.palette.neutral600,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-    backgroundColor: colors.palette.neutral300,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.palette.overlay50 || 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.palette.neutral100,
-    borderRadius: 12,
-    padding: 20,
-    width: '100%',
-    maxWidth: 400,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.palette.biancaHeader,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  clientList: {
-    maxHeight: 300,
-    marginBottom: 16,
-  },
-  clientItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: colors.palette.neutral200,
-  },
-  selectedClientItem: {
-    backgroundColor: colors.palette.biancaSuccessBackground,
-    borderWidth: 1,
-    borderColor: colors.palette.biancaSuccess,
-  },
-  clientItemText: {
-    fontSize: 16,
-    color: colors.palette.biancaHeader,
-    flex: 1,
-  },
-  modalCloseButton: {
-    backgroundColor: colors.palette.neutral300,
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-  },
-  modalCloseText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.palette.neutral700,
-  },
-})
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: colors.palette.neutral200,
+      flex: 1,
+    },
+    content: {
+      padding: 20,
+      paddingBottom: 32,
+    },
+    clientSelector: {
+      marginBottom: 20,
+    },
+    selectorLabel: {
+      color: colors.palette.neutral600,
+      fontSize: 13,
+      fontWeight: "600",
+      marginBottom: 8,
+    },
+    singleClientLabel: {
+      color: colors.palette.neutral600,
+      fontSize: 15,
+      fontWeight: "600",
+      marginBottom: 8,
+    },
+    intro: {
+      color: colors.palette.neutral600,
+      fontSize: 15,
+      lineHeight: 22,
+      marginBottom: 20,
+    },
+    sectionLabel: {
+      color: colors.palette.neutral600,
+      fontSize: 13,
+      fontWeight: "700",
+      letterSpacing: 0.4,
+      marginBottom: 10,
+      textTransform: "uppercase",
+    },
+    sectionLabelSecondary: {
+      color: colors.palette.neutral500,
+      fontSize: 12,
+      fontWeight: "600",
+      letterSpacing: 0.3,
+      marginBottom: 10,
+      marginTop: 8,
+      textTransform: "uppercase",
+    },
+    clientPicker: {
+      alignItems: "center",
+      backgroundColor: colors.palette.neutral100,
+      borderColor: colors.palette.neutral300,
+      borderRadius: 12,
+      borderWidth: 1,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      padding: 14,
+    },
+    clientPickerText: {
+      color: colors.palette.biancaHeader,
+      flex: 1,
+      fontSize: 16,
+    },
+    grid: {
+      gap: 12,
+      marginBottom: 12,
+    },
+    reportCard: {
+      flexDirection: "column",
+      marginBottom: 0,
+      minHeight: 0,
+      padding: 16,
+    },
+    reportCardPrimary: {
+      paddingVertical: 18,
+    },
+    reportCardSecondary: {
+      opacity: 0.95,
+      paddingVertical: 14,
+    },
+    reportCardDisabled: {
+      opacity: 0.55,
+    },
+    reportCardInner: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 14,
+    },
+    iconCircle: {
+      alignItems: "center",
+      borderRadius: 12,
+      height: 44,
+      justifyContent: "center",
+      width: 44,
+    },
+    reportTextBlock: {
+      flex: 1,
+      gap: 2,
+    },
+    reportTitle: {
+      color: colors.palette.biancaHeader,
+      fontSize: 17,
+      fontWeight: "700",
+    },
+    reportTitleSecondary: {
+      fontSize: 15,
+      fontWeight: "600",
+    },
+    reportHint: {
+      color: colors.palette.neutral500,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    modalOverlay: {
+      alignItems: "center",
+      backgroundColor: colors.palette.overlay50 || "rgba(15, 23, 42, 0.5)",
+      flex: 1,
+      justifyContent: "center",
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: colors.palette.neutral100,
+      borderRadius: 16,
+      maxHeight: "80%",
+      maxWidth: 400,
+      padding: 20,
+      width: "100%",
+    },
+    modalTitle: {
+      color: colors.palette.biancaHeader,
+      fontSize: 18,
+      fontWeight: "700",
+      marginBottom: 16,
+      textAlign: "center",
+    },
+    clientList: {
+      marginBottom: 16,
+      maxHeight: 300,
+    },
+    clientItem: {
+      alignItems: "center",
+      backgroundColor: colors.palette.neutral200,
+      borderRadius: 12,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 8,
+      padding: 12,
+    },
+    selectedClientItem: {
+      backgroundColor: colors.palette.primary100,
+      borderColor: colors.palette.primary500,
+      borderWidth: 1,
+    },
+    clientItemText: {
+      color: colors.palette.biancaHeader,
+      flex: 1,
+      fontSize: 16,
+    },
+  })

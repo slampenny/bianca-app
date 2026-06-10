@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { View, StyleSheet, Pressable, Animated, Platform } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
-import { Button, Text, Screen } from "app/components"
+import { Button, Text, AuthScreenLayout } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import type { OnboardingPersona } from "app/services/api/api.types"
@@ -27,11 +27,9 @@ export function OnboardingAboutYouScreen({ navigation }: OnboardingAboutYouScree
 
   if (themeLoading) {
     return (
-      <Screen style={[styles.screen, { backgroundColor: colors.palette?.biancaBackground }]}>
-        <View style={styles.centered}>
-          <Text>{translate("common.loading")}</Text>
-        </View>
-      </Screen>
+      <AuthScreenLayout testID="onboarding-about-you-screen">
+        <Text>{translate("common.loading")}</Text>
+      </AuthScreenLayout>
     )
   }
 
@@ -43,62 +41,52 @@ export function OnboardingAboutYouScreen({ navigation }: OnboardingAboutYouScree
   }
 
   const options: { value: OnboardingPersona; labelKey: string; testID: string }[] = [
-    { value: "organization", labelKey: "onboarding.aboutYou.organization", testID: "onboarding-persona-organization" },
     { value: "caregiver", labelKey: "onboarding.aboutYou.caregiver", testID: "onboarding-persona-caregiver" },
     { value: "agingInPlace", labelKey: "onboarding.aboutYou.agingInPlace", testID: "onboarding-persona-agingInPlace" },
   ]
 
   return (
-    <Screen
-      testID="onboarding-about-you-screen"
-      style={[styles.screen, { backgroundColor: colors.palette?.biancaBackground }]}
-      preset="fixed"
-      contentContainerStyle={styles.screenContent}
-    >
+    <AuthScreenLayout testID="onboarding-about-you-screen" accessibilityLabel="onboarding-about-you-screen">
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-        <View style={styles.contentBlock}>
-          <Text style={stylesWithColors.title} tx="onboarding.aboutYou.title" />
-          <Text style={stylesWithColors.subtitle} tx="onboarding.aboutYou.subtitle" />
+        <Text style={stylesWithColors.title} tx="onboarding.aboutYou.title" />
+        <Text style={stylesWithColors.subtitle} tx="onboarding.aboutYou.subtitle" />
 
-          <View style={styles.options}>
-            {options.map((opt) => (
-              <Pressable
-                key={opt.value}
-                testID={opt.testID}
+        <View style={styles.options}>
+          {options.map((opt) => (
+            <Pressable
+              key={opt.value}
+              testID={opt.testID}
+              style={[
+                stylesWithColors.option,
+                persona === opt.value && stylesWithColors.optionSelected,
+              ]}
+              onPress={() => setPersona(opt.value)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: persona === opt.value }}
+              accessibilityLabel={translate(opt.labelKey as import("../i18n").TxKeyPath)}
+            >
+              <Text
                 style={[
-                  stylesWithColors.option,
-                  persona === opt.value && stylesWithColors.optionSelected,
+                  stylesWithColors.optionText,
+                  persona === opt.value && stylesWithColors.optionTextSelected,
                 ]}
-                onPress={() => setPersona(opt.value)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: persona === opt.value }}
-                accessibilityLabel={translate(opt.labelKey as import("../i18n").TxKeyPath)}
               >
-                <Text
-                  style={[
-                    stylesWithColors.optionText,
-                    persona === opt.value && stylesWithColors.optionTextSelected,
-                  ]}
-                >
-                  {translate(opt.labelKey as import("../i18n").TxKeyPath)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <View style={styles.footer}>
-            <Button
-              testID="onboarding-about-you-continue"
-              tx="common.continue"
-              preset="primary"
-              onPress={handleContinue}
-              disabled={!persona}
-              style={stylesWithColors.primaryButton}
-            />
-          </View>
+                {translate(opt.labelKey as import("../i18n").TxKeyPath)}
+              </Text>
+            </Pressable>
+          ))}
         </View>
+
+        <Button
+          testID="onboarding-about-you-continue"
+          tx="common.continue"
+          preset="primary"
+          onPress={handleContinue}
+          disabled={!persona}
+          style={stylesWithColors.primaryButton}
+        />
       </Animated.View>
-    </Screen>
+    </AuthScreenLayout>
   )
 }
 
@@ -132,12 +120,12 @@ const createStyles = (colors: any) =>
       paddingHorizontal: 22,
       borderRadius: 12,
       borderWidth: 2,
-      borderColor: colors.palette?.neutral300 ?? "#e5e5e5",
-      backgroundColor: colors.palette?.neutral100 ?? "#fafafa",
+      borderColor: colors.palette.neutral300,
+      backgroundColor: colors.palette.neutral100,
     },
     optionSelected: {
-      borderColor: colors.palette?.primary500 ?? "#6366f1",
-      backgroundColor: (colors.palette as any)?.primary50 ?? "#eef2ff",
+      borderColor: colors.palette?.primary500 ?? "#0f766e",
+      backgroundColor: colors.palette?.primary100 ?? "#f0fdfa",
     },
     optionText: {
       fontSize: 18,
@@ -145,10 +133,9 @@ const createStyles = (colors: any) =>
       color: colors.palette?.neutral800 ?? colors.text,
     },
     optionTextSelected: {
-      color: colors.palette?.primary700 ?? "#4338ca",
+      color: colors.palette?.primary700 ?? "#0f766e",
     },
     primaryButton: {
-      borderRadius: 20,
-      paddingVertical: 14,
+      marginTop: 28,
     },
   })

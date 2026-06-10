@@ -7,8 +7,8 @@ const { expect } = require('@playwright/test');
 
 When('I navigate to the reports screen', async function() {
   const base = (this.baseURL || '').replace(/\/$/, '');
-  const reportsTab = this.page.getByTestId('tab-reports')
-    .or(this.page.locator('[data-testid="tab-reports"], [aria-label="Reports tab"]').first());
+  const reportsTab = this.page.getByTestId('tab-insights')
+    .or(this.page.locator('[data-testid="tab-insights"], [aria-label="Insights tab"]').first());
   
   await reportsTab.waitFor({ state: 'visible', timeout: 10000 });
   await reportsTab.click();
@@ -25,7 +25,7 @@ When('I navigate to the reports screen', async function() {
   ]).catch(() => false);
 
   if (!reportsVisible) {
-    await this.page.goto(`${base}#/MainTabs/Reports`, { waitUntil: 'load' });
+    await this.page.goto(`${base}#/MainTabs/Insights`, { waitUntil: 'load' });
     await Promise.race([
       reportsScreen.first().waitFor({ state: 'visible', timeout: 10000 }),
       clientPicker.first().waitFor({ state: 'visible', timeout: 10000 }),
@@ -101,10 +101,10 @@ Given(/^I am on the fraud\/abuse analysis screen$/, async function() {
   await this.page.locator('[data-testid^="tab-"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
   const reportsPaths = [
-    `${base}/MainTabs/Reports`,
-    `${base}/MainTabs/Reports/ReportsList`,
-    `${base}#/MainTabs/Reports`,
-    `${base}#/MainTabs/Reports/ReportsList`,
+    `${base}/MainTabs/Insights`,
+    `${base}/MainTabs/Insights/ReportsList`,
+    `${base}#/MainTabs/Insights`,
+    `${base}#/MainTabs/Insights/ReportsList`,
   ];
   let onReports = false;
   for (const path of reportsPaths) {
@@ -125,14 +125,14 @@ Given(/^I am on the fraud\/abuse analysis screen$/, async function() {
   if (!onReports) {
     await this.page.goto(`${base}/`, { waitUntil: 'load' });
     await this.page.locator('[data-testid="reports-screen"], [data-testid="fraud-abuse"], [data-testid*="schedule"]').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    let reportsTab = this.page.getByTestId('tab-reports').first();
+    let reportsTab = this.page.getByTestId('tab-insights').first();
     let tabCount = await reportsTab.count();
     if (tabCount === 0) {
-      reportsTab = this.page.locator('[data-testid="tab-reports"], [aria-label*="Reports"]').first();
+      reportsTab = this.page.locator('[data-testid="tab-insights"], [aria-label*="Insights"]').first();
       tabCount = await reportsTab.count();
     }
     if (tabCount === 0) {
-      reportsTab = this.page.getByText(/reports/i).first();
+      reportsTab = this.page.getByText(/insights/i).first();
       tabCount = await reportsTab.count();
     }
     if (tabCount > 0) {

@@ -39,18 +39,14 @@ async function goThroughOnboardingToRegister(page, persona = 'caregiver', orgNam
   ]);
   const onAboutYou = await aboutYou.isVisible().catch(() => false);
   if (!onAboutYou) return;
-  const personaTestId = persona === 'organization' ? 'onboarding-persona-organization'
-    : persona === 'caregiver' ? 'onboarding-persona-caregiver' : 'onboarding-persona-agingInPlace';
+  const effectivePersona = persona === 'organization' ? 'caregiver' : persona;
+  const personaTestId = effectivePersona === 'caregiver' ? 'onboarding-persona-caregiver' : 'onboarding-persona-agingInPlace';
   await page.getByTestId(personaTestId).click();
   await page.getByTestId('onboarding-about-you-continue').click();
   await page.getByTestId('onboarding-how-it-works-next').waitFor({ state: 'visible', timeout: 10000 });
   await page.getByTestId('onboarding-how-it-works-next').click();
   if (persona === 'organization') {
-    await page.getByTestId('onboarding-org-info-screen').waitFor({ state: 'visible', timeout: 10000 });
-    const orgNameInput = page.locator('input[data-testid="onboarding-org-name"]');
-    await orgNameInput.waitFor({ state: 'visible', timeout: 5000 });
-    await orgNameInput.fill(orgName);
-    await page.getByTestId('onboarding-org-info-continue').click();
+    // B2C mobile skips org info; Register follows How Bianca works.
   }
   await registerName.waitFor({ state: 'visible', timeout: 10000 });
 }

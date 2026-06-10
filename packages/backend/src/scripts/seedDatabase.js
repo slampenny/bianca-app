@@ -31,6 +31,7 @@ const sentimentAnalysisSeeder = require('./seeders/sentimentAnalysis.seeder');
 const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
 const clientReportSnapshotSeeder = require('./seeders/clientReportSnapshot.seeder');
 const onboardingSeeder = require('./seeders/onboarding.seeder');
+const familySeeder = require('./seeders/family.seeder');
 
 /**
  * Clear all database collections
@@ -186,13 +187,22 @@ async function seedDatabase() {
 
     await clientReportSnapshotSeeder.seedClientReportSnapshots([client1, client2, client3]);
 
+    const family = await familySeeder.seedFamilyAccount();
+
     console.log('Database seeded successfully!');
+    console.log('');
+    console.log('Test logins (password for all: Password1):');
+    console.log('  B2B facility staff (web):  fake@example.org');
+    console.log('  B2B org admin (web):         admin@example.org');
+    console.log('  B2C family / mobile dev:     parent@example.org');
+    console.log('');
     return { 
       org, 
       caregiver: caregiverOneRecord, 
       clients: [client1, client2, client3], 
       invoice, 
-      paymentMethods 
+      paymentMethods,
+      family,
     };
   } catch (error) {
     console.error('Error seeding database:', error);

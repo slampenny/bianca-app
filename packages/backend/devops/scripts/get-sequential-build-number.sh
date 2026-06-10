@@ -9,7 +9,7 @@
 
 set -e
 
-PIPELINE_NAME="${1:-bianca-staging-pipeline}"
+PIPELINE_NAME="${1:-bianca-production-pipeline}"
 READ_ONLY="${2:-false}"
 BUILD_COUNTER_KEY="build-counter/sequential-build-number.txt"
 

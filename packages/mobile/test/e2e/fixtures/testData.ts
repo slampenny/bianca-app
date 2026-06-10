@@ -1,5 +1,12 @@
 // Test user data for E2E tests
 export const TEST_USERS = {
+  /** B2C family account (mobile) — seeded by /v1/test/seed */
+  FAMILY_PARENT: {
+    name: "Alex Parent",
+    email: "parent@example.org",
+    password: "Password1",
+  },
+  /** B2B facility staff — seeded by /v1/test/seed */
   WITH_CLIENTS: {
     name: "Test User",
     email: "fake@example.org",

@@ -2167,7 +2167,6 @@ resource "aws_acm_certificate" "primary_domain_cert" {
     "staging.${var.primary_domain}",
     "staging-api.${var.primary_domain}",
     "staging-admin.${var.primary_domain}",
-    "demo.${var.primary_domain}",
     "sip.${var.primary_domain}",
     "staging-sip.${var.primary_domain}",
   ]

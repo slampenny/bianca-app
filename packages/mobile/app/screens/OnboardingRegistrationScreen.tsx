@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from "react"
 import { View, StyleSheet, Pressable } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
-import { Button, Text, Screen, TextField, PhoneInputWeb, CountryPicker } from "app/components"
+import { Button, Text, AuthScreenLayout, TextField, PhoneInputWeb, CountryPicker } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { useSelector } from "react-redux"
 import { getCurrentUser } from "app/store/authSlice"
+import { getOrg } from "app/store/orgSlice"
 import { useCompleteOnboardingMutation } from "app/services/api/authApi"
 import { useUpdateCaregiverMutation } from "app/services/api/caregiverApi"
 import type { OnboardingPersona } from "app/services/api/api.types"
 import { OnboardingStackParamList } from "app/navigators/navigationTypes"
 import { Ionicons } from "@expo/vector-icons"
+import { disableFamilyVoiceOnboarding } from "app/utils/familyOrgSettings"
 
 export type OnboardingRegistrationScreenProps = StackScreenProps<
   OnboardingStackParamList,
@@ -20,6 +22,7 @@ export type OnboardingRegistrationScreenProps = StackScreenProps<
 export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRegistrationScreenProps) {
   const { persona } = route.params
   const currentUser = useSelector(getCurrentUser)
+  const currentOrg = useSelector(getOrg)
   const { colors, isLoading: themeLoading } = useTheme()
   const [completeOnboarding, { isLoading: isCompleting }] = useCompleteOnboardingMutation()
   const [updateCaregiver] = useUpdateCaregiverMutation()
@@ -33,7 +36,7 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
   const [showWhyImportant, setShowWhyImportant] = useState(false)
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
 
-  const showConsent = persona === "organization" || persona === "caregiver"
+  const showConsent = persona === "caregiver"
 
   useEffect(() => {
     if (currentUser) {
@@ -45,11 +48,9 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
 
   if (themeLoading) {
     return (
-      <Screen style={[styles.screen, { backgroundColor: colors.palette?.biancaBackground }]}>
-        <View style={styles.centered}>
-          <Text>{translate("common.loading")}</Text>
-        </View>
-      </Screen>
+      <AuthScreenLayout testID="onboarding-registration-screen">
+        <Text>{translate("common.loading")}</Text>
+      </AuthScreenLayout>
     )
   }
 
@@ -77,6 +78,11 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
         acceptTerms: true,
         ...(showConsent && { singleConsentState }),
       }).unwrap()
+      const orgId = currentOrg?.id || currentUser.org
+      if (orgId) {
+        await disableFamilyVoiceOnboarding(orgId)
+      }
+      navigation.replace("OnboardingAddLovedOne")
     } catch {
       // Error handled by RTK
     }
@@ -86,138 +92,121 @@ export function OnboardingRegistrationScreen({ route, navigation }: OnboardingRe
   const openPrivacy = () => navigation.navigate("Privacy")
 
   return (
-    <Screen
-      testID="onboarding-registration-screen"
-      style={[styles.screen, { backgroundColor: colors.palette?.biancaBackground }]}
-      preset="scroll"
-    >
-      <View style={[styles.container, styles.centeredContent]}>
-        <View style={styles.contentBlock}>
-          <Text style={stylesWithColors.title} tx="onboarding.registration.title" />
-          <Text style={stylesWithColors.subtitle} tx="onboarding.registration.subtitle" />
+    <AuthScreenLayout testID="onboarding-registration-screen">
+      <Text style={stylesWithColors.title} tx="onboarding.registration.title" />
+      <Text style={stylesWithColors.subtitle} tx="onboarding.registration.subtitle" />
 
-          <View style={styles.field}>
-            <TextField
-              value={name}
-              onChangeText={(t) => { setName(t); if (nameInvalid) setAttemptedSubmit(false) }}
-              labelTx="registerScreen.nameFieldLabel"
-              placeholderTx="registerScreen.nameFieldPlaceholder"
-              status={nameInvalid ? "error" : undefined}
-              helper={nameInvalid ? translate("onboarding.registration.nameRequired") : undefined}
-              testID="onboarding-reg-name"
-            />
-          </View>
-          <View style={styles.field}>
-            <TextField
-              value={email}
-              onChangeText={(t) => { setEmail(t); if (emailInvalid) setAttemptedSubmit(false) }}
-              labelTx="registerScreen.emailFieldLabel"
-              placeholderTx="registerScreen.emailFieldPlaceholder"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              status={emailInvalid ? "error" : undefined}
-              helper={emailInvalid ? translate("onboarding.registration.emailRequired") : undefined}
-              testID="onboarding-reg-email"
-            />
-          </View>
-          <View style={styles.field}>
-            <PhoneInputWeb
-              value={phone}
-              onChangeText={setPhone}
-              labelTx="registerScreen.phoneFieldLabel"
-              placeholderTx="registerScreen.phoneFieldPlaceholder"
-              testID="onboarding-reg-phone"
-            />
-          </View>
-          <View style={styles.field}>
-            <CountryPicker
-              value={country}
-              onValueChange={setCountry}
-              labelTx="registerScreen.countryFieldLabel"
-              containerStyle={styles.pickerContainer}
-            />
-          </View>
+      <View style={styles.field}>
+        <TextField
+          value={name}
+          onChangeText={(t) => { setName(t); if (nameInvalid) setAttemptedSubmit(false) }}
+          labelTx="registerScreen.nameFieldLabel"
+          placeholderTx="registerScreen.nameFieldPlaceholder"
+          status={nameInvalid ? "error" : undefined}
+          helper={nameInvalid ? translate("onboarding.registration.nameRequired") : undefined}
+          testID="onboarding-reg-name"
+        />
+      </View>
+      <View style={styles.field}>
+        <TextField
+          value={email}
+          onChangeText={(t) => { setEmail(t); if (emailInvalid) setAttemptedSubmit(false) }}
+          labelTx="registerScreen.emailFieldLabel"
+          placeholderTx="registerScreen.emailFieldPlaceholder"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          status={emailInvalid ? "error" : undefined}
+          helper={emailInvalid ? translate("onboarding.registration.emailRequired") : undefined}
+          testID="onboarding-reg-email"
+        />
+      </View>
+      <View style={styles.field}>
+        <PhoneInputWeb
+          value={phone}
+          onChangeText={setPhone}
+          labelTx="registerScreen.phoneFieldLabel"
+          placeholderTx="registerScreen.phoneFieldPlaceholder"
+          testID="onboarding-reg-phone"
+        />
+      </View>
+      <View style={styles.field}>
+        <CountryPicker
+          value={country}
+          onValueChange={setCountry}
+          labelTx="registerScreen.countryFieldLabel"
+          containerStyle={styles.pickerContainer}
+        />
+      </View>
 
-          {/* Terms */}
-          <View style={[styles.termsSection, termsInvalid && stylesWithColors.termsSectionError]}>
-            {termsInvalid && (
-              <Text style={stylesWithColors.fieldErrorText}>{translate("onboarding.registration.termsRequired")}</Text>
-            )}
+      <View style={[styles.termsSection, termsInvalid && stylesWithColors.termsSectionError]}>
+        {termsInvalid && (
+          <Text style={stylesWithColors.fieldErrorText}>{translate("onboarding.registration.termsRequired")}</Text>
+        )}
+        <Pressable
+          style={styles.termsRow}
+          onPress={() => { setAcceptTerms((v) => !v); if (termsInvalid) setAttemptedSubmit(false) }}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: acceptTerms }}
+        >
+          <View style={[stylesWithColors.checkbox, acceptTerms && stylesWithColors.checkboxChecked]}>
+            {acceptTerms && <Ionicons name="checkmark" size={18} color="#fff" />}
+          </View>
+          <Text style={stylesWithColors.termsText}>
+            {translate("onboarding.termsAndConsent.acceptTerms")}{" "}
+            <Text style={stylesWithColors.link} onPress={openTerms}>{translate("onboarding.termsAndConsent.termsLink")}</Text>{" "}
+            {translate("onboarding.termsAndConsent.and")}{" "}
+            <Text style={stylesWithColors.link} onPress={openPrivacy}>{translate("onboarding.termsAndConsent.privacyLink")}</Text>
+          </Text>
+        </Pressable>
+      </View>
+
+      {showConsent && (
+        <View style={styles.consentSection}>
+          <Text style={stylesWithColors.consentLabel} tx="onboarding.termsAndConsent.singleConsentQuestion" />
+          <Pressable style={styles.whyButton} onPress={() => setShowWhyImportant((v) => !v)}>
+            <Ionicons name="help-circle-outline" size={20} color={colors.palette?.primary500 ?? "#6366f1"} />
+            <Text style={stylesWithColors.whyText}>{translate("onboarding.termsAndConsent.whyImportant")}</Text>
+          </Pressable>
+          {showWhyImportant && (
+            <Text style={stylesWithColors.whyBody} tx="onboarding.termsAndConsent.whyImportantBody" />
+          )}
+          <View style={styles.consentRow}>
             <Pressable
-              style={styles.termsRow}
-              onPress={() => { setAcceptTerms((v) => !v); if (termsInvalid) setAttemptedSubmit(false) }}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: acceptTerms }}
+              style={[stylesWithColors.consentOption, singleConsentState && stylesWithColors.consentOptionSelected]}
+              onPress={() => setSingleConsentState(true)}
             >
-              <View style={[stylesWithColors.checkbox, acceptTerms && stylesWithColors.checkboxChecked]}>
-                {acceptTerms && <Ionicons name="checkmark" size={18} color="#fff" />}
-              </View>
-              <Text style={stylesWithColors.termsText}>
-                {translate("onboarding.termsAndConsent.acceptTerms")}{" "}
-                <Text style={stylesWithColors.link} onPress={openTerms}>{translate("onboarding.termsAndConsent.termsLink")}</Text>{" "}
-                {translate("onboarding.termsAndConsent.and")}{" "}
-                <Text style={stylesWithColors.link} onPress={openPrivacy}>{translate("onboarding.termsAndConsent.privacyLink")}</Text>
+              <Text style={[stylesWithColors.consentOptionText, singleConsentState && stylesWithColors.consentOptionTextSelected]}>
+                {translate("onboarding.termsAndConsent.yes")}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[stylesWithColors.consentOption, !singleConsentState && stylesWithColors.consentOptionSelected]}
+              onPress={() => setSingleConsentState(false)}
+            >
+              <Text style={[stylesWithColors.consentOptionText, !singleConsentState && stylesWithColors.consentOptionTextSelected]}>
+                {translate("onboarding.termsAndConsent.no")}
               </Text>
             </Pressable>
           </View>
-
-          {/* Single-consent (org/caregiver only) */}
-          {showConsent && (
-            <View style={styles.consentSection}>
-              <Text style={stylesWithColors.consentLabel} tx="onboarding.termsAndConsent.singleConsentQuestion" />
-              <Pressable style={styles.whyButton} onPress={() => setShowWhyImportant((v) => !v)}>
-                <Ionicons name="help-circle-outline" size={20} color={colors.palette?.primary500 ?? "#6366f1"} />
-                <Text style={stylesWithColors.whyText}>{translate("onboarding.termsAndConsent.whyImportant")}</Text>
-              </Pressable>
-              {showWhyImportant && (
-                <Text style={stylesWithColors.whyBody} tx="onboarding.termsAndConsent.whyImportantBody" />
-              )}
-              <View style={styles.consentRow}>
-                <Pressable
-                  style={[stylesWithColors.consentOption, singleConsentState && stylesWithColors.consentOptionSelected]}
-                  onPress={() => setSingleConsentState(true)}
-                >
-                  <Text style={[stylesWithColors.consentOptionText, singleConsentState && stylesWithColors.consentOptionTextSelected]}>
-                    {translate("onboarding.termsAndConsent.yes")}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[stylesWithColors.consentOption, !singleConsentState && stylesWithColors.consentOptionSelected]}
-                  onPress={() => setSingleConsentState(false)}
-                >
-                  <Text style={[stylesWithColors.consentOptionText, !singleConsentState && stylesWithColors.consentOptionTextSelected]}>
-                    {translate("onboarding.termsAndConsent.no")}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.footer}>
-            <Button
-              testID="onboarding-registration-save"
-              tx="onboarding.termsAndConsent.saveAndContinue"
-              preset="primary"
-              onPress={handleSave}
-              disabled={!canSubmit}
-              loading={isCompleting}
-              style={stylesWithColors.primaryButton}
-              disabledStyle={stylesWithColors.primaryButtonDisabled}
-              disabledTextStyle={stylesWithColors.primaryButtonDisabledText}
-            />
-          </View>
         </View>
-      </View>
-    </Screen>
+      )}
+
+      <Button
+        testID="onboarding-registration-save"
+        tx="onboarding.termsAndConsent.saveAndContinue"
+        preset="primary"
+        onPress={handleSave}
+        disabled={!canSubmit}
+        loading={isCompleting}
+        style={stylesWithColors.primaryButton}
+        disabledStyle={stylesWithColors.primaryButtonDisabled}
+        disabledTextStyle={stylesWithColors.primaryButtonDisabledText}
+      />
+    </AuthScreenLayout>
   )
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: 24 },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  centeredContent: { justifyContent: "center", minHeight: "100%" },
-  contentBlock: { maxWidth: 440, width: "100%", alignSelf: "center", paddingTop: 24 },
   field: { marginBottom: 18 },
   pickerContainer: { marginBottom: 0 },
   termsSection: { marginTop: 8, marginBottom: 20 },
@@ -225,7 +214,6 @@ const styles = StyleSheet.create({
   consentSection: { marginBottom: 20 },
   whyButton: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
   consentRow: { flexDirection: "row", gap: 12, marginTop: 8 },
-  footer: { marginTop: 24, paddingBottom: 24 },
 })
 
 const createStyles = (colors: any) =>
@@ -277,10 +265,7 @@ const createStyles = (colors: any) =>
     },
     consentOptionText: { fontSize: 16, fontWeight: "600", color: colors.palette?.neutral700 ?? colors.text },
     consentOptionTextSelected: { color: colors.palette?.primary700 ?? "#4338ca" },
-    primaryButton: {
-      borderRadius: 20,
-      paddingVertical: 14,
-    },
+    primaryButton: { borderRadius: 20, paddingVertical: 14, marginTop: 8 },
     primaryButtonDisabled: {
       opacity: 0.5,
       backgroundColor: (colors.palette as any)?.neutral400 ?? "#a3a3a3",

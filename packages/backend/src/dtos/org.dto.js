@@ -26,6 +26,7 @@ const OrgDTO = (org) => {
     requireClientConsent,
     debugAudioUploadEnabled,
     voiceOnboarding,
+    requiredCallQuestions,
     dailyDigestSettings,
   } = orgObj;
   
@@ -73,6 +74,15 @@ const OrgDTO = (org) => {
           })),
         }
       : { useDefault: true, days: [] },
+    requiredCallQuestions: requiredCallQuestions
+      ? {
+          enabled: requiredCallQuestions.enabled === true,
+          questions: (requiredCallQuestions.questions || []).map((q) => ({
+            id: q.id,
+            prompt: q.prompt,
+          })),
+        }
+      : { enabled: false, questions: [] },
     dailyDigestSettings: {
       enabled: dailyDigestSettings?.enabled === true,
       sendTime: dailyDigestSettings?.sendTime || null,

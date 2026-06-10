@@ -2,6 +2,50 @@ const Joi = require('joi');
 const validator = require('validator');
 const { password, objectId } = require('./custom.validation');
 
+const emergencyContactEntry = Joi.object()
+  .keys({
+    id: Joi.string().custom(objectId).optional(),
+    name: Joi.string().allow('').optional(),
+    relationship: Joi.string().allow('').optional(),
+    phone: Joi.string().allow('').optional(),
+    email: Joi.string()
+      .trim()
+      .allow('')
+      .optional()
+      .custom((value, helpers) => {
+        if (value === '' || value == null) return value;
+        if (!validator.isEmail(value)) {
+          return helpers.message('Invalid emergency contact email');
+        }
+        return value;
+      }),
+  })
+  .optional();
+
+const familyDigestRecipient = Joi.object()
+  .keys({
+    id: Joi.string().custom(objectId).optional(),
+    name: Joi.string().allow('').optional(),
+    relationship: Joi.string().allow('').optional(),
+    email: Joi.string()
+      .trim()
+      .allow('')
+      .optional()
+      .custom((value, helpers) => {
+        if (value === '' || value == null) return value;
+        if (!validator.isEmail(value)) {
+          return helpers.message('Invalid family digest recipient email');
+        }
+        return value;
+      }),
+    familyDigestEmail: Joi.object()
+      .keys({
+        enabled: Joi.boolean().optional(),
+      })
+      .optional(),
+  })
+  .optional();
+
 const emergencyContact = Joi.object()
   .keys({
     name: Joi.string().allow('').optional(),
@@ -53,6 +97,8 @@ const createClient = {
     room: Joi.string().trim().allow('', null).optional(),
     moveInDate: Joi.date().optional(),
     emergencyContact,
+    emergencyContacts: Joi.array().items(emergencyContactEntry).optional(),
+    familyDigestRecipients: Joi.array().items(familyDigestRecipient).optional(),
     caregivers: Joi.array().optional(),
     schedules: Joi.array()
       .items(
@@ -131,6 +177,8 @@ const updateClient = {
       room: Joi.string().trim().allow('', null).optional(),
       moveInDate: Joi.date().optional(),
       emergencyContact,
+      emergencyContacts: Joi.array().items(emergencyContactEntry).optional(),
+      familyDigestRecipients: Joi.array().items(familyDigestRecipient).optional(),
       caregivers: Joi.array().optional(),
       schedules: Joi.array()
         .items(
@@ -226,6 +274,11 @@ const sendFamilyDigestEmailVerification = {
   params: Joi.object().keys({
     clientId: Joi.string().custom(objectId).required(),
   }),
+  body: Joi.object()
+    .keys({
+      recipientId: Joi.string().custom(objectId).optional(),
+    })
+    .optional(),
 };
 
 const verifyFamilyDigestEmail = {

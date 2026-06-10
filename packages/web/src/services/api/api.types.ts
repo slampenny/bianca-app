@@ -118,6 +118,24 @@ export interface Client {
       verifiedEmail?: string | null
     }
   } | null
+  emergencyContacts?: Array<{
+    id?: string | null
+    name?: string
+    relationship?: string
+    phone?: string
+    email?: string
+  }>
+  familyDigestRecipients?: Array<{
+    id?: string | null
+    name?: string
+    relationship?: string
+    email?: string
+    familyDigestEmail?: {
+      enabled?: boolean
+      verifiedAt?: string | null
+      verifiedEmail?: string | null
+    }
+  }>
   lastCallAttemptAt?: string | null
   lastAnsweredCallAt?: string | null
   sentimentTrendDirection?: "improving" | "stable" | "declining" | null

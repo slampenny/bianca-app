@@ -50,10 +50,9 @@ export class SimpleWorkflow {
     // WHEN: I check available navigation tabs
     const tabs = [
       { name: 'Home', testId: 'tab-home' },
-      { name: 'Org', testId: 'tab-org' },
+      { name: 'Insights', testId: 'tab-insights' },
       { name: 'Alerts', testId: 'tab-alert' },
-      { name: 'Reports', testId: 'tab-reports' },
-      { name: 'Conversations', testId: 'conversations-tab' }
+      { name: 'Settings', testId: 'tab-settings' },
     ]
     
     const availableTabs = []

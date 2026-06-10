@@ -152,6 +152,22 @@ const updateClient = catchAsync(async (req, res) => {
       }
     }
   }
+  if (Array.isArray(clientData.familyDigestRecipients)) {
+    if (caregiver.role !== 'orgAdmin' && caregiver.role !== 'superAdmin') {
+      delete clientData.familyDigestRecipients;
+    } else {
+      clientData.familyDigestRecipients = clientData.familyDigestRecipients.map((recipient) => {
+        if (!recipient?.familyDigestEmail || recipient.familyDigestEmail.enabled === undefined) {
+          const { familyDigestEmail, ...rest } = recipient;
+          return rest;
+        }
+        return {
+          ...recipient,
+          familyDigestEmail: { enabled: Boolean(recipient.familyDigestEmail.enabled) },
+        };
+      });
+    }
+  }
   const client = await clientService.updateClientById(req.params.clientId, clientData);
   if (schedules) {
     for (const schedule of schedules) {
@@ -406,7 +422,11 @@ const verifyConsent = catchAsync(async (req, res) => {
 });
 
 const sendFamilyDigestEmailVerification = catchAsync(async (req, res) => {
-  const result = await clientService.sendFamilyDigestEmailVerification(req.caregiver, req.params.clientId);
+  const result = await clientService.sendFamilyDigestEmailVerification(
+    req.caregiver,
+    req.params.clientId,
+    req.body?.recipientId
+  );
   res.status(httpStatus.OK).send(result);
 });
 

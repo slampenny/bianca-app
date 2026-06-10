@@ -42,42 +42,9 @@ else
 fi
 echo ""
 
-# Check pipeline status
-echo -e "${BLUE}📊 Checking pipeline status...${NC}"
-PIPELINE_NAME="bianca-staging-pipeline"
-
-if aws codepipeline get-pipeline --name "$PIPELINE_NAME" --profile "$AWS_PROFILE" --region "$AWS_REGION" >/dev/null 2>&1; then
-    LATEST_EXECUTION=$(aws codepipeline list-pipeline-executions \
-        --pipeline-name "$PIPELINE_NAME" \
-        --profile "$AWS_PROFILE" \
-        --region "$AWS_REGION" \
-        --max-results 1 \
-        --query 'pipelineExecutionSummaries[0]' \
-        --output json 2>/dev/null)
-    
-    if [ -n "$LATEST_EXECUTION" ] && [ "$LATEST_EXECUTION" != "null" ]; then
-        STATUS=$(echo "$LATEST_EXECUTION" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-        EXECUTION_ID=$(echo "$LATEST_EXECUTION" | grep -o '"pipelineExecutionId":"[^"]*"' | cut -d'"' -f4)
-        START_TIME=$(echo "$LATEST_EXECUTION" | grep -o '"startTime":"[^"]*"' | cut -d'"' -f4)
-        
-        echo -e "${BLUE}   Latest execution:${NC}"
-        echo "   Status: $STATUS"
-        echo "   Execution ID: $EXECUTION_ID"
-        echo "   Started: $START_TIME"
-        
-        if [ "$STATUS" = "Succeeded" ]; then
-            echo -e "${GREEN}   ✅ Pipeline completed successfully${NC}"
-        elif [ "$STATUS" = "InProgress" ]; then
-            echo -e "${YELLOW}   ⏳ Pipeline is still running${NC}"
-        elif [ "$STATUS" = "Failed" ]; then
-            echo -e "${RED}   ❌ Pipeline failed${NC}"
-        fi
-    else
-        echo -e "${YELLOW}   ⚠️  No pipeline executions found${NC}"
-    fi
-else
-    echo -e "${YELLOW}   ⚠️  Pipeline not found or not accessible${NC}"
-fi
+# Check live-dev / instance status (pipeline removed)
+echo -e "${BLUE}📊 Staging deploy model...${NC}"
+echo -e "${GREEN}✅ CodePipeline removed — use yarn staging:live or manual-deploy-staging.sh${NC}"
 echo ""
 
 # Check for timezone-related code

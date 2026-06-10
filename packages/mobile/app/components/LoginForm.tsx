@@ -370,6 +370,14 @@ export const LoginForm: FC<LoginFormProps> = ({
   }
 
   const styles = createStyles(colors, compact)
+  const devLogin =
+    typeof __DEV__ !== "undefined" &&
+    __DEV__ &&
+    !compact &&
+    Config.API_URL.includes("localhost") &&
+    "devLogin" in Config
+      ? (Config as typeof Config & { devLogin?: { email: string; password: string } }).devLogin
+      : undefined
 
   const formContent = (
     <>
@@ -515,6 +523,14 @@ export const LoginForm: FC<LoginFormProps> = ({
           <Text style={styles.linkButtonText} tx="loginScreen.forgotPassword" />
         </Button>
       )}
+      {devLogin ? (
+        <Text style={styles.devHintText} testID="login-dev-hint">
+          {translate("loginScreen.devSeedHint", {
+            email: devLogin.email,
+            password: devLogin.password,
+          })}
+        </Text>
+      ) : null}
     </View>
   )
 }
@@ -558,14 +574,15 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     } as const),
   },
   appName: {
-    fontSize: 24, // Reduced from 28
-    fontWeight: "bold",
+    fontSize: 24,
+    fontWeight: "700",
     color: colors.palette.biancaHeader,
-    marginBottom: 2, // Reduced from 4
+    marginBottom: 2,
   },
   appTagline: {
-    fontSize: 12, // Reduced from 14
-    color: colors.palette.neutral600,
+    fontSize: 14,
+    color: colors.palette.neutral500,
+    lineHeight: 20,
     textAlign: "center",
   },
   errorContainer: {
@@ -597,56 +614,47 @@ const createStyles = (colors: any, compact: boolean) => StyleSheet.create({
     width: "100%",
   },
   inputWrapper: {
-    backgroundColor: colors.palette.neutral100,
+    backgroundColor: colors.palette.neutral200,
     borderColor: colors.palette.biancaBorder,
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 1,
-    elevation: 1,
-    marginBottom: 6, // Reduced from 8
-    paddingHorizontal: 12,
-    paddingVertical: 10, // Reduced from 12
-    shadowColor: colors.palette.neutral900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
+    marginBottom: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   linkButton: {
     alignSelf: "center",
     marginTop: 6, // Reduced from 10
   },
   linkButtonText: {
-    color: colors.palette.biancaButtonSelected,
-    fontSize: 16,
+    color: colors.palette.primary500,
+    fontSize: 15,
     textAlign: "center",
-    textDecorationLine: "underline",
   },
   loginButton: {
-    backgroundColor: colors.palette.biancaButtonSelected,
-    borderRadius: 5,
-    marginBottom: 6, // Reduced from 8
-    marginTop: 10, // Reduced from 16
-    paddingHorizontal: 20,
-    paddingVertical: 10, // Reduced from 12
+    marginBottom: 8,
+    marginTop: 12,
     width: "100%",
   },
   loginButtonText: {
-    color: colors.palette.neutral100,
-    fontSize: 16, // Reduced from 18
-    fontWeight: "bold",
+    fontSize: 16,
+    fontWeight: "600",
     textAlign: "center",
   },
   registerButton: {
-    backgroundColor: colors.palette.biancaButtonUnselected,
-    borderRadius: 5,
-    marginBottom: 6, // Reduced from 8
-    paddingHorizontal: 20,
-    paddingVertical: 10, // Reduced from 12
+    marginTop: 4,
     width: "100%",
   },
   registerButtonText: {
-    color: colors.palette.biancaButtonSelected,
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  devHintText: {
+    color: colors.palette.neutral500,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 16,
     textAlign: "center",
   },
 })

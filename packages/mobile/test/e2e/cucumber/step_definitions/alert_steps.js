@@ -141,8 +141,7 @@ When('I navigate to the alerts screen', async function() {
         const tabIds = await Promise.all(allTabs.map(tab => tab.getAttribute('data-testid').catch(() => 'unknown')));
         tabInfo = tabIds.join(', ');
       } else {
-        // Try finding React Native Web tabs by text content (Home, Org, Alert, Reports)
-        const tabTexts = ['Home', 'Org', 'Alert', 'Reports', 'Alerts'];
+        const tabTexts = ['Home', 'Insights', 'Alert', 'Settings', 'Alerts'];
         const foundTabs = [];
         for (const text of tabTexts) {
           const tab = await this.page.getByText(text, { exact: false }).count().catch(() => 0);

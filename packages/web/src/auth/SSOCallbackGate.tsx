@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
 import type { AuthTokens, Caregiver, Org } from "../services/api/api.types"
 import {
-  hasSSOCallbackInUrl,
+  clearOAuthCallbackActive,
+  isOAuthCallbackActive,
   tryCompleteRedirectAuth,
   SSO_REDIRECT_ERROR_KEY,
 } from "../services/webSsoService"
@@ -12,6 +13,14 @@ import { needsOnboarding, resolvePostAuthPath } from "../lib/postAuthNavigation"
 import { setAuthEmail, setAuthTokens, setCurrentUser, setPendingOnboarding } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch } from "../store/store"
+
+function storeSsoError(message: string) {
+  try {
+    sessionStorage.setItem(SSO_REDIRECT_ERROR_KEY, JSON.stringify({ description: message }))
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
  * When the SPA loads with OAuth `code` in the URL, finish PKCE exchange and backend login
@@ -21,38 +30,39 @@ export function SSOCallbackGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
-  const [status, setStatus] = useState<"completing" | "done">(() =>
-    typeof window !== "undefined" && hasSSOCallbackInUrl() ? "completing" : "done",
-  )
+  const [completing, setCompleting] = useState(() => isOAuthCallbackActive())
 
   useEffect(() => {
-    if (status !== "completing") return
+    if (!isOAuthCallbackActive()) return
 
-    void tryCompleteRedirectAuth().then((result) => {
-      if (!result) {
-        setStatus("done")
-        return
-      }
-      if ("error" in result) {
-        try {
-          sessionStorage.setItem(
-            SSO_REDIRECT_ERROR_KEY,
-            JSON.stringify({ description: result.description || result.error }),
-          )
-        } catch {
-          /* ignore */
+    setCompleting(true)
+
+    void tryCompleteRedirectAuth()
+      .then((result) => {
+        if (!result) {
+          storeSsoError("Sign-in could not be completed. Please try again.")
+          navigate("/login", { replace: true })
+          return
         }
-        setStatus("done")
-        navigate("/login", { replace: true })
-        return
-      }
 
-      const user = result as typeof result & {
-        tokens?: AuthTokens
-        backendUser?: Caregiver
-        backendOrg?: Org
-      }
-      if (user.tokens && user.backendUser) {
+        if ("error" in result) {
+          storeSsoError(result.description || result.error)
+          navigate("/login", { replace: true })
+          return
+        }
+
+        const user = result as typeof result & {
+          tokens?: AuthTokens
+          backendUser?: Caregiver
+          backendOrg?: Org
+        }
+
+        if (!user.tokens || !user.backendUser) {
+          storeSsoError("Sign-in succeeded but the app did not receive a session. Please try again.")
+          navigate("/login", { replace: true })
+          return
+        }
+
         const caregiver = user.backendUser as Caregiver
         dispatch(setAuthTokens(user.tokens))
         dispatch(setAuthEmail(user.email))
@@ -61,12 +71,14 @@ export function SSOCallbackGate({ children }: { children: ReactNode }) {
         if (user.backendOrg) dispatch(setOrg(user.backendOrg))
         notifyAuthSuccess()
         navigate(resolvePostAuthPath(caregiver), { replace: true })
-      }
-      setStatus("done")
-    })
-  }, [status, dispatch, navigate])
+      })
+      .finally(() => {
+        clearOAuthCallbackActive()
+        setCompleting(false)
+      })
+  }, [dispatch, navigate])
 
-  if (status === "completing") {
+  if (completing) {
     return (
       <div className="va-login">
         <div className="va-login-card" style={{ textAlign: "center" }}>

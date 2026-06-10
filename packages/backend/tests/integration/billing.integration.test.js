@@ -1,27 +1,5 @@
 require('../utils/integration-setup');
 
-jest.mock('../../src/services/stripeSubscription.service', () => ({
-  getOrCreateSubscription: jest.fn().mockResolvedValue({
-    items: { data: [{ id: 'si_test123' }] },
-  }),
-}));
-
-jest.mock('../../src/services/stripeUsage.service', () => ({
-  reportConversationUsage: jest.fn().mockResolvedValue({ id: 'meter_event_test' }),
-  getUsageSummary: jest.fn().mockResolvedValue({
-    subscriptionId: 'sub_test123',
-    subscriptionItemId: 'si_test123',
-    currentPeriodStart: Math.floor(Date.now() / 1000) - 86400 * 7,
-    currentPeriodEnd: Math.floor(Date.now() / 1000) + 86400 * 23,
-    usageRecords: [],
-    totalUsage: 0,
-  }),
-}));
-
-jest.mock('../../src/services/stripeSync.service', () => ({
-  syncOrgInvoices: jest.fn().mockResolvedValue(undefined),
-}));
-
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const mongoose = require('mongoose');
 const request = require('supertest');
@@ -38,6 +16,7 @@ describe('Billing System Integration Tests', () => {
   let client1;
   let client2;
   let accessToken;
+  let reportConversationUsageSpy;
 
   beforeAll(async () => {
     mongoServer = new MongoMemoryServer();
@@ -88,10 +67,15 @@ describe('Billing System Integration Tests', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    reportConversationUsageSpy = jest.spyOn(stripeUsageService, 'reportConversationUsage');
     await Call.deleteMany({});
     await Conversation.deleteMany({});
     await Invoice.deleteMany({});
     await LineItem.deleteMany({});
+  });
+
+  afterEach(() => {
+    reportConversationUsageSpy?.mockRestore();
   });
 
   describe('Stripe usage reporting flow', () => {
@@ -141,7 +125,7 @@ describe('Billing System Integration Tests', () => {
 
       await processUsageReporting();
 
-      expect(stripeUsageService.reportConversationUsage).toHaveBeenCalledTimes(3);
+      expect(reportConversationUsageSpy).toHaveBeenCalledTimes(3);
 
       const reportedCalls = await Call.find({ stripeUsageReportedAt: { $ne: null } });
       expect(reportedCalls).toHaveLength(3);
@@ -178,7 +162,7 @@ describe('Billing System Integration Tests', () => {
       await processUsageReporting();
       await processUsageReporting();
 
-      expect(stripeUsageService.reportConversationUsage).toHaveBeenCalledTimes(1);
+      expect(reportConversationUsageSpy).toHaveBeenCalledTimes(1);
     });
 
     it('skips zero-cost calls', async () => {
@@ -209,7 +193,7 @@ describe('Billing System Integration Tests', () => {
 
       await processUsageReporting();
 
-      expect(stripeUsageService.reportConversationUsage).toHaveBeenCalledTimes(1);
+      expect(reportConversationUsageSpy).toHaveBeenCalledTimes(1);
 
       const zeroCostCall = await Call.findOne({ cost: 0 });
       expect(zeroCostCall.stripeUsageReportedAt).toBeNull();

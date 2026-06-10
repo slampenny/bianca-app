@@ -363,6 +363,13 @@ chown -R ec2-user:ec2-user "$DEPLOY_DIR" 2>/dev/null || true
 chmod -R 755 "$DEPLOY_DIR" 2>/dev/null || true
 cd "$DEPLOY_DIR"
 
+if [ "$DEPLOY_DIR" = "/opt/bianca-staging" ] && [ -f "/opt/bianca-staging/.live-dev-enabled" ]; then
+  echo "❌ ERROR: Staging live-dev is active (.live-dev-enabled)." >&2
+  echo "   Disable it first: yarn staging:live:off" >&2
+  echo "   Then re-run the pipeline deploy." >&2
+  exit 1
+fi
+
 # Get instance metadata
 PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)

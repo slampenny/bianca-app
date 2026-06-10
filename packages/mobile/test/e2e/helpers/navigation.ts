@@ -28,13 +28,12 @@ export async function goThroughOnboardingToRegister(
     return
   }
 
-  // About You: select persona and continue
+  // About You: select persona and continue (B2C mobile: organization maps to caregiver)
+  const effectivePersona = persona === "organization" ? "caregiver" : persona
   const personaTestId =
-    persona === "organization"
-      ? "onboarding-persona-organization"
-      : persona === "caregiver"
-        ? "onboarding-persona-caregiver"
-        : "onboarding-persona-agingInPlace"
+    effectivePersona === "caregiver"
+      ? "onboarding-persona-caregiver"
+      : "onboarding-persona-agingInPlace"
   await page.getByTestId(personaTestId).click()
   await page.getByTestId("onboarding-about-you-continue").click()
 
@@ -43,12 +42,7 @@ export async function goThroughOnboardingToRegister(
   await page.getByTestId("onboarding-how-it-works-next").click()
 
   if (persona === "organization") {
-    // Org info: fill org name (country/timezone use defaults), continue
-    await page.getByTestId("onboarding-org-info-screen").waitFor({ state: "visible", timeout: 10000 })
-    const orgNameInput = page.locator('input[data-testid="onboarding-org-name"]')
-    await orgNameInput.waitFor({ state: "visible", timeout: 5000 })
-    await orgNameInput.fill(orgName ?? "Test Org")
-    await page.getByTestId("onboarding-org-info-continue").click()
+    // Org onboarding is web/B2B only; mobile B2C skips org info and lands on Register.
   }
 
   // Wait for Register screen
@@ -385,13 +379,13 @@ export async function isPaymentScreen(page: Page) {
   console.log("Confirmed on Payment Screen.")
 }
 
-export async function navigateToTab(page: Page, tabName: 'home' | 'org' | 'alert' | 'reports' | 'payment') {
+export async function navigateToTab(page: Page, tabName: 'home' | 'settings' | 'alert' | 'insights' | 'payment') {
   console.log(`Navigating to ${tabName} tab...`)
   const tabSelectors = {
     home: '[data-testid="tab-home"]',
-    org: '[data-testid="tab-org"]',
+    settings: '[data-testid="tab-settings"]',
     alert: '[data-testid="tab-alert"]',
-    reports: '[data-testid="tab-reports"]',
+    insights: '[data-testid="tab-insights"]',
     payment: '[data-testid="tab-payment"]'
   }
   
@@ -430,21 +424,18 @@ export async function navigateToReportsTab(page: Page) {
   const homeHeader = page.locator('[data-testid="home-header"]')
   const isHomeVisible = await homeHeader.isVisible({ timeout: 5000 }).catch(() => false)
   if (!isHomeVisible) {
-    // Try to navigate to home first
     await navigateToTab(page, 'home')
     await page.waitForTimeout(1000)
   }
-  
-  // Now navigate to reports tab
-  await navigateToTab(page, 'reports')
-  // Wait for reports screen to load - be more flexible with what we wait for
+
+  await navigateToTab(page, 'insights')
   await Promise.race([
     page.waitForSelector('[data-testid="reports-screen"]', { timeout: 10000 }),
-    page.waitForSelector('text=/Reports/i', { timeout: 10000 }),
-    page.waitForTimeout(2000) // Fallback timeout
+    page.waitForSelector('text=/Insights/i', { timeout: 10000 }),
+    page.waitForTimeout(2000),
   ])
   await page.waitForTimeout(1000)
-  console.log("Successfully navigated to Reports screen")
+  console.log("Successfully navigated to Insights screen")
 }
 
 export async function navigateToClientScreen(page: Page, clientName?: string) {
@@ -518,7 +509,8 @@ export async function isAlertScreen(page: Page) {
 }
 
 export async function isReportsScreen(page: Page) {
-  console.log("Checking if on Reports Screen...")
+  console.log("Checking if on Insights screen...")
   await expect(page.locator('[data-testid="reports-screen"], [aria-label="reports-screen"]')).toBeVisible({ timeout: 10000 })
-  console.log("Confirmed on Reports Screen.")
+  console.log("Confirmed on Insights screen.")
+}
 }

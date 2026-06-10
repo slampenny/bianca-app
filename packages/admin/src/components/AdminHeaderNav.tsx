@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from "../store/store"
 const NAV_LINKS: { to: string; label: string; end?: boolean }[] = [
   { to: "/", label: "Observability", end: true },
   { to: "/voice-onboarding", label: "Voice onboarding" },
+  { to: "/required-questions", label: "Required questions" },
   { to: "/backups", label: "Backups" },
   { to: "/org-flags", label: "Org flags" },
   { to: "/scim", label: "SCIM" },

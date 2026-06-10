@@ -12,6 +12,10 @@ router
   .get(auth('readAny:org'), validate(orgValidation.getOrgs), orgController.getOrgs);
 
 router
+  .route('/onboarding/default-plan')
+  .get(auth('readOwn:org'), orgController.getDefaultVoiceOnboardingPlan);
+
+router
   .route('/:orgId')
   .get(auth('readOwn:org'), validate(orgValidation.getOrg), orgController.getOrg)
   .patch(auth('updateOwn:org'), validate(orgValidation.updateOrg), orgController.updateOrg)

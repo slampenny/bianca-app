@@ -24,7 +24,7 @@ import i18n from "i18n-js"
 import { useNavigation, NavigationProp } from "@react-navigation/native"
 import { logger } from "../utils/logger"
 import { TIMEOUTS } from "../constants"
-import { OrgStackParamList } from "app/navigators/navigationTypes"
+import { SettingsStackParamList } from "app/navigators/navigationTypes"
 import { getCaregiver, setCaregiver } from "../store/caregiverSlice"
 import { getCurrentUser, getInviteToken, getAuthTokens, setCurrentUser } from "../store/authSlice"
 import type { RootState } from "../store/store"
@@ -40,7 +40,7 @@ import { testingProps } from "../utils/testingProps"
 import { jwtDecode } from "jwt-decode"
 
 function ProfileScreen() {
-  const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
+  const navigation = useNavigation<NavigationProp<SettingsStackParamList>>()
   const dispatch = useDispatch()
   const { toast, showInfo, hideToast } = useToast()
   const { colors, isLoading: themeLoading, fontScale } = useTheme()

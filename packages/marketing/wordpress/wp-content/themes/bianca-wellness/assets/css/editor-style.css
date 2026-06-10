@@ -1,0 +1,25 @@
+/**
+ * Block editor — mirrors front-end variables for a closer WYSIWYG experience.
+ */
+:root {
+	--bianca-bg-deep: #070b12;
+	--bianca-bg: #0c111c;
+	--bianca-surface: #121a2a;
+	--bianca-text: #f1f5f9;
+	--bianca-muted: #94a3b8;
+	--bianca-accent: #38bdf8;
+	--bianca-border: rgba(148, 163, 184, 0.12);
+	--bianca-radius: 12px;
+}
+
+.editor-styles-wrapper,
+.block-editor-block-list__layout {
+	background: var(--bianca-bg-deep);
+	color: var(--bianca-text);
+	font-family: "DM Sans", system-ui, sans-serif;
+}
+
+/* stylelint-disable */
+.block-editor-block-list__block {
+	color: inherit;
+}

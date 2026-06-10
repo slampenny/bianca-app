@@ -11,6 +11,7 @@ import { ScimProvisioningPage } from "./pages/ScimProvisioningPage"
 import { EmbeddingAnchorsPage } from "./pages/EmbeddingAnchorsPage"
 import { OrgFlagsPage } from "./pages/OrgFlagsPage"
 import { OrgVoiceOnboardingPage } from "./pages/OrgVoiceOnboardingPage"
+import { OrgRequiredQuestionsPage } from "./pages/OrgRequiredQuestionsPage"
 import { CorpEmailForwardsPage } from "./pages/CorpEmailForwardsPage"
 import { InviteSignupPage } from "./pages/InviteSignupPage"
 import { SecurityEventsPage } from "./pages/SecurityEventsPage"
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="scim" element={<ScimProvisioningPage />} />
             <Route path="org-flags" element={<OrgFlagsPage />} />
             <Route path="voice-onboarding" element={<OrgVoiceOnboardingPage />} />
+            <Route path="required-questions" element={<OrgRequiredQuestionsPage />} />
             <Route path="embedding-anchors" element={<EmbeddingAnchorsPage />} />
             <Route path="corp-email" element={<CorpEmailForwardsPage />} />
             <Route path="security-events" element={<SecurityEventsPage />} />

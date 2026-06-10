@@ -13,13 +13,6 @@ export function localizedReportTemplates(t: TFunction): ReportTemplate[] {
   }))
 }
 
-export function localizedStaffVersusFamily(t: TFunction) {
-  return {
-    title: t("reports.staffVsFamilyTitle"),
-    body: [t("reports.staffVsFamily1"), t("reports.staffVsFamily2"), t("reports.staffVsFamily3")],
-  }
-}
-
 export function localizedReportTemplate(t: TFunction, id: ReportTemplateId): ReportTemplate | undefined {
   const base = reportTemplates.find((x) => x.id === id)
   if (!base) return undefined

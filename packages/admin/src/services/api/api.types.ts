@@ -67,6 +67,16 @@ export interface VoiceOnboardingConfig {
   days?: VoiceOnboardingDay[]
 }
 
+export interface RequiredCallQuestion {
+  id: string
+  prompt: string
+}
+
+export interface RequiredCallQuestionsConfig {
+  enabled: boolean
+  questions: RequiredCallQuestion[]
+}
+
 export interface VoiceOnboardingPlan {
   useDefault: boolean
   totalDays: number
@@ -82,6 +92,7 @@ export interface AdminOrgDetail {
   country?: string
   requireClientConsent?: boolean
   voiceOnboarding?: VoiceOnboardingConfig
+  requiredCallQuestions?: RequiredCallQuestionsConfig
 }
 
 export interface ScimAdminStatus {

@@ -11,6 +11,55 @@ const config = require('../config/config');
 const { tokenTypes } = require('../config/tokens');
 const { toIdString, assertCaregiverOrgAccess } = require('../utils/accessControl');
 const { normalizeEmail, getFamilyDigestEmailSettings } = require('../utils/familyDigestEligibility');
+const { syncLegacyEmergencyContactFields } = require('../utils/clientContacts.util');
+
+const mergeFamilyDigestEmailSettings = (prev, patch) => ({
+  ...(prev || { enabled: false, verifiedAt: null, verifiedEmail: null }),
+  ...(patch || {}),
+});
+
+const mergeFamilyDigestRecipients = (prevList, patchList) => {
+  const prevById = new Map();
+  (prevList || []).forEach((entry) => {
+    const plain = entry && typeof entry.toObject === 'function' ? entry.toObject() : entry;
+    const id = plain?._id ? String(plain._id) : plain?.id ? String(plain.id) : null;
+    if (id) prevById.set(id, plain);
+  });
+  return patchList.map((item) => {
+    const id = item.id || item._id;
+    const prev = id ? prevById.get(String(id)) : null;
+    let familyDigestEmail = mergeFamilyDigestEmailSettings(prev?.familyDigestEmail, item.familyDigestEmail);
+    const prevEmail = normalizeEmail(prev?.email);
+    const nextEmail = normalizeEmail(item.email != null ? item.email : prev?.email);
+    if (item.email !== undefined && nextEmail !== prevEmail) {
+      familyDigestEmail = { ...familyDigestEmail, verifiedAt: null, verifiedEmail: null };
+    }
+    return {
+      ...(id ? { _id: id } : {}),
+      name: item.name != null ? String(item.name).trim() : prev?.name || '',
+      relationship: item.relationship != null ? String(item.relationship).trim() : prev?.relationship || '',
+      email: nextEmail,
+      familyDigestEmail,
+    };
+  });
+};
+
+const mergeEmergencyContacts = (prevList, patchList) =>
+  patchList.map((item) => {
+    const id = item.id || item._id;
+    const prev =
+      id && Array.isArray(prevList)
+        ? prevList.find((entry) => String(entry._id || entry.id) === String(id))
+        : null;
+    const plainPrev = prev && typeof prev.toObject === 'function' ? prev.toObject() : prev;
+    return {
+      ...(id ? { _id: id } : {}),
+      name: item.name != null ? String(item.name).trim() : plainPrev?.name || '',
+      relationship: item.relationship != null ? String(item.relationship).trim() : plainPrev?.relationship || '',
+      phone: item.phone != null ? String(item.phone).trim() : plainPrev?.phone || '',
+      email: normalizeEmail(item.email != null ? item.email : plainPrev?.email),
+    };
+  });
 
 const createClient = async (clientBody) => {
   return Client.create(clientBody);
@@ -41,25 +90,34 @@ const updateClientById = async (clientId, updateBody) => {
         ? client.emergencyContact.toObject()
         : client.emergencyContact || {};
     if (patch.emergencyContact.familyDigestEmail && typeof patch.emergencyContact.familyDigestEmail === 'object') {
-      patch.emergencyContact.familyDigestEmail = {
-        ...(prev.familyDigestEmail || {}),
-        ...patch.emergencyContact.familyDigestEmail,
-      };
+      patch.emergencyContact.familyDigestEmail = mergeFamilyDigestEmailSettings(
+        prev.familyDigestEmail,
+        patch.emergencyContact.familyDigestEmail
+      );
     }
     if (patch.emergencyContact.email !== undefined) {
       const prevEmail = normalizeEmail(prev.email);
       const nextEmail = normalizeEmail(patch.emergencyContact.email);
       if (nextEmail !== prevEmail) {
-        patch.emergencyContact.familyDigestEmail = {
-          ...(patch.emergencyContact.familyDigestEmail || prev.familyDigestEmail || {}),
-          verifiedAt: null,
-          verifiedEmail: null,
-        };
+        patch.emergencyContact.familyDigestEmail = mergeFamilyDigestEmailSettings(
+          patch.emergencyContact.familyDigestEmail || prev.familyDigestEmail,
+          { verifiedAt: null, verifiedEmail: null }
+        );
       }
     }
     patch.emergencyContact = { ...prev, ...patch.emergencyContact };
   }
+  if (Array.isArray(patch.emergencyContacts)) {
+    patch.emergencyContacts = mergeEmergencyContacts(client.emergencyContacts, patch.emergencyContacts);
+  }
+  if (Array.isArray(patch.familyDigestRecipients)) {
+    patch.familyDigestRecipients = mergeFamilyDigestRecipients(
+      client.familyDigestRecipients,
+      patch.familyDigestRecipients
+    );
+  }
   Object.assign(client, patch);
+  syncLegacyEmergencyContactFields(client);
   await client.save();
   return client;
 };
@@ -301,7 +359,7 @@ const verifyConsentToken = async (consentToken) => {
   }
 };
 
-const sendFamilyDigestEmailVerification = async (caregiver, clientId) => {
+const sendFamilyDigestEmailVerification = async (caregiver, clientId, recipientId) => {
   if (caregiver.role !== 'orgAdmin' && caregiver.role !== 'superAdmin') {
     throw new ApiError(
       httpStatus.FORBIDDEN,
@@ -316,11 +374,22 @@ const sendFamilyDigestEmailVerification = async (caregiver, clientId) => {
   if (!client.org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
   }
-  const email = normalizeEmail(client.emergencyContact?.email);
-  if (!email || !validator.isEmail(email)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'A valid emergency contact email is required before sending verification');
+  const {
+    resolveFamilyDigestRecipients,
+    findFamilyDigestRecipientById,
+    getPrimaryFamilyDigestRecipient,
+  } = require('../utils/clientContacts.util');
+  const recipient = recipientId
+    ? findFamilyDigestRecipientById(client, recipientId)
+    : getPrimaryFamilyDigestRecipient(client);
+  if (!recipient) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'Family digest recipient not found');
   }
-  const verifyToken = await tokenService.generateFamilyDigestEmailVerifyToken(client, email);
+  const email = normalizeEmail(recipient.email);
+  if (!email || !validator.isEmail(email)) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'A valid family digest recipient email is required before sending verification');
+  }
+  const verifyToken = await tokenService.generateFamilyDigestEmailVerifyToken(client, email, recipient.id);
   const verifyLink = `${config.frontendUrl}/family-digest-email/verify?token=${encodeURIComponent(verifyToken)}`;
   await emailService.sendFamilyDigestEmailVerificationEmail(
     email,
@@ -331,7 +400,7 @@ const sendFamilyDigestEmailVerification = async (caregiver, clientId) => {
   logger.info(`[Client Service] Family digest email verification sent for client ${clientId} (${email})`);
   return {
     success: true,
-    message: 'Verification email sent to the emergency contact address.',
+    message: 'Verification email sent to the family digest recipient address.',
   };
 };
 
@@ -358,27 +427,45 @@ const verifyFamilyDigestEmailToken = async (verifyToken) => {
   if (!client || !client.org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  const currentEmail = normalizeEmail(client.emergencyContact?.email);
-  if (!currentEmail || currentEmail !== tokenEmail) {
+  const { resolveFamilyDigestRecipients, findFamilyDigestRecipientById } = require('../utils/clientContacts.util');
+  const recipientId = payload.recipientId ? String(payload.recipientId) : null;
+  const recipient = recipientId
+    ? findFamilyDigestRecipientById(client, recipientId)
+    : resolveFamilyDigestRecipients(client).find((row) => normalizeEmail(row.email) === tokenEmail);
+  if (!recipient || normalizeEmail(recipient.email) !== tokenEmail) {
     throw new ApiError(
       httpStatus.UNAUTHORIZED,
-      'Emergency contact email has changed since this link was sent. Please request a new verification email.'
+      'Family digest recipient email has changed since this link was sent. Please request a new verification email.'
     );
   }
 
-  const digestSettings = getFamilyDigestEmailSettings(client.emergencyContact);
+  const digestSettings = getFamilyDigestEmailSettings(recipient);
   const alreadyVerified = Boolean(
-    digestSettings.verifiedAt && digestSettings.verifiedEmail === currentEmail
+    digestSettings.verifiedAt && digestSettings.verifiedEmail === tokenEmail
   );
 
   await Token.deleteMany({ client: client._id, type: tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY });
 
-  if (!alreadyVerified) {
+  if (!alreadyVerified && recipient.id) {
+    const updatedRecipients = (client.familyDigestRecipients || []).map((entry) => {
+      const plain = entry && typeof entry.toObject === 'function' ? entry.toObject() : entry;
+      if (String(plain._id) !== String(recipient.id)) return plain;
+      return {
+        ...plain,
+        familyDigestEmail: {
+          ...(plain.familyDigestEmail || {}),
+          verifiedAt: new Date(),
+          verifiedEmail: tokenEmail,
+        },
+      };
+    });
+    await updateClientById(client._id, { familyDigestRecipients: updatedRecipients });
+  } else if (!alreadyVerified) {
     await updateClientById(client._id, {
       emergencyContact: {
         familyDigestEmail: {
           verifiedAt: new Date(),
-          verifiedEmail: currentEmail,
+          verifiedEmail: tokenEmail,
         },
       },
     });

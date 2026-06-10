@@ -4,7 +4,7 @@
 
 set -e
 
-PIPELINE_NAME="${1:-bianca-staging-pipeline}"
+PIPELINE_NAME="${1:-bianca-production-pipeline}"
 STAGE_NAME="${2}"
 PROFILE="${3:-jordan}"
 

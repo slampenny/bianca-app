@@ -45,6 +45,45 @@ const clientTwo = {
   // org must be provided when using this fixture
 };
 
+/** Home-care clients for parent@example.org (mobile B2C) — no facility room numbers. */
+const familyClientMom = {
+  name: 'Eleanor Smith',
+  firstName: 'Eleanor',
+  lastName: 'Smith',
+  preferredName: 'Mom',
+  age: 84,
+  email: 'eleanor.smith@example.org',
+  phone: '1234567901',
+  preferredLanguage: 'en',
+  notes: 'Lives at home; daughter checks in via Bianca.',
+  emergencyContact: {
+    name: 'Alex Parent',
+    relationship: 'Daughter',
+    phone: '1234567900',
+    email: 'parent@example.org',
+  },
+  schedules: [],
+};
+
+const familyClientDad = {
+  name: 'Robert Smith',
+  firstName: 'Robert',
+  lastName: 'Smith',
+  preferredName: 'Dad',
+  age: 86,
+  email: 'robert.smith@example.org',
+  phone: '1234567902',
+  preferredLanguage: 'en',
+  notes: 'Lives with Eleanor; enjoys afternoon check-ins.',
+  emergencyContact: {
+    name: 'Alex Parent',
+    relationship: 'Daughter',
+    phone: '1234567900',
+    email: 'parent@example.org',
+  },
+  schedules: [],
+};
+
 const insertClients = async (clients) => {
   const clientsWithOrg = clients.map(client => {
     if (!client.org) {
@@ -81,6 +120,8 @@ const insertClientsAndAddToCaregiver = async (caregiver, clients) => {
 module.exports = {
   clientOne,
   clientTwo,
+  familyClientMom,
+  familyClientDad,
   insertClients,
   insertClientsWithOrg,
   insertClientsAndAddToCaregiver,

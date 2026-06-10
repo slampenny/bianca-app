@@ -14,7 +14,6 @@ terraform init -input=false -backend-config=backend-config.hcl
 
 terraform apply -input=false -auto-approve \
   -var="aws_profile=${AWS_PROFILE}" \
-  -target=aws_codebuild_project.production_tests \
-  -target=aws_codebuild_project.staging_tests
+  -target=aws_codebuild_project.production_tests
 
 echo "Done."

@@ -329,7 +329,7 @@ describe('familyWeeklyDigest.service', () => {
           digestId: draft.id,
           clientId: String(client._id),
           orgId: String(org._id),
-          emailRecipient: 'family@test.com',
+          emailRecipients: ['family@test.com'],
           emailMessageId: 'msg-family-test-123',
         })
       );
@@ -365,15 +365,59 @@ describe('familyWeeklyDigest.service', () => {
       const payloadHashAtSend = hashPayload(draft.payload);
 
       const sent = await markDigestSent(draft, {
-        email: 'family@test.com',
+        emails: ['family@test.com'],
         subject: 'Weekly update from Test Org',
-        messageId: 'helper-msg-1',
+        messageIds: ['helper-msg-1'],
         payloadHashAtSend,
       });
 
       expect(sent.status).toBe('sent');
       expect(sent.sentPayloadHash).toBe(payloadHashAtSend);
       expect(sent.emailMessageId).toBe('helper-msg-1');
+    });
+  });
+
+  describe('required call question answers', () => {
+    it('includes standard question answers in weekly call rows and summary', async () => {
+      const { weekStart } = orgWeek();
+      const call = await Call.create({
+        callSid: `CA${Date.now()}`,
+        clientId: client._id,
+        status: 'completed',
+        callOutcome: 'answered',
+        duration: 240,
+        startTime: new Date(weekStart.getTime() + 86400000),
+      });
+      await Conversation.create({
+        callId: call._id,
+        clientId: client._id,
+        summary: 'Pleasant wellness check.',
+        history: 'Pleasant wellness check.',
+        analyzedData: {
+          requiredQuestions: {
+            answers: [
+              {
+                questionId: 'med',
+                prompt: 'Have you taken your medication today?',
+                answer: 'Yes',
+                asked: true,
+              },
+            ],
+          },
+        },
+      });
+
+      const { payload } = await previewDigest(requester, client._id.toString(), weekRef());
+      expect(payload.callRows[0].requiredQuestionAnswers).toEqual([
+        {
+          question: 'Have you taken your medication today?',
+          answer: 'Yes',
+          asked: true,
+        },
+      ]);
+      expect(payload.callRows[0].summary).toContain('Standard questions:');
+      expect(payload.callRows[0].summary).toContain('Have you taken your medication today?');
+      expect(payload.callRows[0].summary).toContain('Yes');
     });
   });
 

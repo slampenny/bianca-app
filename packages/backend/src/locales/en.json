@@ -74,6 +74,7 @@
 		"subtitle": "Wellness check-ins for your assigned residents",
 		"subtitleWithOrg": "Wellness check-ins — %s",
 		"labelConversationSummary": "Conversation summary",
+		"labelRequiredQuestions": "Standard questions",
 		"labelSentiment": "Sentiment",
 		"labelCallsToday": "Calls today",
 		"noActivity": "No calls scheduled for this day.",

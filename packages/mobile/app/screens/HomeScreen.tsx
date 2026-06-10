@@ -1,13 +1,13 @@
 import React, { useCallback } from "react"
 import { View, StyleSheet, FlatList, Platform } from "react-native"
-import { AutoImage, Card, Button, Text, ClientGlanceStat } from "app/components"
+import { AutoImage, Card, Button, Text, ClientGlanceStat, StatusBanner } from "app/components"
 import { Ionicons } from "@expo/vector-icons"
 import { useSelector, useDispatch } from "react-redux"
 import { getCurrentUser, getAuthTokens } from "../store/authSlice"
 import { useAuthModal } from "../contexts/AuthModalContext"
 import { hasUsableAccessToken } from "../utils/accessToken"
 import { setClient, getClientsForCaregiver, clearClient, setClientsForCaregiver } from "../store/clientSlice"
-import { getAlerts } from "../store/alertSlice"
+import { getAlerts, selectUnreadAlertCount } from "../store/alertSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
 import { setPendingCallData, clearCallData } from "../store/callSlice"
 import { clearConversation } from "../store/conversationSlice"
@@ -74,6 +74,7 @@ export function HomeScreen() {
   })
 
   const alertsFromStore = useSelector(getAlerts)
+  const unreadAlertCount = useSelector(selectUnreadAlertCount)
 
   const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
     ...liveAlertsQueryOptions,
@@ -219,6 +220,154 @@ export function HomeScreen() {
   }
 
   const styles = createStyles(colors)
+  const useHeroLayout = clients.length <= 2
+
+  const renderGlanceStats = (item: Client, clientAlertCount: number) => {
+    const sentimentIcon = sentimentGlanceIcon(
+      item.sentimentTrendDirection,
+      item.sentimentAnalyzedConversations,
+    )
+    const sentimentIconColor =
+      item.sentimentTrendDirection === "improving"
+        ? colors.palette.biancaSuccess || "#22c55e"
+        : item.sentimentTrendDirection === "declining"
+          ? colors.palette.error || "#ef4444"
+          : colors.palette.neutral500
+
+    return (
+      <View style={styles.glanceStats}>
+        <ClientGlanceStat
+          labelTx="homeScreen.glanceSentiment"
+          valueTestID={`client-glance-mood-${item.id}`}
+          value={formatSentimentGlanceLabel(
+            item.sentimentTrendDirection,
+            item.sentimentAnalyzedConversations,
+          )}
+          accessibilityHint={translate("homeScreen.glanceSentimentActionHint")}
+          onPress={() => {
+            if (!item.id) return
+            if (!ensureSignedInForGlanceNavigation()) return
+            primeClientForReports(item)
+            navigation.navigate("Insights", {
+              screen: "SentimentReport",
+              params: { clientId: item.id, clientName: item.name, timeRange: "lastCall" },
+            })
+          }}
+          leftAccessory={
+            sentimentIcon ? (
+              <Ionicons name={sentimentIcon} size={14} color={sentimentIconColor} />
+            ) : undefined
+          }
+        />
+        <ClientGlanceStat
+          labelTx="homeScreen.glanceHealth"
+          value={formatScoreGlance(item.latestOverallHealthScore)}
+          accessibilityHint={translate("homeScreen.glanceHealthActionHint")}
+          onPress={() => {
+            if (!item.id) return
+            if (!ensureSignedInForGlanceNavigation()) return
+            primeClientForReports(item)
+            navigation.navigate("Insights", {
+              screen: "MedicalAnalysis",
+              params: { clientId: item.id, clientName: item.name },
+            })
+          }}
+        />
+        <ClientGlanceStat
+          labelTx="homeScreen.glanceRisk"
+          value={formatScoreGlance(item.latestOverallRiskScore)}
+          accessibilityHint={translate("homeScreen.glanceRiskActionHint")}
+          onPress={() => {
+            if (!item.id) return
+            if (!ensureSignedInForGlanceNavigation()) return
+            primeClientForReports(item)
+            navigation.navigate("Insights", {
+              screen: "FraudAbuseAnalysis",
+              params: { clientId: item.id, clientName: item.name },
+            })
+          }}
+        />
+        <ClientGlanceStat
+          labelTx="homeScreen.glanceAlerts"
+          value={String(clientAlertCount)}
+          valueTestID={`client-glance-alerts-${item.id}`}
+          tone={clientAlertCount > 0 ? "danger" : "default"}
+          accessibilityHint={translate("homeScreen.glanceAlertsActionHint")}
+          onPress={() => {
+            if (!item.id) return
+            if (!ensureSignedInForGlanceNavigation()) return
+            navigation.navigate("Alert", {
+              screen: "AlertList",
+              params: { filterClientId: item.id, filterClientName: item.name },
+            })
+          }}
+          leftAccessory={
+            clientAlertCount > 0 ? (
+              <Ionicons name="notifications-outline" size={14} color={colors.palette.biancaError} />
+            ) : undefined
+          }
+        />
+      </View>
+    )
+  }
+
+  const renderClientHero = ({ item }: { item: Client }) => {
+    const hasNoSchedule = !item.schedules || item.schedules.length === 0
+    const lastCalledLabel = item.lastCallAttemptAt
+      ? formatRelativeFromIso(item.lastCallAttemptAt)
+      : translate("homeScreen.neverCalled")
+    const lastAnsweredLabel = item.lastAnsweredCallAt
+      ? formatRelativeFromIso(item.lastAnsweredCallAt)
+      : translate("homeScreen.noAnsweredCallsYet")
+    const clientAlertCount = item.id ? alertCountByClientId.get(item.id) ?? 0 : 0
+
+    return (
+      <Card
+        style={[styles.heroCard, hasNoSchedule && styles.clientCardWarning]}
+        testID={`client-card-${item.id}`}
+        accessibilityLabel={`client-card-${item.name}`}
+        ContentComponent={
+          <View style={styles.heroContent}>
+            <View style={styles.heroTopRow}>
+              <AutoImage source={{ uri: item.avatar }} style={styles.heroAvatar} />
+              <View style={styles.heroMeta}>
+                <Text style={styles.heroName} testID={`client-name-${item.name}`}>
+                  {item.name}
+                </Text>
+                <Text style={styles.callMetaLine} size="xs">
+                  {translate("homeScreen.lastCalled")}: {lastCalledLabel}
+                </Text>
+                <Text style={styles.callMetaLine} size="xs">
+                  {translate("homeScreen.lastAnsweredCall")}: {lastAnsweredLabel}
+                </Text>
+              </View>
+            </View>
+            <Button
+              preset="primary"
+              tx="common.callNow"
+              onPress={() => handleCallNow(item)}
+              loading={isInitiatingCall}
+              testID={`call-now-${item.name}`}
+              style={styles.heroCallButton}
+            />
+            {renderGlanceStats(item, clientAlertCount)}
+            {hasNoSchedule ? (
+              <Text style={styles.warningFooter} testID={`no-schedule-warning-${item.name}`}>
+                {translate("homeScreen.noScheduleWarning")}
+              </Text>
+            ) : null}
+            <Button
+              preset="default"
+              tx="homeScreen.viewDetails"
+              onPress={() => handleClientPress(item)}
+              testID={`edit-client-button-${item.id}`}
+              style={styles.heroDetailsButton}
+            />
+          </View>
+        }
+      />
+    )
+  }
 
   const renderClient = ({ item }: { item: Client }) => {
     const hasNoSchedule = !item.schedules || item.schedules.length === 0
@@ -275,7 +424,7 @@ export function HomeScreen() {
                 if (!item.id) return
                 if (!ensureSignedInForGlanceNavigation()) return
                 primeClientForReports(item)
-                navigation.navigate("Reports", {
+                navigation.navigate("Insights", {
                   screen: "SentimentReport",
                   params: {
                     clientId: item.id,
@@ -298,7 +447,7 @@ export function HomeScreen() {
                 if (!item.id) return
                 if (!ensureSignedInForGlanceNavigation()) return
                 primeClientForReports(item)
-                navigation.navigate("Reports", {
+                navigation.navigate("Insights", {
                   screen: "MedicalAnalysis",
                   params: { clientId: item.id, clientName: item.name },
                 })
@@ -312,7 +461,7 @@ export function HomeScreen() {
                 if (!item.id) return
                 if (!ensureSignedInForGlanceNavigation()) return
                 primeClientForReports(item)
-                navigation.navigate("Reports", {
+                navigation.navigate("Insights", {
                   screen: "FraudAbuseAnalysis",
                   params: { clientId: item.id, clientName: item.name },
                 })
@@ -411,9 +560,14 @@ export function HomeScreen() {
 
   return (
     <View style={styles.container} accessibilityLabel="home-screen">
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle} testID="home-header" accessibilityLabel="home-header">{translate("homeScreen.welcome", { name: currentUser ? currentUser.name : translate("homeScreen.guest") })}</Text>
+      <View style={styles.pageHeader}>
+        <Text style={styles.pageTitle} testID="home-header" accessibilityLabel="home-header">
+          {translate("homeScreen.welcome", { name: currentUser ? currentUser.name : translate("homeScreen.guest") })}
+        </Text>
+        <StatusBanner
+          unreadAlertCount={unreadAlertCount}
+          onPressAlerts={() => navigation.navigate("Alert", { screen: "AlertList" })}
+        />
       </View>
 
       {/* Phone Verification Banner */}
@@ -423,7 +577,7 @@ export function HomeScreen() {
       <FlatList
         data={clients}
         keyExtractor={(item, index) => item.id || String(index)}
-        renderItem={renderClient}
+        renderItem={useHeroLayout ? renderClientHero : renderClient}
         contentContainerStyle={styles.listContentContainer}
         ListEmptyComponent={ListEmpty}
         testID="client-list"
@@ -478,7 +632,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignSelf: "flex-start",
   },
   container: {
-    backgroundColor: colors.palette.biancaBackground,
+    backgroundColor: colors.palette.neutral200,
     flex: 1,
   },
   editButton: {
@@ -514,17 +668,55 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: 0,
     margin: 0,
   },
-  header: {
-    alignItems: "center",
-    backgroundColor: colors.palette.neutral100,
-    borderBottomWidth: 1,
-    borderColor: colors.palette.biancaBorder,
-    paddingVertical: 20,
+  pageHeader: {
+    backgroundColor: colors.palette.neutral200,
+    paddingBottom: 4,
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  headerTitle: {
+  pageTitle: {
     color: colors.palette.biancaHeader,
-    fontSize: 20,
-    fontWeight: "600",
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+  heroAvatar: {
+    backgroundColor: colors.palette.neutral300,
+    borderRadius: 32,
+    height: 64,
+    marginRight: 14,
+    width: 64,
+  },
+  heroCallButton: {
+    marginTop: 16,
+    width: "100%",
+  },
+  heroCard: {
+    flexDirection: "column",
+    marginBottom: 16,
+    minHeight: 0,
+    padding: 16,
+  },
+  heroContent: {
+    width: "100%",
+  },
+  heroDetailsButton: {
+    marginTop: 12,
+    width: "100%",
+  },
+  heroMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  heroName: {
+    color: colors.palette.biancaHeader,
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  heroTopRow: {
+    alignItems: "center",
+    flexDirection: "row",
   },
   listContentContainer: {
     paddingHorizontal: 16,
@@ -543,15 +735,14 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 12,
     padding: 16,
-    borderRadius: 6,
+    borderRadius: 16,
+    borderColor: colors.palette.neutral300,
 
-    // iOS shadow
     shadowColor: colors.palette.neutral900,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
 
-    // Android elevation
     elevation: 2,
   },
   clientCardWarning: {

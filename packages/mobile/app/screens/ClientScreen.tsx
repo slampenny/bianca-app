@@ -114,6 +114,7 @@ function ClientScreen() {
   const [successMessage, setSuccessMessage] = useState("")
   const [apiError, setApiError] = useState("") // Consolidated API error state
   const [showCaregiverModal, setShowCaregiverModal] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Ref to store the timeout ID
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -123,9 +124,9 @@ function ClientScreen() {
     return () => { isMountedRef.current = false }
   }, [])
 
-  // Check if user has permission to create or edit clients
-  const canCreateOrEditClient = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
-  const canManageCaregivers = currentUser?.role === 'orgAdmin' || currentUser?.role === 'superAdmin'
+  // B2C mobile: account owners manage their loved ones directly
+  const canCreateOrEditClient = true
+  const canManageCaregivers = false
 
   const [updateClient, { isLoading: isUpdating, error: updateError }] = useUpdateClientMutation()
   const [createClient, { isLoading: isCreating, error: createError }] = useCreateClientMutation()
@@ -162,6 +163,7 @@ function ClientScreen() {
       setSuccessMessage("")
       setAvatarBlob(undefined) // Clear any previously selected blob
       setConfirmDelete(false) // Reset delete confirmation
+      setIsEditing(!client.id)
     } else {
       // Reset form for new client
       setName("")
@@ -175,6 +177,7 @@ function ClientScreen() {
       setSuccessMessage("")
       setAvatarBlob(undefined)
       setConfirmDelete(false)
+      setIsEditing(true)
     }
   }, [client])
 
@@ -476,6 +479,37 @@ function ClientScreen() {
         {/* Display Success Message */}
         {successMessage ? <Text style={styles.success} testID="client-saved">{successMessage}</Text> : null}
 
+        {client?.id && !isEditing ? (
+          <View style={styles.formCard} testID="loved-one-profile-view">
+            <AvatarPicker initialAvatar={avatar} onAvatarChanged={handleAvatarChange} />
+            <Text style={styles.profileName}>{name}</Text>
+            <Text style={styles.profileMeta}>{phone}</Text>
+            <Text style={styles.profileMeta}>{getLanguageByCode(preferredLanguage).label}</Text>
+            <Button
+              text={translate("clientScreen.whenBiancaCalls")}
+              onPress={handleManageSchedules}
+              preset="primary"
+              style={[styles.button, styles.manageButton]}
+              testID="profile-schedule-button"
+            />
+            <Button
+              text={translate("clientScreen.callHistory")}
+              onPress={handleManageConversations}
+              preset="default"
+              style={[styles.button, styles.manageButton]}
+              testID="profile-conversations-button"
+            />
+            <Button
+              text={translate("clientScreen.editDetails")}
+              onPress={() => setIsEditing(true)}
+              preset="default"
+              style={[styles.button, styles.manageButton]}
+              testID="profile-edit-button"
+            />
+          </View>
+        ) : null}
+
+        {(isEditing || !client?.id) ? (
         <View style={styles.formCard} testID="client-avatar-picker">
           <AvatarPicker
             // Use local avatar state which defaults correctly
@@ -567,107 +601,44 @@ function ClientScreen() {
           />
 
           {client && client.id ? (
-            <View style={styles.onboardingSection} testID="client-onboarding-section">
-              {onboardingQueryError ? (
-                <Text style={styles.apiError}>{translate("clientOnboardingScreen.error")}</Text>
-              ) : null}
-              {(onboardingLoading || onboardingFetching) && !onboardingData ? (
-                <Button
-                  loading
-                  text={translate("clientOnboardingScreen.loading")}
-                  disabled
-                  testID="view-onboarding-responses-button"
-                  preset={hasAlertsForClient ? "danger" : "success"}
-                  style={[styles.button, styles.manageButton, styles.onboardingButton]}
-                  textStyle={styles.onboardingButtonText}
-                />
-              ) : onboardingData ? (
-                <View>
-                  {!onboardingData.journey.journeyComplete ? (
-                    <View style={styles.onboardingCopyBlock}>
-                      <Text style={styles.onboardingSectionTitle}>
-                        {translate("clientScreen.onboardingCardTitle")}
-                      </Text>
-                      <Text style={styles.onboardingHint}>
-                        {translate("clientScreen.onboardingCallsCompleted", {
-                          completed: onboardingData.journey.sessionsCompletedCount,
-                          total: onboardingData.journey.totalDays,
-                        })}
-                      </Text>
-                      <Text style={styles.onboardingHint}>
-                        {translate("clientScreen.onboardingOutboundCallsHint", {
-                          day: onboardingData.journey.currentDay ?? 1,
-                        })}
-                      </Text>
-                    </View>
-                  ) : null}
-                  <Button
-                    onPress={handleViewOnboarding}
-                    disabled={isLoading}
-                    text={onboardingButtonCompactLine(onboardingData)}
-                    testID="view-onboarding-responses-button"
-                    preset={hasAlertsForClient ? "danger" : "success"}
-                    accessibilityLabel={onboardingButtonCompactLine(onboardingData)}
-                    accessibilityHint={translate("clientScreen.onboardingButtonA11yHint")}
-                    style={[styles.button, styles.manageButton, styles.onboardingButton]}
-                    textStyle={styles.onboardingButtonText}
-                  />
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-
-          {/* Show Delete, Schedules, Conversations only for existing clients */}
-          {client && client.id && (
             <>
+              {!isEditing ? null : (
+              <>
               <Button
-                text={translate("clientScreen.manageSchedules")}
+                text={translate("clientScreen.whenBiancaCalls")}
                 onPress={handleManageSchedules}
                 disabled={isLoading}
                 testID="manage-schedules-button"
-                accessibilityHint="Opens screen to manage client schedules"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
               />
 
               <Button
-                text={translate("clientScreen.manageConversations")}
+                text={translate("clientScreen.callHistory")}
                 onPress={handleManageConversations}
                 disabled={isLoading}
                 testID="manage-conversations-button"
-                accessibilityLabel={translate("clientScreen.manageConversations") || "Manage conversations"}
-                accessibilityHint="Opens screen to view and manage client conversations"
                 preset="default"
                 style={[styles.button, styles.manageButton]}
                 textStyle={styles.buttonText}
               />
 
-              {canManageCaregivers && (
-                <Button
-                  text={translate("clientScreen.manageCaregivers")}
-                  onPress={() => setShowCaregiverModal(true)}
-                  disabled={isLoading}
-                  testID="manage-caregivers-button"
-                  preset="default"
-                  style={[styles.button, styles.manageButton]}
-                  textStyle={styles.buttonText}
-                />
-              )}
-
               <Button
-                text={confirmDelete ? translate("clientScreen.confirmDelete") : translate("clientScreen.deleteClient")}
+                text={confirmDelete ? translate("clientScreen.confirmDelete") : translate("clientScreen.removeLovedOne")}
                 onPress={handleDelete}
                 disabled={isLoading}
                 testID="delete-client-button"
-                accessibilityHint={confirmDelete ? "Permanently deletes this client. This action cannot be undone." : "Tap once to confirm deletion, tap again to permanently delete this client"}
                 preset="danger"
                 style={[styles.button, styles.deleteButton, isLoading ? styles.buttonDisabled : undefined]}
                 textStyle={styles.buttonText}
               />
+              </>
+              )}
             </>
-          )}
+          ) : null}
         </View>
+        ) : null}
       </ScrollView>
 
       {/* Language Picker Modal */}
@@ -765,6 +736,19 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   contentContainer: {
     padding: 20,
     paddingBottom: 40, // Add padding at the bottom
+  },
+  profileName: {
+    color: colors.text || colors.palette.biancaHeader || colors.palette.neutral800,
+    fontSize: 24,
+    fontWeight: "700",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  profileMeta: {
+    color: colors.palette.neutral600,
+    fontSize: 15,
+    marginTop: 6,
+    textAlign: "center",
   },
   deleteButton: {
     backgroundColor: colors.palette.angry500, // Red for delete

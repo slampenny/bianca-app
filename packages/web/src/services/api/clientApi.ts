@@ -83,11 +83,12 @@ export const clientApi = createApi({
     }),
     sendFamilyDigestEmailVerification: builder.mutation<
       { success: boolean; message: string },
-      { clientId: string }
+      { clientId: string; recipientId?: string }
     >({
-      query: ({ clientId }) => ({
+      query: ({ clientId, recipientId }) => ({
         url: `/clients/${clientId}/family-digest-email/verification`,
         method: "POST",
+        body: recipientId ? { recipientId } : undefined,
       }),
       invalidatesTags: (_r, _e, { clientId }) => [{ type: "Client", id: clientId }],
     }),
@@ -125,6 +126,8 @@ export const clientApi = createApi({
             | "room"
             | "moveInDate"
             | "emergencyContact"
+            | "emergencyContacts"
+            | "familyDigestRecipients"
           >
         >
       }

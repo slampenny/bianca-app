@@ -1,0 +1,28 @@
+# Staging live-dev backend — full workspace deps for nodemon (not production).
+FROM public.ecr.aws/docker/library/node:20-bullseye
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+  libssl-dev ca-certificates curl ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable
+
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn ./.yarn
+COPY packages/backend/package.json ./packages/backend/package.json
+
+RUN yarn workspaces focus @bianca-app/backend
+
+COPY packages/backend/.eslintrc.json packages/backend/nodemon.json packages/backend/jest.config.js ./packages/backend/
+COPY packages/backend/src ./packages/backend/src
+COPY packages/backend/migrations ./packages/backend/migrations
+COPY packages/backend/migrate-mongo-config.js ./packages/backend/
+COPY packages/backend/tests/fixtures ./packages/backend/tests/fixtures
+
+WORKDIR /app/packages/backend
+
+EXPOSE 3000 9229
+
+CMD ["yarn", "dev:staging"]

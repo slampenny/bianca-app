@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit"
+import { REHYDRATE } from "redux-persist"
 import { needsOnboarding } from "../lib/postAuthNavigation"
 import { authApi } from "../services/api/authApi"
 import { caregiverApi } from "../services/api/caregiverApi"
@@ -47,6 +48,18 @@ export const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
+    builder.addCase(REHYDRATE, (state, action) => {
+      const persisted = (action.payload as { auth?: Partial<AuthState> } | undefined)?.auth
+      if (!persisted) return
+      const keepTokens = state.tokens
+      const keepUser = state.currentUser
+      const keepPending = state.pendingOnboarding
+      if (persisted.authEmail !== undefined) state.authEmail = persisted.authEmail
+      if (persisted.inviteToken !== undefined) state.inviteToken = persisted.inviteToken
+      if (keepTokens) state.tokens = keepTokens
+      if (keepUser) state.currentUser = keepUser
+      if (keepPending) state.pendingOnboarding = keepPending
+    })
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, { payload }) => {
       if ("caregiver" in payload && "tokens" in payload) {
         state.currentUser = payload.caregiver

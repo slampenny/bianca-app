@@ -74,7 +74,6 @@ resource "aws_iam_role_policy" "pipeline_notify_lambda" {
           "codepipeline:ListActionExecutions"
         ]
         Resource = [
-          aws_codepipeline.staging.arn,
           aws_codepipeline.production.arn
         ]
       },
@@ -123,7 +122,7 @@ resource "aws_lambda_function" "pipeline_notify" {
 
 resource "aws_cloudwatch_event_rule" "pipeline_execution_state" {
   name        = "bianca-pipeline-execution-notify"
-  description = "Notify on staging/production CodePipeline success or failure"
+  description = "Notify on production CodePipeline success or failure"
 
   event_pattern = jsonencode({
     source      = ["aws.codepipeline"]
@@ -131,7 +130,6 @@ resource "aws_cloudwatch_event_rule" "pipeline_execution_state" {
     detail = {
       state = ["SUCCEEDED", "FAILED"]
       pipeline = [
-        aws_codepipeline.staging.name,
         aws_codepipeline.production.name
       ]
     }
