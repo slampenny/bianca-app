@@ -277,7 +277,7 @@ echo "   ✅ Image tag: $IMAGE_TAG"
 # Set Twilio caller ID by environment (demo uses dedicated number)
 case "$ENVIRONMENT" in
   production)
-    TWILIO_PHONENUMBER="+19786256514"
+    TWILIO_PHONENUMBER="+16047060134"
     ;;
   staging)
     TWILIO_PHONENUMBER="+19285758645"
