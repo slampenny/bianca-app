@@ -14,6 +14,7 @@ const NAV_LINKS: { to: string; label: string; end?: boolean }[] = [
   { to: "/corp-email", label: "Corp email" },
   { to: "/security-events", label: "Security events" },
   { to: "/impersonate", label: "Sign in as user" },
+  { to: "/place-call", label: "Place call" },
 ]
 
 function navActive(pathname: string, to: string, end?: boolean) {

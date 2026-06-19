@@ -17,6 +17,7 @@ import { InviteSignupPage } from "./pages/InviteSignupPage"
 import { SecurityEventsPage } from "./pages/SecurityEventsPage"
 import { SecurityEventDetailPage } from "./pages/SecurityEventDetailPage"
 import { BackupsPage } from "./pages/BackupsPage"
+import { PlaceCallPage } from "./pages/PlaceCallPage"
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="security-events" element={<SecurityEventsPage />} />
             <Route path="security-events/:id" element={<SecurityEventDetailPage />} />
             <Route path="backups" element={<BackupsPage />} />
+            <Route path="place-call" element={<PlaceCallPage />} />
           </Route>
         </Route>
       </Route>

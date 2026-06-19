@@ -5,7 +5,7 @@ const { conversationService, voiceTelephonyService, clientService, caregiverServ
 const onboardingService = require('../services/onboarding.service');
 const onboardingPlanService = require('../services/onboardingPlan.service');
 const { ConversationDTO } = require('../dtos');
-const { Call, Conversation } = require('../models');
+const { Call, Conversation, Org } = require('../models');
 const logger = require('../config/logger');
 
 /**
@@ -41,7 +41,9 @@ const initiateCall = catchAsync(async (req, res) => {
         ? onboardingDash.journey.currentDay
         : null;
 
-    const callSid = await voiceTelephonyService.initiateCall(client.id);
+    const org = await Org.findById(client.org, 'country');
+    const fromNumber = voiceTelephonyService.getFromNumber(org?.country);
+    const callSid = await voiceTelephonyService.initiateCall(client.id, fromNumber);
     let call = await Call.findOne({ callSid });
     if (!call) {
       call = await Call.create({

@@ -10,6 +10,7 @@ const buildTwilioConfig = (envVars) => {
   return {
     twilio: {
       phone: envVars.TWILIO_PHONENUMBER,
+      phoneUS: envVars.TWILIO_PHONE_US,
       apiUrl: envVars.PUBLIC_TUNNEL_URL || envVars.API_BASE_URL || `http://localhost:${envVars.PORT}`,
       accountSid: envVars.TWILIO_ACCOUNTSID,
       authToken: envVars.TWILIO_AUTHTOKEN,
@@ -23,6 +24,7 @@ const buildTwilioConfig = (envVars) => {
 const validateTwilioEnvVars = (envVars) => {
   const schema = Joi.object({
     TWILIO_PHONENUMBER: Joi.string().optional(),
+    TWILIO_PHONE_US: Joi.string().optional(),
     TWILIO_ACCOUNTSID: Joi.string().optional(),
     TWILIO_AUTHTOKEN: Joi.string().optional(),
     PUBLIC_TUNNEL_URL: Joi.string().uri().optional(),
@@ -36,6 +38,7 @@ const applyTwilioSecrets = (config, secrets) => {
   if (secrets.TWILIO_ACCOUNTSID) config.twilio.accountSid = secrets.TWILIO_ACCOUNTSID;
   if (secrets.TWILIO_AUTHTOKEN) config.twilio.authToken = secrets.TWILIO_AUTHTOKEN;
   if (secrets.TWILIO_VOICEURL) config.twilio.voiceUrl = secrets.TWILIO_VOICEURL;
+  if (secrets.TWILIO_PHONE_US) config.twilio.phoneUS = secrets.TWILIO_PHONE_US;
   return config;
 };
 

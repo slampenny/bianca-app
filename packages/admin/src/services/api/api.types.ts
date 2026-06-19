@@ -312,3 +312,22 @@ export interface HipaaBackupRestoreResponse {
   backupRestored?: string
   timestamp?: string
 }
+
+export interface PlaceAdminCallResponse {
+  conversationId: string
+  callId: string
+  callSid: string
+  clientId: string
+  clientName: string
+  clientPhone: string
+  status: string
+  callStatus: string
+}
+
+export interface AdminCallStatusResponse {
+  callStatus?: string
+  status?: string
+  callSid?: string
+  clientName?: string
+  clientPhone?: string
+}

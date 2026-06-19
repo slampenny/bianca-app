@@ -42,7 +42,7 @@ class TwilioVoiceProvider {
    * @param {string} clientId - Database ID of the client
    * @returns {Promise<string>} - The call SID
    */
-  async initiateCall(clientId) {
+  async initiateCall(clientId, fromNumber) {
     logger.info(`[Twilio Service] Initiating call for client ID: ${clientId}`);
     let client;
     let conversation;
@@ -55,22 +55,25 @@ class TwilioVoiceProvider {
       }
       logger.info(`[Twilio Service] Found client ${client.name} with phone ${client.phone}`);
 
-      const initialTwiMLUrl = getStartCallWebhookUrl(clientId);
-      const statusCallbackUrl = getCallStatusWebhookUrl();
-      
-      logger.info(`[Twilio Service] Using TwiML URL: ${initialTwiMLUrl}`);
-      logger.info(`[Twilio Service] Using callback URL: ${statusCallbackUrl}`);
-
       // Validate Twilio configuration before making API call
       if (!config.twilio.accountSid || !config.twilio.authToken) {
         logger.error(`[Twilio Service] Missing Twilio credentials - accountSid: ${!!config.twilio.accountSid}, authToken: ${!!config.twilio.authToken}`);
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Twilio credentials not configured');
       }
-      
+
       if (!config.twilio.phone) {
         logger.error(`[Twilio Service] Missing Twilio phone number`);
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Twilio phone number not configured');
       }
+
+      const callerNumber = fromNumber || config.twilio.phone;
+      logger.info(`[Twilio Service] Using caller number: ${callerNumber}`);
+
+      const initialTwiMLUrl = getStartCallWebhookUrl(clientId, callerNumber);
+      const statusCallbackUrl = getCallStatusWebhookUrl();
+
+      logger.info(`[Twilio Service] Using TwiML URL: ${initialTwiMLUrl}`);
+      logger.info(`[Twilio Service] Using callback URL: ${statusCallbackUrl}`);
 
       // Ensure Twilio client is initialized
       if (!twilioClient) {
@@ -83,7 +86,7 @@ class TwilioVoiceProvider {
       const callOptions = {
         url: initialTwiMLUrl,
         to: client.phone,
-        from: config.twilio.phone,
+        from: callerNumber,
         statusCallback: statusCallbackUrl,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
         statusCallbackMethod: 'POST',
@@ -123,7 +126,7 @@ class TwilioVoiceProvider {
         } else         if (twilioError.code === 21211) {
           throw new ApiError(httpStatus.BAD_REQUEST, `Invalid phone number format: ${client.phone}`);
         } else if (twilioError.code === 21212) {
-          throw new ApiError(httpStatus.BAD_REQUEST, `Invalid caller ID: ${config.twilio.phone}`);
+          throw new ApiError(httpStatus.BAD_REQUEST, `Invalid caller ID: ${callerNumber}`);
         } else {
           throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, `Twilio API error: ${twilioError.message || 'Unknown error'}`);
         }
@@ -211,7 +214,7 @@ class TwilioVoiceProvider {
       // Connect to Asterisk SIP endpoint with clientId as a parameter
       // CRITICAL FIX: Remove answerOnBridge to prevent initial audio cutoff
       const dialOptions = {
-        callerId: config.twilio.phone, // Use configured Twilio number
+        callerId: req.query.from || config.twilio.phone,
         timeLimit: 1800, // Example: 30 mins
         timeout: 20, // Example: Ring Asterisk for 20 secs
         // answerOnBridge: true, // REMOVED: This was causing initial audio cutoff

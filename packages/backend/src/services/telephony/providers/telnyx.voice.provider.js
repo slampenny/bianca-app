@@ -25,7 +25,7 @@ const {
 } = require('../voiceCallStatus.handler');
 
 class TelnyxVoiceProvider {
-  async initiateCall(clientId) {
+  async initiateCall(clientId, fromNumber) {
     logger.info(`[Telnyx Service] Initiating call for client ID: ${clientId}`);
 
     try {
@@ -44,7 +44,10 @@ class TelnyxVoiceProvider {
         throw new ApiError(httpStatus.INTERNAL_SERVER_ERROR, 'Telnyx phone number not configured');
       }
 
-      const texmlUrl = getStartCallWebhookUrl(clientId);
+      const callerNumber = fromNumber || config.telnyx.phone;
+      logger.info(`[Telnyx Service] Using caller number: ${callerNumber}`);
+
+      const texmlUrl = getStartCallWebhookUrl(clientId, callerNumber);
       const webhookUrl = getCallStatusWebhookUrl();
       logger.info(`[Telnyx Service] TeXML URL: ${texmlUrl}`);
       logger.info(`[Telnyx Service] Webhook URL: ${webhookUrl}`);
@@ -57,7 +60,7 @@ class TelnyxVoiceProvider {
       try {
         result = await telnyxApi.createOutboundCall({
           to: client.phone,
-          from: config.telnyx.phone,
+          from: callerNumber,
           texmlUrl,
           webhookUrl,
           clientState: { clientId: clientId.toString(), recordCalls },
@@ -103,7 +106,7 @@ class TelnyxVoiceProvider {
         callSid,
         clientId,
         answeredBy,
-        callerId: config.telnyx.phone,
+        callerId: req.query.from || config.telnyx.phone,
         recordCalls: config.telnyx.recordCalls,
       });
 

@@ -12,6 +12,7 @@ const buildTelnyxConfig = (envVars) => {
       apiKey: envVars.TELNYX_API_KEY,
       connectionId: envVars.TELNYX_CONNECTION_ID,
       phone: envVars.TELNYX_PHONE_NUMBER || envVars.TELNYX_PHONENUMBER,
+      phoneUS: envVars.TELNYX_PHONE_US,
       publicKey: envVars.TELNYX_PUBLIC_KEY,
       recordCalls: shouldRecord,
       apiBaseUrl: envVars.TELNYX_API_BASE_URL || 'https://api.telnyx.com/v2',
@@ -25,6 +26,7 @@ const validateTelnyxEnvVars = (envVars) => {
     TELNYX_CONNECTION_ID: Joi.string().optional(),
     TELNYX_PHONE_NUMBER: Joi.string().optional(),
     TELNYX_PHONENUMBER: Joi.string().optional(),
+    TELNYX_PHONE_US: Joi.string().optional(),
     TELNYX_PUBLIC_KEY: Joi.string().optional(),
     TELNYX_API_BASE_URL: Joi.string().uri().optional(),
   });
@@ -36,6 +38,7 @@ const applyTelnyxSecrets = (config, secrets) => {
   if (secrets.TELNYX_CONNECTION_ID) config.telnyx.connectionId = secrets.TELNYX_CONNECTION_ID;
   if (secrets.TELNYX_PUBLIC_KEY) config.telnyx.publicKey = secrets.TELNYX_PUBLIC_KEY;
   if (secrets.TELNYX_PHONE_NUMBER) config.telnyx.phone = secrets.TELNYX_PHONE_NUMBER;
+  if (secrets.TELNYX_PHONE_US) config.telnyx.phoneUS = secrets.TELNYX_PHONE_US;
   return config;
 };
 

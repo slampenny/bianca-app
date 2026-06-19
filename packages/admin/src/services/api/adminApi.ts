@@ -15,6 +15,8 @@ import type {
   HipaaBackupsListResponse,
   HipaaBackupTriggerResponse,
   ObservabilityPayload,
+  PlaceAdminCallResponse,
+  AdminCallStatusResponse,
   SaveCorpEmailForwardsResponse,
   ScimAdminStatus,
   ScimTokenIssueResponse,
@@ -27,7 +29,7 @@ import baseQueryWithAuth from "./baseQueryWithAuth"
 export const adminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: baseQueryWithAuth(),
-  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards", "BreachLogs", "Backups"],
+  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards", "BreachLogs", "Backups", "AdminCall"],
   endpoints: (builder) => ({
     getObservability: builder.query<ObservabilityPayload, void>({
       query: () => ({
@@ -260,6 +262,26 @@ export const adminApi = createApi({
       }),
       invalidatesTags: ["Backups"],
     }),
+    placeAdminCall: builder.mutation<PlaceAdminCallResponse, { firstName: string; lastName: string; phone: string }>({
+      query: (body) => ({
+        url: "/admin/place-call",
+        method: "POST",
+        body,
+      }),
+    }),
+    getAdminCallStatus: builder.query<AdminCallStatusResponse, string>({
+      query: (conversationId) => ({
+        url: `/calls/${conversationId}/status`,
+        method: "GET",
+      }),
+    }),
+    endAdminCall: builder.mutation<void, { conversationId: string; outcome?: string }>({
+      query: ({ conversationId, outcome = "answered" }) => ({
+        url: `/calls/${conversationId}/end`,
+        method: "POST",
+        body: { outcome },
+      }),
+    }),
   }),
 })
 
@@ -290,4 +312,7 @@ export const {
   useListBackupsQuery,
   useTriggerBackupMutation,
   useRestoreBackupMutation,
+  usePlaceAdminCallMutation,
+  useLazyGetAdminCallStatusQuery,
+  useEndAdminCallMutation,
 } = adminApi
