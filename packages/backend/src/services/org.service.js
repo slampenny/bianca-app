@@ -84,6 +84,16 @@ const updateOrgById = async (orgId, updateBody) => {
     org.voiceOnboarding = updateBody.voiceOnboarding;
     const { voiceOnboarding, ...restUpdateBody } = updateBody;
     Object.assign(org, restUpdateBody);
+  } else if (updateBody.requiredCallQuestions) {
+    const { assertValidRequiredCallQuestionsConfig } = require('./requiredCallQuestions.service');
+    try {
+      assertValidRequiredCallQuestionsConfig(updateBody.requiredCallQuestions);
+    } catch (err) {
+      throw new ApiError(httpStatus.BAD_REQUEST, err.message);
+    }
+    org.requiredCallQuestions = updateBody.requiredCallQuestions;
+    const { requiredCallQuestions, ...restUpdateBody } = updateBody;
+    Object.assign(org, restUpdateBody);
   } else if (updateBody.dailyDigestSettings) {
     if (!org.dailyDigestSettings) {
       org.dailyDigestSettings = { enabled: false, sendTime: null };

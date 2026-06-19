@@ -7,7 +7,8 @@ echo "=== Debugging Staging 502 Error ==="
 echo ""
 
 echo "1. Check CodePipeline status..."
-echo "   Run: aws codepipeline get-pipeline-state --name bianca-staging-pipeline --profile jordan"
+echo "   Staging: yarn staging:live  (no CodePipeline)"
+echo "   Production: aws codepipeline get-pipeline-state --name bianca-production-pipeline --profile jordan"
 echo ""
 
 echo "2. Check EC2 instance status..."

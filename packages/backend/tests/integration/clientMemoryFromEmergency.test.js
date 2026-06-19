@@ -3,26 +3,14 @@ const { MongoMemoryServer } = require('mongodb-memory-server');
 const corpusRunner = require('../helpers/corpusRunner');
 const emergencyEmbeddingPipeline = require('../../src/services/emergencyEmbeddingPipeline.service');
 const { EmergencyProcessor } = require('../../src/services/emergencyProcessor.service');
-const { ClientMemory } = require('../../src/models');
-
-jest.mock('../../src/services/emergencyEmbeddingPipeline.service', () => ({
-  evaluateEmergencyEmbedding: jest.fn(),
-}));
-
-jest.mock('../../src/services/clientMemory.service', () => {
-  const actual = jest.requireActual('../../src/services/clientMemory.service');
-  return {
-    ...actual,
-    writeUrgentFact: jest.fn().mockImplementation(actual.writeUrgentFact),
-  };
-});
-
 const clientMemory = require('../../src/services/clientMemory.service');
+const { ClientMemory } = require('../../src/models');
 
 let mongoServer;
 let processor;
 let clientId;
 let conversationId;
+let embeddingSpy;
 
 beforeAll(async () => {
   mongoServer = await MongoMemoryServer.create();
@@ -56,18 +44,17 @@ describe('ClientMemory from emergency (integration)', () => {
     const dedupe = require('../../src/utils/alertDeduplicator').getAlertDeduplicator();
     dedupe.clearHistory();
 
-    clientMemory.writeUrgentFact.mockImplementation(
-      jest.requireActual('../../src/services/clientMemory.service').writeUrgentFact
-    );
+    embeddingSpy = jest.spyOn(emergencyEmbeddingPipeline, 'evaluateEmergencyEmbedding');
   });
 
   afterEach(() => {
     delete process.env.FORCE_EMBEDDING_PIPELINE;
+    embeddingSpy?.mockRestore();
   });
 
   it('writes urgent ClientMemory fact when emergency is detected', async () => {
     const testCase = corpusRunner.getById('TP-MED-001');
-    emergencyEmbeddingPipeline.evaluateEmergencyEmbedding.mockResolvedValue({
+    embeddingSpy.mockResolvedValue({
       evaluated: true,
       isEmergency: true,
       severity: 'CRITICAL',
@@ -91,7 +78,7 @@ describe('ClientMemory from emergency (integration)', () => {
 
   it('urgent fact has priority:urgent and source:mid_call_emergency', async () => {
     const testCase = corpusRunner.getById('TP-MED-001');
-    emergencyEmbeddingPipeline.evaluateEmergencyEmbedding.mockResolvedValue({
+    embeddingSpy.mockResolvedValue({
       evaluated: true,
       isEmergency: true,
       severity: 'CRITICAL',
@@ -117,14 +104,14 @@ describe('ClientMemory from emergency (integration)', () => {
 
   it('does not write ClientMemory fact for true negative', async () => {
     const testCase = corpusRunner.getById('TN-MED-001');
-    emergencyEmbeddingPipeline.evaluateEmergencyEmbedding.mockResolvedValue({
+    embeddingSpy.mockResolvedValue({
       evaluated: true,
       isEmergency: false,
       buckets: ['medical_emergency'],
       tense: 'past',
     });
 
-    const spy = jest.spyOn(clientMemory, 'writeUrgentFact').mockResolvedValue(undefined);
+    const spy = jest.spyOn(clientMemory, 'writeUrgentFact');
 
     await processor.processUtterance(clientId, testCase.text, Date.now(), conversationId);
 
@@ -134,7 +121,7 @@ describe('ClientMemory from emergency (integration)', () => {
 
   it('emergency processor does not throw if writeUrgentFact fails', async () => {
     const testCase = corpusRunner.getById('TP-MED-001');
-    emergencyEmbeddingPipeline.evaluateEmergencyEmbedding.mockResolvedValue({
+    embeddingSpy.mockResolvedValue({
       evaluated: true,
       isEmergency: true,
       severity: 'CRITICAL',
@@ -153,7 +140,7 @@ describe('ClientMemory from emergency (integration)', () => {
 
   it('conversationId is null-safe for writeUrgentFact', async () => {
     const testCase = corpusRunner.getById('TP-MED-001');
-    emergencyEmbeddingPipeline.evaluateEmergencyEmbedding.mockResolvedValue({
+    embeddingSpy.mockResolvedValue({
       evaluated: true,
       isEmergency: true,
       severity: 'CRITICAL',
@@ -163,7 +150,7 @@ describe('ClientMemory from emergency (integration)', () => {
       tense: 'current',
     });
 
-    const spy = jest.spyOn(clientMemory, 'writeUrgentFact').mockResolvedValue(undefined);
+    const spy = jest.spyOn(clientMemory, 'writeUrgentFact');
 
     await processor.processUtterance(clientId, testCase.text, Date.now(), null);
 

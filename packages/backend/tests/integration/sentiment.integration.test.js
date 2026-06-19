@@ -166,11 +166,9 @@ describe('Sentiment Analysis Integration', () => {
     });
 
     it('should handle sentiment analysis failure gracefully', async () => {
-      // Override integration-setup mock so analyzeSentiment fails (finalizeConversation calls analyzeSentiment)
-      const openaiSentiment = require('../../src/services/openai.sentiment.service');
-      openaiSentiment.getOpenAISentimentServiceInstance.mockReturnValueOnce({
-        analyzeSentiment: jest.fn().mockResolvedValue({ success: false, error: 'OpenAI API error' }),
-        analyzeConversationSentiment: jest.fn().mockResolvedValue({ success: true, data: {} })
+      jest.spyOn(sentimentService, 'analyzeSentiment').mockResolvedValueOnce({
+        success: false,
+        error: 'OpenAI API error',
       });
 
       const result = await conversationService.finalizeConversation(conversation._id, false);
@@ -459,8 +457,8 @@ describe('Sentiment Analysis Integration', () => {
     });
   });
 
-  describe('Sentiment Data Validation', () => {
-    it('should validate sentiment data structure', () => {
+  describe('Sentiment response parsing', () => {
+    it('should parse valid sentiment JSON from OpenAI response', () => {
       const validSentimentData = {
         overallSentiment: 'positive',
         sentimentScore: 0.7,
@@ -472,21 +470,23 @@ describe('Sentiment Analysis Integration', () => {
         recommendations: 'Continue current approach'
       };
 
-      const result = sentimentService.validateSentimentData(validSentimentData);
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      const parsed = sentimentService.parseSentimentResponse(JSON.stringify(validSentimentData), true);
+      expect(parsed.overallSentiment).toBe('positive');
+      expect(parsed.sentimentScore).toBe(0.7);
+      expect(parsed.confidence).toBe(0.9);
     });
 
-    it('should reject invalid sentiment data', () => {
-      const invalidSentimentData = {
-        overallSentiment: 'invalid',
-        sentimentScore: 2.0, // Invalid range
-        confidence: -0.1 // Invalid range
-      };
-
-      const result = sentimentService.validateSentimentData(invalidSentimentData);
-      expect(result.isValid).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
+    it('should clamp out-of-range sentiment scores', () => {
+      const parsed = sentimentService.parseSentimentResponse(
+        JSON.stringify({
+          overallSentiment: 'positive',
+          sentimentScore: 2.0,
+          confidence: -0.1,
+        }),
+        false
+      );
+      expect(parsed.sentimentScore).toBe(1);
+      expect(parsed.confidence).toBe(0);
     });
   });
 });

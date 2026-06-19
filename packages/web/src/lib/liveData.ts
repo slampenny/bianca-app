@@ -61,7 +61,12 @@ function formatMoveInDate(iso: string | null | undefined): string {
 }
 
 function mapEmergencyContact(c: Client): Resident["emergencyContact"] {
-  const ec = c.emergencyContact
+  const contacts = c.emergencyContacts?.length
+    ? c.emergencyContacts
+    : c.emergencyContact
+      ? [c.emergencyContact]
+      : []
+  const ec = contacts[0]
   if (!ec) return { name: "—", relationship: "—", phone: "—" }
   const has = (ec.name || "").trim() || (ec.relationship || "").trim() || (ec.phone || "").trim()
   if (!has) return { name: "—", relationship: "—", phone: "—" }

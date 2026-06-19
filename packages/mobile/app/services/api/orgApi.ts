@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import { Org, OrgPages, Caregiver } from "./api.types"
+import { Org, OrgPages, Caregiver, VoiceOnboardingPlan } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 import { logger } from "../../utils/logger"
 
@@ -26,6 +26,9 @@ export const orgApi = createApi({
         logger.debug("[orgApi] getOrg query called for orgId:", orgId)
         return `/orgs/${orgId}`
       },
+    }),
+    getDefaultVoiceOnboardingPlan: builder.query<{ plan: VoiceOnboardingPlan }, void>({
+      query: () => "/orgs/onboarding/default-plan",
     }),
     updateOrg: builder.mutation<Org, { orgId: string; org: any }>({
       query: ({ orgId, org }) => {
@@ -135,6 +138,7 @@ export const orgApi = createApi({
 export const {
   useGetAllOrgsQuery,
   useGetOrgQuery,
+  useGetDefaultVoiceOnboardingPlanQuery,
   useUpdateOrgMutation,
   useDeleteOrgMutation,
   useAddCaregiverMutation,

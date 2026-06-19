@@ -3,10 +3,10 @@ const mongoose = require('mongoose');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/ApiError');
 const { getAdminObservabilitySnapshot } = require('../services/observability.service');
-const { caregiverService, tokenService, alertService, orgService } = require('../services');
+const { caregiverService, tokenService, alertService, orgService, voiceTelephonyService, conversationService } = require('../services');
 const scimService = require('../services/scim.service');
 const { AlertDTO, CaregiverDTO, OrgDTO, clientsToDTOsWithLastCall } = require('../dtos');
-const { AuditLog, Caregiver } = require('../models');
+const { AuditLog, Caregiver, Call, Conversation, Client, Org } = require('../models');
 const logger = require('../config/logger');
 const embeddingAnchorPhraseService = require('../services/embeddingAnchorPhrase.service');
 const corpEmailForwardService = require('../services/corpEmailForward.service');
@@ -442,6 +442,83 @@ const restoreBackup = catchAsync(async (req, res) => {
   res.send(result);
 });
 
+const ADMIN_CALLS_ORG_EMAIL = 'admin-calls@internal.bianca';
+
+const placeAdminCall = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const { firstName, lastName, phone } = req.body;
+
+  // Find or lazily create the admin calls org
+  let adminOrg = await Org.findOne({ email: ADMIN_CALLS_ORG_EMAIL });
+  if (!adminOrg) {
+    adminOrg = await Org.create({
+      name: 'Admin Test Calls',
+      email: ADMIN_CALLS_ORG_EMAIL,
+      timezone: 'America/Los_Angeles',
+    });
+    logger.info(`[AdminCall] Created admin calls org: ${adminOrg._id}`);
+  }
+
+  // Find or create client by phone within the admin org
+  let client = await Client.findOne({ phone, org: adminOrg._id });
+  if (!client) {
+    client = await Client.create({
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`,
+      phone,
+      org: adminOrg._id,
+    });
+    await Org.findByIdAndUpdate(adminOrg._id, { $addToSet: { clients: client._id } });
+    logger.info(`[AdminCall] Created client ${client._id} for phone ${phone}`);
+  } else if (client.firstName !== firstName || client.lastName !== lastName) {
+    client.firstName = firstName;
+    client.lastName = lastName;
+    client.name = `${firstName} ${lastName}`;
+    await client.save();
+  }
+
+  const fromNumber = voiceTelephonyService.getFromNumber(adminOrg.country);
+  const callSid = await voiceTelephonyService.initiateCall(client.id, fromNumber);
+
+  let call = await Call.findOne({ callSid });
+  if (!call) {
+    call = await Call.create({
+      callSid,
+      clientId: client._id,
+      startTime: new Date(),
+      callStartTime: new Date(),
+      callType: 'outbound',
+      status: 'initiated',
+      callStatus: 'initiating',
+    });
+  }
+  call.status = 'in-progress';
+  call.callStatus = 'ringing';
+  call.callType = 'outbound';
+  await call.save();
+
+  let conversation = await Conversation.findOne({ callId: call._id });
+  if (!conversation) {
+    conversation = await conversationService.createConversationForClient(client._id, call._id);
+    call.conversationId = conversation._id;
+    await call.save();
+  }
+
+  logger.info(`[AdminCall] Call initiated for ${client.name}, SID: ${callSid}, conversation: ${conversation._id}`);
+
+  res.status(httpStatus.CREATED).send({
+    conversationId: conversation._id.toString(),
+    callId: call._id.toString(),
+    callSid,
+    clientId: client._id.toString(),
+    clientName: client.name,
+    clientPhone: client.phone,
+    status: call.status,
+    callStatus: call.callStatus,
+  });
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -466,4 +543,5 @@ module.exports = {
   listBackups,
   triggerBackup,
   restoreBackup,
+  placeAdminCall,
 };

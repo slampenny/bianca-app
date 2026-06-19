@@ -94,6 +94,10 @@ const familyWeeklyDigestSchema = mongoose.Schema(
       type: String,
       default: null,
     },
+    emailRecipients: {
+      type: [String],
+      default: [],
+    },
     emailSubject: {
       type: String,
       default: null,

@@ -330,6 +330,16 @@ export const SchedulesScreen = () => {
     }
   }, [selectedSchedule?.id]) // Only reset when schedule ID changes, not on every update
 
+  // Consumer mode: auto-select the only schedule
+  useEffect(() => {
+    if (schedules.length === 1 && selectedSchedule?.id !== schedules[0].id) {
+      dispatch(setSchedule(schedules[0]))
+    }
+  }, [schedules, selectedSchedule?.id, dispatch])
+
+  const showSchedulePicker = schedules.length > 1
+  const allowNewSchedule = schedules.length === 0
+
 
   if (themeLoading) {
     return <LoadingScreen />
@@ -348,23 +358,25 @@ export const SchedulesScreen = () => {
         <Text style={styles.headerTitle} testID="schedules-header" accessibilityLabel="schedules-header">{translate("schedulesScreen.scheduleDetails")}</Text>
       </View>
 
-      {/* Schedule Selector Card */}
-      {schedules && schedules.length > 0 ? (
+      {/* Schedule Selector Card — only when multiple schedules exist */}
+      {showSchedulePicker ? (
         <Card
           style={styles.selectorCard}
           ContentComponent={
             <View style={styles.selectorContent}>
               <Text style={styles.selectorLabel}>{translate("schedulesScreen.selectSchedule")}</Text>
               <View style={styles.pickerRow}>
-                <TouchableOpacity
-                  onPress={handleNewSchedule}
-                  style={styles.newScheduleButton}
-                  testID="schedule-new-button"
-                  accessibilityLabel="New Schedule"
-                  accessibilityHint="Creates a new schedule"
-                >
-                  <Text style={styles.newScheduleButtonText}>+</Text>
-                </TouchableOpacity>
+                {allowNewSchedule ? (
+                  <TouchableOpacity
+                    onPress={handleNewSchedule}
+                    style={styles.newScheduleButton}
+                    testID="schedule-new-button"
+                    accessibilityLabel="New Schedule"
+                    accessibilityHint="Creates a new schedule"
+                  >
+                    <Text style={styles.newScheduleButtonText}>+</Text>
+                  </TouchableOpacity>
+                ) : null}
                 <View style={styles.pickerWrapper}>
                   <Picker
                     testID="schedule-selector-picker"
@@ -394,7 +406,7 @@ export const SchedulesScreen = () => {
             </View>
           }
         />
-      ) : (
+      ) : schedules.length === 0 ? (
         <Card
           style={styles.emptyStateCard}
           verticalAlignment="center"
@@ -406,7 +418,7 @@ export const SchedulesScreen = () => {
             </View>
           }
         />
-      )}
+      ) : null}
 
       {/* Schedule Configuration Card */}
       <Card
@@ -441,7 +453,7 @@ export const SchedulesScreen = () => {
         testID="schedule-save-button"
         accessibilityLabel="schedule-save-button"
       />
-      {schedules && schedules.length > 0 && selectedSchedule && selectedSchedule.id && (
+      {showSchedulePicker && selectedSchedule?.id ? (
         <Button
           text={translate("scheduleScreen.deleteSchedule")}
           onPress={handleDelete}
@@ -450,7 +462,7 @@ export const SchedulesScreen = () => {
           testID="schedule-delete-button"
           accessibilityLabel="schedule-delete-button"
         />
-      )}
+      ) : null}
     </ScrollView>
   )
 }

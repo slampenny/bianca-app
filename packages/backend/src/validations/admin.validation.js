@@ -219,6 +219,14 @@ const restoreBackup = {
   }),
 };
 
+const placeAdminCall = {
+  body: Joi.object().keys({
+    firstName: Joi.string().trim().min(1).max(100).required(),
+    lastName: Joi.string().trim().min(1).max(100).required(),
+    phone: Joi.string().trim().min(7).max(40).required(),
+  }),
+};
+
 module.exports = {
   searchCaregivers,
   impersonate,
@@ -237,4 +245,5 @@ module.exports = {
   listBackups,
   triggerBackup,
   restoreBackup,
+  placeAdminCall,
 };

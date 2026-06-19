@@ -1,6 +1,6 @@
 import { createStackNavigator } from "@react-navigation/stack"
 import { Platform, ViewStyle } from "react-native"
-import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, SSOAccountLinkingScreen, MFAVerificationScreen, ClientConsentScreen, OnboardingAboutYouScreen, OnboardingHowBiancaWorksScreen, OnboardingOrgInfoScreen, OnboardingRegistrationScreen } from "app/screens"
+import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, MFAVerificationScreen, ClientConsentScreen, OnboardingAboutYouScreen, OnboardingHowBiancaWorksScreen, OnboardingOrgInfoScreen, OnboardingRegistrationScreen, OnboardingAddLovedOneScreen, OnboardingScheduleScreen } from "app/screens"
 import MainTabs from "./MainTabs"
 import { AppStackParamList, LoginStackParamList, OnboardingStackParamList } from "./navigationTypes"
 import { translate } from "app/i18n"
@@ -16,17 +16,23 @@ const Stack = createStackNavigator<AppStackParamList>()
 const LoginStack = createStackNavigator<LoginStackParamList>()
 const OnboardingStack = createStackNavigator<OnboardingStackParamList>()
 
-export const OnboardingStackNavigator = () => {
+export const OnboardingStackNavigator = ({
+  initialRouteName = "OnboardingAboutYou",
+}: {
+  initialRouteName?: keyof OnboardingStackParamList
+}) => {
   const { colors } = useTheme()
   return (
     <OnboardingStack.Navigator
       screenOptions={{ headerShown: false, cardStyle: webCardStyle }}
-      initialRouteName="OnboardingAboutYou"
+      initialRouteName={initialRouteName}
     >
       <OnboardingStack.Screen name="OnboardingAboutYou" component={OnboardingAboutYouScreen} />
       <OnboardingStack.Screen name="OnboardingHowBiancaWorks" component={OnboardingHowBiancaWorksScreen} />
       <OnboardingStack.Screen name="OnboardingOrgInfo" component={OnboardingOrgInfoScreen} />
       <OnboardingStack.Screen name="OnboardingRegistration" component={OnboardingRegistrationScreen} />
+      <OnboardingStack.Screen name="OnboardingAddLovedOne" component={OnboardingAddLovedOneScreen} />
+      <OnboardingStack.Screen name="OnboardingSchedule" component={OnboardingScheduleScreen} />
       <OnboardingStack.Screen
         name="Terms"
         component={TermsScreen}
@@ -115,7 +121,6 @@ export const UnauthStack = () => {
       <LoginStack.Screen name="EmailVerified" component={EmailVerifiedScreen} />
       <LoginStack.Screen name="EmailVerificationRequired" component={EmailVerificationRequiredScreen} />
       <LoginStack.Screen name="VerifyEmail" component={VerifyEmailScreen} />
-      <LoginStack.Screen name="SSOAccountLinking" component={SSOAccountLinkingScreen} />
       <LoginStack.Screen name="MFAVerification" component={MFAVerificationScreen} />
       <LoginStack.Screen name="ClientConsent" component={ClientConsentScreen} options={{ headerShown: false }} />
     </LoginStack.Navigator>

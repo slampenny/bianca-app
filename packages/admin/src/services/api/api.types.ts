@@ -67,6 +67,16 @@ export interface VoiceOnboardingConfig {
   days?: VoiceOnboardingDay[]
 }
 
+export interface RequiredCallQuestion {
+  id: string
+  prompt: string
+}
+
+export interface RequiredCallQuestionsConfig {
+  enabled: boolean
+  questions: RequiredCallQuestion[]
+}
+
 export interface VoiceOnboardingPlan {
   useDefault: boolean
   totalDays: number
@@ -82,6 +92,7 @@ export interface AdminOrgDetail {
   country?: string
   requireClientConsent?: boolean
   voiceOnboarding?: VoiceOnboardingConfig
+  requiredCallQuestions?: RequiredCallQuestionsConfig
 }
 
 export interface ScimAdminStatus {
@@ -300,4 +311,23 @@ export interface HipaaBackupRestoreResponse {
   success?: boolean
   backupRestored?: string
   timestamp?: string
+}
+
+export interface PlaceAdminCallResponse {
+  conversationId: string
+  callId: string
+  callSid: string
+  clientId: string
+  clientName: string
+  clientPhone: string
+  status: string
+  callStatus: string
+}
+
+export interface AdminCallStatusResponse {
+  callStatus?: string
+  status?: string
+  callSid?: string
+  clientName?: string
+  clientPhone?: string
 }

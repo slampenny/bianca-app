@@ -2,17 +2,17 @@
 
 Use this when **staging works but production doesn’t** and you need to compare behavior.
 
-## CodePipeline stage order (same for both)
+## Deployment model
 
-`Source → Build → CreateGreenInstance → Deploy → RunTests → PostDeployValidation → SwapAndTerminate`
+| | Staging | Production |
+|---|---------|------------|
+| **How code gets there** | `yarn staging:live` (rsync + nodemon/Vite) or `manual-deploy-staging.sh` (ECR pull) | **CodePipeline** on push to `main` → blue/green → CodeDeploy |
+| **CI/CD pipeline** | None (removed) | `bianca-production-pipeline` |
+| **On-server reload** | nodemon (backend) + Vite HMR (frontend) in live-dev mode | pm2 + static nginx from ECR images |
 
-Failed **RunTests** or **PostDeployValidation** stops the pipeline before swap. Pipelines use **V2 + QUEUED** execution mode so only one run is active at a time (avoids the console showing a failed swap on one run while tests from an older run still appear in progress).
+Production pipeline stage order: `Source → Build → CreateGreenInstance → Deploy → RunTests → PostDeployValidation → SwapAndTerminate`
 
-## Deployment model (same for both)
-
-- Code is **not** deployed via `git pull` on the server.
-- **CodeDeploy** writes `docker-compose.yml` and pulls images from **ECR** (`:staging` vs `:production`).
-- “Latest code” on an instance = **latest images** → `docker compose pull` then `docker compose up -d`.
+Failed **RunTests** or **PostDeployValidation** stops the production pipeline before swap.
 
 ## Typical differences
 
@@ -24,7 +24,7 @@ Failed **RunTests** or **PostDeployValidation** stops the pipeline before swap. 
 | **API / app URLs** | `staging-api.biancawellness.com`, etc. | `api.biancawellness.com`, `app.biancawellness.com` |
 | **Secrets** | Staging Secrets Manager secret | Production secret |
 | **NODE_ENV in containers** | `staging` | `production` |
-| **Blue/green** | Same pattern (green dir may exist during deploy) | Same |
+| **Blue/green** | Single instance (no pipeline) | Blue/green via pipeline |
 
 ## Which production instance is live?
 
@@ -81,7 +81,7 @@ After apply, `terraform output production_ec2_schedule_summary` shows the resolv
 
 ### Marketing WordPress (apex site)
 
-Lightsail + separate Terraform state: **`packages/backend/devops/terraform-marketing-wordpress/`** (not the main `devops/terraform/` stack). SSH uses the same **`~/.ssh/bianca-key-pair.pem`** as EC2 (imported into Lightsail by Terraform). WordPress source and `deploy-to-lightsail.sh` remain in **`~/code/wp-dev`** — see `sites/biancawellness/LIGHTSAIL.md` there.
+Lightsail + separate Terraform state: **`packages/backend/devops/terraform-marketing-wordpress/`** (not the main `devops/terraform/` stack). WordPress source and deploy scripts: **`packages/marketing/`** — see `README.md` and `docs/LIGHTSAIL.md`.
 
 ### Staging — manual start, idle auto-stop
 

@@ -367,6 +367,10 @@ const buildPayloadForCaregiverDay = async (caregiverDoc, { digestDateStart, orgT
         : tx(locale, 'caregiverDailyDigest.languageMismatchExplanationNoSentiment', clientLangName, caregiverLangName);
     }
 
+    const { pickAnswersForDigest } = require('./requiredCallQuestions.service');
+    const requiredQuestionAnswers =
+      primaryConv && !languageMismatch ? pickAnswersForDigest(primaryConv.analyzedData) : [];
+
     entries.push({
       clientId: cl._id.toString(),
       clientName: displayName,
@@ -375,6 +379,7 @@ const buildPayloadForCaregiverDay = async (caregiverDoc, { digestDateStart, orgT
       languageMismatch,
       languageMismatchExplanation,
       conversationSummaryShort,
+      requiredQuestionAnswers,
       sentiment,
       callsPlaced: calls.length,
       answeredCalls: answeredCalls.length,
@@ -392,6 +397,7 @@ const buildPayloadForCaregiverDay = async (caregiverDoc, { digestDateStart, orgT
     timezone,
     labels: {
       conversationSummary: tx(locale, 'caregiverDailyDigest.labelConversationSummary'),
+      requiredQuestions: tx(locale, 'caregiverDailyDigest.labelRequiredQuestions'),
       sentiment: tx(locale, 'caregiverDailyDigest.labelSentiment'),
       callsToday: tx(locale, 'caregiverDailyDigest.labelCallsToday'),
       noActivity: tx(locale, 'caregiverDailyDigest.noActivity'),
@@ -438,10 +444,17 @@ const payloadToEmailHtml = (payload) => {
       const sentBlock = sent
         ? `<p style="margin:0 0 4px"><strong>${escapeHtml(labels.sentiment)}</strong></p><p style="margin:0">${escapeHtml(sent)}</p>`
         : '';
+      const reqRows = Array.isArray(e.requiredQuestionAnswers) ? e.requiredQuestionAnswers : [];
+      const reqBlock =
+        reqRows.length > 0
+          ? `<p style="margin:8px 0 4px"><strong>${escapeHtml(labels.requiredQuestions)}</strong></p><ul style="margin:0;padding-left:1.2rem">${reqRows
+              .map((r) => `<li>${escapeHtml(r.question)}: ${escapeHtml(r.answer || '(not answered)')}</li>`)
+              .join('')}</ul>`
+          : '';
       return `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px">
 <h3 style="margin:0 0 8px;font-size:1rem">${escapeHtml(e.clientName)}</h3>
 <p style="margin:0 0 8px;font-size:0.8rem;color:#64748b">${escapeHtml(labels.callsToday)}: ${e.callsPlaced} · ${e.answeredCalls} answered</p>
-${mismatch}${summary}${sentBlock}
+${mismatch}${summary}${reqBlock}${sentBlock}
 </div>`;
     })
     .join('');
@@ -471,6 +484,11 @@ const payloadToPlainText = (payload) => {
     lines.push(`${payload.labels.callsToday}: ${e.callsPlaced}, answered: ${e.answeredCalls}`);
     if (e.languageMismatchExplanation) lines.push(e.languageMismatchExplanation);
     if (e.conversationSummaryShort) lines.push(`${payload.labels.conversationSummary}: ${e.conversationSummaryShort}`);
+    if (Array.isArray(e.requiredQuestionAnswers) && e.requiredQuestionAnswers.length > 0) {
+      e.requiredQuestionAnswers.forEach((r) => {
+        lines.push(`${payload.labels.requiredQuestions}: ${r.question} — ${r.answer || '(not answered)'}`);
+      });
+    }
     const s = formatSentimentPlain(e.sentiment);
     if (s) lines.push(`${payload.labels.sentiment}: ${s}`);
     lines.push('');

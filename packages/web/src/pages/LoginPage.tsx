@@ -15,6 +15,7 @@ import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
 import { mapValidationErrorToMessage, parseLoginError } from "../lib/loginError"
 import { notifyAuthSuccess } from "../services/api/baseQueryWithAuth"
+import { AuthBrand } from "../components/AuthBrand"
 import { AuthTextField } from "../components/AuthTextField"
 import { PasswordField } from "../components/PasswordField"
 import { SSOLoginButtons } from "../components/SSOLoginButtons"
@@ -116,10 +117,7 @@ export function LoginPage() {
     <div className="va-login">
       <div className="va-login-card">
         <div className="va-login-brand">
-          <span className="va-logo">
-            bianca<span className="va-logo-teal">.</span>
-          </span>
-          <p className="va-login-tagline">{t("login.tagline")}</p>
+          <AuthBrand tagline={t("login.tagline")} />
         </div>
 
         <form className="va-login-form" onSubmit={handleSubmit}>

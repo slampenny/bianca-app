@@ -134,10 +134,10 @@ export function Card(props: CardProps) {
   
   const getContainerPresets = (colors: any) => {
     const shadowStyle = platformShadow({
-      color: colors.palette?.neutral800 ?? "#000",
-      offset: { width: 0, height: 12 },
-      opacity: 0.08,
-      radius: 12.81,
+      color: colors.palette?.neutral900 ?? "#0F172A",
+      offset: { width: 0, height: 1 },
+      opacity: 0.06,
+      radius: 2,
     })
     return {
       default: [
@@ -299,10 +299,10 @@ export function Card(props: CardProps) {
 }
 
 const $containerBase: ViewStyle = {
-  borderRadius: spacing.md,
-  padding: spacing.xs,
+  borderRadius: 16,
+  padding: spacing.sm,
   borderWidth: 1,
-  elevation: 16,
+  elevation: 2,
   minHeight: 96,
   flexDirection: "row",
 }

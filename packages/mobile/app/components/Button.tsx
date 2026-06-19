@@ -274,13 +274,13 @@ export function Button(props: ButtonProps) {
 }
 
 const $baseViewStyle: ViewStyle = {
-  minHeight: 56,
-  borderRadius: 4,
+  minHeight: 48,
+  borderRadius: 12,
   justifyContent: "center",
   alignItems: "center",
   flexDirection: "row",
   paddingVertical: spacing.sm,
-  paddingHorizontal: spacing.sm,
+  paddingHorizontal: spacing.md,
   overflow: "hidden",
 }
 
@@ -303,7 +303,7 @@ function getViewPresets(colors: any): Record<PresetNames, StyleProp<ViewStyle>> 
       $baseViewStyle,
       {
         borderWidth: 1,
-        borderColor: colors.palette.neutral400,
+        borderColor: colors.palette.neutral300,
         backgroundColor: colors.palette.neutral100,
       },
     ] as StyleProp<ViewStyle>,

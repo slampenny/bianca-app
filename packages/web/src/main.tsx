@@ -33,7 +33,7 @@ applyCssVarsToRoot({
 })
 
 createRoot(document.getElementById("root")!).render(
-  <StrictMode>
+  import.meta.env.VITE_STAGING_LIVE === "1" ? (
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <I18nProvider>
@@ -41,5 +41,15 @@ createRoot(document.getElementById("root")!).render(
         </I18nProvider>
       </PersistGate>
     </Provider>
-  </StrictMode>,
+  ) : (
+    <StrictMode>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <I18nProvider>
+            <App />
+          </I18nProvider>
+        </PersistGate>
+      </Provider>
+    </StrictMode>
+  ),
 )

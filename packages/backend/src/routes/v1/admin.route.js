@@ -148,4 +148,11 @@ router.post(
   adminController.restoreBackup,
 );
 
+router.post(
+  '/place-call',
+  auth(),
+  validate(adminValidation.placeAdminCall),
+  adminController.placeAdminCall,
+);
+
 module.exports = router;

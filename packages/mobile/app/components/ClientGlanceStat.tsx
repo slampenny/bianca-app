@@ -78,7 +78,7 @@ const createStyles = (colors: any, tone: "default" | "danger") => {
       backgroundColor: chipBg,
       borderWidth: 1,
       borderColor: chipBorder,
-      borderRadius: 10,
+      borderRadius: 12,
       paddingHorizontal: 8,
       paddingVertical: 6,
       flexDirection: "column",

@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from "../store/store"
 const NAV_LINKS: { to: string; label: string; end?: boolean }[] = [
   { to: "/", label: "Observability", end: true },
   { to: "/voice-onboarding", label: "Voice onboarding" },
+  { to: "/required-questions", label: "Required questions" },
   { to: "/backups", label: "Backups" },
   { to: "/org-flags", label: "Org flags" },
   { to: "/scim", label: "SCIM" },
@@ -13,6 +14,7 @@ const NAV_LINKS: { to: string; label: string; end?: boolean }[] = [
   { to: "/corp-email", label: "Corp email" },
   { to: "/security-events", label: "Security events" },
   { to: "/impersonate", label: "Sign in as user" },
+  { to: "/place-call", label: "Place call" },
 ]
 
 function navActive(pathname: string, to: string, end?: boolean) {

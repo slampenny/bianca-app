@@ -14,7 +14,6 @@ fi
 
 case "$PIPELINE" in
   bianca-production-pipeline) GREEN_TAG="${GREEN_TAG:-bianca-production-green}" ;;
-  bianca-staging-pipeline)    GREEN_TAG="${GREEN_TAG:-bianca-staging-green}" ;;
   *)
     echo "Skipping green termination (pipeline=$PIPELINE)"
     exit 0

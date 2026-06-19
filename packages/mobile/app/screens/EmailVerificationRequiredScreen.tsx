@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
-import { View, ViewStyle, StyleSheet } from "react-native"
+import { View, StyleSheet } from "react-native"
 import { useNavigation, useRoute } from "@react-navigation/native"
-import { Screen, Text, Button, TextField } from "app/components"
+import { Text, Button, TextField, AuthScreenLayout } from "app/components"
 import { LoadingButton } from "app/components/LoadingButton"
 import { spacing } from "app/theme"
 import { useResendVerificationEmailMutation } from "app/services/api/authApi"
@@ -12,71 +12,55 @@ import { translate } from "app/i18n"
 import { logger } from "../utils/logger"
 import { TIMEOUTS } from "../constants"
 
-const createStyles = (colors: any) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.palette.biancaBackground || colors.palette.neutral100,
-    padding: spacing.lg,
-    justifyContent: "center",
-  },
-  contentWrapper: {
-    width: "100%",
-    maxWidth: 500,
-    alignSelf: "center",
-  },
-  title: {
-    color: colors.palette.neutral800 || colors.palette.biancaHeader,
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: spacing.md,
-  },
-  message: {
-    color: colors.palette.neutral600,
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: spacing.xl,
-    lineHeight: 24,
-  },
-  label: {
-    color: colors.palette.neutral800,
-    fontSize: 14,
-    fontWeight: "600",
-    marginBottom: spacing.xs,
-  },
-  fieldContainer: {
-    marginBottom: spacing.lg,
-  },
-  successMessage: {
-    color: colors.palette.success500 || colors.palette.biancaSuccess,
-    fontSize: 16,
-    textAlign: "center",
-    marginBottom: spacing.lg,
-    backgroundColor: colors.palette.biancaSuccessBackground || "#d1fae5",
-    padding: spacing.md,
-    borderRadius: 8,
-  },
-  errorContainer: {
-    backgroundColor: colors.palette.biancaErrorBackground || "#fee2e2",
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.palette.biancaError || "#dc2626",
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  errorText: {
-    color: colors.palette.biancaError || "#dc2626",
-    fontSize: 14,
-    fontWeight: "500",
-    textAlign: "left",
-    lineHeight: 20,
-  },
-  buttonContainer: {
-    marginTop: spacing.lg,
-    gap: spacing.md,
-  },
-})
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    title: {
+      color: colors.palette.neutral800 || colors.palette.biancaHeader,
+      fontSize: 24,
+      fontWeight: "700",
+      textAlign: "center",
+      marginBottom: spacing.md,
+    },
+    message: {
+      color: colors.palette.neutral600,
+      fontSize: 16,
+      textAlign: "center",
+      marginBottom: spacing.xl,
+      lineHeight: 24,
+    },
+    fieldContainer: {
+      marginBottom: spacing.lg,
+    },
+    successMessage: {
+      color: colors.palette.success500 || colors.palette.biancaSuccess,
+      fontSize: 16,
+      textAlign: "center",
+      marginBottom: spacing.lg,
+      backgroundColor: colors.palette.biancaSuccessBackground || "#d1fae5",
+      padding: spacing.md,
+      borderRadius: 8,
+    },
+    errorContainer: {
+      backgroundColor: colors.palette.biancaErrorBackground || "#fee2e2",
+      borderRadius: 8,
+      borderLeftWidth: 4,
+      borderLeftColor: colors.palette.biancaError || "#dc2626",
+      marginBottom: spacing.lg,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    errorText: {
+      color: colors.palette.biancaError || "#dc2626",
+      fontSize: 14,
+      fontWeight: "500",
+      textAlign: "left",
+      lineHeight: 20,
+    },
+    buttonContainer: {
+      marginTop: spacing.lg,
+      gap: spacing.md,
+    },
+  })
 
 export const EmailVerificationRequiredScreen = () => {
   const navigation = useNavigation()
@@ -89,10 +73,9 @@ export const EmailVerificationRequiredScreen = () => {
   const [errorMessage, setErrorMessage] = useState("")
   const { colors, isLoading: themeLoading } = useTheme()
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const isResendingRef = useRef(false) // Prevent duplicate button clicks
+  const isResendingRef = useRef(false)
 
   useEffect(() => {
-    // Set email from route params or Redux if not already set
     if (!email && routeEmail) {
       setEmail(routeEmail)
     } else if (!email && authEmail) {
@@ -100,7 +83,6 @@ export const EmailVerificationRequiredScreen = () => {
     }
   }, [routeEmail, authEmail, email])
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -117,13 +99,11 @@ export const EmailVerificationRequiredScreen = () => {
   const styles = createStyles(colors)
 
   const handleResendEmail = async () => {
-    // Prevent duplicate clicks - if already processing, ignore
     if (isResendingRef.current || isLoading) {
       logger.debug("Resend already in progress, ignoring duplicate click")
       return
     }
 
-    // Clear previous error and success messages
     setErrorMessage("")
     setEmailSent(false)
 
@@ -132,7 +112,6 @@ export const EmailVerificationRequiredScreen = () => {
       return
     }
 
-    // Mark as processing
     isResendingRef.current = true
 
     try {
@@ -140,14 +119,12 @@ export const EmailVerificationRequiredScreen = () => {
       const result = await resendVerificationEmail({ email: email.trim() }).unwrap()
       logger.debug("Resend verification email success:", result)
       setEmailSent(true)
-      setErrorMessage("") // Clear any previous errors on success
-      
-      // Clear any existing timeout
+      setErrorMessage("")
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
-      
-      // Set new timeout with cleanup
+
       timeoutRef.current = setTimeout(() => {
         setEmailSent(false)
         timeoutRef.current = null
@@ -155,88 +132,71 @@ export const EmailVerificationRequiredScreen = () => {
     } catch (error: unknown) {
       const err = error as { status?: number; data?: { message?: string }; error?: unknown; message?: string }
       logger.error("Resend verification email error:", error)
-      logger.error("Error details:", {
-        status: err?.status,
-        data: err?.data,
-        error: err?.error,
-        message: err?.message
-      })
-      // Extract specific error message from API response
-      const errorMsg = err?.data?.message || err?.message || translate("emailVerificationScreen.errorSendFailed")
+      const errorMsg =
+        err?.data?.message || err?.message || translate("emailVerificationScreen.errorSendFailed")
       setErrorMessage(errorMsg)
-      setEmailSent(false) // Clear success state if error occurs
+      setEmailSent(false)
     } finally {
-      // Always reset the processing flag
       isResendingRef.current = false
     }
   }
 
   const handleBackToLogin = () => {
-    (navigation.navigate as (name: string) => void)("Login")
+    ;(navigation.navigate as (name: string) => void)("Login")
   }
 
   return (
-    <Screen 
-      preset="fixed" 
-      style={styles.container}
-      contentContainerStyle={styles.container}
-    >
-      <View style={styles.contentWrapper}>
-        <Text preset="heading" tx="emailVerificationScreen.title" style={styles.title} />
-        
-        <Text 
-          preset="default"
-          tx="emailVerificationScreen.message"
-          style={styles.message}
+    <AuthScreenLayout testID="email-verification-required-screen">
+      <Text preset="heading" tx="emailVerificationScreen.title" style={styles.title} />
+
+      <Text preset="default" tx="emailVerificationScreen.message" style={styles.message} />
+
+      <View style={styles.fieldContainer}>
+        <TextField
+          value={email}
+          labelTx="emailVerificationScreen.emailFieldLabel"
+          placeholderTx="emailVerificationScreen.emailFieldPlaceholder"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={false}
+          accessibilityLabel="email-input"
+          testID="email-input"
         />
-        
-        <View style={styles.fieldContainer}>
-          <TextField
-            value={email}
-            labelTx="emailVerificationScreen.emailFieldLabel"
-            placeholderTx="emailVerificationScreen.emailFieldPlaceholder"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            editable={false}
-            accessibilityLabel="email-input"
-            testID="email-input"
-          />
-        </View>
-
-        {errorMessage ? (
-          <View style={styles.errorContainer}>
-            <Text preset="default" text={errorMessage} style={styles.errorText} testID="error-message" />
-          </View>
-        ) : null}
-
-        {emailSent && (
-          <Text
-            preset="default"
-            tx="emailVerificationScreen.successMessage"
-            style={styles.successMessage}
-            testID="email-resend-success-message"
-          />
-        )}
-
-        <View style={styles.buttonContainer}>
-          <LoadingButton
-            title={translate("emailVerificationScreen.resendButton")}
-            onPress={handleResendEmail}
-            loading={isLoading}
-            disabled={!email.trim() || isLoading}
-            testID="resend-verification-button"
-          />
-          
-          <Button
-            tx="emailVerificationScreen.backToLoginButton"
-            onPress={handleBackToLogin}
-            preset="default"
-            accessibilityLabel="back-to-login-button"
-            testID="back-to-login-button"
-          />
-        </View>
       </View>
-    </Screen>
+
+      {errorMessage ? (
+        <View style={styles.errorContainer}>
+          <Text preset="default" text={errorMessage} style={styles.errorText} testID="error-message" />
+        </View>
+      ) : null}
+
+      {emailSent ? (
+        <Text
+          preset="default"
+          tx="emailVerificationScreen.successMessage"
+          style={styles.successMessage}
+          testID="email-resend-success-message"
+        />
+      ) : null}
+
+      <View style={styles.buttonContainer}>
+        <LoadingButton
+          title={translate("emailVerificationScreen.resendButton")}
+          onPress={handleResendEmail}
+          loading={isLoading}
+          disabled={!email.trim() || isLoading}
+          testID="resend-verification-button"
+        />
+
+        <Button
+          tx="emailVerificationScreen.backToLoginButton"
+          onPress={handleBackToLogin}
+          preset="default"
+          accessibilityLabel="back-to-login-button"
+          testID="back-to-login-button"
+        />
+      </View>
+    </AuthScreenLayout>
   )
 }

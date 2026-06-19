@@ -51,4 +51,4 @@ If you removed `biancawellness.com` / `www` Route53 records from the main `devop
 
 ## Deploy WordPress content
 
-The WordPress tree and `deploy-to-lightsail.sh` live in **`~/code/wp-dev`** — see `sites/biancawellness/LIGHTSAIL.md` there.
+The WordPress tree and deploy scripts live in **`packages/marketing/`** — see that folder’s **`README.md`** and **`docs/LIGHTSAIL.md`**.

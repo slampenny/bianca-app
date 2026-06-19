@@ -181,6 +181,22 @@ const orgSchema = mongoose.Schema(
         },
       ],
     },
+    /**
+     * Questions Bianca must ask on every wellness call (not voice onboarding sessions).
+     * Org admins configure prompts; answers are captured from transcripts post-call.
+     */
+    requiredCallQuestions: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      questions: [
+        {
+          id: { type: String, required: true, trim: true },
+          prompt: { type: String, required: true, trim: true },
+        },
+      ],
+    },
     /** Automated Daily Wellness Digest email scheduling (org-local send time). */
     dailyDigestSettings: {
       enabled: {

@@ -23,8 +23,12 @@ function buildWebhookUrl(pathSegment) {
   return `${base}${prefix}${path}`;
 }
 
-function getStartCallWebhookUrl(clientId) {
-  return buildWebhookUrl(`/start-call/${clientId}`);
+function getStartCallWebhookUrl(clientId, fromNumber) {
+  const path = `/start-call/${clientId}`;
+  if (fromNumber) {
+    return buildWebhookUrl(`${path}?from=${encodeURIComponent(fromNumber)}`);
+  }
+  return buildWebhookUrl(path);
 }
 
 function getCallStatusWebhookUrl() {

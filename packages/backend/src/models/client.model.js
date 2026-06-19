@@ -4,12 +4,33 @@ const validator = require('validator');
 const { toJSON, paginate } = require('./plugins');
 const { splitFullName, fullNameFromParts } = require('../utils/clientName.util');
 
-const emergencyContactSchema = new mongoose.Schema(
+const familyDigestEmailSchema = {
+  enabled: {
+    type: Boolean,
+    default: false,
+  },
+  verifiedAt: {
+    type: Date,
+    default: null,
+  },
+  verifiedEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: null,
+    validate(value) {
+      if (value != null && String(value).trim() !== '' && !validator.isEmail(value)) {
+        throw new Error('Invalid verified family digest email');
+      }
+    },
+  },
+};
+
+const emergencyContactEntrySchema = new mongoose.Schema(
   {
     name: { type: String, trim: true },
     relationship: { type: String, trim: true },
     phone: { type: String, trim: true },
-    /** Optional; required to email weekly family call digests to an authorized contact. */
     email: {
       type: String,
       trim: true,
@@ -21,28 +42,48 @@ const emergencyContactSchema = new mongoose.Schema(
         }
       },
     },
-    /** Opt-in + verification for weekly family digest emails to this contact. */
-    familyDigestEmail: {
-      enabled: {
-        type: Boolean,
-        default: false,
-      },
-      verifiedAt: {
-        type: Date,
-        default: null,
-      },
-      verifiedEmail: {
-        type: String,
-        trim: true,
-        lowercase: true,
-        default: null,
-        validate(value) {
-          if (value != null && String(value).trim() !== '' && !validator.isEmail(value)) {
-            throw new Error('Invalid verified family digest email');
-          }
-        },
+  },
+  { _id: true }
+);
+
+const familyDigestRecipientSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true },
+    relationship: { type: String, trim: true },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+      validate(value) {
+        if (value && String(value).trim() !== '' && !validator.isEmail(value)) {
+          throw new Error('Invalid family digest recipient email');
+        }
       },
     },
+    familyDigestEmail: familyDigestEmailSchema,
+  },
+  { _id: true }
+);
+
+/** @deprecated Legacy single contact — synced from emergencyContacts + familyDigestRecipients on save. */
+const emergencyContactSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true },
+    relationship: { type: String, trim: true },
+    phone: { type: String, trim: true },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+      validate(value) {
+        if (value && String(value).trim() !== '' && !validator.isEmail(value)) {
+          throw new Error('Invalid emergency contact email');
+        }
+      },
+    },
+    familyDigestEmail: familyDigestEmailSchema,
   },
   { _id: false }
 );
@@ -135,6 +176,8 @@ const clientSchema = mongoose.Schema(
       required: false,
     },
     emergencyContact: emergencyContactSchema,
+    emergencyContacts: [emergencyContactEntrySchema],
+    familyDigestRecipients: [familyDigestRecipientSchema],
     org: {
       type: mongoose.SchemaTypes.ObjectId,
       ref: 'Org',
@@ -197,6 +240,12 @@ clientSchema.statics.isEmailTaken = async function (email, excludeClientId) {
   const client = await this.findOne({ email, _id: { $ne: excludeClientId } });
   return !!client;
 };
+
+clientSchema.pre('save', function (next) {
+  const { syncLegacyEmergencyContactFields } = require('../utils/clientContacts.util');
+  syncLegacyEmergencyContactFields(this);
+  next();
+});
 
 clientSchema.pre('validate', function (next) {
   if (this.isModified('name') && !this.isModified('firstName') && !this.isModified('lastName') && this.name) {

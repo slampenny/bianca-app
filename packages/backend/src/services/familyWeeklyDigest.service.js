@@ -16,6 +16,13 @@ const {
   isTranscriptLikeText,
 } = require('../utils/digestContentSafety');
 const { buildFamilyDigestEligibility } = require('../utils/familyDigestEligibility');
+const {
+  getPrimaryFamilyDigestRecipient,
+  getEligibleFamilyDigestRecipients,
+  buildAggregateFamilyDigestEligibility,
+  recipientSnapshot,
+  personalizePayloadForRecipient,
+} = require('../utils/clientContacts.util');
 const ApiError = require('../utils/ApiError');
 const logger = require('../config/logger');
 const emailService = require('./email.service');
@@ -145,20 +152,9 @@ const ensureCaregiverCanAccessDigest = async (caregiver, digest) => {
   throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
 };
 
-const getRecipientFromClient = (client) => {
-  const ec = client.emergencyContact;
-  if (!ec || typeof ec !== 'object') {
-    return { name: '', relationship: '', email: '' };
-  }
-  const email = ec.email ? String(ec.email).trim().toLowerCase() : '';
-  return {
-    name: ec.name ? String(ec.name).trim() : '',
-    relationship: ec.relationship ? String(ec.relationship).trim() : '',
-    email,
-  };
-};
+const getRecipientFromClient = (client) => recipientSnapshot(getPrimaryFamilyDigestRecipient(client));
 
-const buildEligibility = (client, recipient) => buildFamilyDigestEligibility(client, recipient);
+const buildEligibility = (client) => buildAggregateFamilyDigestEligibility(client);
 
 /**
  * Build digest payload from calls/conversations (no persist).
@@ -174,7 +170,7 @@ const buildPayloadForWeek = async (client, orgName, weekContext) => {
 
   const callIds = calls.map((c) => c._id);
   const convs = await Conversation.find({ callId: { $in: callIds } })
-    .select('callId summary history')
+    .select('callId summary history analyzedData')
     .lean();
   const convByCallId = new Map(convs.map((c) => [c.callId.toString(), c]));
 
@@ -183,16 +179,25 @@ const buildPayloadForWeek = async (client, orgName, weekContext) => {
     (client.name && String(client.name).trim().split(/\s+/)[0]) ||
     'your loved one';
 
+  const { pickAnswersForDigest, formatAnswersPlain } = require('./requiredCallQuestions.service');
+
   const callRows = calls.map((call) => {
     const answered = isCallAnswered(call);
     const conv = convByCallId.get(call._id.toString());
     const t = call.startTime ? new Date(call.startTime) : new Date(0);
     const { dayLabel, dateLabel } = formatCallDayLabels(timezone, t);
+    const requiredQuestionAnswers = answered ? pickAnswersForDigest(conv?.analyzedData) : [];
+    let summary = familySafeSummary(call, conv, answered);
+    if (requiredQuestionAnswers.length > 0) {
+      const reqLine = formatAnswersPlain(requiredQuestionAnswers);
+      summary = `${summary} Standard questions: ${reqLine}`;
+    }
     return {
       dayLabel,
       dateLabel,
       connected: answered,
-      summary: familySafeSummary(call, conv, answered),
+      summary,
+      requiredQuestionAnswers,
     };
   });
 
@@ -218,7 +223,7 @@ const buildPayloadForWeek = async (client, orgName, weekContext) => {
   ];
 
   const recipient = getRecipientFromClient(client);
-  const eligibility = buildEligibility(client, recipient);
+  const eligibility = buildEligibility(client);
 
   const narrative = [
     'This digest describes wellness check-in calls only — not clinical care.',
@@ -352,15 +357,17 @@ const updateDraftDigest = async (digestDoc, { payload, recipient, weekEnd }) => 
 };
 
 /** Mark a draft digest as sent after successful email delivery. */
-const markDigestSent = async (digestDoc, { email, subject, messageId, payloadHashAtSend }) => {
+const markDigestSent = async (digestDoc, { emails, subject, messageIds, payloadHashAtSend }) => {
   assertDigestIsDraft(digestDoc);
+  const recipients = Array.isArray(emails) ? emails.filter(Boolean) : [];
   digestDoc.status = 'sent';
   digestDoc.sentAt = new Date();
   digestDoc.sentPayloadHash = payloadHashAtSend;
   digestDoc.payloadHash = payloadHashAtSend;
-  digestDoc.emailRecipient = email;
+  digestDoc.emailRecipients = recipients;
+  digestDoc.emailRecipient = recipients.length > 0 ? recipients.join(', ') : null;
   digestDoc.emailSubject = subject;
-  digestDoc.emailMessageId = messageId;
+  digestDoc.emailMessageId = Array.isArray(messageIds) ? messageIds.filter(Boolean).join(', ') : messageIds;
   digestDoc.sendInProgressAt = null;
   await digestDoc.save();
   return digestDoc;
@@ -513,52 +520,56 @@ const deliverDigestEmail = async (digest) => {
   if (!client) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  const recipient = getRecipientFromClient(client);
-  const eligibility = buildEligibility(client, recipient);
-  if (!eligibility.ok) {
+  const eligibleRecipients = getEligibleFamilyDigestRecipients(client);
+  const eligibility = buildEligibility(client);
+  if (!eligibility.ok || eligibleRecipients.length === 0) {
     throw new ApiError(httpStatus.BAD_REQUEST, eligibility.reasons.join(' ') || 'Cannot send digest');
-  }
-  const email = recipient.email;
-  if (!email || !validator.isEmail(email)) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Valid recipient email is required to send');
   }
 
   const org = await Org.findById(digest.org);
   const orgName = org?.name || 'Your care community';
-  const html = payloadToEmailHtml(digest.payload, orgName);
-  const text = payloadToPlainText(digest.payload, orgName);
   const subject = `Weekly update from ${orgName}`;
   const payloadHashAtSend = hashPayload(digest.payload);
 
   digest.sendInProgressAt = new Date();
   await digest.save();
 
-  let sendResult;
+  const sentEmails = [];
+  const messageIds = [];
   try {
-    sendResult = await emailService.sendEmail(email, subject, text, html);
+    for (const recipient of eligibleRecipients) {
+      const email = recipient.email;
+      if (!email || !validator.isEmail(email)) {
+        throw new ApiError(httpStatus.BAD_REQUEST, 'Valid recipient email is required to send');
+      }
+      const personalizedPayload = personalizePayloadForRecipient(digest.payload, recipient);
+      const html = payloadToEmailHtml(personalizedPayload, orgName);
+      const text = payloadToPlainText(personalizedPayload, orgName);
+      const sendResult = await emailService.sendEmail(email, subject, text, html);
+      sentEmails.push(email);
+      messageIds.push(extractEmailMessageId(sendResult));
+    }
   } catch (err) {
     digest.sendInProgressAt = null;
     await digest.save();
     throw err;
   }
 
-  const messageId = extractEmailMessageId(sendResult);
-
   try {
-    await markDigestSent(digest, { email, subject, messageId, payloadHashAtSend });
+    await markDigestSent(digest, { emails: sentEmails, subject, messageIds, payloadHashAtSend });
   } catch (saveErr) {
     logger.error('[FamilyWeeklyDigest] CRITICAL: SES succeeded but Mongo save failed', {
       digestId: digest.id,
       clientId: String(digest.client),
       orgId: String(digest.org),
-      emailRecipient: email,
-      emailMessageId: messageId,
+      emailRecipients: sentEmails,
+      emailMessageId: messageIds.join(', '),
       error: saveErr.message,
     });
     throw saveErr;
   }
 
-  logger.info(`[FamilyWeeklyDigest] Sent digest ${digest.id} to ${email}`);
+  logger.info(`[FamilyWeeklyDigest] Sent digest ${digest.id} to ${sentEmails.join(', ')}`);
   return digest;
 };
 

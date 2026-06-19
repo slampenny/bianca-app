@@ -177,4 +177,70 @@ describe('clientService', () => {
     expect(created.emergencyContact.familyDigestEmail.enabled).toBe(false);
     expect(created.emergencyContact.familyDigestEmail.verifiedAt).toBeNull();
   });
+
+  it('updates emergencyContacts and familyDigestRecipients arrays', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const created = await clientService.createClient({ ...clientOne, org: org._id });
+
+    const updated = await clientService.updateClientById(created.id, {
+      emergencyContacts: [
+        { name: 'Bob', relationship: 'Son', phone: '+16045550101', email: 'bob@test.com' },
+        { name: 'Jane', relationship: 'Daughter', phone: '+16045550102', email: 'jane@test.com' },
+      ],
+      familyDigestRecipients: [
+        {
+          name: 'Sarah',
+          relationship: 'daughter',
+          email: 'family@test.com',
+          familyDigestEmail: { enabled: true },
+        },
+      ],
+    });
+
+    expect(updated.emergencyContacts).toHaveLength(2);
+    expect(updated.emergencyContacts[0].name).toBe('Bob');
+    expect(updated.familyDigestRecipients).toHaveLength(1);
+    expect(updated.familyDigestRecipients[0].email).toBe('family@test.com');
+    expect(updated.emergencyContact.name).toBe('Bob');
+    expect(updated.emergencyContact.familyDigestEmail.enabled).toBe(true);
+  });
+
+  it('clears family digest verification when recipient email changes', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const created = await clientService.createClient({
+      ...clientOne,
+      org: org._id,
+      familyDigestRecipients: [
+        {
+          name: 'Sarah',
+          relationship: 'daughter',
+          email: 'family@test.com',
+          familyDigestEmail: {
+            enabled: true,
+            verifiedAt: new Date('2026-01-01T00:00:00.000Z'),
+            verifiedEmail: 'family@test.com',
+          },
+        },
+      ],
+    });
+    const recipientId = created.familyDigestRecipients[0]._id.toString();
+
+    const updated = await clientService.updateClientById(created.id, {
+      familyDigestRecipients: [
+        {
+          id: recipientId,
+          name: 'Sarah',
+          relationship: 'daughter',
+          email: 'newfamily@test.com',
+          familyDigestEmail: { enabled: true },
+        },
+      ],
+    });
+
+    const recipient = updated.familyDigestRecipients[0];
+    expect(recipient.email).toBe('newfamily@test.com');
+    expect(recipient.familyDigestEmail.verifiedAt).toBeNull();
+    expect(recipient.familyDigestEmail.verifiedEmail).toBeNull();
+    expect(recipient.familyDigestEmail.enabled).toBe(true);
+  });
 });

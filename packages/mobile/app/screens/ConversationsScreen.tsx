@@ -6,7 +6,7 @@ import { useGetConversationsByClientQuery } from "../services/api/conversationAp
 import { getClient } from "../store/clientSlice"
 import { getConversations, clearConversations, getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall } from "../store/callSlice"
-import { Conversation, Message } from "../services/api/api.types"
+import { Conversation, Message, RequiredCallQuestionAnswer } from "../services/api/api.types"
 import { useTheme } from "app/theme/ThemeContext"
 import type { ThemeColors } from "../types"
 import { SentimentIndicator } from "../components/SentimentIndicator"
@@ -151,6 +151,32 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   debugText: {
     color: colors.palette.biancaHeader,
     fontSize: 12,
+  },
+  standardQuestionsSection: {
+    borderTopColor: colors.palette.biancaBorder,
+    borderTopWidth: 1,
+    marginTop: 8,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  standardQuestionsTitle: {
+    color: colors.palette.biancaHeader,
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  standardQuestionRow: {
+    marginBottom: 6,
+  },
+  standardQuestionPrompt: {
+    color: colors.palette.neutral600,
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  standardQuestionAnswer: {
+    color: colors.palette.biancaHeader,
+    fontSize: 14,
   },
 })
 
@@ -304,6 +330,14 @@ export function ConversationsScreen() {
     }
   }, [])
 
+  const getRequiredQuestionAnswers = useCallback((conversation: Conversation): RequiredCallQuestionAnswer[] => {
+    const rq = conversation.analyzedData?.requiredQuestions as
+      | { answers?: RequiredCallQuestionAnswer[] }
+      | undefined
+    if (!rq?.answers?.length) return []
+    return rq.answers.filter((a) => a && (a.answer || a.asked))
+  }, [])
+
   const getConversationPreview = useCallback((messages: Message[]) => {
     if (messages.length === 0) return translate("conversationsScreen.noMessages")
     const lastMessage = messages[messages.length - 1]
@@ -366,11 +400,28 @@ export function ConversationsScreen() {
         }
         ContentComponent={
           isExpanded ? (
-            <ConversationMessages
-              messages={item.messages || []}
-              style={styles.messagesContainer}
-              data-testid={`messages-container-${conversationId}`}
-            />
+            <View>
+              {getRequiredQuestionAnswers(item).length > 0 ? (
+                <View style={styles.standardQuestionsSection}>
+                  <Text style={styles.standardQuestionsTitle}>
+                    {translate("conversationsScreen.standardQuestionsTitle")}
+                  </Text>
+                  {getRequiredQuestionAnswers(item).map((answer) => (
+                    <View key={answer.questionId} style={styles.standardQuestionRow}>
+                      <Text style={styles.standardQuestionPrompt}>{answer.prompt}</Text>
+                      <Text style={styles.standardQuestionAnswer}>
+                        {answer.answer || translate("conversationsScreen.standardQuestionNotAnswered")}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+              <ConversationMessages
+                messages={item.messages || []}
+                style={styles.messagesContainer}
+                data-testid={`messages-container-${conversationId}`}
+              />
+            </View>
           ) : undefined
         }
         onPress={handlePress}

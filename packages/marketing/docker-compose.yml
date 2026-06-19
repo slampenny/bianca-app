@@ -1,0 +1,62 @@
+# Local marketing WordPress — self-contained (no wp-dev sibling repo required).
+#
+#   yarn marketing:up
+#   open http://localhost:8085
+#
+# First run: copy wp-config.php.example → wordpress/wp-config.php
+# Populate DB: scripts/pull-from-production.sh (optional)
+
+services:
+  db:
+    image: mariadb:11.4
+    container_name: bianca-marketing-db-1
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: biancawellness
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    volumes:
+      - marketing_db_data:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - marketing
+
+  wordpress:
+    image: wordpress:php8.2-apache
+    container_name: bianca-marketing-wordpress-1
+    depends_on:
+      - db
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: biancawellness
+    volumes:
+      - ./wordpress/wp-content:/var/www/html/wp-content
+      - ./wordpress/wp-config.php:/var/www/html/wp-config.php
+    ports:
+      - "8085:80"
+    restart: unless-stopped
+    networks:
+      - marketing
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_USER: wordpress
+      PMA_PASSWORD: wordpress
+    ports:
+      - "8086:80"
+    restart: unless-stopped
+    networks:
+      - marketing
+
+volumes:
+  marketing_db_data:
+
+networks:
+  marketing:
+    driver: bridge

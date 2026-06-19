@@ -7,6 +7,7 @@
  */
 const config = require('../../config/config');
 const logger = require('../../config/logger');
+const { requiresHIPAA } = require('../../utils/jurisdiction.utils');
 
 let cachedImpl;
 let cachedProviderId;
@@ -36,6 +37,21 @@ function clearImplementationCache() {
   cachedProviderId = null;
 }
 
+/**
+ * Returns the outbound caller ID to use for an org based on its country.
+ * US orgs get the US number when configured; all others get the default number.
+ * @param {string|undefined} country - ISO 3166-1 alpha-2 country code from the org
+ * @returns {string|undefined}
+ */
+function getFromNumber(country) {
+  const providerId = getProviderId();
+  if (requiresHIPAA(country)) {
+    const usPhone = providerId === 'telnyx' ? config.telnyx?.phoneUS : config.twilio?.phoneUS;
+    if (usPhone) return usPhone;
+  }
+  return providerId === 'telnyx' ? config.telnyx?.phone : config.twilio?.phone;
+}
+
 function getProviderId() {
   return config.telephony?.provider || 'twilio';
 }
@@ -46,7 +62,8 @@ module.exports = {
   },
   getImplementation,
   clearImplementationCache,
-  initiateCall: (clientId) => getImplementation().initiateCall(clientId),
+  getFromNumber,
+  initiateCall: (clientId, fromNumber) => getImplementation().initiateCall(clientId, fromNumber),
   hangupCall: (externalCallId) => getImplementation().hangupCall(externalCallId),
   handleCallStatus: (req) => getImplementation().handleCallStatus(req),
   /** Provider answer markup (TwiML, TeXML, etc.) for inbound answer webhooks */

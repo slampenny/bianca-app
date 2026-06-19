@@ -7,7 +7,13 @@ const httpStatus = require('http-status');
 // Import integration test app AFTER all mocks are set up
 const app = require('../utils/integration-app');
 const { Org, Caregiver, Token } = require('../../src/models');
-const { caregiverOne, caregiverTwo, admin, insertCaregivers, superAdmin } = require('../fixtures/caregiver.fixture');
+const {
+  caregiverOne,
+  caregiverTwo,
+  admin,
+  insertCaregivers,
+  superAdmin,
+} = require('../fixtures/caregiver.fixture');
 const { orgOne, orgTwo, insertOrgs } = require('../fixtures/org.fixture');
 const { tokenService, orgService } = require('../../src/services');
 const { setupMongoMemoryServer, teardownMongoMemoryServer, clearDatabase } = require('../utils/mongodb-memory-server');
@@ -136,6 +142,89 @@ describe('Org routes', () => {
       .delete(`/v1/orgs/${orgId}/caregiver/${caregiverId}`)
       .set('Authorization', `Bearer ${adminAccessToken}`);
     expect(res.statusCode).toEqual(200);
+  });
+
+  describe('org settings: voice onboarding and required call questions', () => {
+    let orgAdminAccessToken;
+
+    beforeEach(async () => {
+      const org = await Org.findById(orgId);
+      await Caregiver.findByIdAndUpdate(adminId, { org: orgId });
+      if (!org.caregivers.some((c) => String(c) === String(adminId))) {
+        org.caregivers.push(adminId);
+        await org.save();
+      }
+      orgAdminAccessToken = tokenService.generateToken(adminId);
+    });
+
+    it('should return default voice onboarding plan for org admin', async () => {
+      const res = await request(app)
+        .get('/v1/orgs/onboarding/default-plan')
+        .set('Authorization', `Bearer ${orgAdminAccessToken}`);
+
+      expect(res.statusCode).toEqual(httpStatus.OK);
+      expect(res.body.plan).toBeDefined();
+      expect(res.body.plan.totalDays).toBe(4);
+      expect(res.body.plan.days.every((d) => d.questions.length > 0)).toBe(true);
+    });
+
+    it('should allow org admin to save custom voice onboarding', async () => {
+      const res = await request(app)
+        .patch(`/v1/orgs/${orgId}`)
+        .set('Authorization', `Bearer ${orgAdminAccessToken}`)
+        .send({
+          voiceOnboarding: {
+            useDefault: false,
+            days: [
+              {
+                dayNumber: 1,
+                theme: 'Custom day',
+                opening: 'Hello from our team',
+                questions: [{ id: 'day1_topic_1', prompt: 'Did you eat breakfast?' }],
+              },
+            ],
+          },
+        });
+
+      expect(res.statusCode).toEqual(httpStatus.OK);
+      expect(res.body.voiceOnboarding.useDefault).toBe(false);
+      expect(res.body.voiceOnboarding.days[0].questions[0].prompt).toContain('breakfast');
+
+      const reloaded = await Org.findById(orgId);
+      expect(reloaded.voiceOnboarding.useDefault).toBe(false);
+      expect(reloaded.voiceOnboarding.days[0].questions[0].id).toBe('day1_topic_1');
+    });
+
+    it('should allow org admin to configure required call questions', async () => {
+      const res = await request(app)
+        .patch(`/v1/orgs/${orgId}`)
+        .set('Authorization', `Bearer ${orgAdminAccessToken}`)
+        .send({
+          requiredCallQuestions: {
+            enabled: true,
+            questions: [{ id: 'med', prompt: 'Have you taken your medication today?' }],
+          },
+        });
+
+      expect(res.statusCode).toEqual(httpStatus.OK);
+      expect(res.body.requiredCallQuestions.enabled).toBe(true);
+      expect(res.body.requiredCallQuestions.questions).toHaveLength(1);
+
+      const reloaded = await Org.findById(orgId);
+      expect(reloaded.requiredCallQuestions.enabled).toBe(true);
+      expect(reloaded.requiredCallQuestions.questions[0].prompt).toContain('medication');
+    });
+
+    it('should reject enabled required questions without prompts', async () => {
+      const res = await request(app)
+        .patch(`/v1/orgs/${orgId}`)
+        .set('Authorization', `Bearer ${orgAdminAccessToken}`)
+        .send({
+          requiredCallQuestions: { enabled: true, questions: [] },
+        });
+
+      expect(res.statusCode).toEqual(httpStatus.BAD_REQUEST);
+    });
   });
 
   it("should change a caregiver's role", async () => {

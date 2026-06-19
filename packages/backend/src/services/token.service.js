@@ -382,7 +382,7 @@ const generateClientConsentToken = async (client) => {
  * @param {string} email - Normalized emergency contact email
  * @returns {Promise<string>}
  */
-const generateFamilyDigestEmailVerifyToken = async (client, email) => {
+const generateFamilyDigestEmailVerifyToken = async (client, email, recipientId) => {
   const clientId = extractClientId(client);
   const normalizedEmail = String(email).trim().toLowerCase();
   if (!normalizedEmail) {
@@ -395,6 +395,7 @@ const generateFamilyDigestEmailVerifyToken = async (client, email) => {
   const payload = {
     sub: clientId,
     email: normalizedEmail,
+    ...(recipientId ? { recipientId: String(recipientId) } : {}),
     iat: moment().unix(),
     exp: expires.unix(),
     type: tokenTypes.FAMILY_DIGEST_EMAIL_VERIFY,

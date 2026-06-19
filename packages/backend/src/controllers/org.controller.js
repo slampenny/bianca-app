@@ -73,10 +73,16 @@ const verifyInvite = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send({ orgId });
 });
 
+const getDefaultVoiceOnboardingPlan = catchAsync(async (req, res) => {
+  const onboardingPlanService = require('../services/onboardingPlan.service');
+  res.status(httpStatus.OK).send({ plan: onboardingPlanService.getDefaultPlanTemplate() });
+});
+
 module.exports = {
   createOrg,
   getOrgs,
   getOrg,
+  getDefaultVoiceOnboardingPlan,
   updateOrg,
   deleteOrg,
   addCaregiver,

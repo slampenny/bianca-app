@@ -28,14 +28,24 @@ export default defineConfig({
     strictPort: true,
     // WSL / LAN: bind all interfaces; align HMR WebSocket with the page origin
     host: true,
-    hmr: {
-      protocol: "ws",
-      port: 5173,
-      clientPort: 5173,
-    },
+    hmr:
+      process.env.VITE_STAGING_LIVE === "1"
+        ? {
+            protocol: "wss",
+            host: "staging.biancawellness.com",
+            clientPort: 443,
+          }
+        : {
+            protocol: "ws",
+            port: 5173,
+            clientPort: 5173,
+          },
     watch: {
       usePolling: process.env.VITE_USE_POLLING === "1",
     },
+    ...(process.env.VITE_STAGING_LIVE === "1"
+      ? { allowedHosts: true as const }
+      : {}),
   },
   test: {
     environment: "jsdom",

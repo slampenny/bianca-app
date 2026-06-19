@@ -41,9 +41,19 @@ export type DrawerParamList = {
   Home: undefined
   Profile: undefined
   Alert: NavigatorScreenParams<AlertStackParamList>
-  Org: undefined
-  Reports: NavigatorScreenParams<ReportsStackParamList>
+  Settings: undefined
+  Insights: NavigatorScreenParams<ReportsStackParamList>
   Logout: undefined
+}
+
+export type SettingsStackParamList = {
+  SettingsHome: undefined
+  Profile: undefined
+  Privacy: undefined
+  Terms: undefined
+  PrivacyRequest: undefined
+  Logout: undefined
+  MFASetup: undefined
 }
 
 export type HomeStackParamList = {
@@ -73,6 +83,7 @@ export type ProfileStackParamList = {
 
 export type OrgStackParamList = {
   Organization: undefined
+  VoiceOnboarding: undefined
   Caregivers: undefined
   Caregiver: undefined
   CaregiverInvited: {
@@ -119,6 +130,8 @@ export type OnboardingStackParamList = {
   OnboardingHowBiancaWorks: { persona: import("../services/api/api.types").OnboardingPersona }
   OnboardingOrgInfo: { persona: import("../services/api/api.types").OnboardingPersona }
   OnboardingRegistration: { persona: import("../services/api/api.types").OnboardingPersona }
+  OnboardingAddLovedOne: undefined
+  OnboardingSchedule: { clientId: string }
   OnboardingTermsAndConsent: { persona?: import("../services/api/api.types").OnboardingPersona }
   Terms: undefined
   Privacy: undefined

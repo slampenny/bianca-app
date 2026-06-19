@@ -45,12 +45,27 @@ function formatSentimentLine(s: Record<string, unknown>): string {
   return parts.join(" — ") || "—"
 }
 
+function formatRequiredQuestions(entry: CaregiverDailyDigestEntry, labels: CaregiverDailyDigest["payload"]["labels"]): string {
+  const rows = entry.requiredQuestionAnswers
+  if (!rows?.length) return ""
+  const label = labels.requiredQuestions || "Standard questions"
+  return rows
+    .map((r) => `${label}: ${r.question} — ${r.answer || "(not answered)"}`)
+    .join("\n")
+}
+
 function entryNotes(entry: CaregiverDailyDigestEntry, labels: CaregiverDailyDigest["payload"]["labels"]): string {
   if (entry.languageMismatch && entry.languageMismatchExplanation) {
     return entry.languageMismatchExplanation
   }
+  const parts: string[] = []
   if (entry.conversationSummaryShort) {
-    return entry.conversationSummaryShort
+    parts.push(entry.conversationSummaryShort)
+  }
+  const req = formatRequiredQuestions(entry, labels)
+  if (req) parts.push(req)
+  if (parts.length > 0) {
+    return parts.join("\n")
   }
   if (entry.callsPlaced === 0) {
     return labels.noActivity

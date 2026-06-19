@@ -70,6 +70,8 @@ export function OrgScreen() {
   const [requireClientConsent, setRequireClientConsent] = useState(false)
   const [timezone, setTimezone] = useState("America/New_York")
   const [country, setCountry] = useState<string>("CA")
+  const [requiredQuestionsEnabled, setRequiredQuestionsEnabled] = useState(false)
+  const [requiredQuestions, setRequiredQuestions] = useState<{ id: string; prompt: string }[]>([])
 
   const navigation = useNavigation<NavigationProp<OrgStackParamList>>()
 
@@ -108,6 +110,11 @@ export function OrgScreen() {
         }
         // Initialize requireClientConsent
         setRequireClientConsent(currentOrg.requireClientConsent ?? false)
+        const rcq = currentOrg.requiredCallQuestions
+        setRequiredQuestionsEnabled(rcq?.enabled === true)
+        setRequiredQuestions(
+          (rcq?.questions || []).map((q) => ({ id: q.id, prompt: q.prompt }))
+        )
         setIsLoading(false)
         return
       }
@@ -152,6 +159,9 @@ export function OrgScreen() {
           ? ((retryCountValue >= 1 && retryCountValue <= 5) ? retryCountValue : 2)
           : 0
         
+        const trimmedQuestions = requiredQuestions
+          .map((q) => ({ id: q.id.trim(), prompt: q.prompt.trim() }))
+          .filter((q) => q.id && q.prompt)
         const result = await updateOrg({
           orgId: currentOrg.id,
           org: {
@@ -166,6 +176,10 @@ export function OrgScreen() {
               retryCount: validRetryCount,
               retryIntervalMinutes: validRetryMinutes,
               alertOnAllMissedCalls,
+            },
+            requiredCallQuestions: {
+              enabled: requiredQuestionsEnabled && trimmedQuestions.length > 0,
+              questions: trimmedQuestions,
             },
           },
         }).unwrap()
@@ -199,6 +213,10 @@ export function OrgScreen() {
   const handlePaymentPress = () => {
     // Navigate to payment screen
     navigation.navigate("Payment")
+  }
+
+  const handleVoiceOnboardingPress = () => {
+    navigation.navigate("VoiceOnboarding")
   }
 
   // Handler to only allow numeric input for retry count (1-5)
@@ -475,6 +493,78 @@ export function OrgScreen() {
           />
         </View>
 
+        {canEditOrg ? (
+          <View style={styles.voiceOnboardingSection}>
+            <Text style={styles.sectionTitle} preset="formLabel">
+              {translate("orgScreen.voiceOnboardingTitle")}
+            </Text>
+            <Text style={styles.sectionHelper} preset="formHelper">
+              {translate("orgScreen.voiceOnboardingHelper")}
+            </Text>
+            <Button
+              preset="default"
+              text={translate("orgScreen.configureVoiceOnboarding")}
+              onPress={handleVoiceOnboardingPress}
+              testID="configure-voice-onboarding-button"
+            />
+          </View>
+        ) : null}
+
+        <View style={styles.requiredQuestionsSection}>
+          <Text style={styles.sectionTitle} preset="formLabel">
+            {translate("orgScreen.requiredQuestionsTitle")}
+          </Text>
+          <Text style={styles.sectionHelper} preset="formHelper">
+            {translate("orgScreen.requiredQuestionsHelper")}
+          </Text>
+          <Toggle
+            variant="switch"
+            labelTx="orgScreen.enableRequiredQuestionsLabel"
+            value={requiredQuestionsEnabled}
+            onValueChange={setRequiredQuestionsEnabled}
+            editable={canEditOrg}
+            containerStyle={styles.inputContainer}
+          />
+          {requiredQuestions.map((question, index) => (
+            <View key={`${question.id}-${index}`} style={styles.requiredQuestionRow}>
+              <TextField
+                placeholderTx="orgScreen.requiredQuestionPromptPlaceholder"
+                value={question.prompt}
+                onChangeText={(text) =>
+                  setRequiredQuestions((prev) =>
+                    prev.map((item, i) => (i === index ? { ...item, prompt: text } : item))
+                  )
+                }
+                editable={canEditOrg}
+                containerStyle={styles.inputContainer}
+                inputWrapperStyle={!canEditOrg ? styles.readonlyInputWrapper : styles.inputWrapper}
+                style={!canEditOrg ? styles.readonlyInput : styles.input}
+              />
+              {canEditOrg ? (
+                <Button
+                  preset="default"
+                  text={translate("orgScreen.removeRequiredQuestion")}
+                  onPress={() => setRequiredQuestions((prev) => prev.filter((_, i) => i !== index))}
+                  style={styles.removeQuestionButton}
+                />
+              ) : null}
+            </View>
+          ))}
+          {canEditOrg && requiredQuestions.length < 10 ? (
+            <Button
+              preset="default"
+              text={translate("orgScreen.addRequiredQuestion")}
+              onPress={() =>
+                setRequiredQuestions((prev) => [
+                  ...prev,
+                  { id: `q_${prev.length + 1}`, prompt: "" },
+                ])
+              }
+              style={styles.addQuestionButton}
+            />
+          ) : null}
+        </View>
+
         {canEditOrg && (
           <Button 
             preset="primary"
@@ -591,6 +681,27 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: colors.palette.neutral300,
+  },
+  voiceOnboardingSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
+  },
+  requiredQuestionsSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.palette.neutral300,
+  },
+  requiredQuestionRow: {
+    marginBottom: 8,
+  },
+  addQuestionButton: {
+    marginTop: 4,
+  },
+  removeQuestionButton: {
+    marginTop: 4,
   },
   countrySection: {
     marginTop: 20,

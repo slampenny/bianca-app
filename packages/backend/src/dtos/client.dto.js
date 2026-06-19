@@ -2,12 +2,56 @@ const ScheduleDTO = require('./schedule.dto');
 const callService = require('../services/call.service');
 const clientHomeSnapshotService = require('../services/clientHomeSnapshot.service');
 const { splitFullName, fullNameFromParts } = require('../utils/clientName.util');
-const { normalizeEmail } = require('../utils/familyDigestEligibility');
+const { normalizeEmail, getFamilyDigestEmailSettings } = require('../utils/familyDigestEligibility');
+const {
+  resolveEmergencyContacts,
+  resolveFamilyDigestRecipients,
+} = require('../utils/clientContacts.util');
 
 const toIsoOrNull = (d) => {
   if (d == null) return null;
   const date = d instanceof Date ? d : new Date(d);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
+const formatEmergencyContactDto = (emergencyContact) =>
+  emergencyContact &&
+  typeof emergencyContact === 'object' &&
+  (emergencyContact.name ||
+    emergencyContact.relationship ||
+    emergencyContact.phone ||
+    emergencyContact.email ||
+    emergencyContact.familyDigestEmail)
+    ? {
+        name: emergencyContact.name || '',
+        relationship: emergencyContact.relationship || '',
+        phone: emergencyContact.phone || '',
+        email: emergencyContact.email ? String(emergencyContact.email).trim().toLowerCase() : '',
+        familyDigestEmail: emergencyContact.familyDigestEmail
+          ? {
+              enabled: emergencyContact.familyDigestEmail.enabled === true,
+              verifiedAt: toIsoOrNull(emergencyContact.familyDigestEmail.verifiedAt),
+              verifiedEmail: emergencyContact.familyDigestEmail.verifiedEmail
+                ? normalizeEmail(emergencyContact.familyDigestEmail.verifiedEmail)
+                : null,
+            }
+          : { enabled: false, verifiedAt: null, verifiedEmail: null },
+      }
+    : null;
+
+const formatFamilyDigestRecipientDto = (recipient) => {
+  const digest = getFamilyDigestEmailSettings(recipient);
+  return {
+    id: recipient.id || recipient._id || null,
+    name: recipient.name || '',
+    relationship: recipient.relationship || '',
+    email: recipient.email ? normalizeEmail(recipient.email) : '',
+    familyDigestEmail: {
+      enabled: digest.enabled,
+      verifiedAt: toIsoOrNull(digest.verifiedAt),
+      verifiedEmail: digest.verifiedEmail,
+    },
+  };
 };
 
 const ClientDTO = (client) => {
@@ -89,30 +133,15 @@ const ClientDTO = (client) => {
     latestOverallRiskScore: latestOverallRiskScore == null ? null : Math.round(Number(latestOverallRiskScore)),
     room: room == null || room === '' ? null : String(room).trim(),
     moveInDate: toIsoOrNull(moveInDate),
-    emergencyContact:
-      emergencyContact &&
-      typeof emergencyContact === 'object' &&
-      (emergencyContact.name ||
-        emergencyContact.relationship ||
-        emergencyContact.phone ||
-        emergencyContact.email ||
-        emergencyContact.familyDigestEmail)
-        ? {
-            name: emergencyContact.name || '',
-            relationship: emergencyContact.relationship || '',
-            phone: emergencyContact.phone || '',
-            email: emergencyContact.email ? String(emergencyContact.email).trim().toLowerCase() : '',
-            familyDigestEmail: emergencyContact.familyDigestEmail
-              ? {
-                  enabled: emergencyContact.familyDigestEmail.enabled === true,
-                  verifiedAt: toIsoOrNull(emergencyContact.familyDigestEmail.verifiedAt),
-                  verifiedEmail: emergencyContact.familyDigestEmail.verifiedEmail
-                    ? normalizeEmail(emergencyContact.familyDigestEmail.verifiedEmail)
-                    : null,
-                }
-              : { enabled: false, verifiedAt: null, verifiedEmail: null },
-          }
-        : null,
+    emergencyContact: formatEmergencyContactDto(emergencyContact),
+    emergencyContacts: resolveEmergencyContacts(source).map((entry) => ({
+      id: entry.id || null,
+      name: entry.name,
+      relationship: entry.relationship,
+      phone: entry.phone,
+      email: entry.email,
+    })),
+    familyDigestRecipients: resolveFamilyDigestRecipients(source).map(formatFamilyDigestRecipientDto),
   };
 };
 

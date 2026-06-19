@@ -8,6 +8,28 @@ import {
 const SSO_REDIRECT_STORAGE_KEY = "sso_redirect_pending"
 export const SSO_REDIRECT_ERROR_KEY = "sso_redirect_error"
 
+/** True while an OAuth redirect callback is being processed (survives StrictMode remount). */
+let oauthCallbackActive = false
+
+export function isOAuthCallbackActive(): boolean {
+  if (typeof window === "undefined") return false
+  return oauthCallbackActive || hasSSOCallbackInUrl()
+}
+
+function markOAuthCallbackStarted(): void {
+  oauthCallbackActive = true
+}
+
+export function clearOAuthCallbackActive(): void {
+  oauthCallbackActive = false
+}
+
+function clearOAuthUrl(): void {
+  if (typeof window === "undefined" || !window.history.replaceState) return
+  const cleanUrl = window.location.pathname || "/"
+  window.history.replaceState({}, "", cleanUrl)
+}
+
 export function consumeSsoRedirectError(): string | null {
   if (typeof sessionStorage === "undefined") return null
   try {
@@ -259,8 +281,11 @@ async function authenticateWithBackend(userInfo: SSOUser): Promise<
 /**
  * After OAuth redirect, exchange code and complete backend login. Clears query/hash from URL.
  * Returns null if no `code` in URL.
+ *
+ * React StrictMode (Vite dev / staging live-dev) mounts twice; reuse one in-flight exchange
+ * so the auth code and sessionStorage PKCE state are not consumed by parallel runs.
  */
-export async function tryCompleteRedirectAuth(): Promise<
+let redirectAuthInFlight: Promise<
   | (SSOUser & {
       tokens?: unknown
       backendUser?: unknown
@@ -270,19 +295,21 @@ export async function tryCompleteRedirectAuth(): Promise<
     })
   | SSOError
   | null
+> | null = null
+
+async function completeRedirectAuthOnce(
+  code: string,
+  state: string | null,
+): Promise<
+  | (SSOUser & {
+      tokens?: unknown
+      backendUser?: unknown
+      backendOrg?: unknown
+      backendClients?: unknown[]
+      backendAlerts?: unknown[]
+    })
+  | SSOError
 > {
-  if (typeof window === "undefined" || !window.location) return null
-
-  const params = new URLSearchParams(window.location.search)
-  let code = params.get("code")
-  let state = params.get("state")
-  if (!code && window.location.hash) {
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""))
-    code = code || hashParams.get("code")
-    state = state || hashParams.get("state")
-  }
-  if (!code) return null
-
   const redirectUri = getRedirectUri()
   let stored: StoredRedirect | null = null
   try {
@@ -303,12 +330,6 @@ export async function tryCompleteRedirectAuth(): Promise<
       error: "Authentication failed",
       description: "Invalid sign-in state. Please try again.",
     }
-  }
-  sessionStorage.removeItem(SSO_REDIRECT_STORAGE_KEY)
-
-  if (window.history.replaceState) {
-    const cleanUrl = window.location.pathname || "/"
-    window.history.replaceState({}, "", cleanUrl)
   }
 
   const apiBase = getApiBaseUrl()
@@ -355,5 +376,46 @@ export async function tryCompleteRedirectAuth(): Promise<
       ? await fetchMicrosoftUserInfo(accessToken)
       : await fetchGoogleUserInfo(accessToken)
 
-  return authenticateWithBackend(userInfo)
+  sessionStorage.removeItem(SSO_REDIRECT_STORAGE_KEY)
+  const loginResult = await authenticateWithBackend(userInfo)
+  if (!("error" in loginResult)) {
+    clearOAuthUrl()
+  }
+  return loginResult
+}
+
+export async function tryCompleteRedirectAuth(): Promise<
+  | (SSOUser & {
+      tokens?: unknown
+      backendUser?: unknown
+      backendOrg?: unknown
+      backendClients?: unknown[]
+      backendAlerts?: unknown[]
+    })
+  | SSOError
+  | null
+> {
+  if (typeof window === "undefined" || !window.location) return null
+
+  const params = new URLSearchParams(window.location.search)
+  let code = params.get("code")
+  let state = params.get("state")
+  if (!code && window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+    code = code || hashParams.get("code")
+    state = state || hashParams.get("state")
+  }
+  if (!code) return null
+
+  markOAuthCallbackStarted()
+
+  if (redirectAuthInFlight) {
+    return redirectAuthInFlight
+  }
+
+  redirectAuthInFlight = completeRedirectAuthOnce(code, state).finally(() => {
+    redirectAuthInFlight = null
+  })
+
+  return redirectAuthInFlight
 }

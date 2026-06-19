@@ -155,6 +155,15 @@ export function DashboardPage() {
     return { complete, active, notStarted, total: vals.length }
   }, [onboardingRollupsRes])
 
+  const showOnboardingCard = useMemo(() => {
+    if (!authed || onbRollLoading || onbRollError) return false
+    const rollups = Object.values(onboardingRollupsRes?.rollups ?? {})
+    if (rollups.length === 0) return false
+    const onboardingEnabled = rollups.some((u) => u.enabled !== false)
+    if (!onboardingEnabled) return false
+    return onboardingCounts.active > 0 || onboardingCounts.notStarted > 0
+  }, [authed, onbRollLoading, onbRollError, onboardingRollupsRes, onboardingCounts])
+
   if (authed && clientPages === undefined && clientsListLoading) {
     return (
       <div
@@ -271,13 +280,22 @@ export function DashboardPage() {
         }}
         className="va-dash-metrics"
       >
-        <MetricCard icon={<UsersGlyph />} value={c} label={t("dashboard.totalResidents")} accent="rgba(37, 99, 235, 0.12)" iconC="var(--va-blue)" />
+        <MetricCard
+          icon={<UsersGlyph />}
+          value={c}
+          label={t("dashboard.totalResidents")}
+          accent="rgba(37, 99, 235, 0.12)"
+          iconC="var(--va-blue)"
+          to="/residents"
+          ariaLabel={t("dashboard.totalResidentsLink")}
+          testId="dashboard-total-residents"
+        />
         <MetricCard icon={<ActivityGlyph />} value={activeToday} label={t("dashboard.activeToday")} accent="var(--va-emerald-100)" iconC="var(--va-emerald-600)" />
         <MetricCard icon={<PhoneIcon size={20} />} value={callsCompleted} label={t("dashboard.callsCompleted24h")} accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
         <MetricCard icon={<ChartGlyph />} value={successRate} label={t("dashboard.answerRate24h")} accent="rgba(20, 184, 166, 0.15)" iconC="var(--va-teal)" />
       </div>
 
-      {authed ? (
+      {showOnboardingCard ? (
         <div className="va-card va-card-pad" data-testid="dashboard-onboarding-card">
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: "0.75rem" }}>
             <div>
@@ -287,45 +305,37 @@ export function DashboardPage() {
               </p>
             </div>
           </div>
-          {onbRollError ? (
-            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-red-600)" }}>{t("dashboard.onboardingLoadError")}</p>
-          ) : onbRollLoading ? (
-            <p style={{ margin: "0.75rem 0 0", fontSize: "0.8125rem", color: "var(--va-slate-500)" }}>{t("dashboard.onboardingLoading")}</p>
-          ) : (
-            <>
-              <div
-                style={{
-                  marginTop: "1rem",
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-                  gap: "0.75rem",
-                }}
-              >
-                <OnboardingStat value={onboardingCounts.active} label={t("dashboard.onboardingInProgress")} accent="var(--va-amber-50)" border="var(--va-amber-200)" />
-                <OnboardingStat value={onboardingCounts.notStarted} label={t("dashboard.onboardingNotStarted")} accent="var(--va-slate-50)" border="var(--va-slate-200)" />
-                <OnboardingStat value={onboardingCounts.complete} label={t("dashboard.onboardingComplete")} accent="var(--va-emerald-50)" border="var(--va-emerald-200)" />
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem", marginTop: "1rem" }}>
-                <Link to="/residents?onboarding=in_progress" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  {t("dashboard.viewInProgress")}
-                </Link>
-                <Link to="/residents?onboarding=not_started" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  {t("dashboard.viewNotStarted")}
-                </Link>
-                <Link to="/residents?onboarding=complete" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  {t("dashboard.viewComplete")}
-                </Link>
-                <Link to="/residents" className="va-btn-ghost" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
-                  {t("dashboard.allResidents")}
-                </Link>
-              </div>
-              <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: "0.65rem", marginBottom: 0 }}>
-                {onboardingCounts.total === 1
-                  ? t("dashboard.onboardingMetaOne", { count: onboardingCounts.total })
-                  : t("dashboard.onboardingMetaMany", { count: onboardingCounts.total })}
-              </p>
-            </>
-          )}
+          <div
+            style={{
+              marginTop: "1rem",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+              gap: "0.75rem",
+            }}
+          >
+            <OnboardingStat value={onboardingCounts.active} label={t("dashboard.onboardingInProgress")} accent="var(--va-amber-50)" border="var(--va-amber-200)" />
+            <OnboardingStat value={onboardingCounts.notStarted} label={t("dashboard.onboardingNotStarted")} accent="var(--va-slate-50)" border="var(--va-slate-200)" />
+            <OnboardingStat value={onboardingCounts.complete} label={t("dashboard.onboardingComplete")} accent="var(--va-emerald-50)" border="var(--va-emerald-200)" />
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.65rem", marginTop: "1rem" }}>
+            <Link to="/residents?onboarding=in_progress" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+              {t("dashboard.viewInProgress")}
+            </Link>
+            <Link to="/residents?onboarding=not_started" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+              {t("dashboard.viewNotStarted")}
+            </Link>
+            <Link to="/residents?onboarding=complete" className="va-btn-secondary" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+              {t("dashboard.viewComplete")}
+            </Link>
+            <Link to="/residents" className="va-btn-ghost" style={{ textDecoration: "none", fontSize: "0.8125rem", padding: "0.35rem 0.75rem" }}>
+              {t("dashboard.allResidents")}
+            </Link>
+          </div>
+          <p style={{ fontSize: "0.7rem", color: "var(--va-slate-400)", marginTop: "0.65rem", marginBottom: 0 }}>
+            {onboardingCounts.total === 1
+              ? t("dashboard.onboardingMetaOne", { count: onboardingCounts.total })
+              : t("dashboard.onboardingMetaMany", { count: onboardingCounts.total })}
+          </p>
         </div>
       ) : null}
 
@@ -535,15 +545,21 @@ function MetricCard({
   label,
   accent,
   iconC,
+  to,
+  ariaLabel,
+  testId,
 }: {
   icon: import("react").ReactNode
   value: string | number
   label: string
   accent: string
   iconC: string
+  to?: string
+  ariaLabel?: string
+  testId?: string
 }) {
-  return (
-    <div className="va-card va-card-pad">
+  const content = (
+    <>
       <div
         style={{
           width: 40,
@@ -563,8 +579,24 @@ function MetricCard({
       <p style={{ fontSize: "0.75rem", fontWeight: 500, color: "var(--va-slate-500)", textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>
         {label}
       </p>
-    </div>
+    </>
   )
+
+  if (to) {
+    return (
+      <Link
+        to={to}
+        className="va-card va-card-pad"
+        data-testid={testId}
+        aria-label={ariaLabel ?? label}
+        style={{ display: "block", textDecoration: "none", color: "inherit", cursor: "pointer" }}
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  return <div className="va-card va-card-pad">{content}</div>
 }
 
 function UsersGlyph() {

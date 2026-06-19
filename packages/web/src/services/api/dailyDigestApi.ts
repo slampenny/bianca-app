@@ -10,6 +10,7 @@ export type CaregiverDailyDigestEntry = {
   languageMismatch: boolean
   languageMismatchExplanation: string | null
   conversationSummaryShort: string | null
+  requiredQuestionAnswers?: { question: string; answer: string; asked: boolean }[]
   sentiment: Record<string, unknown> | null
   callsPlaced: number
   answeredCalls: number
@@ -32,6 +33,7 @@ export type CaregiverDailyDigestPayload = {
   phiRedacted?: boolean
   labels: {
     conversationSummary: string
+    requiredQuestions?: string
     sentiment: string
     callsToday: string
     noActivity: string

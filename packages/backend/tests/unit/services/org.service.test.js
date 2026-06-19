@@ -144,6 +144,67 @@ describe('orgService', () => {
     expect(updatedOrg.caregivers).not.toContainEqual(cg.id);
   });
 
+  it('should update requiredCallQuestions', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const updated = await orgService.updateOrgById(org.id, {
+      requiredCallQuestions: {
+        enabled: true,
+        questions: [{ id: 'med', prompt: 'Have you taken your medication today?' }],
+      },
+    });
+    expect(updated.requiredCallQuestions.enabled).toBe(true);
+    expect(updated.requiredCallQuestions.questions).toHaveLength(1);
+    expect(updated.requiredCallQuestions.questions[0].id).toBe('med');
+  });
+
+  it('should reject invalid requiredCallQuestions config', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    await expect(
+      orgService.updateOrgById(org.id, {
+        requiredCallQuestions: { enabled: true, questions: [] },
+      })
+    ).rejects.toThrow();
+  });
+
+  it('should update custom voiceOnboarding plan', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const updated = await orgService.updateOrgById(org.id, {
+      voiceOnboarding: {
+        useDefault: false,
+        days: [
+          {
+            dayNumber: 1,
+            theme: 'Welcome',
+            opening: 'Hi from Bianca',
+            questions: [{ id: 'day1_topic_1', prompt: 'How are you settling in?' }],
+          },
+        ],
+      },
+    });
+    expect(updated.voiceOnboarding.useDefault).toBe(false);
+    expect(updated.voiceOnboarding.days).toHaveLength(1);
+    expect(updated.voiceOnboarding.days[0].questions[0].prompt).toContain('settling');
+  });
+
+  it('should reset voiceOnboarding to default plan', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    await orgService.updateOrgById(org.id, {
+      voiceOnboarding: {
+        useDefault: false,
+        days: [
+          {
+            questions: [{ id: 'custom_q', prompt: 'Custom question?' }],
+          },
+        ],
+      },
+    });
+    const reset = await orgService.updateOrgById(org.id, {
+      voiceOnboarding: { useDefault: true, days: [] },
+    });
+    expect(reset.voiceOnboarding.useDefault).toBe(true);
+    expect(reset.voiceOnboarding.days).toEqual([]);
+  });
+
   it('should set the role of a caregiver in an org', async () => {
     const [org] = await insertOrgs([orgOne]);
     const [cg] = await insertCaregivers([

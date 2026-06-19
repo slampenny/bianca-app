@@ -113,6 +113,31 @@ describe('Minimum Necessary Middleware', () => {
       expect(data).not.toHaveProperty('medicalRecordNumber'); // Filtered
     });
 
+    it('should retain emergencyContacts and familyDigestRecipients for orgAdmin', async () => {
+      const req = httpMocks.createRequest({
+        caregiver: { _id: '123', role: 'orgAdmin' },
+      });
+      const res = httpMocks.createResponse();
+      const next = jest.fn();
+
+      minimumNecessaryMiddleware('client')(req, res, next);
+
+      res.json({
+        id: 'client-123',
+        name: 'John Doe',
+        emergencyContacts: [{ id: 'ec1', name: 'Bob', phone: '+16045550101' }],
+        familyDigestRecipients: [
+          { id: 'fd1', name: 'Sarah', email: 'family@test.com', familyDigestEmail: { enabled: true } },
+        ],
+        medicalRecordNumber: 'secret',
+      });
+
+      const data = res._getJSONData();
+      expect(data.emergencyContacts).toHaveLength(1);
+      expect(data.familyDigestRecipients).toHaveLength(1);
+      expect(data).not.toHaveProperty('medicalRecordNumber');
+    });
+
     it('should filter array of clients', async () => {
       const req = httpMocks.createRequest({
         caregiver: {

@@ -154,9 +154,10 @@ export class AuthWorkflow {
     await this.page.locator('input[data-testid="register-confirm-password"]').fill(data.confirmPassword)
     await this.page.locator('input[data-testid="register-phone"]').fill(data.phone)
     if (data.organizationName) {
-      // Switch to organization account type first
-      await this.page.getByTestId('register-organization-toggle').click()
-      await this.page.locator('input[data-testid="register-org-name"]').fill(data.organizationName)
+      const orgNameField = this.page.locator('input[data-testid="register-org-name"]')
+      if (await orgNameField.isVisible().catch(() => false)) {
+        await orgNameField.fill(data.organizationName)
+      }
     }
   }
 

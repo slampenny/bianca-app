@@ -20,7 +20,7 @@ import { useGetReportsSummaryQuery } from "../services/api/facilityReportsApi"
 import { isAuthenticated, getCurrentUser } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
 import { BellIcon, ChartBarIcon, DownloadIcon, FileTextIcon, PhoneIcon, UsersIcon } from "../icons"
-import { localizedReportTemplates, localizedStaffVersusFamily } from "../lib/reportI18n"
+import { localizedReportTemplates } from "../lib/reportI18n"
 import type { ReportTemplateId } from "../data/reportCatalog"
 import { ReportsResidentTab } from "./ReportsResidentTab"
 import "../app.css"
@@ -233,7 +233,6 @@ export function ReportsPage() {
   const devDemo = isDevDemoEnabled()
   const authed = useAppSelector(isAuthenticated)
   const reportTemplates = useMemo(() => localizedReportTemplates(t), [t])
-  const staffVersusFamilyDigestCopy = useMemo(() => localizedStaffVersusFamily(t), [t])
   const org = useAppSelector((s) => s.org)
   const currentUser = useAppSelector(getCurrentUser)
   const superAdminNeedsOrg = currentUser?.role === "superAdmin"
@@ -384,25 +383,6 @@ export function ReportsPage() {
           )}
         </div>
         <p className="va-reports-muted" style={{ margin: 0 }}>{t("reports.liveMetricsNote")}</p>
-      </div>
-
-      <div
-        className="va-card va-card-pad"
-        style={{
-          background: "linear-gradient(135deg, rgba(20, 184, 166, 0.06) 0%, #fff 55%)",
-          border: "1px solid var(--va-slate-100)",
-        }}
-      >
-        <h2 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--va-navy)", margin: "0 0 0.75rem", lineHeight: 1.35 }}>
-          {staffVersusFamilyDigestCopy.title}
-        </h2>
-        <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "var(--va-slate-600)", fontSize: "0.875rem", lineHeight: 1.65 }}>
-          {staffVersusFamilyDigestCopy.body.map((p) => (
-            <li key={p} style={{ marginBottom: "0.5rem" }}>
-              {p}
-            </li>
-          ))}
-        </ul>
       </div>
 
       <div className="va-reports-stat-grid" aria-busy={summaryLoading}>

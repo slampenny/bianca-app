@@ -1,7 +1,7 @@
 // Integration test setup utility
 // This must be imported BEFORE any other modules to ensure proper mocking
 
-// Mock external services that cause timeouts in integration tests
+// Mock external job scheduler (npm package)
 jest.mock('agenda', () => {
   return jest.fn().mockImplementation(() => ({
     start: jest.fn().mockResolvedValue(),
@@ -21,104 +21,50 @@ jest.mock('agenda', () => {
   }));
 });
 
-// Don't mock email service - use real Ethereal mail for privacy tests
-// Note: Other tests may still mock it if needed, but privacy tests need real email
-
-jest.mock('../../src/services/ari.client', () => ({
-  getAriClientInstance: jest.fn().mockReturnValue({
-    isConnected: false,
-    connect: jest.fn().mockResolvedValue(),
-    disconnect: jest.fn().mockResolvedValue()
-  })
-}));
-
-// Mock other external services that might cause issues
-jest.mock('../../src/services/sns.service', () => {
-  const mockSNSService = {
-    sendSMS: jest.fn().mockResolvedValue({ success: true }),
-    isConfigured: jest.fn().mockReturnValue(false),
-    testConnectivity: jest.fn().mockResolvedValue(true),
-    sendEmergencyAlert: jest.fn().mockResolvedValue({ success: true }),
-    sendToPhone: jest.fn().mockResolvedValue({ MessageId: 'test-message-id-123' }),
-    formatPhoneNumber: jest.fn().mockImplementation((phone) => {
-      if (!phone) return null;
-      const digits = phone.replace(/\D/g, '');
-      if (digits.length === 10) {
-        return `+1${digits}`;
+// Mock OpenAI SDK (external npm package) — real sentiment/required-questions services use openaiSdk
+jest.mock('openai', () => {
+  const mockConstructor = jest.fn().mockImplementation(() => ({
+    chat: {
+      completions: {
+        create: jest.fn().mockResolvedValue({
+          choices: [{
+            message: {
+              content: JSON.stringify({
+                overallSentiment: 'neutral',
+                sentimentScore: 0,
+                confidence: 0.8,
+                clientMood: 'calm',
+                keyEmotions: [],
+                concernLevel: 'low',
+                satisfactionIndicators: { positive: [], negative: [] },
+                summary: 'Mocked sentiment for integration tests',
+                recommendations: ''
+              })
+            }
+          }]
+        })
       }
-      return phone.startsWith('+') ? phone : `+${phone}`;
-    }),
-    isValidPhoneNumber: jest.fn().mockReturnValue(true),
-    get isInitialized() { return true; }
-  };
-  // Export as both default and named exports to match different import patterns
+    },
+    embeddings: {
+      create: jest.fn().mockResolvedValue({ data: [{ embedding: [1, 0, 0] }] })
+    }
+  }));
   return {
     __esModule: true,
-    default: mockSNSService,
-    snsService: mockSNSService
+    default: mockConstructor,
+    OpenAI: mockConstructor,
   };
 });
 
-// Removed mock of our own twilioCall.service - we want to test our service, just mock external Twilio library
-
-// Mock OpenAI services
-jest.mock('../../src/services/openai.realtime.service', () => ({
-  getOpenAIRealtimeServiceInstance: jest.fn().mockReturnValue({
-    initialize: jest.fn().mockResolvedValue(true),
-    disconnect: jest.fn().mockResolvedValue(),
-    isConnectionReady: jest.fn().mockReturnValue(false)
-  })
+// Mock Asterisk ARI client (external npm package)
+jest.mock('ari-client', () => jest.fn().mockResolvedValue({
+  on: jest.fn(),
+  once: jest.fn(),
+  start: jest.fn().mockResolvedValue(),
+  stop: jest.fn().mockResolvedValue(),
 }));
 
-jest.mock('../../src/services/openai.sentiment.service', () => ({
-  getOpenAISentimentServiceInstance: jest.fn().mockReturnValue({
-    analyzeConversationSentiment: jest.fn().mockResolvedValue({
-      sentiment: 'positive',
-      confidence: 0.8,
-      reasoning: 'Mocked sentiment analysis'
-    }),
-    analyzeSentiment: jest.fn().mockResolvedValue({
-      success: true,
-      data: {
-        overallSentiment: 'positive',
-        sentimentScore: 0.8,
-        confidence: 0.8,
-        clientMood: 'Mocked',
-        keyEmotions: [],
-        concernLevel: 'low',
-        satisfactionIndicators: { positive: [], negative: [] },
-        summary: 'Mocked sentiment analysis',
-        recommendations: ''
-      }
-    })
-  })
-}));
-
-// Mock S3 service to prevent AWS connection attempts
-jest.mock('../../src/services/s3.service', () => ({
-  uploadFile: jest.fn().mockResolvedValue({
-    ETag: '"mock-etag"',
-    Location: 'https://mock-bucket.s3.amazonaws.com/mock-key'
-  }),
-  getPresignedUrl: jest.fn().mockResolvedValue('https://mock-presigned-url.com/file')
-}));
-
-// Mock LangChain API to prevent OpenAI API calls
-jest.mock('../../src/api/langChainAPI', () => ({
-  langChainAPI: {
-    summarizeConversation: jest.fn().mockResolvedValue('Mocked conversation summary'),
-    extractUserInformation: jest.fn().mockResolvedValue('Mocked user information'),
-    processConversation: jest.fn().mockResolvedValue({
-      summary: 'Mocked conversation summary',
-      userInformation: 'Mocked user information',
-      timestamp: new Date().toISOString()
-    })
-  }
-}));
-
-// Don't mock payment.service - we want to test our own business logic
-
-// Mock AWS SDK S3 client directly
+// Mock AWS SDK S3 client (external)
 jest.mock('@aws-sdk/client-s3', () => ({
   S3Client: jest.fn().mockImplementation(() => ({
     send: jest.fn().mockResolvedValue({ ETag: '"mock-etag"' })
@@ -127,12 +73,11 @@ jest.mock('@aws-sdk/client-s3', () => ({
   GetObjectCommand: jest.fn()
 }));
 
-// Mock AWS S3 presigner
 jest.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: jest.fn().mockResolvedValue('https://mock-presigned-url.com/file')
 }));
 
-// Mock LangChain OpenAI to prevent API calls
+// Mock LangChain OpenAI (external npm package)
 jest.mock('@langchain/openai', () => ({
   ChatOpenAI: jest.fn().mockImplementation(() => ({
     invoke: jest.fn().mockResolvedValue({
@@ -141,56 +86,16 @@ jest.mock('@langchain/openai', () => ({
   }))
 }));
 
-// Mock OpenAI sentiment service (analyzeSentiment used by finalizeConversation)
-jest.mock('../../src/services/openai.sentiment.service', () => ({
-  getOpenAISentimentServiceInstance: jest.fn().mockReturnValue({
-    analyzeConversationSentiment: jest.fn().mockResolvedValue({
-      success: true,
-      data: {
-        overallSentiment: 'negative',
-        sentimentScore: -0.5,
-        confidence: 0.8,
-        clientMood: 'anxious and concerned',
-        keyEmotions: ['anxiety', 'concern'],
-        concernLevel: 'medium',
-        satisfactionIndicators: {
-          positive: [],
-          negative: ['expressed worry', 'mentioned anxiety']
-        },
-        summary: 'Patient shows negative sentiment with moderate confidence',
-        recommendations: 'Consider additional support'
-      }
-    }),
-    analyzeSentiment: jest.fn().mockResolvedValue({
-      success: true,
-      data: {
-        overallSentiment: 'neutral',
-        sentimentScore: 0,
-        confidence: 0.8,
-        clientMood: 'Mocked',
-        keyEmotions: [],
-        concernLevel: 'low',
-        satisfactionIndicators: { positive: [], negative: [] },
-        summary: 'Mocked sentiment for finalizeConversation',
-        recommendations: ''
-      }
-    }),
-    validateSentimentData: jest.fn().mockImplementation((data) => {
-      const validSentiments = ['positive', 'negative', 'neutral'];
-      const isValid = validSentiments.includes(data.overallSentiment) && 
-                     data.sentimentScore >= -1 && data.sentimentScore <= 1 &&
-                     data.confidence >= 0 && data.confidence <= 1;
-      return {
-        isValid,
-        errors: isValid ? [] : ['Invalid sentiment data']
-      };
-    })
-  })
-}));
-
-// Mock Stripe configuration and client with unique IDs
+// Mock Stripe client (external API boundary via config module)
 let mockPaymentMethodCounter = 0;
 let mockCustomerCounter = 0;
+
+const defaultStripeSubscription = () => ({
+  id: 'sub_test123',
+  items: { data: [{ id: 'si_test123' }] },
+  current_period_start: Math.floor(Date.now() / 1000) - 86400 * 7,
+  current_period_end: Math.floor(Date.now() / 1000) + 86400 * 23,
+});
 
 jest.mock('../../src/config/stripe', () => ({
   customers: {
@@ -233,78 +138,42 @@ jest.mock('../../src/config/stripe', () => ({
   invoices: {
     create: jest.fn().mockResolvedValue({
       id: 'in_mock_invoice_id'
-    })
-  }
+    }),
+    retrieve: jest.fn().mockResolvedValue({
+      id: 'in_mock_invoice_id',
+      status: 'paid',
+      amount_paid: 0,
+      created: Math.floor(Date.now() / 1000),
+      due_date: null,
+      number: 'INV-000001',
+      lines: { data: [] },
+      subscription: 'sub_test123',
+      status_transitions: {},
+    }),
+    list: jest.fn().mockResolvedValue({ data: [] }),
+  },
+  subscriptions: {
+    retrieve: jest.fn().mockImplementation(() => Promise.resolve(defaultStripeSubscription())),
+    create: jest.fn().mockImplementation(() => Promise.resolve(defaultStripeSubscription())),
+  },
+  subscriptionItems: {
+    listUsageRecordSummaries: jest.fn().mockResolvedValue({ data: [] }),
+  },
+  billing: {
+    meters: {
+      list: jest.fn().mockResolvedValue({
+        data: [{ id: 'meter_test123', event_name: 'api_requests' }],
+      }),
+      create: jest.fn().mockResolvedValue({ id: 'meter_test123', event_name: 'api_requests' }),
+      retrieve: jest.fn().mockResolvedValue({ id: 'meter_test123', event_name: 'api_requests' }),
+    },
+    meterEvents: {
+      create: jest.fn().mockResolvedValue({ id: 'meter_event_test' }),
+    },
+  },
 }));
 
-// Mock stripeUsageService to prevent Stripe API calls
-jest.mock('../../src/services/stripeUsage.service', () => ({
-  getUsageSummary: jest.fn().mockResolvedValue({
-    subscriptionId: 'sub_test123',
-    totalUsage: 0,
-    items: []
-  }),
-  reportConversationUsage: jest.fn().mockResolvedValue({ success: true }),
-}));
-
-// Don't mock paymentMethod.service - we want to test our own business logic
-
-// Mock cache service to prevent initialization issues
-jest.mock('../../src/services/cache.service', () => ({
-  get: jest.fn().mockResolvedValue(null),
-  set: jest.fn().mockResolvedValue(true),
-  del: jest.fn().mockResolvedValue(true),
-  delPattern: jest.fn().mockResolvedValue(0),
-  exists: jest.fn().mockResolvedValue(false),
-  increment: jest.fn().mockResolvedValue(1),
-  getStats: jest.fn().mockResolvedValue({ type: 'memory', keys: 0 }),
-  flush: jest.fn().mockResolvedValue(true),
-  getCacheType: jest.fn().mockReturnValue('memory')
-}));
-
-// Mock network utilities to prevent external IP lookups
-jest.mock('../../src/utils/network.utils', () => ({
-  getNetworkIPs: jest.fn().mockResolvedValue({
-    publicIp: '127.0.0.1',
-    privateIp: '127.0.0.1'
-  })
-}));
-
-// Don't mock our own business logic services - only mock infrastructure/external dependencies
-// Mock infrastructure services that connect to external systems or cause timeouts
-jest.mock('../../src/services/rtp.sender.service', () => ({
-  startRTPSender: jest.fn().mockResolvedValue(),
-  stopRTPSender: jest.fn().mockResolvedValue(),
-  sendAudio: jest.fn().mockResolvedValue()
-}));
-
-jest.mock('../../src/services/rtp.listener.service', () => ({
-  startRTPListener: jest.fn().mockResolvedValue(),
-  stopRTPListener: jest.fn().mockResolvedValue()
-}));
-
-jest.mock('../../src/services/channel.tracker', () => ({
-  trackChannel: jest.fn().mockResolvedValue(),
-  untrackChannel: jest.fn().mockResolvedValue(),
-  getChannelStatus: jest.fn().mockReturnValue('active'),
-  initialize: jest.fn().mockResolvedValue()
-}));
-
-jest.mock('../../src/services/port.manager.service', () => ({
-  allocatePort: jest.fn().mockResolvedValue(20000),
-  releasePort: jest.fn().mockResolvedValue(),
-  getAvailablePorts: jest.fn().mockReturnValue([20000, 20001, 20002]),
-  initialize: jest.fn().mockResolvedValue(),
-  destroy: jest.fn().mockResolvedValue()
-}));
-
-jest.mock('../../src/services/audio.diagnostic.service', () => ({
-  diagnoseAudio: jest.fn().mockResolvedValue({
-    status: 'healthy'
-  })
-}));
-
-// Mock external Twilio library (not our service)
+// Mock external Twilio library (not our twilioCall / twilioSms services)
 jest.mock('twilio', () => {
   const mockTwilio = jest.fn(() => ({
     calls: {
@@ -320,10 +189,22 @@ jest.mock('twilio', () => {
           duration: 120
         })
       })
-    }
+    },
+    messages: {
+      create: jest.fn().mockResolvedValue({
+        sid: 'test-sms-sid-123',
+        status: 'queued',
+      }),
+    },
+    api: {
+      v2010: {
+        accounts: jest.fn().mockReturnValue({
+          fetch: jest.fn().mockResolvedValue({ sid: 'test-twilio-account-sid' }),
+        }),
+      },
+    },
   }));
-  
-  // Add twiml as a property of the constructor function
+
   mockTwilio.twiml = {
     VoiceResponse: jest.fn().mockImplementation(() => ({
       say: jest.fn().mockReturnThis(),
@@ -333,27 +214,15 @@ jest.mock('twilio', () => {
       toString: jest.fn().mockReturnValue('<Response><Say>Hello</Say></Response>')
     }))
   };
-  
+
   return mockTwilio;
 });
-
-// Don't mock emergencyProcessor - integration tests need the real implementation
-// jest.mock('../../src/services/emergencyProcessor.service', () => ({
-//   processEmergency: jest.fn().mockResolvedValue({
-//     processed: true
-//   }),
-//   initialize: jest.fn().mockResolvedValue()
-// }));
 
 // Set required environment variables for tests
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-testing';
 process.env.TWILIO_ACCOUNTSID = process.env.TWILIO_ACCOUNTSID || 'test-twilio-account-sid';
 process.env.TWILIO_AUTHTOKEN = process.env.TWILIO_AUTHTOKEN || 'test-twilio-auth-token';
-process.env.TWILIO_PHONENUMBER = process.env.TWILIO_PHONENUMBER || '+15551234567'; // Required for twilioCallService (note: config uses TWILIO_PHONENUMBER)
-// OpenAI Realtime API: GA only (no env toggle)
+process.env.TWILIO_PHONENUMBER = process.env.TWILIO_PHONENUMBER || '+15551234567';
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-openai-api-key';
 
-module.exports = {
-  // This file is imported for its side effects (mocking)
-  // No exports needed
-};
+module.exports = {};

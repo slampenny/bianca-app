@@ -37,13 +37,13 @@ describe('familyDigestEligibility', () => {
     client.emergencyContact.email = '';
     const result = buildFamilyDigestEligibility(client, { ...recipient(), email: '' });
     expect(result.ok).toBe(false);
-    expect(result.reasons.some((r) => r.includes('valid emergency contact email'))).toBe(true);
+    expect(result.reasons.some((r) => r.includes('valid family digest recipient email'))).toBe(true);
   });
 
   it('blocks when emergency contact email is invalid', () => {
     const result = buildFamilyDigestEligibility(baseClient(), { ...recipient(), email: 'not-an-email' });
     expect(result.ok).toBe(false);
-    expect(result.reasons.some((r) => r.includes('valid emergency contact email'))).toBe(true);
+    expect(result.reasons.some((r) => r.includes('valid family digest recipient email'))).toBe(true);
   });
 
   it('blocks when client consented is false', () => {

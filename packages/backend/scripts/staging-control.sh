@@ -74,7 +74,7 @@ show_status() {
         --region $REGION 2>/dev/null || echo "false")
     
     echo -e "Always-on mode: ${YELLOW}$always_on${NC}"
-    echo -e "Auto-stop Lambda: ${YELLOW}bianca-staging-auto-stop${NC} (every 30m if idle — stops bianca-staging + bianca-demo; never starts)"
+    echo -e "Auto-stop Lambda: ${YELLOW}bianca-staging-auto-stop${NC} (every 30m if idle — stops bianca-staging only; never starts)"
     echo -e "Start staging: ${YELLOW}manual only${NC} (yarn staging:up or staging-control.sh start)"
 }
 
@@ -186,22 +186,20 @@ disable_always_on() {
     echo -e "${YELLOW}ℹ️  Staging will now follow business hours schedule${NC}"
 }
 
-# Deploy to staging
+# Deploy to staging (live-dev sync or manual ECR pull)
 deploy_staging() {
-    echo -e "${BLUE}🚀 Deploying to staging...${NC}"
-    
-    # Start instance if not running
+    echo -e "${BLUE}🚀 Staging deploy options${NC}"
+    echo ""
+    echo -e "  ${GREEN}yarn staging:live${NC}          — rsync + nodemon/Vite (recommended)"
+    echo -e "  ${GREEN}./manual-deploy-staging.sh${NC} — pull :staging ECR images"
+    echo ""
     local instance_id=$(get_staging_instance_id)
     local status=$(get_staging_status $instance_id)
-    
+
     if [ "$status" = "stopped" ]; then
         echo -e "${YELLOW}⚠️  Instance is stopped, starting it first...${NC}"
         start_staging
-        sleep 30  # Wait for instance to be fully ready
     fi
-    
-    # Run deployment
-    ./scripts/deploy-staging.sh
 }
 
 # Show usage
@@ -214,9 +212,13 @@ show_usage() {
     echo "  status     - Show current staging status"
     echo "  start      - Start staging instance"
     echo "  stop       - Stop staging instance"
-    echo "  deploy     - Deploy to staging (starts instance if needed)"
-    echo "  always-on  - Enable always-on mode (24/7)"
-    echo "  schedule   - Disable always-on mode (business hours only)"
+    echo "  deploy     - Show staging deploy options (starts instance if stopped)"
+    echo "  always-on  - Enable always-on mode (24/7, pauses auto-stop Lambda)"
+    echo "  schedule   - Disable always-on mode (idle auto-stop resumes)"
+    echo ""
+    echo "Live dev (local rsync + nodemon/Vite on staging — not production):"
+    echo "  yarn staging:live       - sync and watch for changes"
+    echo "  yarn staging:live:off   - restore ECR images"
     echo "  help       - Show this help message"
     echo ""
     echo "Examples:"

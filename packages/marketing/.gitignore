@@ -1,0 +1,46 @@
+# Local secrets (copy from wp-config.php.example)
+wp-config.php
+wordpress/wp-config.php
+
+# WordPress core — provided by the official Docker image at runtime
+wordpress/wp-admin/
+wordpress/wp-includes/
+wordpress/*.php
+wordpress/license.txt
+wordpress/readme.html
+wordpress/xmlrpc.php
+
+# Runtime / generated under wp-content
+wordpress/wp-content/uploads/
+wordpress/wp-content/upgrade/
+wordpress/wp-content/cache/
+wordpress/wp-content/jetpack-waf/
+wordpress/wp-content/debug.log
+wordpress/wp-content/advanced-cache.php
+wordpress/wp-content/object-cache.php
+wordpress/wp-content/wflogs/
+wordpress/wp-content/backup-db/
+wordpress/wp-content/backups/
+
+# Third-party plugins (install on server or via Bitnami marketplace)
+wordpress/wp-content/plugins/*
+!wordpress/wp-content/plugins/myphonefriend-stripe-method/
+
+# Third-party themes
+wordpress/wp-content/themes/*
+!wordpress/wp-content/themes/bianca-wellness/
+
+# SES mu-plugin with credentials (use .example + server wp-config instead)
+wordpress/wp-content/mu-plugins/aws-ses-smtp.php
+
+# Database dumps and local init SQL
+db/
+*.sql
+*.sql.gz
+
+# Legacy local terraform state from wp-dev (infra is in packages/backend/devops/terraform-marketing-wordpress)
+terraform/
+.terraform/
+
+# OS / editor
+.DS_Store

@@ -64,6 +64,92 @@ type SentimentTimeRange = "lastCall" | "month" | "lifetime"
 type AnalysisTab = "medical" | "sentiment" | "security"
 type MainTab = "overview" | "analysis" | "conversations"
 
+type EmergencyContactDraft = {
+  id?: string
+  name: string
+  relationship: string
+  phone: string
+  email: string
+}
+
+type FamilyDigestRecipientDraft = {
+  id?: string
+  name: string
+  relationship: string
+  email: string
+  familyDigestEnabled: boolean
+}
+
+const emptyEmergencyContact = (): EmergencyContactDraft => ({
+  name: "",
+  relationship: "",
+  phone: "",
+  email: "",
+})
+
+const emptyFamilyDigestRecipient = (): FamilyDigestRecipientDraft => ({
+  name: "",
+  relationship: "",
+  email: "",
+  familyDigestEnabled: false,
+})
+
+function isFamilyDigestRecipientVerified(recipient: {
+  email?: string
+  familyDigestEmail?: { verifiedAt?: string | null; verifiedEmail?: string | null }
+}): boolean {
+  const email = recipient.email?.trim().toLowerCase()
+  const fd = recipient.familyDigestEmail
+  if (!email || !fd?.verifiedAt || !fd.verifiedEmail) return false
+  return fd.verifiedEmail.trim().toLowerCase() === email
+}
+
+function emergencyContactsFromClient(c: Client): EmergencyContactDraft[] {
+  if (c.emergencyContacts?.length) {
+    return c.emergencyContacts.map((entry) => ({
+      id: entry.id ? String(entry.id) : undefined,
+      name: entry.name || "",
+      relationship: entry.relationship || "",
+      phone: entry.phone || "",
+      email: entry.email || "",
+    }))
+  }
+  if (c.emergencyContact) {
+    return [
+      {
+        name: c.emergencyContact.name || "",
+        relationship: c.emergencyContact.relationship || "",
+        phone: c.emergencyContact.phone || "",
+        email: c.emergencyContact.email || "",
+      },
+    ]
+  }
+  return [emptyEmergencyContact()]
+}
+
+function familyDigestRecipientsFromClient(c: Client): FamilyDigestRecipientDraft[] {
+  if (c.familyDigestRecipients?.length) {
+    return c.familyDigestRecipients.map((entry) => ({
+      id: entry.id ? String(entry.id) : undefined,
+      name: entry.name || "",
+      relationship: entry.relationship || "",
+      email: entry.email || "",
+      familyDigestEnabled: entry.familyDigestEmail?.enabled === true,
+    }))
+  }
+  if (c.emergencyContact?.email || c.emergencyContact?.familyDigestEmail?.enabled) {
+    return [
+      {
+        name: c.emergencyContact.name || "",
+        relationship: c.emergencyContact.relationship || "",
+        email: c.emergencyContact.email || "",
+        familyDigestEnabled: c.emergencyContact.familyDigestEmail?.enabled === true,
+      },
+    ]
+  }
+  return [emptyFamilyDigestRecipient()]
+}
+
 export function ResidentDetailPage() {
   const { t, i18n } = useTranslation()
   const { residentId } = useParams()
@@ -84,11 +170,10 @@ export function ResidentDetailPage() {
   const [residentLanguage, setResidentLanguage] = useState("en")
   const [residentRoom, setResidentRoom] = useState("")
   const [residentMoveInDate, setResidentMoveInDate] = useState("")
-  const [emergencyName, setEmergencyName] = useState("")
-  const [emergencyRelationship, setEmergencyRelationship] = useState("")
-  const [emergencyPhone, setEmergencyPhone] = useState("")
-  const [emergencyEmail, setEmergencyEmail] = useState("")
-  const [familyDigestEmailEnabled, setFamilyDigestEmailEnabled] = useState(false)
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContactDraft[]>([emptyEmergencyContact()])
+  const [familyDigestRecipients, setFamilyDigestRecipients] = useState<FamilyDigestRecipientDraft[]>([
+    emptyFamilyDigestRecipient(),
+  ])
   const [residentAvatarFile, setResidentAvatarFile] = useState<File | null>(null)
   const [scheduleError, setScheduleError] = useState("")
   const [scheduleNotice, setScheduleNotice] = useState("")
@@ -110,6 +195,7 @@ export function ResidentDetailPage() {
   const [scheduleDeleteConfirmId, setScheduleDeleteConfirmId] = useState<string | null>(null)
   const [familyDigestVerificationNotice, setFamilyDigestVerificationNotice] = useState("")
   const [familyDigestVerificationError, setFamilyDigestVerificationError] = useState("")
+  const [familyDigestVerificationTargetId, setFamilyDigestVerificationTargetId] = useState<string | null>(null)
 
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const user = useAppSelector(getCurrentUser)
@@ -168,11 +254,25 @@ export function ResidentDetailPage() {
   } = useGetMedicalAnalysisResultsQuery(clientIdForApi ? { clientId: clientIdForApi, limit: 1 } : skipToken)
 
   const resident = useMemo(() => (apiClient ? mapClientToResident(apiClient) : null), [apiClient])
-  const familyDigestEmailVerified = useMemo(() => {
-    const contactEmail = apiClient?.emergencyContact?.email?.trim().toLowerCase()
-    const fd = apiClient?.emergencyContact?.familyDigestEmail
-    if (!contactEmail || !fd?.verifiedAt || !fd.verifiedEmail) return false
-    return fd.verifiedEmail.trim().toLowerCase() === contactEmail
+  const displayEmergencyContacts = useMemo(
+    () => (apiClient ? emergencyContactsFromClient(apiClient) : []),
+    [apiClient],
+  )
+  const displayFamilyDigestRecipients = useMemo(() => {
+    if (!apiClient) return []
+    if (apiClient.familyDigestRecipients?.length) return apiClient.familyDigestRecipients
+    if (apiClient.emergencyContact?.email || apiClient.emergencyContact?.familyDigestEmail?.enabled) {
+      return [
+        {
+          id: null,
+          name: apiClient.emergencyContact.name,
+          relationship: apiClient.emergencyContact.relationship,
+          email: apiClient.emergencyContact.email,
+          familyDigestEmail: apiClient.emergencyContact.familyDigestEmail,
+        },
+      ]
+    }
+    return []
   }, [apiClient])
   const residentMissing =
     !!clientFetchError &&
@@ -201,11 +301,8 @@ export function ResidentDetailPage() {
     setResidentLanguage(apiClient.preferredLanguage || "en")
     setResidentRoom(apiClient.room || "")
     setResidentMoveInDate(toDateInputValue(apiClient.moveInDate))
-    setEmergencyName(apiClient.emergencyContact?.name || "")
-    setEmergencyRelationship(apiClient.emergencyContact?.relationship || "")
-    setEmergencyPhone(apiClient.emergencyContact?.phone || "")
-    setEmergencyEmail(apiClient.emergencyContact?.email || "")
-    setFamilyDigestEmailEnabled(apiClient.emergencyContact?.familyDigestEmail?.enabled === true)
+    setEmergencyContacts(emergencyContactsFromClient(apiClient))
+    setFamilyDigestRecipients(familyDigestRecipientsFromClient(apiClient))
   }, [apiClient])
 
   const clientAlert = useMemo(
@@ -391,15 +488,18 @@ export function ResidentDetailPage() {
     return true
   }
 
-  const handleSendFamilyDigestVerification = async () => {
+  const handleSendFamilyDigestVerification = async (recipientId?: string) => {
     if (!apiClient?.id) return
     setFamilyDigestVerificationNotice("")
     setFamilyDigestVerificationError("")
+    setFamilyDigestVerificationTargetId(recipientId || null)
     try {
-      const res = await sendFamilyDigestVerification({ clientId: apiClient.id }).unwrap()
+      const res = await sendFamilyDigestVerification({ clientId: apiClient.id, recipientId }).unwrap()
       setFamilyDigestVerificationNotice(res.message || t("residentDetail.familyDigestEmailVerificationSent"))
     } catch {
       setFamilyDigestVerificationError(t("residentDetail.familyDigestEmailVerificationFailed"))
+    } finally {
+      setFamilyDigestVerificationTargetId(null)
     }
   }
 
@@ -421,13 +521,20 @@ export function ResidentDetailPage() {
           preferredLanguage: residentLanguage || "en",
           room: residentRoom.trim() || "",
           moveInDate: residentMoveInDate || undefined,
-          emergencyContact: {
-            name: emergencyName.trim(),
-            relationship: emergencyRelationship.trim(),
-            phone: emergencyPhone.trim(),
-            email: emergencyEmail.trim().toLowerCase(),
-            familyDigestEmail: { enabled: familyDigestEmailEnabled },
-          },
+          emergencyContacts: emergencyContacts.map((entry) => ({
+            ...(entry.id ? { id: entry.id } : {}),
+            name: entry.name.trim(),
+            relationship: entry.relationship.trim(),
+            phone: entry.phone.trim(),
+            email: entry.email.trim().toLowerCase(),
+          })),
+          familyDigestRecipients: familyDigestRecipients.map((entry) => ({
+            ...(entry.id ? { id: entry.id } : {}),
+            name: entry.name.trim(),
+            relationship: entry.relationship.trim(),
+            email: entry.email.trim().toLowerCase(),
+            familyDigestEmail: { enabled: entry.familyDigestEnabled },
+          })),
         },
       }).unwrap()
       if (residentAvatarFile) {
@@ -748,90 +855,211 @@ export function ResidentDetailPage() {
               value={residentMoveInDate}
               onChange={(e) => setResidentMoveInDate(e.target.value)}
             />
-            <AuthTextField
-              label={t("residentDetail.emergencyName")}
-              type="text"
-              value={emergencyName}
-              onChange={(e) => setEmergencyName(e.target.value)}
-            />
-            <AuthTextField
-              label={t("residentDetail.emergencyRelationship")}
-              type="text"
-              value={emergencyRelationship}
-              onChange={(e) => setEmergencyRelationship(e.target.value)}
-            />
-            <AuthTextField
-              label={t("residentDetail.emergencyPhone")}
-              type="tel"
-              value={emergencyPhone}
-              onChange={(e) => setEmergencyPhone(e.target.value)}
-            />
-            <AuthTextField
-              label={t("residentDetail.emergencyEmail")}
-              type="email"
-              value={emergencyEmail}
-              onChange={(e) => setEmergencyEmail(e.target.value)}
-            />
-            <label
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                fontSize: "0.875rem",
-                color: "var(--va-slate-700)",
-              }}
-            >
-              <span style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  data-testid="resident-family-digest-email-enabled"
-                  checked={familyDigestEmailEnabled}
-                  onChange={(e) => setFamilyDigestEmailEnabled(e.target.checked)}
-                  style={{ marginTop: 3 }}
-                />
-                {t("residentDetail.familyDigestEmailEnabled")}
-              </span>
-              <span style={{ fontSize: "0.75rem", color: "var(--va-slate-500)", lineHeight: 1.45 }}>
-                {t("residentDetail.familyDigestEmailEnabledHelp")}
-              </span>
-            </label>
-            {canManageResidents ? (
-              <div
-                data-testid="resident-family-digest-verification"
-                style={{ display: "grid", gap: 8, fontSize: "0.8125rem", color: "var(--va-slate-700)" }}
-              >
-                <p style={{ margin: 0 }}>
-                  {emergencyEmail.trim()
-                    ? familyDigestEmailVerified
-                      ? t("residentDetail.familyDigestEmailVerified")
-                      : t("residentDetail.familyDigestEmailUnverified")
-                    : t("residentDetail.familyDigestEmailNoAddress")}
-                </p>
-                {emergencyEmail.trim() && !familyDigestEmailVerified ? (
-                  <button
-                    type="button"
-                    className="va-btn-secondary"
-                    data-testid="resident-send-family-digest-verification"
-                    disabled={sendingFamilyDigestVerification}
-                    onClick={() => void handleSendFamilyDigestVerification()}
-                  >
-                    {sendingFamilyDigestVerification
-                      ? t("residentDetail.familyDigestEmailSendingVerification")
-                      : t("residentDetail.familyDigestEmailSendVerification")}
-                  </button>
-                ) : null}
-                {familyDigestVerificationNotice ? (
-                  <p data-testid="resident-family-digest-verification-success" style={{ margin: 0, color: "var(--va-emerald-700)" }}>
-                    {familyDigestVerificationNotice}
-                  </p>
-                ) : null}
-                {familyDigestVerificationError ? (
-                  <p data-testid="resident-family-digest-verification-error" style={{ margin: 0, color: "var(--va-red-600)" }}>
-                    {familyDigestVerificationError}
-                  </p>
-                ) : null}
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <h3 style={{ margin: 0, fontSize: "0.9375rem", fontWeight: 600 }}>{t("residentDetail.emergencyContactsTitle")}</h3>
+                <button
+                  type="button"
+                  className="va-btn-secondary"
+                  onClick={() => setEmergencyContacts((rows) => [...rows, emptyEmergencyContact()])}
+                >
+                  {t("residentDetail.addEmergencyContact")}
+                </button>
               </div>
-            ) : null}
+              {emergencyContacts.map((entry, index) => (
+                <div
+                  key={entry.id || `emergency-${index}`}
+                  style={{ display: "grid", gap: 10, padding: 12, border: "1px solid var(--va-slate-200)", borderRadius: 8 }}
+                >
+                  <AuthTextField
+                    label={t("residentDetail.emergencyName")}
+                    type="text"
+                    value={entry.name}
+                    onChange={(e) =>
+                      setEmergencyContacts((rows) =>
+                        rows.map((row, rowIndex) => (rowIndex === index ? { ...row, name: e.target.value } : row)),
+                      )
+                    }
+                  />
+                  <AuthTextField
+                    label={t("residentDetail.emergencyRelationship")}
+                    type="text"
+                    value={entry.relationship}
+                    onChange={(e) =>
+                      setEmergencyContacts((rows) =>
+                        rows.map((row, rowIndex) => (rowIndex === index ? { ...row, relationship: e.target.value } : row)),
+                      )
+                    }
+                  />
+                  <AuthTextField
+                    label={t("residentDetail.emergencyPhone")}
+                    type="tel"
+                    value={entry.phone}
+                    onChange={(e) =>
+                      setEmergencyContacts((rows) =>
+                        rows.map((row, rowIndex) => (rowIndex === index ? { ...row, phone: e.target.value } : row)),
+                      )
+                    }
+                  />
+                  <AuthTextField
+                    label={t("residentDetail.emergencyEmail")}
+                    type="email"
+                    value={entry.email}
+                    onChange={(e) =>
+                      setEmergencyContacts((rows) =>
+                        rows.map((row, rowIndex) => (rowIndex === index ? { ...row, email: e.target.value } : row)),
+                      )
+                    }
+                  />
+                  {emergencyContacts.length > 1 ? (
+                    <button
+                      type="button"
+                      className="va-link"
+                      style={{ justifySelf: "start", border: "none", background: "none", cursor: "pointer", padding: 0 }}
+                      onClick={() => setEmergencyContacts((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}
+                    >
+                      {t("residentDetail.removeContact")}
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "0.9375rem", fontWeight: 600 }}>{t("residentDetail.familyDigestRecipientsTitle")}</h3>
+                <p style={{ margin: "6px 0 0", fontSize: "0.75rem", color: "var(--va-slate-500)", lineHeight: 1.45 }}>
+                  {t("residentDetail.familyDigestRecipientsHelp")}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="va-btn-secondary"
+                style={{ justifySelf: "start" }}
+                onClick={() => setFamilyDigestRecipients((rows) => [...rows, emptyFamilyDigestRecipient()])}
+              >
+                {t("residentDetail.addFamilyDigestRecipient")}
+              </button>
+              {familyDigestRecipients.map((entry, index) => {
+                const savedRecipient = displayFamilyDigestRecipients.find(
+                  (row) => (row.id ? String(row.id) : undefined) === entry.id,
+                )
+                const verified = savedRecipient ? isFamilyDigestRecipientVerified(savedRecipient) : false
+                const verifyingThis =
+                  sendingFamilyDigestVerification &&
+                  familyDigestVerificationTargetId === (entry.id || `draft-${index}`)
+                return (
+                  <div
+                    key={entry.id || `family-${index}`}
+                    style={{ display: "grid", gap: 10, padding: 12, border: "1px solid var(--va-slate-200)", borderRadius: 8 }}
+                  >
+                    <AuthTextField
+                      label={t("residentDetail.familyDigestRecipientName")}
+                      type="text"
+                      value={entry.name}
+                      onChange={(e) =>
+                        setFamilyDigestRecipients((rows) =>
+                          rows.map((row, rowIndex) => (rowIndex === index ? { ...row, name: e.target.value } : row)),
+                        )
+                      }
+                    />
+                    <AuthTextField
+                      label={t("residentDetail.familyDigestRecipientRelationship")}
+                      type="text"
+                      value={entry.relationship}
+                      onChange={(e) =>
+                        setFamilyDigestRecipients((rows) =>
+                          rows.map((row, rowIndex) => (rowIndex === index ? { ...row, relationship: e.target.value } : row)),
+                        )
+                      }
+                    />
+                    <AuthTextField
+                      label={t("residentDetail.familyDigestRecipientEmail")}
+                      type="email"
+                      value={entry.email}
+                      onChange={(e) =>
+                        setFamilyDigestRecipients((rows) =>
+                          rows.map((row, rowIndex) => (rowIndex === index ? { ...row, email: e.target.value } : row)),
+                        )
+                      }
+                    />
+                    <label
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 6,
+                        fontSize: "0.875rem",
+                        color: "var(--va-slate-700)",
+                      }}
+                    >
+                      <span style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          data-testid={index === 0 ? "resident-family-digest-email-enabled" : undefined}
+                          checked={entry.familyDigestEnabled}
+                          onChange={(e) =>
+                            setFamilyDigestRecipients((rows) =>
+                              rows.map((row, rowIndex) =>
+                                rowIndex === index ? { ...row, familyDigestEnabled: e.target.checked } : row,
+                              ),
+                            )
+                          }
+                          style={{ marginTop: 3 }}
+                        />
+                        {t("residentDetail.familyDigestEmailEnabled")}
+                      </span>
+                    </label>
+                    {canManageResidents && entry.id ? (
+                      <div style={{ display: "grid", gap: 8, fontSize: "0.8125rem", color: "var(--va-slate-700)" }}>
+                        <p style={{ margin: 0 }}>
+                          {entry.email.trim()
+                            ? verified
+                              ? t("residentDetail.familyDigestEmailVerified")
+                              : t("residentDetail.familyDigestEmailUnverified")
+                            : t("residentDetail.familyDigestEmailNoAddress")}
+                        </p>
+                        {entry.email.trim() && !verified ? (
+                          <button
+                            type="button"
+                            className="va-btn-secondary"
+                            data-testid={index === 0 ? "resident-send-family-digest-verification" : undefined}
+                            disabled={sendingFamilyDigestVerification}
+                            onClick={() => void handleSendFamilyDigestVerification(entry.id)}
+                          >
+                            {verifyingThis
+                              ? t("residentDetail.familyDigestEmailSendingVerification")
+                              : t("residentDetail.familyDigestEmailSendVerification")}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    {familyDigestRecipients.length > 1 ? (
+                      <button
+                        type="button"
+                        className="va-link"
+                        style={{ justifySelf: "start", border: "none", background: "none", cursor: "pointer", padding: 0 }}
+                        onClick={() => setFamilyDigestRecipients((rows) => rows.filter((_, rowIndex) => rowIndex !== index))}
+                      >
+                        {t("residentDetail.removeContact")}
+                      </button>
+                    ) : null}
+                  </div>
+                )
+              })}
+              {canManageResidents && (familyDigestVerificationNotice || familyDigestVerificationError) ? (
+                <div data-testid="resident-family-digest-verification" style={{ display: "grid", gap: 8, fontSize: "0.8125rem" }}>
+                  {familyDigestVerificationNotice ? (
+                    <p data-testid="resident-family-digest-verification-success" style={{ margin: 0, color: "var(--va-emerald-700)" }}>
+                      {familyDigestVerificationNotice}
+                    </p>
+                  ) : null}
+                  {familyDigestVerificationError ? (
+                    <p data-testid="resident-family-digest-verification-error" style={{ margin: 0, color: "var(--va-red-600)" }}>
+                      {familyDigestVerificationError}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
             <AuthTextAreaField
               label={t("residentDetail.notes")}
               value={residentNotes}
@@ -1034,60 +1262,93 @@ export function ResidentDetailPage() {
               icon={<MessageIcon size={16} />}
               label={t("residentDetail.labelEmergency")}
               value={
-                <>
-                  {resident.emergencyContact.name} ({resident.emergencyContact.relationship})
-                  <br />
-                  {resident.emergencyContact.phone}
-                  {apiClient.emergencyContact?.email ? (
-                    <>
-                      <br />
-                      {apiClient.emergencyContact.email}
-                    </>
-                  ) : null}
-                  <br />
-                  {apiClient.emergencyContact?.familyDigestEmail?.enabled
-                    ? t("residentDetail.familyDigestEmailStatusOn")
-                    : t("residentDetail.familyDigestEmailStatusOff")}
-                  <br />
-                  {apiClient.emergencyContact?.email
-                    ? familyDigestEmailVerified
-                      ? t("residentDetail.familyDigestEmailVerified")
-                      : t("residentDetail.familyDigestEmailUnverified")
-                    : t("residentDetail.familyDigestEmailNoAddress")}
-                  {canManageResidents && apiClient.emergencyContact?.email && !familyDigestEmailVerified ? (
-                    <>
-                      <br />
-                      <button
-                        type="button"
-                        className="va-link"
-                        data-testid="resident-send-family-digest-verification"
-                        style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
-                        disabled={sendingFamilyDigestVerification}
-                        onClick={() => void handleSendFamilyDigestVerification()}
-                      >
-                        {sendingFamilyDigestVerification
-                          ? t("residentDetail.familyDigestEmailSendingVerification")
-                          : t("residentDetail.familyDigestEmailSendVerification")}
-                      </button>
-                    </>
-                  ) : null}
-                  {familyDigestVerificationNotice ? (
-                    <>
-                      <br />
-                      <span data-testid="resident-family-digest-verification-success" style={{ color: "var(--va-emerald-700)" }}>
-                        {familyDigestVerificationNotice}
-                      </span>
-                    </>
-                  ) : null}
-                  {familyDigestVerificationError ? (
-                    <>
-                      <br />
-                      <span data-testid="resident-family-digest-verification-error" style={{ color: "var(--va-red-600)" }}>
-                        {familyDigestVerificationError}
-                      </span>
-                    </>
-                  ) : null}
-                </>
+                displayEmergencyContacts.length > 0 ? (
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {displayEmergencyContacts.map((entry, index) => (
+                      <div key={entry.id || `view-emergency-${index}`}>
+                        {(entry.name || "—") + (entry.relationship ? ` (${entry.relationship})` : "")}
+                        <br />
+                        {entry.phone || "—"}
+                        {entry.email ? (
+                          <>
+                            <br />
+                            {entry.email}
+                          </>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  "—"
+                )
+              }
+            />
+            <InfoRow
+              icon={<MessageIcon size={16} />}
+              label={t("residentDetail.familyDigestRecipientsTitle")}
+              value={
+                displayFamilyDigestRecipients.length > 0 ? (
+                  <div style={{ display: "grid", gap: 16 }}>
+                    {displayFamilyDigestRecipients.map((recipient, index) => {
+                      const verified = isFamilyDigestRecipientVerified(recipient)
+                      const recipientId = recipient.id ? String(recipient.id) : undefined
+                      const verifyingThis =
+                        sendingFamilyDigestVerification && familyDigestVerificationTargetId === recipientId
+                      return (
+                        <div key={recipientId || `view-family-${index}`}>
+                          {(recipient.name || "—") + (recipient.relationship ? ` (${recipient.relationship})` : "")}
+                          <br />
+                          {recipient.email || "—"}
+                          <br />
+                          {recipient.familyDigestEmail?.enabled
+                            ? t("residentDetail.familyDigestEmailStatusOn")
+                            : t("residentDetail.familyDigestEmailStatusOff")}
+                          <br />
+                          {recipient.email
+                            ? verified
+                              ? t("residentDetail.familyDigestEmailVerified")
+                              : t("residentDetail.familyDigestEmailUnverified")
+                            : t("residentDetail.familyDigestEmailNoAddress")}
+                          {canManageResidents && recipient.email && !verified && recipientId ? (
+                            <>
+                              <br />
+                              <button
+                                type="button"
+                                className="va-link"
+                                data-testid={index === 0 ? "resident-send-family-digest-verification" : undefined}
+                                style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
+                                disabled={sendingFamilyDigestVerification}
+                                onClick={() => void handleSendFamilyDigestVerification(recipientId)}
+                              >
+                                {verifyingThis
+                                  ? t("residentDetail.familyDigestEmailSendingVerification")
+                                  : t("residentDetail.familyDigestEmailSendVerification")}
+                              </button>
+                            </>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                    {familyDigestVerificationNotice ? (
+                      <>
+                        <br />
+                        <span data-testid="resident-family-digest-verification-success" style={{ color: "var(--va-emerald-700)" }}>
+                          {familyDigestVerificationNotice}
+                        </span>
+                      </>
+                    ) : null}
+                    {familyDigestVerificationError ? (
+                      <>
+                        <br />
+                        <span data-testid="resident-family-digest-verification-error" style={{ color: "var(--va-red-600)" }}>
+                          {familyDigestVerificationError}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                ) : (
+                  t("residentDetail.familyDigestRecipientsEmpty")
+                )
               }
             />
             <InfoRow icon={<MessageIcon size={16} />} label={t("residentDetail.notes")} value={apiClient.notes || "—"} />
@@ -1896,7 +2157,7 @@ function InfoRow({
       <span style={{ marginTop: 2, color: "var(--va-slate-400)" }}>{icon}</span>
       <div>
         <p style={{ fontSize: "0.75rem", color: "var(--va-slate-400)", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 500 }}>{label}</p>
-        <p style={{ fontSize: "0.875rem", color: "var(--va-navy)", marginTop: 4 }}>{value}</p>
+        <div style={{ fontSize: "0.875rem", color: "var(--va-navy)", marginTop: 4 }}>{value}</div>
       </div>
     </div>
   )

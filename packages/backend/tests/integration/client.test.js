@@ -320,6 +320,74 @@ describe('Client routes', () => {
       expect(res.body).toHaveProperty('schedules');
     });
 
+    test('should accept emergencyContacts and familyDigestRecipients on PATCH', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
+      const [client] = await insertClientsWithOrg([{ ...clientOne, email: 'contacts-patch@example.org' }], org._id);
+
+      const res = await request(app)
+        .patch(`/v1/clients/${client.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          emergencyContacts: [
+            { name: 'Bob', relationship: 'Son', phone: '+16045550101', email: 'bob@test.com' },
+          ],
+          familyDigestRecipients: [
+            {
+              name: 'Sarah',
+              relationship: 'daughter',
+              email: 'family@test.com',
+              familyDigestEmail: { enabled: true },
+            },
+          ],
+        })
+        .expect(httpStatus.OK);
+
+      expect(res.body.emergencyContacts).toHaveLength(1);
+      expect(res.body.emergencyContacts[0]).toMatchObject({
+        name: 'Bob',
+        relationship: 'Son',
+        phone: '+16045550101',
+        email: 'bob@test.com',
+      });
+      expect(res.body.familyDigestRecipients).toHaveLength(1);
+      expect(res.body.familyDigestRecipients[0]).toMatchObject({
+        name: 'Sarah',
+        relationship: 'daughter',
+        email: 'family@test.com',
+        familyDigestEmail: expect.objectContaining({ enabled: true }),
+      });
+    });
+
+    test('should return emergencyContacts and familyDigestRecipients on GET after PATCH', async () => {
+      const [org] = await insertOrgs([orgOne]);
+      const { accessToken } = await insertCaregivertoOrgAndReturnTokenByRole(org, 'orgAdmin');
+      const [client] = await insertClientsWithOrg([{ ...clientOne, email: 'contacts-get@example.org' }], org._id);
+
+      await request(app)
+        .patch(`/v1/clients/${client.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .send({
+          familyDigestRecipients: [
+            {
+              name: 'Sarah',
+              relationship: 'daughter',
+              email: 'family@test.com',
+              familyDigestEmail: { enabled: true },
+            },
+          ],
+        })
+        .expect(httpStatus.OK);
+
+      const res = await request(app)
+        .get(`/v1/clients/${client.id}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(httpStatus.OK);
+
+      expect(res.body.familyDigestRecipients).toHaveLength(1);
+      expect(res.body.familyDigestRecipients[0].email).toBe('family@test.com');
+    });
+
     describe('Phone number validation in client updates', () => {
       let org, caregiver, accessToken, client;
 

@@ -14,13 +14,19 @@
   },
   "resolutions": {
     "afinn-165": "1.0.4",
-    "uuid": "7.0.3"
+    "uuid": "7.0.3",
+    "metro": "0.80.12",
+    "metro-config": "0.80.12",
+    "metro-resolver": "0.80.12"
   },
   "scripts": {
     "dev": "bash scripts/dev-web.sh",
     "dev:safe": "bash scripts/check-ports.sh && yarn workspace @bianca-app/backend dev & yarn workspace @bianca-app/mobile web",
     "dev:backend": "yarn workspace @bianca-app/backend dev",
     "dev:mobile": "yarn workspace @bianca-app/mobile web",
+    "dev:mobile:local": "bash scripts/dev-mobile-local.sh",
+    "seed": "yarn workspace @bianca-app/backend seed",
+    "seed:local": "curl -sf -X POST http://localhost:3000/v1/test/seed && echo ' Database seeded.' || yarn seed",
     "dev:web": "bash scripts/dev-web.sh",
     "dev:admin": "yarn workspace @bianca-app/admin dev",
     "dev:observability": "yarn workspace @bianca-app/backend docker:observability",
@@ -47,7 +53,14 @@
     "demo:deploy": "yarn workspace @bianca-app/backend demo:deploy",
     "staging:up": "bash packages/backend/scripts/staging-control.sh start",
     "staging:down": "bash packages/backend/scripts/staging-control.sh stop",
-    "staging:status": "bash packages/backend/scripts/staging-control.sh status"
+    "staging:status": "bash packages/backend/scripts/staging-control.sh status",
+    "staging:always-on": "bash packages/backend/scripts/staging-control.sh always-on",
+    "staging:live": "bash packages/backend/scripts/staging-live-sync.sh --watch",
+    "staging:live:sync": "bash packages/backend/scripts/staging-live-sync.sh --sync",
+    "staging:live:off": "bash packages/backend/scripts/staging-live-sync.sh --off",
+    "marketing:up": "docker compose -f packages/marketing/docker-compose.yml up -d",
+    "marketing:down": "docker compose -f packages/marketing/docker-compose.yml down",
+    "marketing:deploy": "bash packages/marketing/scripts/deploy-to-lightsail.sh"
   },
   "packageManager": "yarn@4.16.0"
 }

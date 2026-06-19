@@ -1,5 +1,5 @@
 """
-Post-pipeline email via SNS when staging or production CodePipeline finishes.
+Post-pipeline email via SNS when production CodePipeline finishes.
 Triggered by CodePipeline Pipeline Execution State Change (SUCCEEDED / FAILED).
 """
 import os
@@ -13,7 +13,6 @@ codepipeline = boto3.client("codepipeline")
 codebuild = boto3.client("codebuild")
 
 PIPELINE_ENV = {
-    "bianca-staging-pipeline": "staging",
     "bianca-production-pipeline": "production",
 }
 

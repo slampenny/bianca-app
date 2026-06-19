@@ -1,0 +1,24 @@
+# Staging live-dev Vite server (monorepo web + shared + ui). Not used in production.
+FROM public.ecr.aws/docker/library/node:20-alpine
+
+WORKDIR /app
+
+RUN corepack enable
+
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn ./.yarn
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
+COPY packages/web/package.json ./packages/web/package.json
+
+RUN yarn install --immutable 2>/dev/null || yarn install
+
+COPY packages/shared ./packages/shared
+COPY packages/ui ./packages/ui
+COPY packages/web ./packages/web
+
+WORKDIR /app/packages/web
+
+EXPOSE 5173
+
+CMD ["yarn", "dev", "--host", "0.0.0.0", "--port", "5173"]

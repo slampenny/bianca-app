@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from "react"
 import { View, StyleSheet, Animated, Platform } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useSelector } from "react-redux"
-import { Button, Text, Screen } from "app/components"
+import { Button, Text, AuthScreenLayout } from "app/components"
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "app/i18n"
 import { isAuthenticated } from "app/store/authSlice"
@@ -51,11 +51,9 @@ export function OnboardingHowBiancaWorksScreen({
 
   if (themeLoading) {
     return (
-      <Screen style={[styles.screen, { backgroundColor: colors.palette?.biancaBackground }]}>
-        <View style={styles.centered}>
-          <Text>{translate("common.loading")}</Text>
-        </View>
-      </Screen>
+      <AuthScreenLayout testID="onboarding-how-it-works-screen">
+        <Text>{translate("common.loading")}</Text>
+      </AuthScreenLayout>
     )
   }
 
@@ -76,32 +74,22 @@ export function OnboardingHowBiancaWorksScreen({
   }
 
   return (
-    <Screen
-      testID="onboarding-how-it-works-screen"
-      style={[styles.screen, { backgroundColor: colors.palette?.biancaBackground }]}
-      preset="fixed"
-      contentContainerStyle={styles.centeredContent}
-    >
-      <View style={[styles.container, styles.contentWrapper]}>
-        <View style={styles.contentBlock}>
-          <Animated.Text style={[stylesWithColors.title, { opacity: titleOpacity }]}>
-            {translate("onboarding.howItWorks.title")}
-          </Animated.Text>
-          <Animated.Text style={[stylesWithColors.body, { opacity: bodyOpacity }]}>
-            {translate(copyKey as import("../i18n").TxKeyPath)}
-          </Animated.Text>
-          <Animated.View style={[styles.footer, { opacity: buttonOpacity }]}>
-            <Button
-              testID="onboarding-how-it-works-next"
-              text={buttonLabel}
-              preset="primary"
-              onPress={handleGetStarted}
-              style={stylesWithColors.primaryButton}
-            />
-          </Animated.View>
-        </View>
-      </View>
-    </Screen>
+    <AuthScreenLayout testID="onboarding-how-it-works-screen" accessibilityLabel="onboarding-how-it-works-screen">
+      <Animated.Text style={[stylesWithColors.title, { opacity: titleOpacity }]}>
+        {translate("onboarding.howItWorks.title")}
+      </Animated.Text>
+      <Animated.Text style={[stylesWithColors.body, { opacity: bodyOpacity }]}>
+        {translate(copyKey as import("../i18n").TxKeyPath)}
+      </Animated.Text>
+      <Animated.View style={{ opacity: buttonOpacity, marginTop: 28 }}>
+        <Button
+          testID="onboarding-how-it-works-next"
+          text={buttonLabel}
+          preset="primary"
+          onPress={handleGetStarted}
+        />
+      </Animated.View>
+    </AuthScreenLayout>
   )
 }
 

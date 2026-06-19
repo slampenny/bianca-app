@@ -64,6 +64,17 @@ const playwrightTestUser = {
   onboardingComplete: true,
 };
 
+/** B2C mobile dev / family viewer — separate org from facility staff (fake@example.org). */
+const familyParent = {
+  name: 'Alex Parent',
+  email: 'parent@example.org',
+  phone: '+16045624265',
+  role: 'orgAdmin',
+  clients: [],
+  onboardingComplete: true,
+  persona: 'caregiver',
+};
+
 const insertCaregivers = async (caregivers, org = null) => {
   // If no org provided, create a default org for test caregivers
   let testOrg = org;
@@ -140,6 +151,7 @@ module.exports = {
   admin,
   superAdmin,
   playwrightTestUser,
+  familyParent,
   insertCaregivers,
   insertCaregiversAndAddToOrg,
   insertCaregivertoOrgAndReturnToken,

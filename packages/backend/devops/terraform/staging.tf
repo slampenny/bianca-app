@@ -744,7 +744,7 @@ resource "aws_iam_role_policy" "staging_lambda_policy" {
   })
 }
 
-# Lambda for auto-stop (saves money) — staging + demo EC2 when idle
+# Lambda for auto-stop (saves money) — staging EC2 when idle
 resource "aws_lambda_function" "staging_auto_stop" {
   filename         = data.archive_file.staging_auto_stop.output_path
   function_name    = "bianca-staging-auto-stop"
@@ -757,7 +757,7 @@ resource "aws_lambda_function" "staging_auto_stop" {
   environment {
     variables = {
       # Comma-separated EC2 Name tags; resolves newest running instance per tag (blue/green safe for staging).
-      INSTANCE_NAME_TAGS = "bianca-staging,bianca-demo"
+      INSTANCE_NAME_TAGS = "bianca-staging"
     }
   }
 

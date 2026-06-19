@@ -1,5 +1,31 @@
+jest.mock('../../../src/api/langChainAPI', () => ({
+  langChainAPI: {
+    summarizeConversation: jest.fn().mockResolvedValue('Resident reported taking medication this morning.'),
+  },
+}));
+
+jest.mock('../../../src/services/openai.sentiment.service', () => ({
+  getOpenAISentimentServiceInstance: jest.fn().mockReturnValue({
+    analyzeSentiment: jest.fn().mockResolvedValue({
+      success: true,
+      data: {
+        overallSentiment: 'positive',
+        sentimentScore: 0.4,
+        confidence: 0.85,
+        summary: 'Generally positive',
+        keyEmotions: ['calm'],
+      },
+    }),
+  }),
+}));
+
+jest.mock('../../../src/utils/openaiSdk', () => ({
+  getOpenAIConstructor: jest.fn(),
+}));
+
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
+const { getOpenAIConstructor } = require('../../../src/utils/openaiSdk');
 const conversationService = require('../../../src/services/conversation.service');
 const { Conversation, Message, Client, Call, Org } = require('../../../src/models');
 
@@ -152,5 +178,92 @@ describe('conversationService', () => {
     await conversationService.createConversationForClient(client._id, call2._id);
     const conversations = await conversationService.getConversationsByClient(client._id);
     expect(conversations).toHaveLength(2);
+  });
+
+  it('buildEnhancedPrompt includes required call questions when org configures them', async () => {
+    const orgWithQuestions = await Org.create({
+      name: 'Question Org',
+      email: 'questions@test.com',
+      country: 'US',
+      requiredCallQuestions: {
+        enabled: true,
+        questions: [{ id: 'med', prompt: 'Have you taken your medication today?' }],
+      },
+    });
+    const client = await Client.create({
+      name: 'Resident',
+      email: 'resident@test.com',
+      phone: '+16045624264',
+      preferredLanguage: 'en',
+      org: orgWithQuestions._id,
+    });
+
+    const prompt = await conversationService.buildEnhancedPrompt(client._id.toString(), 'outbound');
+    expect(prompt).toContain('REQUIRED CARE TEAM QUESTIONS');
+    expect(prompt).toContain('med — Have you taken your medication today?');
+    expect(prompt).toContain('Question Org');
+  });
+
+  it('finalizeConversation stores required question answers in analyzedData', async () => {
+    const mockCreate = jest.fn().mockResolvedValue({
+      choices: [
+        {
+          message: {
+            content: '[{"questionId":"med","answer":"Yes, took them","asked":true}]',
+          },
+        },
+      ],
+    });
+    getOpenAIConstructor.mockReturnValue(
+      jest.fn().mockImplementation(() => ({
+        chat: { completions: { create: mockCreate } },
+      }))
+    );
+
+    const orgWithQuestions = await Org.create({
+      name: 'Capture Org',
+      email: 'capture@test.com',
+      country: 'US',
+      requiredCallQuestions: {
+        enabled: true,
+        questions: [{ id: 'med', prompt: 'Have you taken your medication today?' }],
+      },
+    });
+    const client = await Client.create({
+      name: 'Resident Two',
+      email: 'resident2@test.com',
+      phone: '+16045624265',
+      preferredLanguage: 'en',
+      org: orgWithQuestions._id,
+    });
+    const call = await Call.create({
+      clientId: client._id,
+      callSid: 'CA9999999999999999',
+      status: 'completed',
+      duration: 90,
+      startTime: new Date(),
+    });
+    const conversation = await conversationService.createConversationForClient(client._id, call._id);
+    await Message.create({
+      conversationId: conversation._id,
+      role: 'assistant',
+      content: 'Have you taken your medication today?',
+    });
+    await Message.create({
+      conversationId: conversation._id,
+      role: 'client',
+      content: 'Yes, I took them this morning.',
+    });
+
+    await conversationService.finalizeConversation(conversation._id.toString(), true);
+
+    const reloaded = await Conversation.findById(conversation._id).lean();
+    expect(reloaded.summary).toContain('medication');
+    expect(reloaded.analyzedData.requiredQuestions.answers[0]).toMatchObject({
+      questionId: 'med',
+      answer: 'Yes, took them',
+      asked: true,
+    });
+    expect(reloaded.analyzedData.sentiment.overallSentiment).toBe('positive');
   });
 });

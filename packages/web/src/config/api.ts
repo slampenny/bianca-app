@@ -22,7 +22,8 @@ export function getApiBaseUrl(): string {
   }
   const fromEnv = import.meta.env.VITE_API_URL
   if (typeof fromEnv === "string" && fromEnv.trim() !== "") {
-    return fromEnv.replace(/\/$/, "")
+    const base = fromEnv.trim().replace(/\/$/, "")
+    return base.endsWith("/v1") ? base : `${base}/v1`
   }
   return "http://localhost:3000/v1"
 }
