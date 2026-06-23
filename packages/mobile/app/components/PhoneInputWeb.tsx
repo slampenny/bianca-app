@@ -1,5 +1,6 @@
 import React, { useState, forwardRef, useRef, useEffect } from 'react'
 import { View, StyleSheet, TextInput, Platform } from 'react-native'
+import { formatPhoneNumber, validatePhoneNumber } from '@bianca-app/shared'
 import { colors, spacing, typography } from 'app/theme'
 import { useTheme } from 'app/theme/ThemeContext'
 import { translate } from 'app/i18n'
@@ -26,66 +27,6 @@ interface PhoneInputProps {
   containerStyle?: any
   inputWrapperStyle?: any
   onFocus?: () => void
-}
-
-// Format phone number to E.164 format (+1XXXXXXXXXX)
-const formatPhoneNumber = (value: string): string => {
-  if (!value) return ''
-  
-  // Remove all non-digit characters
-  const digits = value.replace(/\D/g, '')
-  
-  // If already in E.164 format (starts with +), return as-is
-  if (value.startsWith('+')) {
-    return value
-  }
-  
-  // Convert 10-digit US number to E.164 format
-  if (digits.length === 10) {
-    return `+1${digits}`
-  }
-  
-  // Convert 11-digit number starting with 1 to E.164 format
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return `+${digits}`
-  }
-  
-  // If it's already longer (international), add + if missing
-  if (digits.length > 11) {
-    return value.startsWith('+') ? value : `+${digits}`
-  }
-  
-  // Return as-is if we can't format (let backend handle validation)
-  return value
-}
-
-const validatePhoneNumber = (value: string): string | null => {
-  if (!value) return null
-  
-  // Remove all non-digit characters for validation
-  const digits = value.replace(/\D/g, '')
-  
-  // Accept E.164 format (+1XXXXXXXXXX) or 10-digit US numbers
-  if (value.startsWith('+')) {
-    // E.164 format: + followed by country code and number (10-15 digits total)
-    const e164Regex = /^\+[1-9]\d{9,14}$/
-    if (e164Regex.test(value)) {
-      return null // Valid
-    }
-    return 'Phone number must be in E.164 format (e.g., +1234567890)'
-  }
-  
-  // Accept 10-digit US numbers (will be converted to E.164)
-  if (digits.length === 10) {
-    return null // Valid
-  }
-  
-  // Accept 11-digit numbers starting with 1 (will be converted to E.164)
-  if (digits.length === 11 && digits.startsWith('1')) {
-    return null // Valid
-  }
-  
-  return 'Phone number must be 10 digits or in E.164 format (e.g., +1234567890)'
 }
 
 export const PhoneInputWeb = forwardRef<TextInput, PhoneInputProps>(

@@ -13,3 +13,4 @@ export {
   applyCssVarsToRoot,
 } from "./design-tokens/css-vars"
 export { fontFamily, fontSize, fontWeight, lineHeight } from "./design-tokens/typography-web"
+export { formatPhoneNumber, validatePhoneNumber, isValidPhoneNumber } from "./phone.util"

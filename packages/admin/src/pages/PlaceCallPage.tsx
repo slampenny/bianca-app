@@ -1,7 +1,9 @@
 import { type FormEvent, useEffect, useRef, useState } from "react"
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
+import { isValidPhoneNumber } from "@bianca-app/shared"
 import { useEndAdminCallMutation, useLazyGetAdminCallStatusQuery, usePlaceAdminCallMutation } from "../services/api/adminApi"
 import { AdminPageHeader } from "../components/AdminPageHeader"
+import { PhoneInput } from "../components/PhoneInput"
 
 const TERMINAL_STATUSES = ["completed", "failed", "machine", "ended", "no_answer", "busy"]
 
@@ -68,6 +70,10 @@ export function PlaceCallPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError("")
+    if (!isValidPhoneNumber(phone)) {
+      setError("Enter a valid phone number (10 digits or E.164 format).")
+      return
+    }
     try {
       const res = await placeCall({
         firstName: firstName.trim(),
@@ -142,17 +148,12 @@ export function PlaceCallPage() {
                   required
                 />
               </label>
-              <label className="admin-label" style={{ flex: "1 1 170px" }}>
-                Phone number
-                <input
-                  className="admin-input"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  autoComplete="tel"
-                  placeholder="+16045624263 or 6045624263"
-                  required
-                />
-              </label>
+              <PhoneInput
+                value={phone}
+                onChange={setPhone}
+                required
+                style={{ flex: "1 1 170px" }}
+              />
               <label className="admin-label" style={{ flex: "0 1 160px" }}>
                 Country
                 <select
@@ -165,7 +166,11 @@ export function PlaceCallPage() {
                   <option value="US">United States</option>
                 </select>
               </label>
-              <button type="submit" className="admin-btn admin-btn--primary" disabled={placing}>
+              <button
+                type="submit"
+                className="admin-btn admin-btn--primary"
+                disabled={placing || !isValidPhoneNumber(phone)}
+              >
                 {placing ? "Calling…" : "Call now"}
               </button>
             </form>
