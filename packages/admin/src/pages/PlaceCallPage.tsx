@@ -4,6 +4,8 @@ import { AdminPageHeader } from "../components/AdminPageHeader"
 
 const TERMINAL_STATUSES = ["completed", "failed", "machine", "ended", "no_answer", "busy"]
 
+type DemoCallCountry = "US" | "CA"
+
 function isTerminal(status: string | undefined) {
   return TERMINAL_STATUSES.some((s) => (status ?? "").includes(s))
 }
@@ -12,12 +14,14 @@ export function PlaceCallPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [phone, setPhone] = useState("")
+  const [country, setCountry] = useState<DemoCallCountry>("CA")
   const [error, setError] = useState("")
 
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [callStatus, setCallStatus] = useState<string | undefined>(undefined)
   const [clientName, setClientName] = useState<string | null>(null)
   const [clientPhone, setClientPhone] = useState<string | null>(null)
+  const [fromNumber, setFromNumber] = useState<string | null>(null)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -48,7 +52,7 @@ export function PlaceCallPage() {
       })()
     }, 2000)
     return stopPolling
-  }, [conversationId])
+  }, [conversationId, getStatus])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -58,11 +62,13 @@ export function PlaceCallPage() {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
+        country,
       }).unwrap()
       setConversationId(res.conversationId)
       setCallStatus(res.callStatus)
       setClientName(res.clientName)
       setClientPhone(res.clientPhone)
+      setFromNumber(res.fromNumber ?? null)
     } catch {
       setError("Failed to place call. Check that the phone number is valid and the telephony service is configured.")
     }
@@ -85,6 +91,7 @@ export function PlaceCallPage() {
     setCallStatus(undefined)
     setClientName(null)
     setClientPhone(null)
+    setFromNumber(null)
     setError("")
   }
 
@@ -93,8 +100,8 @@ export function PlaceCallPage() {
   return (
     <>
       <AdminPageHeader
-        title="Place call"
-        subtitle="Initiate an outbound call by entering a name and phone number. Clients are stored in the Admin Test Calls org — calling the same number again reuses the existing client record."
+        title="Demo call"
+        subtitle="Place an outbound demo call by entering a name and phone number. US orgs are called from the US number; Canadian orgs from the Canadian number."
       />
       <main className="admin-main">
         <div className="admin-card admin-card--wide">
@@ -135,8 +142,20 @@ export function PlaceCallPage() {
                   required
                 />
               </label>
+              <label className="admin-label" style={{ flex: "0 1 160px" }}>
+                Country
+                <select
+                  className="admin-input"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value as DemoCallCountry)}
+                  required
+                >
+                  <option value="CA">Canada</option>
+                  <option value="US">United States</option>
+                </select>
+              </label>
               <button type="submit" className="admin-btn admin-btn--primary" disabled={placing}>
-                {placing ? "Placing call…" : "Call"}
+                {placing ? "Calling…" : "Call now"}
               </button>
             </form>
           ) : (
@@ -145,6 +164,11 @@ export function PlaceCallPage() {
                 <strong>{clientName}</strong>
                 {clientPhone ? <> &mdash; {clientPhone}</> : null}
               </p>
+              {fromNumber ? (
+                <p className="admin-muted">
+                  Calling from <code className="admin-code">{fromNumber}</code>
+                </p>
+              ) : null}
               <p>
                 Status: <code className="admin-code">{callStatus ?? "…"}</code>
               </p>

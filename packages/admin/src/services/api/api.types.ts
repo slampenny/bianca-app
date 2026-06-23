@@ -320,6 +320,8 @@ export interface PlaceAdminCallResponse {
   clientId: string
   clientName: string
   clientPhone: string
+  country?: string
+  fromNumber?: string
   status: string
   callStatus: string
 }

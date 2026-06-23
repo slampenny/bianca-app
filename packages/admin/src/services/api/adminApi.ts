@@ -262,7 +262,10 @@ export const adminApi = createApi({
       }),
       invalidatesTags: ["Backups"],
     }),
-    placeAdminCall: builder.mutation<PlaceAdminCallResponse, { firstName: string; lastName: string; phone: string }>({
+    placeAdminCall: builder.mutation<
+      PlaceAdminCallResponse,
+      { firstName: string; lastName: string; phone: string; country: "US" | "CA" }
+    >({
       query: (body) => ({
         url: "/admin/place-call",
         method: "POST",

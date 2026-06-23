@@ -224,6 +224,7 @@ const placeAdminCall = {
     firstName: Joi.string().trim().min(1).max(100).required(),
     lastName: Joi.string().trim().min(1).max(100).required(),
     phone: Joi.string().trim().min(7).max(40).required(),
+    country: Joi.string().valid('US', 'CA').default('CA'),
   }),
 };
 

@@ -446,7 +446,7 @@ const ADMIN_CALLS_ORG_EMAIL = 'admin-calls@internal.bianca';
 
 const placeAdminCall = catchAsync(async (req, res) => {
   assertSuperAdmin(req);
-  const { firstName, lastName, phone } = req.body;
+  const { firstName, lastName, phone, country = 'CA' } = req.body;
 
   // Find or lazily create the admin calls org
   let adminOrg = await Org.findOne({ email: ADMIN_CALLS_ORG_EMAIL });
@@ -455,6 +455,7 @@ const placeAdminCall = catchAsync(async (req, res) => {
       name: 'Admin Test Calls',
       email: ADMIN_CALLS_ORG_EMAIL,
       timezone: 'America/Los_Angeles',
+      country,
     });
     logger.info(`[AdminCall] Created admin calls org: ${adminOrg._id}`);
   }
@@ -478,7 +479,7 @@ const placeAdminCall = catchAsync(async (req, res) => {
     await client.save();
   }
 
-  const fromNumber = voiceTelephonyService.getFromNumber(adminOrg.country);
+  const fromNumber = voiceTelephonyService.getFromNumber(country);
   const callSid = await voiceTelephonyService.initiateCall(client.id, fromNumber);
 
   let call = await Call.findOne({ callSid });
@@ -514,6 +515,8 @@ const placeAdminCall = catchAsync(async (req, res) => {
     clientId: client._id.toString(),
     clientName: client.name,
     clientPhone: client.phone,
+    country,
+    fromNumber,
     status: call.status,
     callStatus: call.callStatus,
   });
