@@ -4,10 +4,14 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=hipaa-env.sh
+source "${SCRIPT_DIR}/hipaa-env.sh"
+
 BACKUP_TYPE="${1:-daily}"
-ENV="${ENVIRONMENT:-staging}"
-BUCKET="${HIPAA_BACKUP_BUCKET:-${ENV}-bianca-hipaa-backups}"
-REGION="${AWS_REGION:-us-east-2}"
+ENV="$(resolve_hipaa_env "$SCRIPT_DIR")"
+BUCKET="${HIPAA_BACKUP_BUCKET:-${ENV}-bianca-hipaa-backups-cac1}"
+REGION="${AWS_REGION:-ca-central-1}"
 WORKDIR="/opt/bianca-${ENV}"
 TIMESTAMP="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 BACKUP_ID="backup-${TIMESTAMP}"

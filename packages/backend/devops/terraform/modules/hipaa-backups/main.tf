@@ -458,106 +458,161 @@ resource "aws_cloudwatch_log_group" "backup_lambda_logs" {
 }
 
 ################################################################################
-# EventBridge Rule for Daily Backups (2 AM EST)
+# EventBridge Scheduler for Backups (noon Pacific — while EC2 is running)
 ################################################################################
 
-resource "aws_cloudwatch_event_rule" "daily_backup" {
-  name                = "${var.environment}-daily-mongodb-backup"
-  description         = "Trigger MongoDB backup daily at 2 AM EST"
-  schedule_expression = "cron(0 7 * * ? *)" # 7 AM UTC = 2 AM EST
+locals {
+  backup_daily_cron = format(
+    "cron(%d %d * * ? *)",
+    var.backup_schedule_minute,
+    var.backup_schedule_hour,
+  )
+  backup_weekly_cron = format(
+    "cron(%d %d ? * SUN *)",
+    var.backup_schedule_minute,
+    var.backup_schedule_hour,
+  )
+  backup_monthly_cron = format(
+    "cron(%d %d 1 * ? *)",
+    var.backup_schedule_minute,
+    var.backup_schedule_hour,
+  )
+  # Weekly verification runs 30 minutes after the weekly backup
+  backup_verification_minute = (var.backup_schedule_minute + 30) % 60
+  backup_verification_hour   = var.backup_schedule_minute + 30 >= 60 ? (var.backup_schedule_hour + 1) % 24 : var.backup_schedule_hour
+  backup_verification_cron = format(
+    "cron(%d %d ? * SUN *)",
+    local.backup_verification_minute,
+    local.backup_verification_hour,
+  )
+}
+
+resource "aws_scheduler_schedule_group" "hipaa_backups" {
+  name = "${var.environment}-hipaa-backups"
+}
+
+resource "aws_iam_role" "backup_scheduler_invoke" {
+  name = "${var.environment}-hipaa-backup-scheduler-invoke"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+    }]
+  })
 
   tags = {
-    Name        = "${var.environment}-daily-backup-schedule"
+    Name        = "${var.environment}-backup-scheduler-invoke"
     Environment = var.environment
   }
 }
 
-resource "aws_cloudwatch_event_target" "backup_lambda" {
-  rule      = aws_cloudwatch_event_rule.daily_backup.name
-  target_id = "BackupLambda"
-  arn       = aws_lambda_function.mongodb_backup.arn
+resource "aws_iam_role_policy" "backup_scheduler_invoke" {
+  name = "${var.environment}-hipaa-backup-scheduler-invoke-policy"
+  role = aws_iam_role.backup_scheduler_invoke.id
 
-  input = jsonencode({
-    backupType = "daily"
-    timestamp  = "$${aws.events.event.time}"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["lambda:InvokeFunction"]
+      Resource = [
+        aws_lambda_function.mongodb_backup.arn,
+        aws_lambda_function.backup_verification.arn,
+      ]
+    }]
   })
 }
 
-# Allow EventBridge to invoke Lambda
-resource "aws_lambda_permission" "allow_eventbridge_daily" {
-  statement_id  = "AllowExecutionFromEventBridge"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.mongodb_backup.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.daily_backup.arn
-}
+resource "aws_scheduler_schedule" "daily_backup" {
+  name                         = "${var.environment}-daily-mongodb-backup"
+  group_name                   = aws_scheduler_schedule_group.hipaa_backups.name
+  state                        = "ENABLED"
+  schedule_expression          = local.backup_daily_cron
+  schedule_expression_timezone = var.backup_schedule_timezone
 
-################################################################################
-# EventBridge Rule for Weekly Backups (Sunday 3 AM EST)
-################################################################################
+  flexible_time_window {
+    mode = "OFF"
+  }
 
-resource "aws_cloudwatch_event_rule" "weekly_backup" {
-  name                = "${var.environment}-weekly-mongodb-backup"
-  description         = "Trigger MongoDB backup weekly on Sunday at 3 AM EST"
-  schedule_expression = "cron(0 8 ? * SUN *)" # 8 AM UTC Sunday = 3 AM EST Sunday
-
-  tags = {
-    Name        = "${var.environment}-weekly-backup-schedule"
-    Environment = var.environment
+  target {
+    arn      = aws_lambda_function.mongodb_backup.arn
+    role_arn = aws_iam_role.backup_scheduler_invoke.arn
+    input    = jsonencode({
+      backupType = "daily"
+      timestamp  = "<aws.scheduler.scheduled-time>"
+    })
   }
 }
 
-resource "aws_cloudwatch_event_target" "weekly_backup_lambda" {
-  rule      = aws_cloudwatch_event_rule.weekly_backup.name
-  target_id = "WeeklyBackupLambda"
-  arn       = aws_lambda_function.mongodb_backup.arn
+resource "aws_scheduler_schedule" "weekly_backup" {
+  name                         = "${var.environment}-weekly-mongodb-backup"
+  group_name                   = aws_scheduler_schedule_group.hipaa_backups.name
+  state                        = "ENABLED"
+  schedule_expression          = local.backup_weekly_cron
+  schedule_expression_timezone = var.backup_schedule_timezone
 
-  input = jsonencode({
-    backupType = "weekly"
-    timestamp  = "$${aws.events.event.time}"
-  })
-}
+  flexible_time_window {
+    mode = "OFF"
+  }
 
-resource "aws_lambda_permission" "allow_eventbridge_weekly" {
-  statement_id  = "AllowExecutionFromEventBridgeWeekly"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.mongodb_backup.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.weekly_backup.arn
-}
-
-################################################################################
-# EventBridge Rule for Monthly Backups (1st of month, 4 AM EST)
-################################################################################
-
-resource "aws_cloudwatch_event_rule" "monthly_backup" {
-  name                = "${var.environment}-monthly-mongodb-backup"
-  description         = "Trigger MongoDB backup monthly on 1st at 4 AM EST"
-  schedule_expression = "cron(0 9 1 * ? *)" # 9 AM UTC on 1st = 4 AM EST on 1st
-
-  tags = {
-    Name        = "${var.environment}-monthly-backup-schedule"
-    Environment = var.environment
+  target {
+    arn      = aws_lambda_function.mongodb_backup.arn
+    role_arn = aws_iam_role.backup_scheduler_invoke.arn
+    input    = jsonencode({
+      backupType = "weekly"
+      timestamp  = "<aws.scheduler.scheduled-time>"
+    })
   }
 }
 
-resource "aws_cloudwatch_event_target" "monthly_backup_lambda" {
-  rule      = aws_cloudwatch_event_rule.monthly_backup.name
-  target_id = "MonthlyBackupLambda"
-  arn       = aws_lambda_function.mongodb_backup.arn
+resource "aws_scheduler_schedule" "monthly_backup" {
+  name                         = "${var.environment}-monthly-mongodb-backup"
+  group_name                   = aws_scheduler_schedule_group.hipaa_backups.name
+  state                        = "ENABLED"
+  schedule_expression          = local.backup_monthly_cron
+  schedule_expression_timezone = var.backup_schedule_timezone
 
-  input = jsonencode({
-    backupType = "monthly"
-    timestamp  = "$${aws.events.event.time}"
-  })
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.mongodb_backup.arn
+    role_arn = aws_iam_role.backup_scheduler_invoke.arn
+    input    = jsonencode({
+      backupType = "monthly"
+      timestamp  = "<aws.scheduler.scheduled-time>"
+    })
+  }
 }
 
-resource "aws_lambda_permission" "allow_eventbridge_monthly" {
-  statement_id  = "AllowExecutionFromEventBridgeMonthly"
+resource "aws_lambda_permission" "allow_scheduler_daily" {
+  statement_id  = "AllowExecutionFromSchedulerDaily"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.mongodb_backup.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.monthly_backup.arn
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.daily_backup.arn
+}
+
+resource "aws_lambda_permission" "allow_scheduler_weekly" {
+  statement_id  = "AllowExecutionFromSchedulerWeekly"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.mongodb_backup.function_name
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.weekly_backup.arn
+}
+
+resource "aws_lambda_permission" "allow_scheduler_monthly" {
+  statement_id  = "AllowExecutionFromSchedulerMonthly"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.mongodb_backup.function_name
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.monthly_backup.arn
 }
 
 ################################################################################
@@ -591,30 +646,31 @@ resource "aws_lambda_function" "backup_verification" {
   }
 }
 
-# Weekly backup verification (Sunday after weekly backup)
-resource "aws_cloudwatch_event_rule" "weekly_verification" {
-  name                = "${var.environment}-weekly-backup-verification"
-  description         = "Test backup restore weekly"
-  schedule_expression = "cron(0 10 ? * SUN *)" # 10 AM UTC Sunday = 5 AM EST (2 hours after backup)
+# Weekly backup verification (Sunday, 30 minutes after weekly backup)
+resource "aws_scheduler_schedule" "weekly_verification" {
+  name                         = "${var.environment}-weekly-backup-verification"
+  group_name                   = aws_scheduler_schedule_group.hipaa_backups.name
+  state                        = "ENABLED"
+  schedule_expression          = local.backup_verification_cron
+  schedule_expression_timezone = var.backup_schedule_timezone
 
-  tags = {
-    Name        = "${var.environment}-weekly-verification"
-    Environment = var.environment
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.backup_verification.arn
+    role_arn = aws_iam_role.backup_scheduler_invoke.arn
+    input    = jsonencode({})
   }
 }
 
-resource "aws_cloudwatch_event_target" "verification_lambda" {
-  rule      = aws_cloudwatch_event_rule.weekly_verification.name
-  target_id = "VerificationLambda"
-  arn       = aws_lambda_function.backup_verification.arn
-}
-
-resource "aws_lambda_permission" "allow_eventbridge_verification" {
-  statement_id  = "AllowExecutionFromEventBridgeVerification"
+resource "aws_lambda_permission" "allow_scheduler_verification" {
+  statement_id  = "AllowExecutionFromSchedulerVerification"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.backup_verification.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.weekly_verification.arn
+  principal     = "scheduler.amazonaws.com"
+  source_arn    = aws_scheduler_schedule.weekly_verification.arn
 }
 
 ################################################################################

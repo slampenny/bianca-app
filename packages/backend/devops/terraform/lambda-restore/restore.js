@@ -32,16 +32,16 @@ exports.handler = async (event) => {
   console.log(`Backup: ${backupKey}`);
 
   try {
-    await s3Client.send(new HeadObjectCommand({
-      Bucket: process.env.S3_BUCKET,
-      Key: backupKey,
-    }));
+    const backupBucket = await resolveBackupBucket(backupKey);
 
     const sendResp = await ssmClient.send(new SendCommandCommand({
       DocumentName: 'AWS-RunShellScript',
       Targets: [{ Key: 'tag:Name', Values: [tagName] }],
       Parameters: {
-        commands: [`export ENVIRONMENT=${env} AWS_REGION=${region}`, `${scriptPath} "${backupKey}" YES_I_WANT_TO_RESTORE`],
+        commands: [
+          `export ENVIRONMENT=${env} AWS_REGION=${region} HIPAA_BACKUP_BUCKET=${backupBucket}`,
+          `${scriptPath} "${backupKey}" YES_I_WANT_TO_RESTORE`,
+        ],
       },
       TimeoutSeconds: 600,
       Comment: `HIPAA MongoDB restore (${env}) from ${backupKey}`,
@@ -98,6 +98,19 @@ exports.handler = async (event) => {
     throw error;
   }
 };
+
+async function resolveBackupBucket(backupKey) {
+  const primary = process.env.S3_BUCKET;
+  try {
+    await s3Client.send(new HeadObjectCommand({ Bucket: primary, Key: backupKey }));
+    return primary;
+  } catch (primaryErr) {
+    const legacy = primary.endsWith('-cac1') ? primary.slice(0, -'-cac1'.length) : null;
+    if (!legacy) throw primaryErr;
+    await s3Client.send(new HeadObjectCommand({ Bucket: legacy, Key: backupKey }));
+    return legacy;
+  }
+}
 
 async function waitForSsmCommand(commandId) {
   const start = Date.now();

@@ -13,7 +13,9 @@ ENVIRONMENT="staging"
 
 # Export ENVIRONMENT to /etc/environment so it's available to CodeDeploy scripts
 echo "ENVIRONMENT=$${ENVIRONMENT}" >> /etc/environment
+echo "AWS_REGION=$${AWS_REGION}" >> /etc/environment
 export ENVIRONMENT="$${ENVIRONMENT}"
+export AWS_REGION="$${AWS_REGION}"
 
 echo "Starting minimal staging infrastructure setup..."
 
@@ -186,9 +188,14 @@ echo "==================================="
 mkdir -p /opt/bianca-staging
 cat > /opt/bianca-staging/install-hipaa-backup-cron.sh <<'CRON_EOF'
 #!/bin/bash
-if [ -x /opt/bianca-staging/hipaa-backup.sh ]; then
-  (crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup.sh; echo "0 2 * * * /opt/bianca-staging/hipaa-backup.sh daily >> /var/log/bianca-staging.log 2>&1") | crontab -u ec2-user -
+if [ ! -x /opt/bianca-staging/hipaa-backup.sh ]; then
+  exit 0
 fi
+(
+  crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup | grep -v 'CRON_TZ=America/Los_Angeles' || true
+  echo 'CRON_TZ=America/Los_Angeles'
+  echo '0 12 * * * /opt/bianca-staging/hipaa-backup.sh daily >> /var/log/bianca-staging.log 2>&1'
+) | crontab -u ec2-user -
 CRON_EOF
 chmod +x /opt/bianca-staging/install-hipaa-backup-cron.sh
 

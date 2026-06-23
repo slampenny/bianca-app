@@ -30,7 +30,10 @@ exports.handler = async (event) => {
       DocumentName: 'AWS-RunShellScript',
       Targets: [{ Key: 'tag:Name', Values: [tagName] }],
       Parameters: {
-        commands: [`export ENVIRONMENT=${env} AWS_REGION=${region}`, `${scriptPath} ${backupType}`],
+        commands: [
+          `export ENVIRONMENT=${env} AWS_REGION=${region} HIPAA_BACKUP_BUCKET=${process.env.S3_BUCKET}`,
+          `${scriptPath} ${backupType}`,
+        ],
       },
       TimeoutSeconds: 600,
       Comment: `HIPAA ${backupType} MongoDB backup (${env})`,

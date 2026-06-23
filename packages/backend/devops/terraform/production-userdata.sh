@@ -13,7 +13,9 @@ ENVIRONMENT="${environment}"
 
 # Export ENVIRONMENT to /etc/environment so it's available to CodeDeploy scripts
 echo "ENVIRONMENT=$${ENVIRONMENT}" >> /etc/environment
+echo "AWS_REGION=$${REGION}" >> /etc/environment
 export ENVIRONMENT="$${ENVIRONMENT}"
+export AWS_REGION="$${REGION}"
 
 # Get instance metadata
 # Use EIP if provided (from Terraform), otherwise fall back to instance metadata
@@ -449,7 +451,18 @@ EOF
 
 chmod +x /opt/bianca-production/backup.sh
 
-# Daily HIPAA backup cron (script deployed via CodeDeploy)
-(crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup.sh; echo "0 2 * * * /opt/bianca-production/hipaa-backup.sh daily >> /var/log/bianca-production.log 2>&1") | crontab -u ec2-user -
+# Daily HIPAA backup cron (noon Pacific; scripts deployed via CodeDeploy)
+cat > /opt/bianca-production/install-hipaa-backup-cron.sh <<'CRON_EOF'
+#!/bin/bash
+if [ ! -x /opt/bianca-production/hipaa-backup.sh ]; then
+  exit 0
+fi
+(
+  crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup | grep -v 'CRON_TZ=America/Los_Angeles' || true
+  echo 'CRON_TZ=America/Los_Angeles'
+  echo '0 12 * * * /opt/bianca-production/hipaa-backup.sh daily >> /var/log/bianca-production.log 2>&1'
+) | crontab -u ec2-user -
+CRON_EOF
+chmod +x /opt/bianca-production/install-hipaa-backup-cron.sh
 
 echo "Production environment setup completed!"

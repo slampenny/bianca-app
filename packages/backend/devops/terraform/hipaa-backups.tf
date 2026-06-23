@@ -104,68 +104,8 @@ moved {
 }
 
 moved {
-  from = aws_cloudwatch_event_rule.daily_backup
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_rule.daily_backup
-}
-
-moved {
-  from = aws_cloudwatch_event_target.backup_lambda
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_target.backup_lambda
-}
-
-moved {
-  from = aws_lambda_permission.allow_eventbridge_daily
-  to   = module.staging_hipaa_backups.aws_lambda_permission.allow_eventbridge_daily
-}
-
-moved {
-  from = aws_cloudwatch_event_rule.weekly_backup
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_rule.weekly_backup
-}
-
-moved {
-  from = aws_cloudwatch_event_target.weekly_backup_lambda
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_target.weekly_backup_lambda
-}
-
-moved {
-  from = aws_lambda_permission.allow_eventbridge_weekly
-  to   = module.staging_hipaa_backups.aws_lambda_permission.allow_eventbridge_weekly
-}
-
-moved {
-  from = aws_cloudwatch_event_rule.monthly_backup
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_rule.monthly_backup
-}
-
-moved {
-  from = aws_cloudwatch_event_target.monthly_backup_lambda
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_target.monthly_backup_lambda
-}
-
-moved {
-  from = aws_lambda_permission.allow_eventbridge_monthly
-  to   = module.staging_hipaa_backups.aws_lambda_permission.allow_eventbridge_monthly
-}
-
-moved {
   from = aws_lambda_function.backup_verification
   to   = module.staging_hipaa_backups.aws_lambda_function.backup_verification
-}
-
-moved {
-  from = aws_cloudwatch_event_rule.weekly_verification
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_rule.weekly_verification
-}
-
-moved {
-  from = aws_cloudwatch_event_target.verification_lambda
-  to   = module.staging_hipaa_backups.aws_cloudwatch_event_target.verification_lambda
-}
-
-moved {
-  from = aws_lambda_permission.allow_eventbridge_verification
-  to   = module.staging_hipaa_backups.aws_lambda_permission.allow_eventbridge_verification
 }
 
 moved {

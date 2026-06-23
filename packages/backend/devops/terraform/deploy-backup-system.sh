@@ -217,7 +217,7 @@ if [ "$TEST_BACKUP" == "yes" ]; then
     echo -e "${GREEN}✓${NC} Test backup triggered"
     echo ""
     echo "Check CloudWatch Logs: /aws/lambda/$LAMBDA_NAME"
-    echo "Check S3 Bucket: ${ENVIRONMENT}-bianca-hipaa-backups"
+    echo "Check S3 Bucket: ${ENVIRONMENT}-bianca-hipaa-backups-cac1"
     echo "Check your email for backup notification"
 fi
 
@@ -232,7 +232,7 @@ echo "Next Steps:"
 echo "  1. ✅ Confirm SNS email subscription (if not already done)"
 echo "  2. ⏰ Wait for first automated backup at 2 AM EST"
 echo "  3. 📊 Monitor: https://console.aws.amazon.com/cloudwatch/home?region=$AWS_REGION#dashboards:name=${ENVIRONMENT}-hipaa-backup-monitoring"
-echo "  4. 📁 Verify backups: https://s3.console.aws.amazon.com/s3/buckets/${ENVIRONMENT}-bianca-hipaa-backups"
+echo "  4. 📁 Verify backups: https://s3.console.aws.amazon.com/s3/buckets/${ENVIRONMENT}-bianca-hipaa-backups-cac1"
 echo ""
 echo "Documentation:"
 echo "  📖 Full guide: HIPAA_BACKUP_DEPLOYMENT_GUIDE.md"

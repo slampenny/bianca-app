@@ -12,13 +12,16 @@ function getBackupConfig() {
   const nodeEnv = config.env;
   const enabled = nodeEnv === 'staging' || nodeEnv === 'production';
   const environment = nodeEnv;
+  const bucket = process.env.HIPAA_BACKUP_S3_BUCKET || `${environment}-bianca-hipaa-backups-cac1`;
+  const legacyBucket = `${environment}-bianca-hipaa-backups`;
   return {
     enabled,
     environment,
-    bucket: process.env.HIPAA_BACKUP_S3_BUCKET || `${environment}-bianca-hipaa-backups`,
+    bucket,
+    legacyBucket: legacyBucket !== bucket ? legacyBucket : null,
     backupLambdaName: process.env.HIPAA_BACKUP_LAMBDA_NAME || `${environment}-mongodb-backup`,
     restoreLambdaName: process.env.HIPAA_RESTORE_LAMBDA_NAME || `${environment}-mongodb-restore`,
-    region: config.aws.region || 'us-east-2',
+    region: config.aws.region || 'ca-central-1',
   };
 }
 
@@ -62,15 +65,15 @@ function mapS3Object(obj) {
 /**
  * List HIPAA backup objects from S3.
  */
-async function listBackups({ prefix, limit = 100 } = {}) {
-  const cfg = assertBackupEnabled();
+async function listObjectsFromBucket(bucket, { prefix, limit } = {}) {
+  const cfg = getBackupConfig();
   const s3 = getS3();
   const results = [];
   let continuationToken;
 
   do {
     const resp = await s3.send(new ListObjectsV2Command({
-      Bucket: cfg.bucket,
+      Bucket: bucket,
       Prefix: prefix || '',
       ContinuationToken: continuationToken,
       MaxKeys: Math.min(limit - results.length, 1000),
@@ -86,13 +89,37 @@ async function listBackups({ prefix, limit = 100 } = {}) {
     continuationToken = resp.IsTruncated ? resp.NextContinuationToken : undefined;
   } while (continuationToken);
 
-  results.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+  return results;
+}
+
+async function listBackups({ prefix, limit = 100 } = {}) {
+  const cfg = assertBackupEnabled();
+  const primary = await listObjectsFromBucket(cfg.bucket, { prefix, limit });
+
+  let merged = primary;
+  if (cfg.legacyBucket) {
+    try {
+      const legacy = await listObjectsFromBucket(cfg.legacyBucket, { prefix, limit });
+      const seen = new Set(primary.map((b) => b.key));
+      for (const row of legacy) {
+        if (!seen.has(row.key)) merged.push(row);
+      }
+    } catch (err) {
+      logger.warn('[HIPAA Backup] Could not list legacy bucket', {
+        bucket: cfg.legacyBucket,
+        message: err.message,
+      });
+    }
+  }
+
+  merged.sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified));
+  if (merged.length > limit) merged = merged.slice(0, limit);
 
   return {
     environment: cfg.environment,
     bucket: cfg.bucket,
-    backups: results,
-    total: results.length,
+    backups: merged,
+    total: merged.length,
   };
 }
 

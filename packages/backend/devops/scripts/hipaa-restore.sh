@@ -4,11 +4,15 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=hipaa-env.sh
+source "${SCRIPT_DIR}/hipaa-env.sh"
+
 S3_KEY="${1:-}"
 CONFIRM="${2:-}"
-ENV="${ENVIRONMENT:-staging}"
-BUCKET="${HIPAA_BACKUP_BUCKET:-${ENV}-bianca-hipaa-backups}"
-REGION="${AWS_REGION:-us-east-2}"
+ENV="$(resolve_hipaa_env "$SCRIPT_DIR")"
+BUCKET="${HIPAA_BACKUP_BUCKET:-${ENV}-bianca-hipaa-backups-cac1}"
+REGION="${AWS_REGION:-ca-central-1}"
 WORKDIR="/opt/bianca-${ENV}"
 
 if [ -z "$S3_KEY" ]; then
