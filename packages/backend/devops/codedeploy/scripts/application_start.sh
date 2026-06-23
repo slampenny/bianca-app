@@ -5,8 +5,12 @@
 
 echo "🚀 ApplicationStart: Starting new containers..."
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/resolve-aws-region.sh"
+echo "   Using AWS region: $AWS_REGION"
+
 # Detect environment - check /etc/environment first, then directories, then instance tags
-AWS_REGION="us-east-2"
 
 echo "   Detecting environment..."
 

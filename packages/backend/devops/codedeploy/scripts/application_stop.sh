@@ -6,9 +6,13 @@ set +e  # Don't exit on errors
 
 echo "🛑 ApplicationStop: Stopping old containers..."
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/resolve-aws-region.sh"
+echo "   Using AWS region: $AWS_REGION"
+
 # Detect environment from instance Name tag
 INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-AWS_REGION="us-east-2"
 INSTANCE_NAME=$(aws ec2 describe-instances --region $AWS_REGION --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].Tags[?Key==`Name`].Value' --output text 2>/dev/null || echo "")
 
 # Determine environment based on instance name

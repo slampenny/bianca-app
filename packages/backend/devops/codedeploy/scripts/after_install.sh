@@ -5,8 +5,12 @@ set -e
 
 echo "📥 AfterInstall: Pulling Docker images and preparing deployment..."
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/resolve-aws-region.sh"
+echo "   Using AWS region: $AWS_REGION"
+
 # Detect environment - check /etc/environment first, then directories, then instance tags
-AWS_REGION="us-east-2"
 
 echo "   Detecting environment..."
 
@@ -173,12 +177,19 @@ if [ -f "$HIPAA_SRC/hipaa-backup.sh" ] && [ -f "$HIPAA_SRC/hipaa-restore.sh" ]; 
   echo "   Installing HIPAA backup scripts to $DEPLOY_DIR..."
   cp "$HIPAA_SRC/hipaa-backup.sh" "$DEPLOY_DIR/hipaa-backup.sh"
   cp "$HIPAA_SRC/hipaa-restore.sh" "$DEPLOY_DIR/hipaa-restore.sh"
+  cp "$HIPAA_SRC/hipaa-env.sh" "$DEPLOY_DIR/hipaa-env.sh"
   chmod +x "$DEPLOY_DIR/hipaa-backup.sh" "$DEPLOY_DIR/hipaa-restore.sh"
-  chown ec2-user:ec2-user "$DEPLOY_DIR/hipaa-backup.sh" "$DEPLOY_DIR/hipaa-restore.sh" || true
-  if [ -x "$DEPLOY_DIR/install-hipaa-backup-cron.sh" ]; then
-    bash "$DEPLOY_DIR/install-hipaa-backup-cron.sh" || true
+  chown ec2-user:ec2-user "$DEPLOY_DIR/hipaa-backup.sh" "$DEPLOY_DIR/hipaa-restore.sh" "$DEPLOY_DIR/hipaa-env.sh" || true
+  if [ -f "$HIPAA_SRC/install-hipaa-backup-cron.sh" ]; then
+    cp "$HIPAA_SRC/install-hipaa-backup-cron.sh" "$DEPLOY_DIR/install-hipaa-backup-cron.sh"
+    chmod +x "$DEPLOY_DIR/install-hipaa-backup-cron.sh"
+    bash "$DEPLOY_DIR/install-hipaa-backup-cron.sh" "$DEPLOY_DIR" || true
+  elif [ -x "$DEPLOY_DIR/install-hipaa-backup-cron.sh" ]; then
+    bash "$DEPLOY_DIR/install-hipaa-backup-cron.sh" "$DEPLOY_DIR" || true
   elif [ "$DETECTED_ENV" = "staging" ] || [ "$DETECTED_ENV" = "production" ]; then
-    (crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup.sh; echo "0 2 * * * $DEPLOY_DIR/hipaa-backup.sh daily >> /var/log/bianca-${DETECTED_ENV}.log 2>&1") | crontab -u ec2-user - || true
+    (crontab -u ec2-user -l 2>/dev/null | grep -v hipaa-backup | grep -v 'CRON_TZ=America/Los_Angeles' || true
+     echo 'CRON_TZ=America/Los_Angeles'
+     echo "0 12 * * * $DEPLOY_DIR/hipaa-backup.sh daily >> /var/log/bianca-${DETECTED_ENV}.log 2>&1") | crontab -u ec2-user - || true
   fi
 else
   echo "   ⚠️  HIPAA scripts not found at $HIPAA_SRC (skip)"

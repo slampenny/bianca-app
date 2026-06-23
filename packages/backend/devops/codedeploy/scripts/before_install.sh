@@ -6,6 +6,11 @@ set +e
 
 echo "🧹 BeforeInstall: Setting up docker-compose.yml and nginx.conf..."
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/resolve-aws-region.sh"
+echo "   Using AWS region: $AWS_REGION"
+
 # Enable maintenance mode at the start of deployment
 if [ -f "/opt/bianca-deployment/devops/maintenance/enable-maintenance.sh" ]; then
     echo "   Enabling maintenance mode..."
@@ -15,7 +20,6 @@ if [ -f "/opt/bianca-deployment/devops/maintenance/enable-maintenance.sh" ]; the
 fi
 
 # Detect environment - check environment variables first, then directories, then instance tags
-AWS_REGION="us-east-2"
 
 echo "   Detecting environment..."
 

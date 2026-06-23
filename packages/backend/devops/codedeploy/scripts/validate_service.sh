@@ -5,8 +5,10 @@ set -e  # Exit on error - we want to fail if validation doesn't pass
 
 echo "✅ ValidateService: Verifying deployment..."
 
-# Detect environment - check /etc/environment first, then directories, then instance tags
-AWS_REGION="us-east-2"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/resolve-aws-region.sh"
+echo "   Using AWS region: $AWS_REGION"
 
 DETECTED_ENV=""
 
