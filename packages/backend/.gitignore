@@ -8,6 +8,11 @@ uploads/
 terraform.tfstate
 terraform.tfstate.backup
 terraform.*.backup
+# Local plan/apply output and manual state exports (devops/scripts one-offs)
+devops/terraform-*-plan*.txt
+devops/terraform-*-apply*.txt
+devops/terraform-state-backup-*.json
+devops/import-*-run.log
 .vscode
 # yarn error logs
 yarn-error.log
