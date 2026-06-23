@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react"
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query"
 import { useEndAdminCallMutation, useLazyGetAdminCallStatusQuery, usePlaceAdminCallMutation } from "../services/api/adminApi"
 import { AdminPageHeader } from "../components/AdminPageHeader"
 
@@ -8,6 +9,16 @@ type DemoCallCountry = "US" | "CA"
 
 function isTerminal(status: string | undefined) {
   return TERMINAL_STATUSES.some((s) => (status ?? "").includes(s))
+}
+
+function formatPlaceCallError(err: unknown): string {
+  if (err && typeof err === "object" && "data" in err) {
+    const data = (err as FetchBaseQueryError).data
+    if (typeof data === "object" && data && "message" in data) {
+      return String((data as { message?: string }).message)
+    }
+  }
+  return "Failed to place call. Check that the phone number is valid and the telephony service is configured."
 }
 
 export function PlaceCallPage() {
@@ -69,8 +80,8 @@ export function PlaceCallPage() {
       setClientName(res.clientName)
       setClientPhone(res.clientPhone)
       setFromNumber(res.fromNumber ?? null)
-    } catch {
-      setError("Failed to place call. Check that the phone number is valid and the telephony service is configured.")
+    } catch (err) {
+      setError(formatPlaceCallError(err))
     }
   }
 
@@ -138,7 +149,7 @@ export function PlaceCallPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   autoComplete="tel"
-                  placeholder="+15551234567"
+                  placeholder="+16045624263 or 6045624263"
                   required
                 />
               </label>

@@ -12,6 +12,7 @@ const embeddingAnchorPhraseService = require('../services/embeddingAnchorPhrase.
 const corpEmailForwardService = require('../services/corpEmailForward.service');
 const breachLogService = require('../services/breachLog.service');
 const hipaaBackupService = require('../services/hipaaBackup.service');
+const phoneUtils = require('../services/messaging/phoneUtils');
 
 function assertSuperAdmin(req) {
   if (req.caregiver.role !== 'superAdmin') {
@@ -444,9 +445,22 @@ const restoreBackup = catchAsync(async (req, res) => {
 
 const ADMIN_CALLS_ORG_EMAIL = 'admin-calls@internal.bianca';
 
+function demoCallClientEmail(normalizedPhone) {
+  const digits = normalizedPhone.replace(/\D/g, '');
+  return `demo-call+${digits}@internal.bianca`;
+}
+
 const placeAdminCall = catchAsync(async (req, res) => {
   assertSuperAdmin(req);
   const { firstName, lastName, phone, country = 'CA' } = req.body;
+
+  const normalizedPhone = phoneUtils.formatPhoneNumber(String(phone || '').trim());
+  if (!normalizedPhone || !phoneUtils.isValidPhoneNumber(normalizedPhone)) {
+    throw new ApiError(
+      httpStatus.BAD_REQUEST,
+      'Invalid phone number. Use 10 digits or E.164 format (e.g. +16045624263).'
+    );
+  }
 
   // Find or lazily create the admin calls org
   let adminOrg = await Org.findOne({ email: ADMIN_CALLS_ORG_EMAIL });
@@ -460,23 +474,44 @@ const placeAdminCall = catchAsync(async (req, res) => {
     logger.info(`[AdminCall] Created admin calls org: ${adminOrg._id}`);
   }
 
+  const demoEmail = demoCallClientEmail(normalizedPhone);
+
   // Find or create client by phone within the admin org
-  let client = await Client.findOne({ phone, org: adminOrg._id });
+  let client = await Client.findOne({
+    org: adminOrg._id,
+    $or: [{ phone: normalizedPhone }, { phone: String(phone).trim() }],
+  });
   if (!client) {
     client = await Client.create({
       firstName,
       lastName,
       name: `${firstName} ${lastName}`,
-      phone,
+      phone: normalizedPhone,
+      email: demoEmail,
       org: adminOrg._id,
+      consented: true,
     });
     await Org.findByIdAndUpdate(adminOrg._id, { $addToSet: { clients: client._id } });
-    logger.info(`[AdminCall] Created client ${client._id} for phone ${phone}`);
-  } else if (client.firstName !== firstName || client.lastName !== lastName) {
-    client.firstName = firstName;
-    client.lastName = lastName;
-    client.name = `${firstName} ${lastName}`;
-    await client.save();
+    logger.info(`[AdminCall] Created client ${client._id} for phone ${normalizedPhone}`);
+  } else {
+    let dirty = false;
+    if (client.phone !== normalizedPhone) {
+      client.phone = normalizedPhone;
+      dirty = true;
+    }
+    if (!client.email) {
+      client.email = demoEmail;
+      dirty = true;
+    }
+    if (client.firstName !== firstName || client.lastName !== lastName) {
+      client.firstName = firstName;
+      client.lastName = lastName;
+      client.name = `${firstName} ${lastName}`;
+      dirty = true;
+    }
+    if (dirty) {
+      await client.save();
+    }
   }
 
   const fromNumber = voiceTelephonyService.getFromNumber(country);
