@@ -59,6 +59,7 @@ phases:
                      --build-arg BUILD_ENV=production \
                      --build-arg VITE_API_URL=https://api.biancawellness.com/v1 \
                      --build-arg VITE_ADMIN_APP_ORIGIN=https://admin.biancawellness.com \
+                     --build-arg VITE_MOBILE_APP_URL=https://mobile.biancawellness.com \
                      -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:production \
                      -f packages/web/devops/Dockerfile .; then

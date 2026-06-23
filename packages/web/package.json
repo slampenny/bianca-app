@@ -23,6 +23,7 @@
   "dependencies": {
     "@bianca-app/shared": "*",
     "@bianca-app/ui": "*",
+    "@bianca/legal": "*",
     "@fontsource/space-grotesk": "^5.2.5",
     "@reduxjs/toolkit": "^2.2.1",
     "i18next": "^26.0.2",

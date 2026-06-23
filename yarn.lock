@@ -2485,6 +2485,7 @@ __metadata:
     "@babel/preset-env": "npm:^7.20.0"
     "@babel/runtime": "npm:^7.20.0"
     "@bianca-app/shared": "npm:*"
+    "@bianca/legal": "npm:*"
     "@cucumber/cucumber": "npm:^12.5.0"
     "@cucumber/pretty-formatter": "npm:^2.4.1"
     "@expo-google-fonts/space-grotesk": "npm:^0.2.2"
@@ -2612,6 +2613,7 @@ __metadata:
     "@axe-core/playwright": "npm:^4.10.0"
     "@bianca-app/shared": "npm:*"
     "@bianca-app/ui": "npm:*"
+    "@bianca/legal": "npm:*"
     "@cucumber/cucumber": "npm:^12.5.0"
     "@cucumber/pretty-formatter": "npm:^2.4.1"
     "@fontsource/space-grotesk": "npm:^5.2.5"
@@ -2638,6 +2640,12 @@ __metadata:
     typescript: "npm:^5.8.3"
     vite: "npm:^6.0.3"
     vitest: "npm:^3.0.5"
+  languageName: unknown
+  linkType: soft
+
+"@bianca/legal@npm:*, @bianca/legal@workspace:packages/legal":
+  version: 0.0.0-use.local
+  resolution: "@bianca/legal@workspace:packages/legal"
   languageName: unknown
   linkType: soft
 

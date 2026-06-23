@@ -11,6 +11,7 @@ import { getOrg } from "../store/orgSlice"
 import type { ThemeColors } from "../types"
 import { useLanguage } from "app/hooks/useLanguage"
 import Markdown from 'react-native-markdown-display'
+import { NOTICE_OF_PRIVACY_PRACTICES, PRIVACY_PIPEDA } from '@bianca/legal'
 
 export const PrivacyPracticesScreen = () => {
   const navigation = useNavigation()
@@ -25,14 +26,7 @@ export const PrivacyPracticesScreen = () => {
   // Use useMemo to ensure it recalculates when currentOrg changes
   const policyContent = useMemo(() => {
     const country = currentOrg?.country || 'US'
-    
-    if (country === 'CA') {
-      // For Canada, show PIPEDA policy (same as PrivacyScreen)
-      return translate("privacyScreen.pipedaContent") || translate("privacyPracticesScreen.content")
-    } else {
-      // For US, show HIPAA Notice of Privacy Practices
-      return translate("privacyPracticesScreen.content")
-    }
+    return country === 'CA' ? PRIVACY_PIPEDA : NOTICE_OF_PRIVACY_PRACTICES
   }, [currentOrg?.country])
 
   // Update header options when theme changes

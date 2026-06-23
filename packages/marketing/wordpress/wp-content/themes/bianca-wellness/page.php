@@ -11,7 +11,9 @@ get_header();
 	<?php
 	while ( have_posts() ) {
 		the_post();
-		the_title( '<h1 class="bianca-page__title">', '</h1>' );
+		if ( bianca_wellness_should_render_page_title() ) {
+			the_title( '<h1 class="bianca-page__title">', '</h1>' );
+		}
 		the_content();
 	}
 	?>

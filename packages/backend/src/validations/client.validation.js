@@ -291,6 +291,30 @@ const verifyFamilyDigestEmail = {
   }),
 };
 
+const familyPortalClientParams = {
+  params: Joi.object().keys({
+    clientId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const inviteFamilyPortal = {
+  ...familyPortalClientParams,
+  body: Joi.object().keys({
+    recipientId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const revokeFamilyPortal = {
+  ...familyPortalClientParams,
+  body: Joi.object().keys({
+    recipientId: Joi.string().custom(objectId).required(),
+  }),
+};
+
+const getFamilyPortalStatus = {
+  ...familyPortalClientParams,
+};
+
 module.exports = {
   createClient,
   getConversationsByClient,
@@ -307,4 +331,7 @@ module.exports = {
   assignUnassignedClients,
   sendFamilyDigestEmailVerification,
   verifyFamilyDigestEmail,
+  inviteFamilyPortal,
+  revokeFamilyPortal,
+  getFamilyPortalStatus,
 };

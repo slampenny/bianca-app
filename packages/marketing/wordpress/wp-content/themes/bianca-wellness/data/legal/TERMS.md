@@ -1,7 +1,7 @@
 ## Bianca Wellness - Terms of Service
 
-**Effective Date:** December 21, 2025
-**Last Updated:** December 21, 2025
+**Effective Date:** June 16, 2026
+**Last Updated:** June 16, 2026
 
 Please read these Terms of Service ("Terms", "Terms of Service") carefully before using the Bianca Wellness mobile application (the "App") and related services (collectively, the "Service") operated by Bianca Technologies Inc. ("us", "we", or "our").
 

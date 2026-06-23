@@ -6,7 +6,7 @@ const { SSMClient, SendCommandCommand, ListCommandInvocationsCommand, GetCommand
 const { S3Client, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 
-const region = process.env.AWS_REGION || 'us-east-2';
+const region = process.env.AWS_REGION || 'ca-central-1';
 const ssmClient = new SSMClient({ region });
 const s3Client = new S3Client({ region });
 const snsClient = new SNSClient({ region });

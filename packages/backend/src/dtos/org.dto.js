@@ -28,6 +28,7 @@ const OrgDTO = (org) => {
     voiceOnboarding,
     requiredCallQuestions,
     dailyDigestSettings,
+    familyPortalSettings,
   } = orgObj;
   
   const id = _id;
@@ -86,6 +87,10 @@ const OrgDTO = (org) => {
     dailyDigestSettings: {
       enabled: dailyDigestSettings?.enabled === true,
       sendTime: dailyDigestSettings?.sendTime || null,
+    },
+    familyPortalSettings: {
+      enabled: familyPortalSettings?.enabled === true,
+      allowInviteAfterDigestVerify: familyPortalSettings?.allowInviteAfterDigestVerify !== false,
     },
   };
 };

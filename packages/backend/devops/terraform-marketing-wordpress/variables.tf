@@ -1,7 +1,7 @@
 variable "aws_region" {
   type        = string
   description = "AWS region (Lightsail + Route53)."
-  default     = "us-east-2"
+  default     = "ca-central-1"
 }
 
 variable "aws_profile" {
@@ -48,7 +48,7 @@ variable "lightsail_blueprint_id" {
 
 variable "availability_zone_suffix" {
   type        = string
-  description = "AZ letter after region (e.g. a → us-east-2a)."
+  description = "AZ letter after region (e.g. a → ca-central-1a)."
   default     = "a"
 }
 

@@ -277,19 +277,20 @@ const login = catchAsync(async (req, res) => {
       );
     }
 
-    // Get alerts and patients for the caregiver
+    // Get alerts and clients for the caregiver
     const caregiverId = caregiver._id || caregiver.id;
-    const alerts = await alertService.getAlerts(caregiverId);
-    const alertDTOs = alerts.map((alert) => AlertDTO(alert));
-    
-    // Get clients from caregiver (already populated)
+    const familyResidentLinkService = require('../services/familyResidentLink.service');
     const clients = caregiver.clients || [];
-    const clientDTOs = await clientsToDTOsWithLastCall(clients);
+    const sessionExtras = await familyResidentLinkService.enrichAuthSession(caregiver, clients);
+    const alerts =
+      caregiver.role === 'family' ? [] : await alertService.getAlerts(caregiverId);
+    const alertDTOs = alerts.map((alert) => AlertDTO(alert));
+    const clientDTOs = await clientsToDTOsWithLastCall(sessionExtras.clients);
 
     // Generate DTOs
     let caregiverDTO, orgDTO;
     try {
-      caregiverDTO = CaregiverDTO(caregiver);
+      caregiverDTO = CaregiverDTO(caregiver, sessionExtras);
       orgDTO = orgForDTO ? OrgDTO(orgForDTO) : null;
       
       // Validate caregiverDTO has required fields to prevent empty profile screen

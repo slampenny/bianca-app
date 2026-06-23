@@ -4,7 +4,7 @@
 # MongoDB data volumes (bianca-*-mongodb-data) must stay separate per environment.
 set -euo pipefail
 : "${AWS_PROFILE:=jordan}"
-: "${AWS_REGION:=us-east-2}"
+: "${AWS_REGION:=ca-central-1}"
 export AWS_PROFILE AWS_REGION
 echo "Protected MongoDB volumes (do not delete):"
 aws ec2 describe-volumes \

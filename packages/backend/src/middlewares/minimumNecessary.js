@@ -89,6 +89,23 @@ const FIELD_ACCESS_RULES = {
     clientOnboarding: ['journey', 'responses', 'flags', 'questionCount', 'rollups'],
   },
 
+  // Facility family app users: one or more linked residents, digest-focused
+  family: {
+    client: ['_id', 'id', 'name', 'preferredName', 'avatar', 'preferredLanguage'],
+    familyResident: ['_id', 'id', 'name', 'preferredName', 'avatar', 'preferredLanguage'],
+    familyDigest: ['*'],
+    conversation: [
+      '_id',
+      'id',
+      'clientId',
+      'status',
+      'duration',
+      'startTime',
+      'endTime',
+      'summary',
+    ],
+  },
+
   // OrgAdmin: Broader access for administrative purposes
   orgAdmin: {
     client: [
@@ -171,11 +188,15 @@ const FIELD_ACCESS_RULES = {
 /**
  * Filter object fields based on allowed fields list
  */
+function allowsAllFields(allowedFields) {
+  return allowedFields === '*' || (Array.isArray(allowedFields) && allowedFields.includes('*'));
+}
+
 function filterFields(obj, allowedFields) {
   if (!obj || typeof obj !== 'object') return obj;
 
   // If allowedFields is '*', return all fields
-  if (allowedFields === '*') return obj;
+  if (allowsAllFields(allowedFields)) return obj;
 
   // If it's an array, filter each item
   if (Array.isArray(obj)) {
@@ -224,7 +245,7 @@ const minimumNecessaryMiddleware = (resourceType) => {
     const allowedFields = getAllowedFields(userRole, resourceType);
 
     // If full access ('*'), skip filtering
-    if (allowedFields === '*') {
+    if (allowsAllFields(allowedFields)) {
       return next();
     }
 
@@ -248,11 +269,21 @@ const minimumNecessaryMiddleware = (resourceType) => {
 
     const originalJson = res.json.bind(res);
     const originalSend = res.send.bind(res);
+    const shouldFilterResponse = () => {
+      const status = res.statusCode;
+      return !status || status < 400;
+    };
     res.json = function wrappedJson(data) {
+      if (!shouldFilterResponse()) {
+        return originalJson(data);
+      }
       logger.debug(`[MINIMUM_NECESSARY] Filtered ${resourceType} fields for role: ${userRole}`);
       return originalJson(filterPayload(data));
     };
     res.send = function wrappedSend(data) {
+      if (!shouldFilterResponse()) {
+        return originalSend(data);
+      }
       logger.debug(`[MINIMUM_NECESSARY] Filtered ${resourceType} fields for role: ${userRole}`);
       return originalSend(filterPayload(data));
     };
@@ -267,7 +298,7 @@ const minimumNecessaryMiddleware = (resourceType) => {
 const filterDataForRole = (data, resourceType, userRole) => {
   const allowedFields = getAllowedFields(userRole, resourceType);
 
-  if (allowedFields === '*') {
+  if (allowsAllFields(allowedFields)) {
     return data;
   }
 
@@ -280,7 +311,7 @@ const filterDataForRole = (data, resourceType, userRole) => {
 const canAccessField = (userRole, resourceType, fieldName) => {
   const allowedFields = getAllowedFields(userRole, resourceType);
 
-  if (allowedFields === '*') {
+  if (allowsAllFields(allowedFields)) {
     return true;
   }
 

@@ -27,6 +27,15 @@ export function normalizeOrgForStore(raw: unknown): Org | null {
                 : null,
           }
         : undefined,
+    familyPortalSettings:
+      o.familyPortalSettings && typeof o.familyPortalSettings === "object"
+        ? {
+            enabled: (o.familyPortalSettings as { enabled?: unknown }).enabled === true,
+            allowInviteAfterDigestVerify:
+              (o.familyPortalSettings as { allowInviteAfterDigestVerify?: unknown })
+                .allowInviteAfterDigestVerify !== false,
+          }
+        : undefined,
   }
 }
 

@@ -80,6 +80,7 @@
   },
   "dependencies": {
     "@bianca-app/shared": "*",
+    "@bianca/legal": "*",
     "@expo-google-fonts/space-grotesk": "^0.2.2",
     "@react-native-async-storage/async-storage": "1.21.0",
     "@react-native-community/cli-server-api": "^18.0.0",

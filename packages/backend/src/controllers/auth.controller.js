@@ -112,6 +112,7 @@ const getInviteInfo = catchAsync(async (req, res) => {
       name: invitedCaregiver.name,
       email: invitedCaregiver.email,
       phone: invitedCaregiver.phone,
+      inviteType: invitedCaregiver.pendingRole === 'family' ? 'family' : 'staff',
     });
   } catch (error) {
     if (error.message === 'Invalid or expired invite token' || error.message === 'Token not found') {
@@ -138,6 +139,9 @@ const registerWithInvite = catchAsync(async (req, res) => {
   const updatePayload = { password, name, phone };
   if (inviteKind === 'superAdmin') {
     updatePayload.role = 'superAdmin';
+  } else if (invitedCaregiver.pendingRole === 'family') {
+    updatePayload.role = 'family';
+    updatePayload.onboardingComplete = true;
   }
 
   const caregiver = await caregiverService.updateCaregiverById(invitedCaregiver.id, updatePayload);
@@ -171,10 +175,39 @@ const registerWithInvite = catchAsync(async (req, res) => {
     });
     // Don't fail registration if consent recording fails - log and continue
   }
-  
-  const caregiverDTO = CaregiverDTO(caregiver);
-  const tokens = await tokenService.generateAuthTokens(caregiver);
-  res.status(httpStatus.CREATED).send({ caregiver: caregiverDTO, tokens });
+
+  const loginShape = await caregiverService.getCaregiverSessionContextById(caregiver.id);
+  const familyResidentLinkService = require('../services/familyResidentLink.service');
+  const sessionExtras = await familyResidentLinkService.enrichAuthSession(
+    loginShape.caregiver,
+    loginShape.clients
+  );
+  const caregiverDTO = CaregiverDTO(loginShape.caregiver, sessionExtras);
+  const tokens = await tokenService.generateAuthTokens(loginShape.caregiver);
+  const clientDTOs = await clientsToDTOsWithLastCall(sessionExtras.clients);
+
+  let orgForDTO = loginShape.org || loginShape.caregiver.org;
+  if (orgForDTO) {
+    const mongoose = require('mongoose');
+    const isObjectId =
+      orgForDTO instanceof mongoose.Types.ObjectId ||
+      (orgForDTO.constructor && orgForDTO.constructor.name === 'ObjectId');
+    const isString = typeof orgForDTO === 'string';
+    const hasOrgProperties = orgForDTO.name !== undefined || orgForDTO.email !== undefined;
+    if (isString || isObjectId || !hasOrgProperties) {
+      const Org = require('../models/org.model');
+      const orgId = isString || isObjectId ? orgForDTO : orgForDTO._id || orgForDTO.toString();
+      orgForDTO = await Org.findById(orgId);
+    }
+  }
+
+  res.status(httpStatus.CREATED).send({
+    caregiver: caregiverDTO,
+    tokens,
+    org: orgForDTO ? OrgDTO(orgForDTO) : null,
+    clients: clientDTOs,
+    alerts: [],
+  });
 });
 
 const login = catchAsync(async (req, res, next) => {
@@ -187,6 +220,8 @@ const login = catchAsync(async (req, res, next) => {
     // Step 1: Validate credentials
     const loginData = await authService.loginCaregiverWithEmailAndPassword(email, password);
     const { caregiver, clients, org } = loginData;
+    const familyResidentLinkService = require('../services/familyResidentLink.service');
+    const sessionExtras = await familyResidentLinkService.enrichAuthSession(caregiver, clients);
 
     // Check if account is locked
     if (caregiver.accountLocked) {
@@ -260,10 +295,11 @@ const login = catchAsync(async (req, res, next) => {
     }
 
     // Step 4: Create session and audit log
-    const alerts = await alertService.getAlerts(caregiverId);
+    const alerts =
+      caregiver.role === 'family' ? [] : await alertService.getAlerts(caregiverId);
     const alertDTOs = alerts.map((alert) => AlertDTO(alert));
-    const clientDTOs = await clientsToDTOsWithLastCall(clients);
-    const caregiverDTO = CaregiverDTO(caregiver);
+    const clientDTOs = await clientsToDTOsWithLastCall(sessionExtras.clients);
+    const caregiverDTO = CaregiverDTO(caregiver, sessionExtras);
     const tokens = await tokenService.generateAuthTokens(caregiver);
     
     // Use org from loginData (already populated) or fallback to caregiver.org

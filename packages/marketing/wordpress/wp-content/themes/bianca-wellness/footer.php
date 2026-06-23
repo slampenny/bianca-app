@@ -17,20 +17,7 @@
 			<?php endif; ?>
 			<p class="bianca-footer__tagline"><?php bloginfo( 'description' ); ?></p>
 		</div>
-		<?php if ( has_nav_menu( 'footer' ) ) : ?>
-			<nav class="bianca-footer__nav" aria-label="<?php esc_attr_e( 'Footer', 'bianca-wellness' ); ?>">
-				<?php
-				wp_nav_menu(
-					array(
-						'theme_location' => 'footer',
-						'container'      => false,
-						'menu_class'     => 'bianca-footer__list',
-						'depth'          => 1,
-					)
-				);
-				?>
-			</nav>
-		<?php endif; ?>
+		<?php bianca_wellness_render_footer_legal_nav(); ?>
 		<div class="bianca-footer__meta">
 			<p class="bianca-footer__email">
 				<a href="mailto:sales@biancawellness.com">sales@biancawellness.com</a>

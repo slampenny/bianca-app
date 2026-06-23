@@ -33,6 +33,17 @@ function bianca_wellness_try_app_page_url() {
 }
 
 /**
+ * Try the App nav target: app when online, book a demo otherwise.
+ */
+function bianca_wellness_try_app_link_url() {
+	if ( bianca_wellness_production_app_window_open() ) {
+		return bianca_wellness_try_app_page_url();
+	}
+
+	return bianca_wellness_book_demo_url();
+}
+
+/**
  * Whether production app EC2 is scheduled to be running (America/Los_Angeles).
  * Mirrors packages/backend/devops/terraform/production-schedule.tf defaults.
  */
@@ -127,7 +138,7 @@ function bianca_wellness_default_nav() {
 		array( 'href' => '/about', 'label' => __( 'Company', 'bianca-wellness' ) ),
 		array( 'href' => '/blog', 'label' => __( 'Resources', 'bianca-wellness' ) ),
 		array( 'href' => '/contact', 'label' => __( 'Contact Us', 'bianca-wellness' ) ),
-		array( 'href' => bianca_wellness_try_app_page_url(), 'label' => __( 'Try the App', 'bianca-wellness' ) ),
+		array( 'href' => bianca_wellness_try_app_link_url(), 'label' => __( 'Try the App', 'bianca-wellness' ) ),
 	);
 	echo '<ul class="bianca-nav__list">';
 	foreach ( $items as $item ) {
@@ -137,16 +148,45 @@ function bianca_wellness_default_nav() {
 	echo '</ul>';
 }
 
+require_once get_template_directory() . '/inc/book-demo.php';
 require_once get_template_directory() . '/inc/seed-content.php';
+require_once get_template_directory() . '/inc/legal-content.php';
+require_once get_template_directory() . '/inc/page-title.php';
 
 /**
- * Create /try-the-app/ page (off-hours copy; in-hours redirect below).
+ * Point assigned "Try the App" menu items at Book a Demo when the app is offline.
+ *
+ * @param WP_Post[] $items Menu items.
+ * @param stdClass  $args  wp_nav_menu() args.
  */
-function bianca_wellness_seed_try_app_page() {
-	if ( get_option( 'bianca_wellness_try_app_seeded' ) ) {
-		return;
+function bianca_wellness_filter_try_app_menu_links( $items, $args ) {
+	if ( bianca_wellness_production_app_window_open() ) {
+		return $items;
 	}
 
+	if ( empty( $args->theme_location ) || ! in_array( $args->theme_location, array( 'primary', 'footer' ), true ) ) {
+		return $items;
+	}
+
+	$demo_url = bianca_wellness_book_demo_url();
+
+	foreach ( $items as $item ) {
+		$path = wp_parse_url( $item->url, PHP_URL_PATH );
+		$slug = is_string( $path ) ? trim( $path, '/' ) : '';
+
+		if ( $slug === 'try-the-app' || stripos( $item->title, 'Try the App' ) !== false ) {
+			$item->url = $demo_url;
+		}
+	}
+
+	return $items;
+}
+add_filter( 'wp_nav_menu_objects', 'bianca_wellness_filter_try_app_menu_links', 10, 2 );
+
+/**
+ * Create /try-the-app/ page if missing (redirect handles all visitor traffic).
+ */
+function bianca_wellness_seed_try_app_page() {
 	$existing = get_posts(
 		array(
 			'name'           => 'try-the-app',
@@ -161,37 +201,16 @@ function bianca_wellness_seed_try_app_page() {
 		return;
 	}
 
-	$content = '<!-- wp:group {"className":"bianca-container bianca-prose"} -->
-<div class="wp-block-group bianca-container bianca-prose"><!-- wp:heading -->
-<h2 class="wp-block-heading">Try the App</h2>
-<!-- /wp:heading -->
-
-<!-- wp:paragraph -->
-<p>Self-serve signup and the Bianca web app are online daily from <strong>7:00am to 1:00pm Pacific Time</strong>.</p>
-<!-- /wp:paragraph -->
-
-<!-- wp:paragraph -->
-<p>Outside that window the app is temporarily unavailable while we keep infrastructure costs down. You can still explore Bianca with us directly.</p>
-<!-- /wp:paragraph -->
-
-<!-- wp:buttons -->
-<div class="wp-block-buttons"><!-- wp:button -->
-<div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="mailto:sales@biancawellness.com?subject=Demo%20Request">Book a Demo</a></div>
-<!-- /wp:button -->
-
-<!-- wp:button {"className":"is-style-outline"} -->
-<div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="/contact/">Contact Us</a></div>
-<!-- /wp:button --></div>
-<!-- /wp:buttons --></div>
-<!-- /wp:group -->';
+	if ( get_option( 'bianca_wellness_try_app_seeded' ) ) {
+		return;
+	}
 
 	$page_id = wp_insert_post(
 		array(
-			'post_title'   => __( 'Try the App', 'bianca-wellness' ),
-			'post_name'    => 'try-the-app',
-			'post_status'  => 'publish',
-			'post_type'    => 'page',
-			'post_content' => $content,
+			'post_title'  => __( 'Try the App', 'bianca-wellness' ),
+			'post_name'   => 'try-the-app',
+			'post_status' => 'publish',
+			'post_type'   => 'page',
 		),
 		true
 	);
@@ -204,15 +223,19 @@ add_action( 'after_switch_theme', 'bianca_wellness_seed_try_app_page' );
 add_action( 'init', 'bianca_wellness_seed_try_app_page' );
 
 /**
- * During the production window, send /try-the-app/ visitors straight to the app.
+ * /try-the-app/: app when online, Book a Demo form when offline.
  */
 function bianca_wellness_try_app_gate() {
 	if ( ! is_page( 'try-the-app' ) ) {
 		return;
 	}
+
 	if ( bianca_wellness_production_app_window_open() ) {
 		wp_safe_redirect( bianca_wellness_app_url() );
 		exit;
 	}
+
+	wp_safe_redirect( bianca_wellness_book_demo_url() );
+	exit;
 }
 add_action( 'template_redirect', 'bianca_wellness_try_app_gate' );

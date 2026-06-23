@@ -27,6 +27,7 @@
     "dev:mobile:local": "bash scripts/dev-mobile-local.sh",
     "seed": "yarn workspace @bianca-app/backend seed",
     "seed:local": "curl -sf -X POST http://localhost:3000/v1/test/seed && echo ' Database seeded.' || yarn seed",
+    "legal:sync": "bash scripts/sync-legal-marketing.sh",
     "dev:web": "bash scripts/dev-web.sh",
     "dev:admin": "yarn workspace @bianca-app/admin dev",
     "dev:observability": "yarn workspace @bianca-app/backend docker:observability",

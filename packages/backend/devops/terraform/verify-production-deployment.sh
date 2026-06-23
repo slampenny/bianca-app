@@ -3,7 +3,7 @@
 
 set -e
 
-REGION="us-east-2"
+REGION="ca-central-1"
 PIPELINE_NAME="bianca-production-pipeline"
 CODEDEPLOY_APP="bianca-production"
 CODEDEPLOY_GROUP="bianca-production-ec2"

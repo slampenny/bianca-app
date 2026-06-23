@@ -8,25 +8,19 @@ export type DialogProps = {
   title: string
   children?: ReactNode
   wide?: boolean
-  /** ID for aria-labelledby; auto-generated from title if omitted. */
-  titleId?: string
 }
 
-export function Dialog({ open, onOpenChange, title, children, wide, titleId }: DialogProps) {
-  const labelledBy = titleId ?? "bianca-dialog-title"
-
+export function Dialog({ open, onOpenChange, title, children, wide }: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="bianca-dialog-overlay" />
         <DialogPrimitive.Content
           className={["bianca-dialog-content", wide ? "bianca-dialog-content--wide" : ""].filter(Boolean).join(" ")}
-          aria-labelledby={labelledBy}
+          aria-describedby={undefined}
         >
           <div className="bianca-dialog-header">
-            <DialogPrimitive.Title id={labelledBy} className="bianca-dialog-title">
-              {title}
-            </DialogPrimitive.Title>
+            <DialogPrimitive.Title className="bianca-dialog-title">{title}</DialogPrimitive.Title>
           </div>
           {children ? <div className="bianca-dialog-body">{children}</div> : null}
         </DialogPrimitive.Content>
@@ -44,27 +38,24 @@ export type ModalProps = {
   closeLabel: string
   footer?: ReactNode
   children: ReactNode
-  titleId?: string
 }
 
 /** Flexible modal with optional subtitle, close control, and custom footer. */
-export function Modal({ open, onOpenChange, title, subtitle, wide, closeLabel, footer, children, titleId }: ModalProps) {
-  const labelledBy = titleId ?? "bianca-modal-title"
-
+export function Modal({ open, onOpenChange, title, subtitle, wide, closeLabel, footer, children }: ModalProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="bianca-dialog-overlay" />
         <DialogPrimitive.Content
           className={["bianca-dialog-content", wide ? "bianca-dialog-content--wide" : ""].filter(Boolean).join(" ")}
-          aria-labelledby={labelledBy}
+          {...(!subtitle ? { "aria-describedby": undefined } : {})}
         >
           <div className="bianca-dialog-header bianca-dialog-header--split">
             <div>
-              <DialogPrimitive.Title id={labelledBy} className="bianca-dialog-title">
-                {title}
-              </DialogPrimitive.Title>
-              {subtitle ? <p className="bianca-dialog-subtitle">{subtitle}</p> : null}
+              <DialogPrimitive.Title className="bianca-dialog-title">{title}</DialogPrimitive.Title>
+              {subtitle ? (
+                <DialogPrimitive.Description className="bianca-dialog-subtitle">{subtitle}</DialogPrimitive.Description>
+              ) : null}
             </div>
             <DialogPrimitive.Close asChild>
               <button type="button" className="bianca-dialog-close bianca-focus-ring" aria-label={closeLabel}>
@@ -111,14 +102,9 @@ export function ConfirmDialog({
     >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="bianca-dialog-overlay" />
-        <DialogPrimitive.Content
-          className="bianca-dialog-content"
-          aria-labelledby="bianca-confirm-dialog-title"
-        >
+        <DialogPrimitive.Content className="bianca-dialog-content" aria-describedby={undefined}>
           <div className="bianca-dialog-header">
-            <DialogPrimitive.Title id="bianca-confirm-dialog-title" className="bianca-dialog-title">
-              {title}
-            </DialogPrimitive.Title>
+            <DialogPrimitive.Title className="bianca-dialog-title">{title}</DialogPrimitive.Title>
           </div>
           {children ? <div className="bianca-dialog-body">{children}</div> : null}
           <div className="bianca-dialog-footer">

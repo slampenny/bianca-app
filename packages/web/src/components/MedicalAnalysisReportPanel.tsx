@@ -1,13 +1,9 @@
 import { useState, type CSSProperties } from "react"
 import { useTranslation, type TFunction } from "react-i18next"
+import { invertRiskScore } from "../lib/analysisScoreDisplay"
 import type { MedicalAnalysisResult, MedicalAnalysisSummaryResponse } from "../services/api/medicalAnalysisApi"
 
 const MIN_DATA_POINTS = 5
-
-function invertRiskScore(riskScore: number | undefined): number | undefined {
-  if (riskScore === undefined || riskScore === null) return undefined
-  return Math.round(100 - riskScore)
-}
 
 function getHealthLevel(invertedScore: number, t: (key: string) => string): { level: string; color: string } {
   if (invertedScore >= 70) return { level: t("medicalAnalysis.healthGood"), color: "var(--va-emerald-700)" }

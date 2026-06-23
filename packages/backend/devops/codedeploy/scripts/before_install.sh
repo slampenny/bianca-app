@@ -303,6 +303,22 @@ case "$ENVIRONMENT" in
     ;;
 esac
 
+# Mobile app web origin for family portal invite emails (public URL — same pattern as FRONTEND_URL)
+case "$ENVIRONMENT" in
+  production)
+    MOBILE_APP_URL="https://mobile.biancawellness.com"
+    ;;
+  staging)
+    MOBILE_APP_URL="https://staging-mobile.biancawellness.com"
+    ;;
+  demo)
+    MOBILE_APP_URL="https://mobile.biancawellness.com"
+    ;;
+  *)
+    MOBILE_APP_URL="https://staging-mobile.biancawellness.com"
+    ;;
+esac
+
 # Per-resident voice turn / server_vad tuning (non-secret; injected into app container env)
 case "$ENVIRONMENT" in
   production)
@@ -535,6 +551,7 @@ services:
       - API_BASE_URL=$API_BASE_URL
       - WEBSOCKET_URL=$WEBSOCKET_URL
       - FRONTEND_URL=$FRONTEND_URL
+      - MOBILE_APP_URL=$MOBILE_APP_URL
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_HOST=asterisk
       - DEPLOYMENT_TYPE=docker-compose

@@ -125,11 +125,23 @@ if ($menu) {
     ));
     
     wp_update_nav_menu_item($menu->term_id, 0, array(
+        'menu-item-title' => 'HIPAA Privacy Practices',
+        'menu-item-url' => '/privacy-practices',
+        'menu-item-status' => 'publish',
+        'menu-item-type' => 'custom',
+        'menu-item-parent-id' => $resources_id,
+    ));
+    
+    wp_update_nav_menu_item($menu->term_id, 0, array(
         'menu-item-title' => 'Try the App',
         'menu-item-url' => '/try-the-app/',
         'menu-item-status' => 'publish',
         'menu-item-type' => 'custom',
     ));
+    
+    $locations = get_theme_mod('nav_menu_locations', array());
+    $locations['primary'] = (int) $menu->term_id;
+    set_theme_mod('nav_menu_locations', $locations);
     
     echo "✅ Menu recreated with proper hierarchy\n";
 } else {

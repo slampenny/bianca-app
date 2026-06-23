@@ -37,6 +37,7 @@ $menu_items = array(
     array('title' => 'Support', 'url' => '/support', 'parent' => 'Resources'),
     array('title' => 'Privacy Policy', 'url' => '/privacy', 'parent' => 'Resources'),
     array('title' => 'Terms of Service', 'url' => '/terms', 'parent' => 'Resources'),
+    array('title' => 'HIPAA Privacy Practices', 'url' => '/privacy-practices', 'parent' => 'Resources'),
     array('title' => 'Try the App', 'url' => '/try-the-app/', 'parent' => 0),
 );
 
@@ -61,6 +62,11 @@ foreach ($menu_items as $item) {
     
     echo "Added: {$item['title']}\n";
 }
+
+$locations = get_theme_mod( 'nav_menu_locations', array() );
+$locations['primary'] = (int) $menu_id;
+set_theme_mod( 'nav_menu_locations', $locations );
+echo "Assigned menu to primary theme location\n";
 
 echo "Menu created successfully\n";
 

@@ -79,6 +79,9 @@ export const authSlice = createSlice({
       state.tokens = payload.tokens
       state.inviteToken = null // Clear invite token after successful registration
       state.pendingOnboarding = payload.caregiver?.onboardingComplete === false
+      if (payload.caregiver?.clients?.length) {
+        state.lovedOneSetupComplete = true
+      }
     })
     builder.addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
       state.tokens = null

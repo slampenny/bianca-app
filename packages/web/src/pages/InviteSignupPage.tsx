@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { AuthPageShell } from "../auth/AuthPageShell"
 import { useGetInviteInfoQuery, useRegisterWithInviteMutation } from "../services/api/authApi"
+import { buildMobileFamilySignupUrl } from "../config/mobileApp"
 import { orgStubFromCaregiverOrgId } from "../lib/normalizeOrg"
 import { validatePhoneDigits } from "../lib/passwordRules"
 import { validatePasswordRulesI18n } from "../lib/passwordI18n"
@@ -18,6 +19,7 @@ export function InviteSignupPage() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = useMemo(() => searchParams.get("token")?.trim() ?? "", [searchParams])
+  const isFamilyParam = searchParams.get("family") === "1"
   const navigate = useNavigate()
   const dispatch = useAppDispatch()
 
@@ -41,6 +43,19 @@ export function InviteSignupPage() {
     setEmail(inviteInfo.email || "")
     setPhone(inviteInfo.phone || "")
   }, [inviteInfo])
+
+  const isFamilyInvite =
+    isFamilyParam || inviteInfo?.inviteType === "family"
+  const redirectingToMobile = Boolean(
+    token && (isFamilyParam || (inviteLoading && !inviteError) || isFamilyInvite),
+  )
+
+  useEffect(() => {
+    if (!token) return
+    if (!isFamilyInvite) return
+    if (!isFamilyParam && inviteLoading) return
+    window.location.replace(buildMobileFamilySignupUrl(token))
+  }, [token, isFamilyParam, isFamilyInvite, inviteLoading])
 
   const inviteErrMsg = inviteError
     ? (() => {
@@ -98,13 +113,18 @@ export function InviteSignupPage() {
           {t("invite.missingTokenBanner")}
         </div>
       ) : null}
-      {token && inviteLoading ? <p className="va-auth-muted">{t("invite.loading")}</p> : null}
-      {token && inviteErrMsg && !inviteLoading ? (
+      {token && redirectingToMobile ? (
+        <p className="va-auth-muted">{t("invite.mobileRedirect")}</p>
+      ) : null}
+      {token && inviteLoading && !redirectingToMobile ? (
+        <p className="va-auth-muted">{t("invite.loading")}</p>
+      ) : null}
+      {token && inviteErrMsg && !inviteLoading && !redirectingToMobile ? (
         <div className="va-login-error" role="alert">
           {inviteErrMsg}
         </div>
       ) : null}
-      {token && inviteInfo ? (
+      {token && inviteInfo && !redirectingToMobile ? (
         <form className="va-login-form" onSubmit={handleSubmit}>
           <AuthTextField
             label={t("invite.fullName")}

@@ -35,6 +35,7 @@ import { translate } from "../i18n"
 import { logger } from "../utils/logger"
 import type { ThemeColors } from "../types"
 import { TIMEOUTS } from "../constants"
+import { useAccountMode } from "../hooks/useAccountMode"
 
 // Remote default image URL (Gravatar "mystery person")
 const defaultAvatarUrl = "https://www.gravatar.com/avatar/?d=mp"
@@ -81,10 +82,11 @@ function ClientScreen() {
   const dispatch = useDispatch()
   const currentUser = useSelector(getCurrentUser)
   const client = useSelector(getClient)
+  const { canEditClient, mode, showCallHistory } = useAccountMode()
   const alertsFromStore = useSelector(getAlerts)
   const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
     ...liveAlertsQueryOptions,
-    skip: !currentUser?.id,
+    skip: !currentUser?.id || mode === "orgFamily",
   })
   const { colors, isLoading: themeLoading } = useTheme()
 
@@ -124,8 +126,8 @@ function ClientScreen() {
     return () => { isMountedRef.current = false }
   }, [])
 
-  // B2C mobile: account owners manage their loved ones directly
-  const canCreateOrEditClient = true
+  // B2C mobile: account owners manage their loved ones directly; org-family is read-only
+  const canCreateOrEditClient = canEditClient
   const canManageCaregivers = false
 
   const [updateClient, { isLoading: isUpdating, error: updateError }] = useUpdateClientMutation()
@@ -163,7 +165,7 @@ function ClientScreen() {
       setSuccessMessage("")
       setAvatarBlob(undefined) // Clear any previously selected blob
       setConfirmDelete(false) // Reset delete confirmation
-      setIsEditing(!client.id)
+      setIsEditing(canEditClient && !client.id)
     } else {
       // Reset form for new client
       setName("")
@@ -177,9 +179,9 @@ function ClientScreen() {
       setSuccessMessage("")
       setAvatarBlob(undefined)
       setConfirmDelete(false)
-      setIsEditing(true)
+      setIsEditing(canEditClient)
     }
-  }, [client])
+  }, [client, canEditClient])
 
   // Effect to clear the success message after a delay
   useEffect(() => {
@@ -479,9 +481,9 @@ function ClientScreen() {
         {/* Display Success Message */}
         {successMessage ? <Text style={styles.success} testID="client-saved">{successMessage}</Text> : null}
 
-        {client?.id && !isEditing ? (
+        {client?.id && (!isEditing || !canEditClient) ? (
           <View style={styles.formCard} testID="loved-one-profile-view">
-            <AvatarPicker initialAvatar={avatar} onAvatarChanged={handleAvatarChange} />
+            <AvatarPicker initialAvatar={avatar} onAvatarChanged={handleAvatarChange} readOnly={!canEditClient} />
             <Text style={styles.profileName}>{name}</Text>
             <Text style={styles.profileMeta}>{phone}</Text>
             <Text style={styles.profileMeta}>{getLanguageByCode(preferredLanguage).label}</Text>
@@ -492,24 +494,28 @@ function ClientScreen() {
               style={[styles.button, styles.manageButton]}
               testID="profile-schedule-button"
             />
-            <Button
-              text={translate("clientScreen.callHistory")}
-              onPress={handleManageConversations}
-              preset="default"
-              style={[styles.button, styles.manageButton]}
-              testID="profile-conversations-button"
-            />
-            <Button
-              text={translate("clientScreen.editDetails")}
-              onPress={() => setIsEditing(true)}
-              preset="default"
-              style={[styles.button, styles.manageButton]}
-              testID="profile-edit-button"
-            />
+            {showCallHistory ? (
+              <Button
+                text={translate("clientScreen.callHistory")}
+                onPress={handleManageConversations}
+                preset="default"
+                style={[styles.button, styles.manageButton]}
+                testID="profile-conversations-button"
+              />
+            ) : null}
+            {canEditClient ? (
+              <Button
+                text={translate("clientScreen.editDetails")}
+                onPress={() => setIsEditing(true)}
+                preset="default"
+                style={[styles.button, styles.manageButton]}
+                testID="profile-edit-button"
+              />
+            ) : null}
           </View>
         ) : null}
 
-        {(isEditing || !client?.id) ? (
+        {canEditClient && (isEditing || !client?.id) ? (
         <View style={styles.formCard} testID="client-avatar-picker">
           <AvatarPicker
             // Use local avatar state which defaults correctly
@@ -614,15 +620,17 @@ function ClientScreen() {
                 textStyle={styles.buttonText}
               />
 
-              <Button
-                text={translate("clientScreen.callHistory")}
-                onPress={handleManageConversations}
-                disabled={isLoading}
-                testID="manage-conversations-button"
-                preset="default"
-                style={[styles.button, styles.manageButton]}
-                textStyle={styles.buttonText}
-              />
+              {showCallHistory ? (
+                <Button
+                  text={translate("clientScreen.callHistory")}
+                  onPress={handleManageConversations}
+                  disabled={isLoading}
+                  testID="manage-conversations-button"
+                  preset="default"
+                  style={[styles.button, styles.manageButton]}
+                  textStyle={styles.buttonText}
+                />
+              ) : null}
 
               <Button
                 text={confirmDelete ? translate("clientScreen.confirmDelete") : translate("clientScreen.removeLovedOne")}

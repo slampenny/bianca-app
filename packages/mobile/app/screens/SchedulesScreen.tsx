@@ -22,6 +22,7 @@ import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { Text, Button, Card } from "app/components"
 import type { ThemeColors } from "../types"
+import { useAccountMode } from "../hooks/useAccountMode"
 
 type SchedulesScreenRouteProp = RouteProp<HomeStackParamList, 'Schedule'>
 
@@ -33,6 +34,7 @@ export const SchedulesScreen = () => {
   const selectedSchedule = useSelector(getSchedule)
   const schedules = useSelector(getSchedules)
   const currentUser = useSelector(getCurrentUser)
+  const { readOnlySchedules } = useAccountMode()
   const [updateSchedule, { isLoading: isUpdating, isError: isUpdatingError }] =
     useUpdateScheduleMutation()
   const [createNewSchedule, { isLoading: isCreating, isError: isCreatingError }] =
@@ -338,7 +340,7 @@ export const SchedulesScreen = () => {
   }, [schedules, selectedSchedule?.id, dispatch])
 
   const showSchedulePicker = schedules.length > 1
-  const allowNewSchedule = schedules.length === 0
+  const allowNewSchedule = schedules.length === 0 && !readOnlySchedules
 
 
   if (themeLoading) {
@@ -428,6 +430,7 @@ export const SchedulesScreen = () => {
             key={scheduleKey}
             initialSchedule={selectedSchedule}
             onScheduleChange={handleScheduleChange}
+            readOnly={readOnlySchedules}
           />
         }
       />
@@ -445,23 +448,27 @@ export const SchedulesScreen = () => {
       )}
 
       {/* Action Buttons */}
-      <Button
-        text={translate("scheduleScreen.saveSchedule")}
-        onPress={handleSave}
-        style={styles.button}
-        preset="primary"
-        testID="schedule-save-button"
-        accessibilityLabel="schedule-save-button"
-      />
-      {showSchedulePicker && selectedSchedule?.id ? (
-        <Button
-          text={translate("scheduleScreen.deleteSchedule")}
-          onPress={handleDelete}
-          style={styles.button}
-          preset="danger"
-          testID="schedule-delete-button"
-          accessibilityLabel="schedule-delete-button"
-        />
+      {!readOnlySchedules ? (
+        <>
+          <Button
+            text={translate("scheduleScreen.saveSchedule")}
+            onPress={handleSave}
+            style={styles.button}
+            preset="primary"
+            testID="schedule-save-button"
+            accessibilityLabel="schedule-save-button"
+          />
+          {showSchedulePicker && selectedSchedule?.id ? (
+            <Button
+              text={translate("scheduleScreen.deleteSchedule")}
+              onPress={handleDelete}
+              style={styles.button}
+              preset="danger"
+              testID="schedule-delete-button"
+              accessibilityLabel="schedule-delete-button"
+            />
+          ) : null}
+        </>
       ) : null}
     </ScrollView>
   )

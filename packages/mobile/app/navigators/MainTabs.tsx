@@ -24,6 +24,8 @@ import {
   FraudAbuseAnalysisScreen,
   MFASetupScreen,
   SettingsScreen,
+  FamilyWeeklyDigestsScreen,
+  FamilyWeeklyDigestDetailScreen,
 } from "app/screens"
 import { DrawerParamList, SettingsStackParamList } from "./navigationTypes"
 import ProfileButton from "app/components/ProfileButton"
@@ -33,6 +35,7 @@ import { Header } from "app/components/Header"
 import { Icon } from "app/components/Icon"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
+import { useAccountMode } from "../hooks/useAccountMode"
 
 const Stack = createStackNavigator()
 const Tab = createBottomTabNavigator<DrawerParamList>()
@@ -143,12 +146,23 @@ function InsightsStack() {
       <Stack.Screen name="MedicalAnalysis" component={MedicalAnalysisScreen} options={() => ({ title: translate("headers.wellnessCheck") })} />
       <Stack.Screen name="FraudAbuseAnalysis" component={FraudAbuseAnalysisScreen} options={() => ({ title: translate("headers.safetyConcerns") })} />
       <Stack.Screen name="HealthReport" component={HealthReportScreen} options={() => ({ title: translate("headers.mentalHealthReport") })} />
+      <Stack.Screen
+        name="FamilyWeeklyDigests"
+        component={FamilyWeeklyDigestsScreen}
+        options={() => ({ title: translate("familyDigests.title") })}
+      />
+      <Stack.Screen
+        name="FamilyWeeklyDigestDetail"
+        component={FamilyWeeklyDigestDetailScreen}
+        options={() => ({ title: translate("familyDigests.detailTitle") })}
+      />
     </Stack.Navigator>
   )
 }
 
 export default function MainTabNavigator() {
   const unreadAlertCount = useSelector(selectUnreadAlertCount)
+  const { showAlertsTab } = useAccountMode()
   const { colors, fontScale } = useTheme()
   useLanguage()
 
@@ -213,23 +227,25 @@ export default function MainTabNavigator() {
           tabBarAccessibilityLabel: "Insights tab",
         })}
       />
-      <Tab.Screen
-        name="Alert"
-        component={AlertStack}
-        options={() => ({
-          tabBarLabel: translate("tabs.alerts"),
-          tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
-          tabBarBadgeStyle: {
-            maxWidth: "auto",
-            minWidth: 20,
-            paddingHorizontal: 6,
-            justifyContent: "center",
-            alignItems: "center",
-          },
-          tabBarTestID: "tab-alert",
-          tabBarAccessibilityLabel: "Alerts tab",
-        })}
-      />
+      {showAlertsTab ? (
+        <Tab.Screen
+          name="Alert"
+          component={AlertStack}
+          options={() => ({
+            tabBarLabel: translate("tabs.alerts"),
+            tabBarBadge: unreadAlertCount > 0 ? unreadAlertCount : undefined,
+            tabBarBadgeStyle: {
+              maxWidth: "auto",
+              minWidth: 20,
+              paddingHorizontal: 6,
+              justifyContent: "center",
+              alignItems: "center",
+            },
+            tabBarTestID: "tab-alert",
+            tabBarAccessibilityLabel: "Alerts tab",
+          })}
+        />
+      ) : null}
       <Tab.Screen
         name="Settings"
         component={SettingsStackNavigator}

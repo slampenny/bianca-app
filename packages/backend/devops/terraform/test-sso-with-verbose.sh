@@ -22,7 +22,7 @@ echo "   Checking if we can access the SSO token..."
 echo ""
 
 echo "4. Alternative: Try with explicit region..."
-aws sts get-caller-identity --profile jordan --region us-east-2 2>&1
+aws sts get-caller-identity --profile jordan --region ca-central-1 2>&1
 echo ""
 
 echo "5. Check if there's a session file..."

@@ -12,4 +12,6 @@ const PRIMARY_DOMAIN = "biancawellness.com";
 export default {
   PRIMARY_DOMAIN,
   API_URL: `https://staging-api.${PRIMARY_DOMAIN}/v1`,
+  androidPlayStoreUrl: "https://play.google.com/store/apps/details?id=com.negascout.bianca",
+  iosAppStoreUrl: "",
 }

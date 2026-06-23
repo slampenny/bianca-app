@@ -65,6 +65,19 @@ const envVarsSchema = Joi.object({
   API_BASE_URL: Joi.string().uri().description('Base API URL (e.g., https://api.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
   BASE_URL: Joi.string().uri().description('Base URL (alternative to API_BASE_URL)'),
   FRONTEND_URL: Joi.string().uri().description('Frontend URL for email links (e.g., https://app.biancawellness.com). If not set, constructed from PRIMARY_DOMAIN.'),
+  MOBILE_APP_URL: Joi.string()
+    .uri()
+    .description('Mobile app web/signup base URL for family portal invite links (e.g., https://mobile.biancawellness.com).'),
+  IOS_APP_STORE_URL: Joi.string()
+    .uri()
+    .optional()
+    .allow('')
+    .description('Optional App Store listing URL for family invite emails.'),
+  ANDROID_PLAY_STORE_URL: Joi.string()
+    .uri()
+    .optional()
+    .allow('')
+    .description('Google Play listing URL for family invite emails.'),
   ADMIN_FRONTEND_URL: Joi.string()
     .uri()
     .description(
@@ -197,6 +210,21 @@ const getUrlFromDomain = (subdomain, domain, protocol = 'https') => {
   return `${protocol}://${subdomain ? `${subdomain}.` : ''}${domain}`;
 };
 
+/** Re-apply public URL env vars (also after AWS Secrets merge — store URLs may live in Secrets Manager JSON). */
+const applyPublicUrlEnvOverrides = (cfg, sourceEnv = process.env) => {
+  const mobile = sourceEnv.MOBILE_APP_URL?.trim();
+  if (mobile) {
+    cfg.mobileAppUrl = mobile.replace(/\/$/, '');
+  }
+  if (Object.prototype.hasOwnProperty.call(sourceEnv, 'IOS_APP_STORE_URL')) {
+    cfg.iosAppStoreUrl = (sourceEnv.IOS_APP_STORE_URL || '').trim();
+  }
+  const android = sourceEnv.ANDROID_PLAY_STORE_URL?.trim();
+  if (android) {
+    cfg.androidPlayStoreUrl = android;
+  }
+};
+
 // Get primary domain (single source of truth)
 const primaryDomain = envVars.PRIMARY_DOMAIN || 'biancawellness.com';
 
@@ -232,6 +260,17 @@ const baselineConfig = {
       : envVars.NODE_ENV === 'staging'
         ? getUrlFromDomain('staging-admin', primaryDomain)
         : getUrlFromDomain('admin', primaryDomain)),
+  mobileAppUrl:
+    envVars.MOBILE_APP_URL ||
+    (envVars.NODE_ENV === 'development' || envVars.NODE_ENV === 'test'
+      ? 'http://localhost:8084'
+      : envVars.NODE_ENV === 'staging'
+        ? getUrlFromDomain('staging-mobile', primaryDomain)
+        : getUrlFromDomain('mobile', primaryDomain)),
+  iosAppStoreUrl: envVars.IOS_APP_STORE_URL || '',
+  androidPlayStoreUrl:
+    envVars.ANDROID_PLAY_STORE_URL ||
+    'https://play.google.com/store/apps/details?id=com.negascout.bianca',
   billing: { 
     ratePerMinute: 0.1,
     minimumBillableDuration: 30,
@@ -373,6 +412,7 @@ if (envVars.NODE_ENV === 'staging') {
   // On staging, frontend is at staging.biancawellness.com, API is at staging-api.biancawellness.com
   baselineConfig.frontendUrl = envVars.FRONTEND_URL || getUrlFromDomain('staging', primaryDomain);
   baselineConfig.adminFrontendUrl = envVars.ADMIN_FRONTEND_URL || getUrlFromDomain('staging-admin', primaryDomain);
+  baselineConfig.mobileAppUrl = envVars.MOBILE_APP_URL || getUrlFromDomain('staging-mobile', primaryDomain);
   baselineConfig.mongoose.url = envVars.MONGODB_URL || 'mongodb://mongodb:27017/bianca-service';
   baselineConfig.email.smtp.secure = true;
   baselineConfig.twilio.apiUrl = apiBaseUrl;
@@ -456,6 +496,9 @@ baselineConfig.loadSecrets = async () => {
 
     // Apply secrets using domain modules (this will override config with AWS secrets)
     applyAllSecrets(baselineConfig, secrets);
+
+    // Public URLs (MOBILE_APP_URL, store listing URLs) may be in Secrets Manager JSON or container env
+    applyPublicUrlEnvOverrides(baselineConfig, process.env);
 
     // Re-read voice-turn / VAD env (may be in Secrets Manager JSON or docker-compose; merged into process.env above)
     baselineConfig.audio.turnDetection = buildAudioTurnDetectionConfig(process.env);
@@ -571,6 +614,8 @@ Object.defineProperty(baselineConfig, 'env', {
   enumerable: true,
   configurable: true
 });
+
+applyPublicUrlEnvOverrides(baselineConfig, envVars);
 
 // Export the configuration object
 module.exports = baselineConfig;

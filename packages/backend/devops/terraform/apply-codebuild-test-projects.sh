@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 export AWS_PROFILE="${AWS_PROFILE:-jordan}"
-export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-2}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-ca-central-1}"
 
 echo "Using AWS profile: $AWS_PROFILE (override with AWS_PROFILE=...)"
 aws sts get-caller-identity --profile "$AWS_PROFILE"

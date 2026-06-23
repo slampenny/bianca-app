@@ -179,6 +179,7 @@ export const appLocalesAuth = {
     missingToken: "Missing invite token. Open the link from your invitation email.",
     missingTokenBanner: "Missing invite token. Use the link from your email, or ask an admin to resend your invite.",
     loading: "Loading invitation…",
+    mobileRedirect: "Opening the Bianca mobile app to complete your family signup…",
     invalidInvite: "Invalid or expired invite.",
     fullName: "Full name",
     name: "Name",

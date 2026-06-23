@@ -4,7 +4,7 @@
 set -e
 
 BUCKET_NAME="bianca-terraform-state"
-REGION="us-east-2"
+REGION="ca-central-1"
 PROFILE="jordan"
 
 echo "🔍 Checking AWS credentials..."

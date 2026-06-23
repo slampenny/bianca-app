@@ -34,6 +34,7 @@ phases:
         if docker build --build-arg BUILD_ENV=production \
                      --build-arg VITE_API_URL=https://api.biancawellness.com/v1 \
                      --build-arg VITE_ADMIN_APP_ORIGIN=https://admin.biancawellness.com \
+                     --build-arg VITE_MOBILE_APP_URL=https://mobile.biancawellness.com \
                      -t $REPOSITORY_URI_FRONTEND:$IMAGE_TAG \
                      -t $REPOSITORY_URI_FRONTEND:production \
                      -f packages/web/devops/Dockerfile .; then

@@ -21,6 +21,7 @@ export default defineConfig({
       "@bianca-app/shared": path.resolve(__dirname, "../shared/src/index.ts"),
       "@bianca-app/ui/styles.css": path.resolve(__dirname, "../ui/src/styles.css"),
       "@bianca-app/ui": path.resolve(__dirname, "../ui/src/index.ts"),
+      "@bianca/legal": path.resolve(__dirname, "../legal/urls.mjs"),
     },
   },
   server: {

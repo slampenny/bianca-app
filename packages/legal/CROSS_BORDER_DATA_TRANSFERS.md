@@ -1,8 +1,8 @@
 # Cross-Border Data Transfers - PIPEDA Compliance
 
-**Document Type:** Privacy Policy Documentation  
-**Last Updated:** December 2024  
-**Status:** Active
+
+**Last Updated:** June 16, 2026
+
 
 ---
 
@@ -209,10 +209,10 @@ Users will be notified of material changes through:
 
 ## Related Documents
 
-- [Privacy Policy (PIPEDA)](link-to-privacy-policy)
-- [Data Retention Policy](link-to-retention-policy)
-- [Breach Notification Procedures](link-to-breach-procedures)
-- [Privacy Impact Assessments](link-to-pia)
+- [Privacy Policy (Canada)](https://biancawellness.com/privacy-pipeda)
+- [Privacy Policy](https://biancawellness.com/privacy)
+- [Notice of Privacy Practices](https://biancawellness.com/privacy-practices)
+- [Cross-Border Data Transfers](https://biancawellness.com/cross-border-data-transfers)
 
 ---
 

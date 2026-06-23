@@ -167,7 +167,7 @@ services:
       - bianca-network
 
   asterisk:
-    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:production
+    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-asterisk:production
     container_name: production_asterisk
     restart: unless-stopped
     ports:
@@ -188,24 +188,25 @@ services:
       - bianca-network
 
   app:
-    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production
+    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-backend:production
     container_name: production_app
     restart: unless-stopped
     ports:
       - "3000:3000"
     command: ["yarn", "start"]
     environment:
-      - AWS_REGION=us-east-2
+      - AWS_REGION=${region}
       - AWS_SECRET_ID=MySecretsManagerSecret
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - NODE_ENV=production
       - API_BASE_URL=https://api.biancawellness.com
       - WEBSOCKET_URL=wss://api.biancawellness.com
       - FRONTEND_URL=https://app.biancawellness.com
+      - MOBILE_APP_URL=https://mobile.biancawellness.com
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_PRIVATE_IP=asterisk
       - ASTERISK_PUBLIC_IP=$${PUBLIC_IP}
-      - AWS_SES_REGION=us-east-2
+      - AWS_SES_REGION=${region}
       - EMAIL_FROM=no-reply@biancawellness.com
       - TWILIO_PHONENUMBER=+16047060134
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
@@ -216,7 +217,7 @@ services:
       - USE_PRIVATE_NETWORK_FOR_RTP=true
       - NETWORK_MODE=DOCKER_COMPOSE
       - APP_RTP_PORT_RANGE=20002-30000
-      - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:us-east-2:730335291008:bianca-emergency-alerts
+      - EMERGENCY_SNS_TOPIC_ARN=arn:aws:sns:${region}:${aws_account_id}:bianca-emergency-alerts
     volumes:
       - ~/.aws:/root/.aws:ro
     depends_on:
@@ -226,7 +227,7 @@ services:
       - bianca-network
 
   frontend:
-    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:production
+    image: ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-frontend:production
     container_name: production_frontend
     restart: unless-stopped
     ports:
@@ -294,7 +295,7 @@ EOF
 
 # Login to ECR (as root for systemd)
 echo "Logging into ECR..."
-aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+aws ecr get-login-password --region ${region} | docker login --username AWS --password-stdin ${aws_account_id}.dkr.ecr.${region}.amazonaws.com
 
 # Format and mount EBS volume for MongoDB data (same behavior as staging-userdata.sh).
 # The Terraform-tagged volume (bianca-production-mongodb-data) is attached as /dev/sdf by
@@ -344,7 +345,7 @@ docker-compose up -d
 
 # Copy source code to host for editing (after containers are running)
 echo "Copying source code to host for editing..."
-docker run --rm --user root -v /opt/bianca-production/app:/target 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:production sh -c "cp -r /usr/src/bianca-app/* /target/"
+docker run --rm --user root -v /opt/bianca-production/app:/target ${aws_account_id}.dkr.ecr.${region}.amazonaws.com/bianca-app-backend:production sh -c "cp -r /usr/src/bianca-app/* /target/"
 
 # Debug: Check what we copied
 echo "Checking copied files on host:"

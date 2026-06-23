@@ -100,6 +100,7 @@ phases:
                      --build-arg BUILD_ENV=staging \
                      --build-arg VITE_API_URL=https://staging-api.biancawellness.com/v1 \
                      --build-arg VITE_ADMIN_APP_ORIGIN=https://staging-admin.biancawellness.com \
+                     --build-arg VITE_MOBILE_APP_URL=https://staging-mobile.biancawellness.com \
                      -t $ECR_REGISTRY/bianca-app-frontend:latest \
                      -t $ECR_REGISTRY/bianca-app-frontend:staging \
                      -f packages/web/devops/Dockerfile .; then

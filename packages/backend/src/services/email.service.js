@@ -1083,6 +1083,51 @@ ${closing}`;
   }
 };
 
+const sendFamilyPortalInviteEmail = async (to, orgName, residentFirstName, inviteLink, locale = 'en') => {
+  const iosUrl = (config.iosAppStoreUrl || '').trim();
+  const androidUrl = (config.androidPlayStoreUrl || '').trim();
+  const storeLines = [];
+  if (iosUrl) storeLines.push(`App Store: ${iosUrl}`);
+  if (androidUrl) storeLines.push(`Google Play: ${androidUrl}`);
+
+  const subject = `View ${residentFirstName}'s updates on Bianca`;
+  const text = [
+    `${orgName} invited you to view wellness updates for ${residentFirstName} in the Bianca mobile app.`,
+    '',
+    'Open this link on your phone to set up your account:',
+    inviteLink,
+    '',
+    storeLines.length ? 'Get the app:' : '',
+    ...storeLines,
+    '',
+    'This link expires in 7 days.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const storeButtons = [
+    iosUrl
+      ? `<a href="${iosUrl}" style="display:inline-block;margin:6px 8px 6px 0;padding:10px 16px;border:1px solid #cbd5e1;border-radius:6px;color:#0f172a;text-decoration:none;font-size:14px;">Download on the App Store</a>`
+      : '',
+    androidUrl
+      ? `<a href="${androidUrl}" style="display:inline-block;margin:6px 0;padding:10px 16px;border:1px solid #cbd5e1;border-radius:6px;color:#0f172a;text-decoration:none;font-size:14px;">Get it on Google Play</a>`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <h2 style="color: #0f172a;">Family updates from ${orgName}</h2>
+      <p>You've been invited to view schedules, call history, and weekly wellness updates for <strong>${residentFirstName}</strong> in the Bianca mobile app.</p>
+      <p style="color:#475569;font-size:15px;line-height:1.5;">For the best experience, open the button below <strong>on your phone</strong>.</p>
+      <p style="margin:24px 0;"><a href="${inviteLink}" style="background:#14b8a6;color:#fff;padding:12px 20px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:600;">Set up your account</a></p>
+      ${storeButtons ? `<p style="margin-top:8px;">${storeButtons}</p>` : ''}
+      <p style="color:#64748b;font-size:14px;margin-top:24px;">This invitation expires in 7 days. If you already use Bianca, sign in with the same email after accepting.</p>
+    </div>`;
+  return sendEmail(to, subject, text, html);
+};
+
 // Export functions
 module.exports = {
   initializeEmailTransport, // Call this at application startup
@@ -1094,6 +1139,7 @@ module.exports = {
   sendPrivacyDataEmail,
   sendClientConsentRequestEmail,
   sendFamilyDigestEmailVerificationEmail,
+  sendFamilyPortalInviteEmail,
   getStatus,
   isReady,
   forceEtherealInitialization,

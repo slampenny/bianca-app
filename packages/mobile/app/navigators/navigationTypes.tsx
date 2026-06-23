@@ -35,6 +35,8 @@ export type ReportsStackParamList = {
   MedicalAnalysis: ClientReportParams | undefined
   FraudAbuseAnalysis: ClientReportParams | undefined
   HealthReport: undefined
+  FamilyWeeklyDigests: { clientId?: string; clientName?: string } | undefined
+  FamilyWeeklyDigestDetail: { digestId: string; clientId: string }
 }
 
 export type DrawerParamList = {
@@ -121,6 +123,7 @@ export type LoginStackParamList = {
   VerifyPhone: undefined
   SSOAccountLinking: { email: string; ssoProvider?: string } | undefined
   Signup: { token?: string }
+  FamilyInviteWelcome: undefined
   MFAVerification: { email: string; password: string; tempToken: string }
   ClientConsent: { token?: string } | undefined
 }

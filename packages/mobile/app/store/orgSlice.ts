@@ -35,6 +35,11 @@ export const orgSlice = createSlice({
           state.org = payload.org as Org
         }
       })
+      .addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
+        if ('org' in payload && payload.org) {
+          state.org = payload.org as Org
+        }
+      })
       // Auto-clear org on logout
       .addMatcher(authApi.endpoints.logout.matchFulfilled, (state) => {
         state.org = null

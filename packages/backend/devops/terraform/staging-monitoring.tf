@@ -77,7 +77,7 @@ resource "aws_cloudwatch_dashboard" "staging_costs" {
           ]
           view    = "timeSeries"
           stacked = false
-          region  = "us-east-2"
+          region  = var.aws_region
           title   = "Staging Instance Metrics"
           period  = 300
         }
@@ -95,7 +95,7 @@ resource "aws_cloudwatch_dashboard" "staging_costs" {
           ]
           view    = "timeSeries"
           stacked = false
-          region  = "us-east-2"
+          region  = var.aws_region
           title   = "Staging Instance Health"
           period  = 300
         }

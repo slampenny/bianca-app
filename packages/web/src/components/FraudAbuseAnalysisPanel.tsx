@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
+import { formatRiskScore } from "../lib/analysisScoreDisplay"
 import type { FraudAbuseAnalysisResult } from "../services/api/fraudAbuseAnalysisApi"
 import { useGetFraudAbuseAnalysisQuery, useTriggerFraudAbuseAnalysisMutation } from "../services/api/fraudAbuseAnalysisApi"
 
@@ -17,7 +18,7 @@ function getRiskLevel(
 }
 
 function formatScore(value: number | undefined): string {
-  return value != null && Number.isFinite(value) ? String(Math.round(value)) : "—"
+  return formatRiskScore(value)
 }
 
 const reportCard: CSSProperties = {

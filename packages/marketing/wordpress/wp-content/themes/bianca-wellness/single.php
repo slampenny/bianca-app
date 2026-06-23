@@ -12,6 +12,11 @@ get_header();
 	while ( have_posts() ) {
 		the_post();
 		the_title( '<h1 class="bianca-page__title">', '</h1>' );
+		if ( has_post_thumbnail() ) {
+			echo '<figure class="bianca-blog__featured">';
+			the_post_thumbnail( 'large' );
+			echo '</figure>';
+		}
 		the_content();
 	}
 	?>

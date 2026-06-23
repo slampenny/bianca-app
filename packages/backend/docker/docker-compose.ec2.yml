@@ -62,6 +62,7 @@ services:
       - API_BASE_URL=https://staging-api.biancawellness.com
       - WEBSOCKET_URL=wss://staging-api.biancawellness.com
       - FRONTEND_URL=https://staging.biancawellness.com
+      - MOBILE_APP_URL=https://staging-mobile.biancawellness.com
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_USERNAME=myphonefriend
       - ASTERISK_PASSWORD=${ARI_PASSWORD}

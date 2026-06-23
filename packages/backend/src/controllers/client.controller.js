@@ -6,7 +6,7 @@ const logger = require('../config/logger');
 const ApiError = require('../utils/ApiError');
 const catchAsync = require('../utils/catchAsync');
 const onboardingService = require('../services/onboarding.service');
-const { caregiverService, conversationService, clientService, scheduleService, callService } = require('../services');
+const { caregiverService, conversationService, clientService, scheduleService, callService, familyPortalService } = require('../services');
 const { Client } = require('../models');
 const { ConversationDTO, ClientDTO, clientsToDTOsWithLastCall, CallListItemDTO } = require('../dtos');
 const { toOrgIdString } = require('../dtos/caregiver.dto');
@@ -42,6 +42,25 @@ const assertStaffHasClientAccess = async (caregiver, clientId, client, denyMessa
   const callCount = await Call.countDocuments({ clientId, caregiverId: caregiver.id });
   if (callCount === 0) {
     throw new ApiError(httpStatus.FORBIDDEN, denyMessage);
+  }
+};
+
+const assertClientNestedResourceAccess = async (caregiver, clientId, client, denyMessage) => {
+  if (caregiver.role === 'staff') {
+    await assertStaffHasClientAccess(caregiver, clientId, client, denyMessage);
+    return;
+  }
+  if (caregiver.role === 'orgAdmin') {
+    const clientOrgId = toOrgIdString(client.org);
+    const caregiverOrgId = toOrgIdString(caregiver.org);
+    if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
+      throw new ApiError(httpStatus.FORBIDDEN, denyMessage);
+    }
+    return;
+  }
+  if (caregiver.role === 'family') {
+    const familyResidentLinkService = require('../services/familyResidentLink.service');
+    await familyResidentLinkService.assertFamilyAccess(caregiver, clientId);
   }
 };
 
@@ -96,6 +115,11 @@ const getClients = catchAsync(async (req, res) => {
     const rosterIds = ((caregiverDoc && caregiverDoc.clients) || []).map((c) => toIdString(c)).filter(Boolean);
     filter.$or = [{ caregivers: toIdString(caregiver._id || caregiver.id) }, { _id: { $in: rosterIds } }];
   }
+  if (caregiver.role === 'family') {
+    const familyResidentLinkService = require('../services/familyResidentLink.service');
+    const links = await familyResidentLinkService.listActiveLinksForCaregiver(caregiver._id || caregiver.id);
+    filter._id = { $in: links.map((l) => l.clientId).filter(Boolean) };
+  }
   const result = await clientService.queryClients(filter, options);
   const clientDTOs = await clientsToDTOsWithLastCall(result.results);
   res.status(httpStatus.OK).json({ ...result, results: clientDTOs });
@@ -124,6 +148,10 @@ const getClient = catchAsync(async (req, res) => {
   const client = await clientService.getClientById(req.params.clientId);
   if (!client) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+  }
+  if (caregiver.role === 'family') {
+    const familyResidentLinkService = require('../services/familyResidentLink.service');
+    await familyResidentLinkService.assertFamilyAccess(caregiver, req.params.clientId);
   }
   const caregiverDoc =
     caregiver.role === 'staff' ? await caregiverService.getCaregiverById(caregiver._id || caregiver.id) : null;
@@ -297,17 +325,14 @@ const getConversationsByClient = catchAsync(async (req, res) => {
   const { caregiver } = req;
   const client = await clientService.getClientById(clientId);
   if (!client) {
-    throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid client ID');
+    throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
   }
-  if (caregiver.role === 'staff') {
-    await assertStaffHasClientAccess(caregiver, clientId, client, "You do not have access to this client's conversations");
-  } else if (caregiver.role === 'orgAdmin') {
-    const clientOrgId = toOrgIdString(client.org);
-    const caregiverOrgId = toOrgIdString(caregiver.org);
-    if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
-      throw new ApiError(httpStatus.FORBIDDEN, "You do not have access to this client's conversations");
-    }
-  }
+  await assertClientNestedResourceAccess(
+    caregiver,
+    clientId,
+    client,
+    "You do not have access to this client's conversations"
+  );
   if (!options.sortBy) options.sortBy = 'createdAt:desc';
   const result = await conversationService.queryConversationsByClient(clientId, options);
   const transformedResults = [];
@@ -344,15 +369,12 @@ const getCallsByClient = catchAsync(async (req, res) => {
   if (!client) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Invalid client ID');
   }
-  if (caregiver.role === 'staff') {
-    await assertStaffHasClientAccess(caregiver, clientId, client, "You do not have access to this client's calls");
-  } else if (caregiver.role === 'orgAdmin') {
-    const clientOrgId = toOrgIdString(client.org);
-    const caregiverOrgId = toOrgIdString(caregiver.org);
-    if (clientOrgId && caregiverOrgId && clientOrgId !== caregiverOrgId) {
-      throw new ApiError(httpStatus.FORBIDDEN, "You do not have access to this client's calls");
-    }
-  }
+  await assertClientNestedResourceAccess(
+    caregiver,
+    clientId,
+    client,
+    "You do not have access to this client's calls"
+  );
   const result = await callService.queryCallsByClient(clientId, options);
   const transformedResults = [];
   for (const call of result.results) {
@@ -475,6 +497,29 @@ const verifyFamilyDigestEmail = catchAsync(async (req, res) => {
   }
 });
 
+const inviteFamilyPortal = catchAsync(async (req, res) => {
+  const result = await familyPortalService.inviteFamilyRecipient(
+    req.caregiver,
+    req.params.clientId,
+    req.body.recipientId
+  );
+  res.status(httpStatus.OK).send(result);
+});
+
+const revokeFamilyPortal = catchAsync(async (req, res) => {
+  const result = await familyPortalService.revokeFamilyRecipient(
+    req.caregiver,
+    req.params.clientId,
+    req.body.recipientId
+  );
+  res.status(httpStatus.OK).send(result);
+});
+
+const getFamilyPortalStatus = catchAsync(async (req, res) => {
+  const result = await familyPortalService.getPortalStatus(req.caregiver, req.params.clientId);
+  res.status(httpStatus.OK).send(result);
+});
+
 module.exports = {
   createClient,
   getClients,
@@ -495,4 +540,7 @@ module.exports = {
   getCaregivers,
   getUnassignedClients,
   assignUnassignedClients,
+  inviteFamilyPortal,
+  revokeFamilyPortal,
+  getFamilyPortalStatus,
 };

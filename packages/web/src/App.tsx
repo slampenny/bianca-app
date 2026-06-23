@@ -113,7 +113,7 @@ function AppRoutes() {
 
 export default function App() {
   const routes = (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <SSOCallbackGate>
         <AuthSessionBridge />
         <AdminSessionHandoffBridge />

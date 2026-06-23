@@ -1,0 +1,16 @@
+{
+  "name": "@bianca/legal",
+  "version": "1.0.0",
+  "description": "Bianca Wellness legal documents — single source of truth",
+  "private": true,
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "import": "./urls.mjs",
+      "require": "./index.js",
+      "default": "./index.js"
+    },
+    "./urls": "./urls.mjs"
+  },
+  "license": "UNLICENSED"
+}

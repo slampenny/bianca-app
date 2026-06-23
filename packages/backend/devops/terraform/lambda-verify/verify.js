@@ -17,9 +17,9 @@ const crypto = require('crypto');
 
 const execAsync = promisify(exec);
 
-const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-2' });
-const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'us-east-2' });
-const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'us-east-2' });
+const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ca-central-1' });
+const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'ca-central-1' });
+const secretsClient = new SecretsManagerClient({ region: process.env.AWS_REGION || 'ca-central-1' });
 
 exports.handler = async (event) => {
   console.log('Starting backup verification test...');

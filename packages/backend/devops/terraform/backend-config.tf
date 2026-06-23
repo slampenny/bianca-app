@@ -4,7 +4,7 @@
 #   backend "s3" {
 #     bucket         = "bianca-terraform-state"
 #     key            = "backend/terraform.tfstate"
-#     region         = "us-east-2"
+#     region         = "ca-central-1"
 #     encrypt        = true
 #     profile        = "jordan"  # Uncomment if needed
 #   }

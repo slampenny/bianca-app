@@ -9,7 +9,7 @@ const createCaregiver = {
     name: Joi.string().required(),
     phone: Joi.string().optional(),
     password: Joi.string().custom(password).optional(),
-    role: Joi.string().valid('invited', 'staff', 'orgAdmin', 'superAdmin').optional(),
+    role: Joi.string().valid('invited', 'staff', 'orgAdmin', 'superAdmin', 'family').optional(),
     active: Joi.boolean().optional(),
     externalId: Joi.string().trim().allow('', null).optional(),
     preferredLanguage: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja', 'pt', 'it', 'ru', 'ko', 'ar', 'hu').optional(),

@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "terms",
+    "title": "Terms of Service",
+    "file": "TERMS.md"
+  },
+  {
+    "slug": "privacy",
+    "title": "Privacy Policy",
+    "file": "PRIVACY.md"
+  },
+  {
+    "slug": "privacy-pipeda",
+    "title": "Privacy Policy (Canada)",
+    "file": "PRIVACY_PIPEDA.md"
+  },
+  {
+    "slug": "privacy-practices",
+    "title": "Notice of Privacy Practices",
+    "file": "NOTICE_OF_PRIVACY_PRACTICES.md"
+  },
+  {
+    "slug": "cross-border-data-transfers",
+    "title": "Cross-Border Data Transfers",
+    "file": "CROSS_BORDER_DATA_TRANSFERS.md"
+  },
+  {
+    "slug": "data-safety",
+    "title": "Data Safety",
+    "file": "DATA_SAFETY.md"
+  }
+]

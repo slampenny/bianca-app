@@ -83,7 +83,7 @@ resource "aws_kms_key_policy" "backup_encryption_policy" {
 ################################################################################
 
 resource "aws_s3_bucket" "hipaa_backups" {
-  bucket = "${var.environment}-bianca-hipaa-backups"
+  bucket = "${var.environment}-bianca-hipaa-backups-cac1"
 
   tags = {
     Name        = "${var.environment}-hipaa-backups"
@@ -231,7 +231,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "hipaa_backups" {
 
 # Enable access logging (audit trail)
 resource "aws_s3_bucket" "backup_access_logs" {
-  bucket = "${var.environment}-bianca-backup-access-logs"
+  bucket = "${var.environment}-bianca-backup-access-logs-cac1"
 
   tags = {
     Name        = "${var.environment}-backup-access-logs"

@@ -18,7 +18,7 @@ export const authApi = createApi({
       }),
     }),
     getInviteInfo: builder.query<
-      { name: string; email: string; phone: string },
+      { name: string; email: string; phone: string; inviteType?: "family" | "staff" },
       { token: string }
     >({
       query: ({ token }) => ({

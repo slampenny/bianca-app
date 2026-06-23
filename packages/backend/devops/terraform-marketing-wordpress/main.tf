@@ -3,6 +3,7 @@ provider "aws" {
   profile = var.aws_profile != "" ? var.aws_profile : null
 }
 
+# TODO: Verify Lightsail is available in ca-central-1 before applying; use EC2 or another service if not.
 locals {
   availability_zone = "${var.aws_region}${var.availability_zone_suffix}"
 }

@@ -121,6 +121,12 @@ const updateOrg = {
           sendTime: Joi.string().pattern(HH_MM_PATTERN).optional().allow(null, ''),
         })
         .optional(),
+      familyPortalSettings: Joi.object()
+        .keys({
+          enabled: Joi.boolean().optional(),
+          allowInviteAfterDigestVerify: Joi.boolean().optional(),
+        })
+        .optional(),
       caregivers: Joi.array().items(Joi.string().custom(objectId)).optional(),
       patients: Joi.array().items(Joi.string().custom(objectId)).optional(),
     })
