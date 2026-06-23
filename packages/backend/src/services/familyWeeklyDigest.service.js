@@ -109,6 +109,11 @@ const ensureCaregiverCanAccessClient = async (caregiver, client) => {
   if (caregiver.role === 'superAdmin') {
     return;
   }
+  if (caregiver.role === 'family') {
+    const familyResidentLinkService = require('./familyResidentLink.service');
+    await familyResidentLinkService.assertFamilyAccess(caregiver, client._id || client.id);
+    return;
+  }
   const clientOrg = toOrgIdString(client.org);
   const caregiverOrg = toOrgIdString(caregiver.org);
   if (!clientOrg || !caregiverOrg || clientOrg !== caregiverOrg) {
@@ -387,6 +392,9 @@ const extractEmailMessageId = (sendResult) => {
 };
 
 const previewDigest = async (caregiver, clientId, weekStartInput) => {
+  if (caregiver.role === 'family') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to preview digests');
+  }
   const client = await Client.findById(clientId);
   await ensureCaregiverCanAccessClient(caregiver, client);
   const org = await Org.findById(client.org);
@@ -471,10 +479,28 @@ const createDigest = async (caregiver, clientId, weekStartInput) => {
 
 const queryDigests = async (caregiver, filter, options) => {
   const base = {};
-  if (caregiver.role !== 'superAdmin') {
+  const { normalizeEmail } = require('../utils/familyDigestEligibility');
+
+  if (caregiver.role === 'family') {
+    if (!filter.clientId) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'Query parameter clientId is required for your role');
+    }
+    const client = await Client.findById(filter.clientId);
+    if (client) {
+      await ensureCaregiverCanAccessClient(caregiver, client);
+    } else {
+      throw new ApiError(httpStatus.NOT_FOUND, 'Client not found');
+    }
+    base.client = filter.clientId;
+    base.status = 'sent';
+    const email = normalizeEmail(caregiver.email);
+    if (email) {
+      base.emailRecipients = email;
+    }
+  } else if (caregiver.role !== 'superAdmin') {
     base.org = caregiver.org;
   }
-  if (filter.clientId) {
+  if (filter.clientId && caregiver.role !== 'family') {
     const c = await Client.findById(filter.clientId);
     if (c) {
       await ensureCaregiverCanAccessClient(caregiver, c);
@@ -497,6 +523,17 @@ const getDigestById = async (caregiver, digestId) => {
   const digest = await FamilyWeeklyDigest.findById(digestId);
   if (!digest) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Digest not found');
+  }
+  if (caregiver.role === 'family') {
+    if (digest.status !== 'sent') {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this digest');
+    }
+    const { normalizeEmail } = require('../utils/familyDigestEligibility');
+    const email = normalizeEmail(caregiver.email);
+    const recipients = digest.emailRecipients || [];
+    if (email && !recipients.map(normalizeEmail).includes(email)) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this digest');
+    }
   }
   await ensureCaregiverCanAccessDigest(caregiver, digest);
   return digest;

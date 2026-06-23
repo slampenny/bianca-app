@@ -189,6 +189,12 @@ const getClients = catchAsync(async (req, res) => {
   res.status(httpStatus.OK).send(clientDTOs);
 });
 
+const getLinkedResidents = catchAsync(async (req, res) => {
+  const familyResidentLinkService = require('../services/familyResidentLink.service');
+  const linkedResidents = await familyResidentLinkService.buildLinkedResidentsForCaregiver(req.caregiver);
+  res.status(httpStatus.OK).send({ linkedResidents });
+});
+
 module.exports = {
   getCaregivers,
   getCaregiver,
@@ -200,4 +206,5 @@ module.exports = {
   addClient,
   removeClient,
   getClients,
+  getLinkedResidents,
 };

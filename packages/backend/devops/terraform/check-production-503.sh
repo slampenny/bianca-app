@@ -4,7 +4,7 @@
 # Or from project root: ./packages/backend/devops/terraform/check-production-503.sh
 
 set -e
-REGION="${AWS_REGION:-us-east-2}"
+REGION="${AWS_REGION:-ca-central-1}"
 
 echo "=== Production 503 diagnostic ==="
 echo ""

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react"
-import { View, ViewStyle, StyleSheet, Linking } from "react-native"
+import { View, ViewStyle, StyleSheet, Linking, Platform } from "react-native"
 import { StackScreenProps } from "@react-navigation/stack"
 import { useRoute } from "@react-navigation/native"
 import { useRegisterWithInviteMutation, useGetInviteInfoQuery } from "../services/api/authApi"
@@ -10,6 +10,7 @@ import { LegalLinks } from "app/components/LegalLinks"
 import { LoginStackParamList } from "app/navigators/navigationTypes"
 import { useTheme } from "app/theme/ThemeContext"
 import { logger } from "../utils/logger"
+import { translate } from "../i18n"
 
 type SignupScreenRouteProp = StackScreenProps<LoginStackParamList, "Signup">
 
@@ -28,6 +29,11 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
     { token: token || "" },
     { skip: !token }
   )
+  const isFamilyInvite =
+    inviteInfo?.inviteType === "family" ||
+    (typeof window !== "undefined" &&
+      window.location &&
+      new URLSearchParams(window.location.search).get("family") === "1")
 
   // Form state - name, email, phone will be prefilled from invite
   const [name, setName] = useState("")
@@ -272,10 +278,12 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
       }).unwrap()
 
       logger.debug("Signup successful:", result)
-      
-      // Navigate to main app since user is now registered and logged in
-      navigation.navigate("MainTabs" as any)
-      
+
+      if (isFamilyInvite && Platform.OS === "web") {
+        navigation.navigate("FamilyInviteWelcome" as keyof LoginStackParamList)
+      } else {
+        navigation.navigate("MainTabs" as any)
+      }
     } catch (error: unknown) {
       const err = error as { data?: { message?: string }; message?: string }
       logger.error("Signup error:", error)
@@ -307,10 +315,15 @@ export const SignupScreen = (props: SignupScreenRouteProp) => {
     )
   }
 
+  const headerTitle = isFamilyInvite ? translate("signupScreen.familyTitle") : translate("signupScreen.title")
+
   return (
     <Screen style={styles.container} testID="signup-screen" accessibilityLabel="signup-screen">
-      <Header titleTx="signupScreen.title" />
+      <Header title={headerTitle} />
       
+      {isFamilyInvite ? (
+        <Text style={styles.infoText}>{translate("signupScreen.familySubtitle")}</Text>
+      ) : null}
       {generalError ? (
         <Text testID="signup-error" style={styles.error}>{generalError}</Text>
       ) : null}

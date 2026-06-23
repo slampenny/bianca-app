@@ -41,7 +41,7 @@ const caregiverSchema = mongoose.Schema(
         // Phone is required for orgAdmin and staff, but not for invited users
         // Also allow phone to be optional during initial setup (before phone verification)
         // This allows email verification to work even if phone isn't set yet
-        if (this.role === 'invited') {
+        if (this.role === 'invited' || this.role === 'family') {
           return false;
         }
         if (this.role === 'orgAdmin' || this.role === 'staff' || this.role === 'superAdmin') {
@@ -97,6 +97,12 @@ const caregiverSchema = mongoose.Schema(
       type: String,
       enum: roles, // assuming roles is an array of valid roles
       default: 'staff',
+    },
+    /** When role is invited, promote to this role on registration (e.g. family vs staff). */
+    pendingRole: {
+      type: String,
+      enum: ['staff', 'family', 'superAdmin'],
+      required: false,
     },
     isEmailVerified: {
       type: Boolean,

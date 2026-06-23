@@ -48,8 +48,8 @@ echo ""
 
 # Prompt for configuration
 read -p "Enter your notification email address: " NOTIFICATION_EMAIL
-read -p "Enter AWS region [us-east-2]: " AWS_REGION
-AWS_REGION=${AWS_REGION:-us-east-2}
+read -p "Enter AWS region [ca-central-1]: " AWS_REGION
+AWS_REGION=${AWS_REGION:-ca-central-1}
 read -p "Enter environment (staging/production) [staging]: " ENVIRONMENT
 ENVIRONMENT=${ENVIRONMENT:-staging}
 

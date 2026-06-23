@@ -9,10 +9,6 @@ import { hasUsableAccessToken } from "../utils/accessToken"
 import { setClient, getClientsForCaregiver, clearClient, setClientsForCaregiver } from "../store/clientSlice"
 import { getAlerts, selectUnreadAlertCount } from "../store/alertSlice"
 import { setSchedules, clearSchedules } from "../store/scheduleSlice"
-import { setPendingCallData, clearCallData } from "../store/callSlice"
-import { clearConversation } from "../store/conversationSlice"
-import { useInitiateCallMutation } from "../services/api/callWorkflowApi"
-import { isAuthCancelledError } from "../services/api/baseQueryWithAuth"
 import type { CompositeNavigationProp } from "@react-navigation/native"
 import { useNavigation, useFocusEffect } from "@react-navigation/native"
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs"
@@ -28,7 +24,7 @@ type HomeScreenNavigationProp = CompositeNavigationProp<
 import { useTheme } from "app/theme/ThemeContext"
 import { translate } from "../i18n"
 import { useLanguage } from "../hooks/useLanguage"
-import { logger } from "../utils/logger"
+import { useAccountMode } from "../hooks/useAccountMode"
 import { PhoneVerificationBanner } from "../components/PhoneVerificationBanner"
 import { caregiverApi } from "../services/api/caregiverApi"
 import { useGetAllAlertsQuery, liveAlertsQueryOptions } from "../services/api/alertApi"
@@ -63,9 +59,10 @@ export function HomeScreen() {
   const dispatch = useDispatch()
   const currentUser: Caregiver | null = useSelector(getCurrentUser)
   const [fetchClientsForCaregiver] = caregiverApi.useLazyGetClientsForCaregiverQuery()
-  const [initiateCall, { isLoading: isInitiatingCall }] = useInitiateCallMutation()
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
   const { colors, isLoading: themeLoading } = useTheme()
+  const { showAlertsTab, showAddClient, mode } = useAccountMode()
+  const isOrgFamily = mode === "orgFamily"
   
   const clients = useSelector((state: RootState) => {
     const user = state.auth.currentUser || (state.auth as { user?: { id: string } }).user
@@ -78,7 +75,7 @@ export function HomeScreen() {
 
   const { data: alertsFromApi } = useGetAllAlertsQuery(undefined, {
     ...liveAlertsQueryOptions,
-    skip: !currentUser?.id,
+    skip: !currentUser?.id || !showAlertsTab,
   })
 
   /** Prefer RTK cache when loaded so home counts stay fresh without clobbering alert Redux merge logic */
@@ -142,8 +139,8 @@ export function HomeScreen() {
   
   // Role-based access control for client creation
   // Only org admins and super admins can create clients
-  // Staff users can only view clients
-  const shouldDisableButton = isStaff
+  // Staff users and org-family accounts cannot create clients
+  const shouldDisableButton = isStaff || !showAddClient
   
   const tooltipMessage = translate("homeScreen.adminOnlyMessage")
 
@@ -164,65 +161,12 @@ export function HomeScreen() {
     navigation.navigate("Client")
   }
 
-  const handleCallNow = async (client: Client) => {
-    try {
-      dispatch(setClient(client))
-      logger.debug('Initiating call for client:', client.id, client.name)
-      const response = await initiateCall({
-        clientId: client.id || '',
-        callNotes: `Manual call initiated by agent to ${client.name}`
-      }).unwrap()
-      
-      logger.debug('Call initiated successfully, response:', response)
-      logger.debug('HomeScreen - response.conversationId:', response.conversationId)
-      
-      // Clear any existing call and conversation data before setting new call
-      dispatch(clearCallData())
-      dispatch(clearConversation())
-      
-      // Set pending call data for CallScreen to consume
-      // Conversation is now created immediately when call is initiated, so conversationId is always available
-      dispatch(setPendingCallData({
-        conversationId: response.conversationId, // Always available now
-        callId: response.callId,
-        callSid: response.callSid,
-        clientId: response.clientId,
-        clientName: response.clientName,
-        clientPhone: response.clientPhone,
-        caregiverId: response.caregiverId,
-        caregiverName: response.caregiverName,
-        status: response.status || 'initiated',
-        callStatus: response.callStatus,
-        callType: response.callType,
-        onboardingDay: response.onboardingDay,
-        onboardingTotalDays: response.onboardingTotalDays,
-        onboardingJourneyComplete: response.onboardingJourneyComplete,
-        onboardingSessionsCompleted: response.onboardingSessionsCompleted,
-        onboardingCurrentStageDay: response.onboardingCurrentStageDay,
-        nextOutboundWillBeOnboarding: response.nextOutboundWillBeOnboarding,
-        isOnboardingCall: response.isOnboardingCall,
-      }))
-      
-      // Navigate to dedicated call screen
-      navigation.navigate("Call")
-    } catch (error: unknown) {
-      if (isAuthCancelledError(error)) {
-        // User closed the auth modal without signing in; no need to log or show a generic error
-        return
-      }
-      console.error('Failed to initiate call:', error)
-      if ((error as any)?.response?.status === 401) {
-        logger.debug('Authentication failed - user may need to login again')
-      } else if ((error as any)?.response?.status >= 400) {
-        console.error('API error:', (error as any)?.response?.data?.message || 'Unknown error')
-      }
-    }
-  }
-
   const styles = createStyles(colors)
   const useHeroLayout = clients.length <= 2
 
   const renderGlanceStats = (item: Client, clientAlertCount: number) => {
+    if (isOrgFamily) return null
+
     const sentimentIcon = sentimentGlanceIcon(
       item.sentimentTrendDirection,
       item.sentimentAnalyzedConversations,
@@ -342,14 +286,6 @@ export function HomeScreen() {
                 </Text>
               </View>
             </View>
-            <Button
-              preset="primary"
-              tx="common.callNow"
-              onPress={() => handleCallNow(item)}
-              loading={isInitiatingCall}
-              testID={`call-now-${item.name}`}
-              style={styles.heroCallButton}
-            />
             {renderGlanceStats(item, clientAlertCount)}
             {hasNoSchedule ? (
               <Text style={styles.warningFooter} testID={`no-schedule-warning-${item.name}`}>
@@ -411,85 +347,87 @@ export function HomeScreen() {
               </Text>
             </View>
           </View>
-          <View style={styles.glanceStats}>
-            <ClientGlanceStat
-              labelTx="homeScreen.glanceSentiment"
-              valueTestID={`client-glance-mood-${item.id}`}
-              value={formatSentimentGlanceLabel(
-                item.sentimentTrendDirection,
-                item.sentimentAnalyzedConversations,
-              )}
-              accessibilityHint={translate("homeScreen.glanceSentimentActionHint")}
-              onPress={() => {
-                if (!item.id) return
-                if (!ensureSignedInForGlanceNavigation()) return
-                primeClientForReports(item)
-                navigation.navigate("Insights", {
-                  screen: "SentimentReport",
-                  params: {
-                    clientId: item.id,
-                    clientName: item.name,
-                    timeRange: "lastCall",
-                  },
-                })
-              }}
-              leftAccessory={
-                sentimentIcon ? (
-                  <Ionicons name={sentimentIcon} size={14} color={sentimentIconColor} />
-                ) : undefined
-              }
-            />
-            <ClientGlanceStat
-              labelTx="homeScreen.glanceHealth"
-              value={formatScoreGlance(item.latestOverallHealthScore)}
-              accessibilityHint={translate("homeScreen.glanceHealthActionHint")}
-              onPress={() => {
-                if (!item.id) return
-                if (!ensureSignedInForGlanceNavigation()) return
-                primeClientForReports(item)
-                navigation.navigate("Insights", {
-                  screen: "MedicalAnalysis",
-                  params: { clientId: item.id, clientName: item.name },
-                })
-              }}
-            />
-            <ClientGlanceStat
-              labelTx="homeScreen.glanceRisk"
-              value={formatScoreGlance(item.latestOverallRiskScore)}
-              accessibilityHint={translate("homeScreen.glanceRiskActionHint")}
-              onPress={() => {
-                if (!item.id) return
-                if (!ensureSignedInForGlanceNavigation()) return
-                primeClientForReports(item)
-                navigation.navigate("Insights", {
-                  screen: "FraudAbuseAnalysis",
-                  params: { clientId: item.id, clientName: item.name },
-                })
-              }}
-            />
-            <ClientGlanceStat
-              labelTx="homeScreen.glanceAlerts"
-              value={String(clientAlertCount)}
-              valueTestID={`client-glance-alerts-${item.id}`}
-              tone={clientAlertCount > 0 ? "danger" : "default"}
-              accessibilityHint={translate("homeScreen.glanceAlertsActionHint")}
-              onPress={() => {
-                if (!item.id) return
-                if (!ensureSignedInForGlanceNavigation()) return
-                navigation.navigate("Alert", {
-                  screen: "AlertList",
-                  params: { filterClientId: item.id, filterClientName: item.name },
-                })
-              }}
-              leftAccessory={
-                clientAlertCount > 0 ? (
-                  <Ionicons name="notifications-outline" size={14} color={colors.palette.biancaError} />
-                ) : undefined
-              }
-            />
-          </View>
+          {!isOrgFamily ? (
+            <View style={styles.glanceStats}>
+              <ClientGlanceStat
+                labelTx="homeScreen.glanceSentiment"
+                valueTestID={`client-glance-mood-${item.id}`}
+                value={formatSentimentGlanceLabel(
+                  item.sentimentTrendDirection,
+                  item.sentimentAnalyzedConversations,
+                )}
+                accessibilityHint={translate("homeScreen.glanceSentimentActionHint")}
+                onPress={() => {
+                  if (!item.id) return
+                  if (!ensureSignedInForGlanceNavigation()) return
+                  primeClientForReports(item)
+                  navigation.navigate("Insights", {
+                    screen: "SentimentReport",
+                    params: {
+                      clientId: item.id,
+                      clientName: item.name,
+                      timeRange: "lastCall",
+                    },
+                  })
+                }}
+                leftAccessory={
+                  sentimentIcon ? (
+                    <Ionicons name={sentimentIcon} size={14} color={sentimentIconColor} />
+                  ) : undefined
+                }
+              />
+              <ClientGlanceStat
+                labelTx="homeScreen.glanceHealth"
+                value={formatScoreGlance(item.latestOverallHealthScore)}
+                accessibilityHint={translate("homeScreen.glanceHealthActionHint")}
+                onPress={() => {
+                  if (!item.id) return
+                  if (!ensureSignedInForGlanceNavigation()) return
+                  primeClientForReports(item)
+                  navigation.navigate("Insights", {
+                    screen: "MedicalAnalysis",
+                    params: { clientId: item.id, clientName: item.name },
+                  })
+                }}
+              />
+              <ClientGlanceStat
+                labelTx="homeScreen.glanceRisk"
+                value={formatScoreGlance(item.latestOverallRiskScore)}
+                accessibilityHint={translate("homeScreen.glanceRiskActionHint")}
+                onPress={() => {
+                  if (!item.id) return
+                  if (!ensureSignedInForGlanceNavigation()) return
+                  primeClientForReports(item)
+                  navigation.navigate("Insights", {
+                    screen: "FraudAbuseAnalysis",
+                    params: { clientId: item.id, clientName: item.name },
+                  })
+                }}
+              />
+              <ClientGlanceStat
+                labelTx="homeScreen.glanceAlerts"
+                value={String(clientAlertCount)}
+                valueTestID={`client-glance-alerts-${item.id}`}
+                tone={clientAlertCount > 0 ? "danger" : "default"}
+                accessibilityHint={translate("homeScreen.glanceAlertsActionHint")}
+                onPress={() => {
+                  if (!item.id) return
+                  if (!ensureSignedInForGlanceNavigation()) return
+                  navigation.navigate("Alert", {
+                    screen: "AlertList",
+                    params: { filterClientId: item.id, filterClientName: item.name },
+                  })
+                }}
+                leftAccessory={
+                  clientAlertCount > 0 ? (
+                    <Ionicons name="notifications-outline" size={14} color={colors.palette.biancaError} />
+                  ) : undefined
+                }
+              />
+            </View>
+          ) : null}
         </View>
-        {hasNoSchedule ? (
+        {!isOrgFamily && hasNoSchedule ? (
           <Text style={styles.warningFooter} testID={`no-schedule-warning-${item.name}`}>
             {translate("homeScreen.noScheduleWarning")}
           </Text>
@@ -506,23 +444,6 @@ export function HomeScreen() {
         ContentComponent={contentBlock}
         RightComponent={
           <View style={styles.buttonContainer}>
-            <Button
-              preset="primary"
-              text="" // Empty text for icon-only button
-              onPress={() => handleCallNow(item)}
-              testID={`call-now-${item.name}`}
-              accessibilityLabel={`Call ${item.name}`}
-              accessibilityHint="Initiates a phone call to this client"
-              style={styles.callButton}
-              textStyle={styles.callButtonText}
-              LeftAccessory={(props) => (
-                <Ionicons 
-                  name="call" 
-                  size={20} 
-                  color={colors.palette.neutral100 || colors.palette.neutral900 || "#FFFFFF"}
-                />
-              )}
-            />
             <Button
               preset="primary"
               text="" // Empty text for icon-only button
@@ -564,10 +485,12 @@ export function HomeScreen() {
         <Text style={styles.pageTitle} testID="home-header" accessibilityLabel="home-header">
           {translate("homeScreen.welcome", { name: currentUser ? currentUser.name : translate("homeScreen.guest") })}
         </Text>
-        <StatusBanner
-          unreadAlertCount={unreadAlertCount}
-          onPressAlerts={() => navigation.navigate("Alert", { screen: "AlertList" })}
-        />
+        {showAlertsTab ? (
+          <StatusBanner
+            unreadAlertCount={unreadAlertCount}
+            onPressAlerts={() => navigation.navigate("Alert", { screen: "AlertList" })}
+          />
+        ) : null}
       </View>
 
       {/* Phone Verification Banner */}
@@ -586,30 +509,32 @@ export function HomeScreen() {
       />
 
       {/* Footer (Add Client) with Tooltip */}
-      <View style={styles.addButtonContainer}>
-        <View
-          onTouchStart={() => { if (shouldDisableButton) setShowTooltip(true) }}
-          onTouchEnd={() => setShowTooltip(false)}
-          {...(Platform.OS === "web" ? {
-            onMouseEnter: () => { if (shouldDisableButton) setShowTooltip(true) },
-            onMouseLeave: () => setShowTooltip(false)
-          } : {})}
-        >
-          <Button
-            text={translate("homeScreen.addClient")}
-            preset="primary"
-            onPress={shouldDisableButton ? undefined : handleAddClient}
-            testID="add-client-button"
-            disabled={shouldDisableButton}
-            style={styles.addButton}
-          />
-        </View>
-        {shouldDisableButton && showTooltip && (
-          <View style={styles.tooltip} testID="add-client-tooltip">
-            <Text style={styles.tooltipText}>{tooltipMessage}</Text>
+      {showAddClient ? (
+        <View style={styles.addButtonContainer}>
+          <View
+            onTouchStart={() => { if (shouldDisableButton) setShowTooltip(true) }}
+            onTouchEnd={() => setShowTooltip(false)}
+            {...(Platform.OS === "web" ? {
+              onMouseEnter: () => { if (shouldDisableButton) setShowTooltip(true) },
+              onMouseLeave: () => setShowTooltip(false)
+            } : {})}
+          >
+            <Button
+              text={translate("homeScreen.addClient")}
+              preset="primary"
+              onPress={shouldDisableButton ? undefined : handleAddClient}
+              testID="add-client-button"
+              disabled={shouldDisableButton}
+              style={styles.addButton}
+            />
           </View>
-        )}
-      </View>
+          {shouldDisableButton && showTooltip && (
+            <View style={styles.tooltip} testID="add-client-tooltip">
+              <Text style={styles.tooltipText}>{tooltipMessage}</Text>
+            </View>
+          )}
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -643,23 +568,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     minHeight: 44,
     // Button component handles theming automatically
   },
-  callButton: {
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginRight: 8,
-    minWidth: 44,
-    minHeight: 44,
-    // Button component handles theming automatically
-  },
-  callButtonText: {
-    // Hide text since we're using icon-only buttons
-    fontSize: 0,
-    lineHeight: 0,
-    width: 0,
-    padding: 0,
-    margin: 0,
-  },
   editButtonText: {
     // Hide text since we're using icon-only buttons
     fontSize: 0,
@@ -686,10 +594,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 64,
     marginRight: 14,
     width: 64,
-  },
-  heroCallButton: {
-    marginTop: 16,
-    width: "100%",
   },
   heroCard: {
     flexDirection: "column",

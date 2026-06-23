@@ -603,19 +603,12 @@ resource "aws_route53_record" "staging_admin_primary" {
 # NOTE: Demo subdomain now points to its own infrastructure (see demo.tf)
 # This record has been moved to demo.tf for isolation
 
-# ACM Certificate for staging (legacy domain)
-data "aws_acm_certificate" "staging_cert" {
-  domain      = "*.myphonefriend.com"
-  statuses    = ["ISSUED"]
-  most_recent = true
-}
-
-# HTTPS Listener for staging - supports both domains via SNI
+# HTTPS Listener for staging - primary domain default cert + legacy SNI for redirects
 resource "aws_lb_listener" "staging_https" {
   load_balancer_arn = aws_lb.staging.arn
   port              = "443"
   protocol          = "HTTPS"
-  certificate_arn   = data.aws_acm_certificate.staging_cert.arn # Legacy cert as default
+  certificate_arn   = aws_acm_certificate_validation.primary_domain_cert.certificate_arn
   ssl_policy        = "ELBSecurityPolicy-TLS-1-2-Ext-2018-06"
 
   default_action {
@@ -624,10 +617,10 @@ resource "aws_lb_listener" "staging_https" {
   }
 }
 
-# Add primary domain certificate to staging listener (SNI - supports multiple certs)
-resource "aws_lb_listener_certificate" "staging_https_primary" {
+# Legacy wildcard certificate (SNI — staging-api/staging.myphonefriend.com HTTPS redirects)
+resource "aws_lb_listener_certificate" "staging_https_legacy" {
   listener_arn    = aws_lb_listener.staging_https.arn
-  certificate_arn = aws_acm_certificate_validation.primary_domain_cert.certificate_arn
+  certificate_arn = aws_acm_certificate_validation.legacy_domain_cert.certificate_arn
 }
 
 # Redirect rules - higher priority (lower number) so redirects happen first

@@ -15,6 +15,7 @@ services:
       - AWS_PROFILE=${AWS_PROFILE:-jordan}
       - AWS_REGION=${AWS_REGION:-us-east-2}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8082}
+      - MOBILE_APP_URL=${MOBILE_APP_URL:-http://localhost:8084}
       # Unset placeholder credentials to avoid conflicts with AWS_PROFILE
       - AWS_ACCESS_KEY_ID=
       - AWS_SECRET_ACCESS_KEY=

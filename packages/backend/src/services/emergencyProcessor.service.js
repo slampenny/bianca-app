@@ -12,6 +12,7 @@ const { snsService } = require('./sns.service');
 const alertService = require('./alert.service');
 const mongoose = require('mongoose');
 const { Client, Caregiver } = require('../models');
+const { isSmsEligibleRole } = require('../utils/familyAccess.util');
 const logger = require('../config/logger');
 
 /**
@@ -528,7 +529,9 @@ class EmergencyProcessor {
         return [];
       }
 
-      return client.caregivers.filter(caregiver => caregiver && caregiver.phone);
+      return client.caregivers.filter(
+        (caregiver) => caregiver && caregiver.phone && isSmsEligibleRole(caregiver.role)
+      );
     } catch (error) {
       logger.error('Error getting client caregivers:', error);
       return [];

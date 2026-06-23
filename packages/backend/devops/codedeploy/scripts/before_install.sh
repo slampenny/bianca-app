@@ -277,7 +277,7 @@ echo "   ✅ Image tag: $IMAGE_TAG"
 # Set Twilio caller ID by environment (demo uses dedicated number)
 case "$ENVIRONMENT" in
   production)
-    TWILIO_PHONENUMBER="+19786256514"
+    TWILIO_PHONENUMBER="+16047060134"
     ;;
   staging)
     TWILIO_PHONENUMBER="+19285758645"
@@ -300,6 +300,22 @@ case "$ENVIRONMENT" in
     ;;
   *)
     SERVER_NAME_ADMIN=""
+    ;;
+esac
+
+# Mobile app web origin for family portal invite emails (public URL — same pattern as FRONTEND_URL)
+case "$ENVIRONMENT" in
+  production)
+    MOBILE_APP_URL="https://mobile.biancawellness.com"
+    ;;
+  staging)
+    MOBILE_APP_URL="https://staging-mobile.biancawellness.com"
+    ;;
+  demo)
+    MOBILE_APP_URL="https://mobile.biancawellness.com"
+    ;;
+  *)
+    MOBILE_APP_URL="https://staging-mobile.biancawellness.com"
     ;;
 esac
 
@@ -535,6 +551,7 @@ services:
       - API_BASE_URL=$API_BASE_URL
       - WEBSOCKET_URL=$WEBSOCKET_URL
       - FRONTEND_URL=$FRONTEND_URL
+      - MOBILE_APP_URL=$MOBILE_APP_URL
       - ASTERISK_URL=http://asterisk:8088
       - ASTERISK_HOST=asterisk
       - DEPLOYMENT_TYPE=docker-compose

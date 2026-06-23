@@ -10,9 +10,10 @@ import { logger } from "../utils/logger"
 interface AvatarPickerProps {
   initialAvatar: string | null
   onAvatarChanged: (avatarData: { uri: string; blob?: Blob }) => void
+  readOnly?: boolean
 }
 
-const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChanged }) => {
+const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChanged, readOnly = false }) => {
   const { colors } = useTheme()
   const [image, setImage] = useState<string | null>(null)
   const { currentLanguage } = useLanguage() // This will trigger re-render when language changes
@@ -123,9 +124,11 @@ const AvatarPicker: React.FC<AvatarPickerProps> = ({ initialAvatar, onAvatarChan
           </View>
         )}
       </View>
-      <Pressable style={styles.selectButton} onPress={pickImage}>
-        <Text style={styles.selectButtonText}>{translate("common.selectImage")}</Text>
-      </Pressable>
+      {!readOnly ? (
+        <Pressable style={styles.selectButton} onPress={pickImage}>
+          <Text style={styles.selectButtonText}>{translate("common.selectImage")}</Text>
+        </Pressable>
+      ) : null}
 
       {/* Debug text to show the current image URI
       {__DEV__ && image && (

@@ -16,9 +16,11 @@ RUN yarn install --immutable || (echo "Lockfile out of sync, updating..." && yar
 ARG BUILD_ENV=production
 ARG VITE_API_URL=
 ARG VITE_ADMIN_APP_ORIGIN=
+ARG VITE_MOBILE_APP_URL=
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_ADMIN_APP_ORIGIN=$VITE_ADMIN_APP_ORIGIN
+ENV VITE_MOBILE_APP_URL=$VITE_MOBILE_APP_URL
 
 WORKDIR /app/packages/web
 RUN echo "Building web (BUILD_ENV=$BUILD_ENV, VITE_API_URL=${VITE_API_URL:-<unset>})..." && \

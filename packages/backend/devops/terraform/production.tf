@@ -541,7 +541,7 @@ resource "aws_lb_listener" "production_https" {
 # Add legacy wildcard certificate to production listener (SNI - for backward compatibility with myphonefriend.com domains)
 resource "aws_lb_listener_certificate" "production_https_legacy" {
   listener_arn    = aws_lb_listener.production_https.arn
-  certificate_arn = data.aws_acm_certificate.app_cert_legacy.arn
+  certificate_arn = aws_acm_certificate_validation.legacy_domain_cert.certificate_arn
 }
 
 # Redirect rules - higher priority (lower number) so redirects happen first

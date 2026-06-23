@@ -3,7 +3,7 @@ import { View, StyleSheet, ActivityIndicator, FlatList, RefreshControl } from "r
 import { Text } from "../components"
 import { useSelector, useDispatch } from "react-redux"
 import { useGetConversationsByClientQuery } from "../services/api/conversationApi"
-import { getClient } from "../store/clientSlice"
+import { getClient, clearClient } from "../store/clientSlice"
 import { getConversations, clearConversations, getConversation, setConversation } from "../store/conversationSlice"
 import { getActiveCall } from "../store/callSlice"
 import { Conversation, Message, RequiredCallQuestionAnswer } from "../services/api/api.types"
@@ -15,6 +15,7 @@ import { Screen } from "../components/Screen"
 import { Card } from "../components/Card"
 import { translate } from "../i18n"
 import { logger } from "../utils/logger"
+import { useNavigation } from "@react-navigation/native"
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   assistantBubble: {
@@ -186,6 +187,7 @@ export function ConversationsScreen() {
   const currentConversation = useSelector(getConversation)
   const activeCall = useSelector(getActiveCall)
   const dispatch = useDispatch()
+  const navigation = useNavigation()
   const [expandedConversations, setExpandedConversations] = useState<Set<string>>(new Set())
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
@@ -230,10 +232,16 @@ export function ConversationsScreen() {
   // Stop pagination on error (e.g. 403) so we don't cycle through pages
   useEffect(() => {
     if (error) {
-      logger.warn('[ConversationsScreen] Conversations request failed, stopping pagination', { error: (error as any)?.status })
+      const status = (error as { status?: number }).status
+      logger.warn('[ConversationsScreen] Conversations request failed, stopping pagination', { error: status })
       setHasMore(false)
+      if (status === 404 || status === 400) {
+        dispatch(clearClient())
+        dispatch(clearConversations())
+        navigation.goBack()
+      }
     }
-  }, [error])
+  }, [error, dispatch, navigation])
 
   useEffect(() => {
     if (client?.id) {

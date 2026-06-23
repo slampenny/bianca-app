@@ -16,7 +16,7 @@ PIPELINE_ENV = {
     "bianca-production-pipeline": "production",
 }
 
-REGION = os.environ.get("AWS_REGION", "us-east-2")
+REGION = os.environ.get("AWS_REGION", "ca-central-1")
 ACCOUNT_ID = os.environ.get("AWS_ACCOUNT_ID", "")
 
 

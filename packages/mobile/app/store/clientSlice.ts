@@ -78,6 +78,22 @@ export const clientSlice = createSlice({
         })
       }
     })
+    builder.addMatcher(authApi.endpoints.registerWithInvite.matchFulfilled, (state, { payload }) => {
+      if ('caregiver' in payload && 'clients' in payload && payload.caregiver && payload.clients) {
+        const caregiverId = payload.caregiver.id!
+        if (!state.clients[caregiverId]) {
+          state.clients[caregiverId] = []
+        }
+        (payload.clients as Client[]).forEach((c: Client) => {
+          const existingIndex = state.clients[caregiverId].findIndex((p) => p.id === c.id)
+          if (existingIndex === -1) {
+            state.clients[caregiverId].push(c)
+          } else {
+            state.clients[caregiverId][existingIndex] = c
+          }
+        })
+      }
+    })
     builder.addMatcher(ssoApi.endpoints.ssoLogin.matchFulfilled, (state, { payload }) => {
       if (payload?.caregiver?.id && payload?.clients) {
         state.clients[payload.caregiver.id] = []

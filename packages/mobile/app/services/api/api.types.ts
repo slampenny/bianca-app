@@ -26,7 +26,16 @@ export interface CaregiverPages {
   totalResults: number
 }
 
-export type CaregiverRole = "admin" | "staff" | "orgAdmin" | "superAdmin" | "unverified"
+export type CaregiverRole = "admin" | "staff" | "orgAdmin" | "superAdmin" | "unverified" | "family"
+
+export type LinkedResident = {
+  clientId: string
+  displayName: string
+  recipientId: string
+  relationship: string
+}
+
+export type AccountMode = "b2c" | "orgFamily"
 
 export type OnboardingPersona = "organization" | "caregiver" | "agingInPlace"
 
@@ -46,6 +55,8 @@ export interface Caregiver {
   ssoProviderId?: string | null
   onboardingComplete?: boolean
   persona?: OnboardingPersona
+  accountMode?: AccountMode
+  linkedResidents?: LinkedResident[]
 }
 
 export interface AlertPages {

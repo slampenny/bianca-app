@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
-import { canManageBilling } from "../lib/roleAccess"
+import { canManageBilling, canManageCaregivers } from "../lib/roleAccess"
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../config/legal"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import {
@@ -14,6 +14,7 @@ import {
 import { useLogoutMutation, useResendVerificationEmailMutation } from "../services/api/authApi"
 import { useGetCaregiverQuery, useUpdateCaregiverMutation, useUploadAvatarMutation } from "../services/api/caregiverApi"
 import { useGetMFAStatusQuery } from "../services/api/mfaApi"
+import { useGetOrgQuery, useUpdateOrgMutation } from "../services/api/orgApi"
 import { AuthSelectField } from "../components/AuthSelectField"
 import { AuthTextField } from "../components/AuthTextField"
 import { AvatarPicker } from "../components/AvatarPicker"
@@ -66,6 +67,20 @@ export function SettingsPage() {
   const isEmailVerified = Boolean(profile?.isEmailVerified || isSsoUser)
   const hasMissingPhone = !profile?.phone || String(profile.phone).trim() === ""
   const canSeeBilling = canManageBilling(user?.role)
+  const isOrgAdmin = canManageCaregivers(user?.role)
+  const orgId = user?.org != null ? String(user.org) : ""
+  const canManageOrgSettings = isOrgAdmin && Boolean(orgId)
+
+  const { data: orgData, isLoading: orgLoading } = useGetOrgQuery({ orgId }, { skip: !canManageOrgSettings })
+  const [updateOrg, { isLoading: savingOrg }] = useUpdateOrgMutation()
+  const [familyPortalEnabled, setFamilyPortalEnabled] = useState(false)
+  const [familyPortalBannerKey, setFamilyPortalBannerKey] = useState<"familyPortalSaved" | "familyPortalSaveFailed" | null>(
+    null,
+  )
+
+  useEffect(() => {
+    setFamilyPortalEnabled(orgData?.familyPortalSettings?.enabled === true)
+  }, [orgData?.familyPortalSettings?.enabled])
 
   useEffect(() => {
     if (!profile) return
@@ -100,6 +115,27 @@ export function SettingsPage() {
     } catch {
       setDailyDigestEmail(!enabled)
       setNotifBannerKey("dailyDigestEmailSaveFailed")
+    }
+  }
+
+  const handleFamilyPortalChange = async (enabled: boolean) => {
+    if (!canManageOrgSettings) return
+    setFamilyPortalBannerKey(null)
+    setFamilyPortalEnabled(enabled)
+    try {
+      await updateOrg({
+        orgId,
+        org: {
+          familyPortalSettings: {
+            enabled,
+            allowInviteAfterDigestVerify: orgData?.familyPortalSettings?.allowInviteAfterDigestVerify !== false,
+          },
+        },
+      }).unwrap()
+      setFamilyPortalBannerKey("familyPortalSaved")
+    } catch {
+      setFamilyPortalEnabled(!enabled)
+      setFamilyPortalBannerKey("familyPortalSaveFailed")
     }
   }
 
@@ -342,6 +378,55 @@ export function SettingsPage() {
           </p>
         ) : null}
       </div>
+
+      {canManageOrgSettings ? (
+        <div className="va-page-section" data-testid="settings-org-family-portal">
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("orgSettings.familyPortalSection")}</h2>
+          {orgLoading && !orgData ? (
+            <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("orgSettings.loading")}</p>
+          ) : (
+            <>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  cursor: savingOrg ? "wait" : "pointer",
+                  fontSize: "0.875rem",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  data-testid="settings-family-portal-enabled"
+                  checked={familyPortalEnabled}
+                  disabled={savingOrg || orgLoading}
+                  onChange={(ev) => void handleFamilyPortalChange(ev.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <span style={{ display: "block", fontWeight: 500 }}>{t("orgSettings.familyPortalEnabledBold")}</span>
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: 4,
+                      color: "var(--va-slate-500)",
+                      fontSize: "0.8125rem",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {t("orgSettings.familyPortalEnabledDetail")}
+                  </span>
+                </span>
+              </label>
+              {familyPortalBannerKey ? (
+                <p style={{ fontSize: "0.8125rem", marginTop: 10, color: "var(--va-slate-600)" }} role="status">
+                  {t(`orgSettings.${familyPortalBannerKey}`)}
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
 
       <div className="va-page-section">
         <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("profile.appearanceTitle")}</h2>

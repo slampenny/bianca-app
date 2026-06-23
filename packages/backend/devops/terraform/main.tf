@@ -1,5 +1,6 @@
 provider "aws" {
-  region = var.aws_region
+  region     = var.aws_region
+  sts_region = "us-east-1" # SSO credential validation; ca-central-1 regional STS may reject SSO tokens
 
   # Only use profile if explicitly set (for local development)
   # In CI/CD (GitHub Actions), use environment variables instead
@@ -13,7 +14,7 @@ provider "aws" {
 variable "aws_region" {
   description = "AWS region for the deployment."
   type        = string
-  default     = "us-east-2"
+  default     = "ca-central-1"
 }
 
 variable "aws_profile" {
@@ -183,7 +184,7 @@ variable "load_balancer_name" {
 variable "bucket_name" {
   description = "Name of the S3 bucket for CodePipeline artifacts."
   type        = string
-  default     = "bianca-codepipeline-artifact-bucket"
+  default     = "bianca-codepipeline-artifact-bucket-cac1"
 }
 
 variable "codepipeline_role_name" {
@@ -231,7 +232,7 @@ variable "github_branch" {
 variable "github_app_connection_arn" {
   description = "ARN of the AWS CodeStar connection to GitHub."
   type        = string
-  default     = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+  default     = "arn:aws:codeconnections:ca-central-1:730335291008:connection/59f13ffa-0768-43f3-8e7b-eb41f5cdf5d3"
 }
 
 # --- Secrets Manager Variables ---
@@ -300,11 +301,51 @@ data "aws_route53_zone" "biancawellness" {
   private_zone = false
 }
 
-# Legacy certificate (for transition period)
-data "aws_acm_certificate" "app_cert_legacy" {
-  domain      = "*.myphonefriend.com"
-  statuses    = ["ISSUED"]
-  most_recent = true
+# Legacy wildcard certificate (myphonefriend.com HTTPS redirects / SNI)
+resource "aws_acm_certificate" "legacy_domain_cert" {
+  domain_name       = "*.myphonefriend.com"
+  validation_method = "DNS"
+
+  subject_alternative_names = ["myphonefriend.com"]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name        = "legacy-domain-ssl"
+    Environment = var.environment
+    Project     = "bianca"
+  }
+}
+
+resource "aws_route53_record" "legacy_cert_validation" {
+  for_each = {
+    for domain in toset(["*.myphonefriend.com", "myphonefriend.com"]) : domain => {
+      name   = [for dvo in aws_acm_certificate.legacy_domain_cert.domain_validation_options : dvo.resource_record_name if dvo.domain_name == domain][0]
+      record = [for dvo in aws_acm_certificate.legacy_domain_cert.domain_validation_options : dvo.resource_record_value if dvo.domain_name == domain][0]
+      type   = [for dvo in aws_acm_certificate.legacy_domain_cert.domain_validation_options : dvo.resource_record_type if dvo.domain_name == domain][0]
+    }
+  }
+
+  zone_id = data.aws_route53_zone.legacy.zone_id
+  name    = each.value.name
+  type    = each.value.type
+  records = [each.value.record]
+  ttl     = 60
+
+  allow_overwrite = true
+}
+
+resource "aws_acm_certificate_validation" "legacy_domain_cert" {
+  certificate_arn = aws_acm_certificate.legacy_domain_cert.arn
+  validation_record_fqdns = [
+    for record in aws_route53_record.legacy_cert_validation : record.fqdn
+  ]
+
+  timeouts {
+    create = "5m"
+  }
 }
 
 # Get latest Amazon Linux 2 AMI if not specified
@@ -1694,7 +1735,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_ses_policy_attach" {
 
 # S3 Debug Audio Bucket and Policy
 resource "aws_s3_bucket" "debug_audio_bucket" {
-  bucket = "bianca-audio-debug"
+  bucket = "bianca-audio-debug-cac1"
   tags = {
     Name        = "Bianca Debug Audio Bucket"
     Environment = "Debug"
@@ -1716,7 +1757,7 @@ resource "aws_iam_policy" "ecs_task_s3_debug_audio_policy" {
     Statement = [{
       Effect   = "Allow",
       Action   = ["s3:PutObject"],
-      Resource = "arn:aws:s3:::bianca-audio-debug/*"
+      Resource = "arn:aws:s3:::bianca-audio-debug-cac1/*"
     }]
   })
 }
@@ -2186,10 +2227,19 @@ resource "aws_acm_certificate" "primary_domain_cert" {
 # Route53 validation records for primary domain certificate
 resource "aws_route53_record" "primary_cert_validation" {
   for_each = {
-    for dvo in aws_acm_certificate.primary_domain_cert.domain_validation_options : dvo.domain_name => {
-      name   = dvo.resource_record_name
-      record = dvo.resource_record_value
-      type   = dvo.resource_record_type
+    for domain in toset([
+      "api.${var.primary_domain}",
+      "app.${var.primary_domain}",
+      "admin.${var.primary_domain}",
+      "staging.${var.primary_domain}",
+      "staging-api.${var.primary_domain}",
+      "staging-admin.${var.primary_domain}",
+      "sip.${var.primary_domain}",
+      "staging-sip.${var.primary_domain}",
+    ]) : domain => {
+      name   = [for dvo in aws_acm_certificate.primary_domain_cert.domain_validation_options : dvo.resource_record_name if dvo.domain_name == domain][0]
+      record = [for dvo in aws_acm_certificate.primary_domain_cert.domain_validation_options : dvo.resource_record_value if dvo.domain_name == domain][0]
+      type   = [for dvo in aws_acm_certificate.primary_domain_cert.domain_validation_options : dvo.resource_record_type if dvo.domain_name == domain][0]
     }
   }
 
@@ -2718,10 +2768,10 @@ output "artifact_bucket_name" {
 }
 
 resource "aws_s3_bucket" "terraform_state" {
-  bucket        = "bianca-terraform-state"
+  bucket        = "bianca-terraform-state-ca-central-1"
   force_destroy = true
   tags = {
-    Name    = "bianca-terraform-state"
+    Name    = "bianca-terraform-state-ca-central-1"
     Purpose = "Terraform remote state storage"
   }
 }

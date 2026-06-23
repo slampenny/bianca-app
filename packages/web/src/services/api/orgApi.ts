@@ -19,6 +19,10 @@ export type OrgUpdatePayload = {
     enabled?: boolean
     sendTime?: string | null
   }
+  familyPortalSettings?: {
+    enabled?: boolean
+    allowInviteAfterDigestVerify?: boolean
+  }
 }
 
 export const orgApi = createApi({

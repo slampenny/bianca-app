@@ -5,6 +5,8 @@ export interface ConfigBaseProps {
   paymentMethodGatewayUrl: string
   assetsBaseUrl: string
   appIconUrl: string
+  iosAppStoreUrl?: string
+  androidAppStoreUrl?: string
 }
 
 export type PersistNavigationConfig = ConfigBaseProps["persistNavigation"]
@@ -32,6 +34,9 @@ const BaseConfig: ConfigBaseProps = {
   
   // S3 URL for app icon
   appIconUrl: "https://bianca-app-assets.s3.us-east-2.amazonaws.com/icon.png",
+
+  iosAppStoreUrl: "",
+  androidPlayStoreUrl: "https://play.google.com/store/apps/details?id=com.negascout.bianca",
 }
 
 export default BaseConfig

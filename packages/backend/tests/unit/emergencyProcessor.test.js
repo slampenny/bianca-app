@@ -372,4 +372,28 @@ describe('Emergency Processor', () => {
       expect(result.alertData.severity).toBe('CRITICAL');
     });
   });
+
+  describe('getClientCaregivers', () => {
+    test('excludes family role caregivers from emergency SMS recipients', async () => {
+      const { Caregiver } = require('../../src/models');
+      const familyMember = await Caregiver.create({
+        name: 'Family Viewer',
+        phone: '+16045624299',
+        email: 'family.viewer@example.com',
+        password: 'testpassword123',
+        org: mockCaregivers[0].org,
+        role: 'family',
+      });
+
+      mockClient.caregivers.push(familyMember._id);
+      await mockClient.save();
+
+      const smsRecipients = await processor.getClientCaregivers(mockClient._id.toString());
+      const roles = smsRecipients.map((c) => c.role);
+
+      expect(roles).not.toContain('family');
+      expect(smsRecipients.length).toBe(mockCaregivers.length);
+      expect(smsRecipients.every((c) => c.phone)).toBe(true);
+    });
+  });
 });

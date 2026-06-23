@@ -9,7 +9,9 @@ import { getClientsForCaregiver, setClient } from "../store/clientSlice"
 import { Client } from "../services/api/api.types"
 import { translate } from "../i18n"
 import { Button, Text, Card } from "app/components"
-type ReportKey = "sentiment" | "medical" | "fraudAbuse"
+import { useAccountMode } from "../hooks/useAccountMode"
+
+type ReportKey = "sentiment" | "medical" | "fraudAbuse" | "weeklyDigests"
 
 type ReportDef = {
   key: ReportKey
@@ -34,6 +36,17 @@ const PRIMARY_REPORTS: ReportDef[] = [
     primary: true,
   },
 ]
+
+const WEEKLY_DIGEST_REPORT: ReportDef = {
+  key: "weeklyDigests",
+  titleKey: "familyDigests.title",
+  hintKey: "familyDigests.listHint",
+  icon: "mail-outline",
+  accent: "rgba(20, 184, 166, 0.12)",
+  iconColor: "#0F766E",
+  testID: "family-weekly-digests-button",
+  primary: true,
+}
 
 const SECONDARY_REPORTS: ReportDef[] = [
   {
@@ -60,6 +73,8 @@ export function ReportsScreen() {
   const navigation = useNavigation()
   const dispatch = useDispatch()
   const currentUser = useSelector(getCurrentUser)
+  const { mode } = useAccountMode()
+  const isOrgFamily = mode === "orgFamily"
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [showClientPicker, setShowClientPicker] = useState(false)
   const { colors, isLoading: themeLoading } = useTheme()
@@ -81,6 +96,16 @@ export function ReportsScreen() {
   const openReport = (key: ReportKey) => {
     if (!selectedClient) return
     dispatch(setClient(selectedClient))
+    if (key === "weeklyDigests") {
+      navigation.navigate(
+        "FamilyWeeklyDigests" as never,
+        {
+          clientId: selectedClient.id,
+          clientName: selectedClient.name,
+        } as never,
+      )
+      return
+    }
     if (key === "sentiment") navigation.navigate("SentimentReport" as never)
     else if (key === "medical") navigation.navigate("MedicalAnalysis" as never)
     else navigation.navigate("FraudAbuseAnalysis" as never)
@@ -158,13 +183,25 @@ export function ReportsScreen() {
         <Text style={styles.singleClientLabel}>{selectedClient.name}</Text>
       ) : null}
 
-      <Text style={styles.intro} tx="reportsScreen.intro" />
+      <Text style={styles.intro} tx={isOrgFamily ? "familyDigests.intro" : "reportsScreen.intro"} />
 
-      <Text style={styles.sectionLabel} tx="reportsScreen.primarySection" />
-      <View style={styles.grid}>{PRIMARY_REPORTS.map(renderReportCard)}</View>
+      {isOrgFamily ? (
+        <>
+          <Text style={styles.sectionLabel}>{translate("familyDigests.sectionTitle")}</Text>
+          <View style={styles.grid}>{renderReportCard(WEEKLY_DIGEST_REPORT)}</View>
+        </>
+      ) : (
+        <>
+          <Text style={styles.sectionLabel} tx="reportsScreen.primarySection" />
+          <View style={styles.grid}>{PRIMARY_REPORTS.map(renderReportCard)}</View>
 
-      <Text style={styles.sectionLabelSecondary} tx="reportsScreen.secondarySection" />
-      <View style={styles.grid}>{SECONDARY_REPORTS.map(renderReportCard)}</View>
+          <Text style={styles.sectionLabel}>{translate("familyDigests.sectionTitle")}</Text>
+          <View style={styles.grid}>{renderReportCard(WEEKLY_DIGEST_REPORT)}</View>
+
+          <Text style={styles.sectionLabelSecondary} tx="reportsScreen.secondarySection" />
+          <View style={styles.grid}>{SECONDARY_REPORTS.map(renderReportCard)}</View>
+        </>
+      )}
 
       <Modal
         visible={showClientPicker}

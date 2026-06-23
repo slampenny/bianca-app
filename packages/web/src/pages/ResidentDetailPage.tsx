@@ -19,6 +19,9 @@ import {
   usePatchClientMutation,
   useSendFamilyDigestEmailVerificationMutation,
   useUploadClientAvatarMutation,
+  useGetFamilyPortalStatusQuery,
+  useInviteFamilyPortalMutation,
+  useRevokeFamilyPortalMutation,
 } from "../services/api/clientApi"
 import { useGetSentimentSummaryQuery, useGetSentimentTrendQuery } from "../services/api/sentimentApi"
 import { useGetMedicalAnalysisResultsQuery, useGetMedicalAnalysisSummaryQuery } from "../services/api/medicalAnalysisApi"
@@ -196,6 +199,9 @@ export function ResidentDetailPage() {
   const [familyDigestVerificationNotice, setFamilyDigestVerificationNotice] = useState("")
   const [familyDigestVerificationError, setFamilyDigestVerificationError] = useState("")
   const [familyDigestVerificationTargetId, setFamilyDigestVerificationTargetId] = useState<string | null>(null)
+  const [familyPortalNotice, setFamilyPortalNotice] = useState("")
+  const [familyPortalError, setFamilyPortalError] = useState("")
+  const [familyPortalActionTargetId, setFamilyPortalActionTargetId] = useState<string | null>(null)
 
   const authed = useAppSelector((s) => !!s.auth.tokens)
   const user = useAppSelector(getCurrentUser)
@@ -216,6 +222,11 @@ export function ResidentDetailPage() {
   const [deleteSchedule, { isLoading: deletingSchedule }] = useDeleteScheduleMutation()
   const [sendFamilyDigestVerification, { isLoading: sendingFamilyDigestVerification }] =
     useSendFamilyDigestEmailVerificationMutation()
+  const { data: familyPortalStatus } = useGetFamilyPortalStatusQuery(
+    apiClient?.id ? { clientId: apiClient.id } : skipToken,
+  )
+  const [inviteFamilyPortal, { isLoading: invitingFamilyPortal }] = useInviteFamilyPortalMutation()
+  const [revokeFamilyPortal, { isLoading: revokingFamilyPortal }] = useRevokeFamilyPortalMutation()
 
   // Call-first list (GET /clients/:id/calls) so order matches billable Call.startTime; only fetch on Conversations tab.
   const { data: convPages, isLoading: convLoading } = useGetCallsByClientQuery(
@@ -501,6 +512,42 @@ export function ResidentDetailPage() {
     } finally {
       setFamilyDigestVerificationTargetId(null)
     }
+  }
+
+  const handleInviteFamilyPortal = async (recipientId: string) => {
+    if (!apiClient?.id) return
+    setFamilyPortalNotice("")
+    setFamilyPortalError("")
+    setFamilyPortalActionTargetId(recipientId)
+    try {
+      const res = await inviteFamilyPortal({ clientId: apiClient.id, recipientId }).unwrap()
+      setFamilyPortalNotice(res.message || t("residentDetail.familyPortalInviteSent"))
+    } catch {
+      setFamilyPortalError(t("residentDetail.familyPortalActionFailed"))
+    } finally {
+      setFamilyPortalActionTargetId(null)
+    }
+  }
+
+  const handleRevokeFamilyPortal = async (recipientId: string) => {
+    if (!apiClient?.id) return
+    setFamilyPortalNotice("")
+    setFamilyPortalError("")
+    setFamilyPortalActionTargetId(recipientId)
+    try {
+      const res = await revokeFamilyPortal({ clientId: apiClient.id, recipientId }).unwrap()
+      setFamilyPortalNotice(res.message || t("residentDetail.familyPortalRevoked"))
+    } catch {
+      setFamilyPortalError(t("residentDetail.familyPortalActionFailed"))
+    } finally {
+      setFamilyPortalActionTargetId(null)
+    }
+  }
+
+  const familyPortalStatusLabel = (status: "not_invited" | "invited" | "active" | undefined) => {
+    if (status === "active") return t("residentDetail.familyPortalStatusActive")
+    if (status === "invited") return t("residentDetail.familyPortalStatusInvited")
+    return t("residentDetail.familyPortalStatusNotInvited")
   }
 
   const onSaveResident = async (e: FormEvent) => {
@@ -1294,6 +1341,24 @@ export function ResidentDetailPage() {
                       const recipientId = recipient.id ? String(recipient.id) : undefined
                       const verifyingThis =
                         sendingFamilyDigestVerification && familyDigestVerificationTargetId === recipientId
+                      const portalRecipient = familyPortalStatus?.recipients.find(
+                        (row) => row.recipientId === recipientId,
+                      )
+                      const portalStatus = portalRecipient?.portalStatus
+                      const portalBusy =
+                        (invitingFamilyPortal || revokingFamilyPortal) &&
+                        familyPortalActionTargetId === recipientId
+                      const canInvitePortal =
+                        canManageResidents &&
+                        familyPortalStatus?.enabled &&
+                        verified &&
+                        recipientId &&
+                        portalStatus !== "active" &&
+                        portalStatus !== "invited"
+                      const canRevokePortal =
+                        canManageResidents &&
+                        recipientId &&
+                        (portalStatus === "active" || portalStatus === "invited")
                       return (
                         <div key={recipientId || `view-family-${index}`}>
                           {(recipient.name || "—") + (recipient.relationship ? ` (${recipient.relationship})` : "")}
@@ -1309,6 +1374,14 @@ export function ResidentDetailPage() {
                               ? t("residentDetail.familyDigestEmailVerified")
                               : t("residentDetail.familyDigestEmailUnverified")
                             : t("residentDetail.familyDigestEmailNoAddress")}
+                          {familyPortalStatus && recipientId ? (
+                            <>
+                              <br />
+                              {familyPortalStatus.enabled
+                                ? familyPortalStatusLabel(portalStatus)
+                                : t("residentDetail.familyPortalDisabled")}
+                            </>
+                          ) : null}
                           {canManageResidents && recipient.email && !verified && recipientId ? (
                             <>
                               <br />
@@ -1326,9 +1399,53 @@ export function ResidentDetailPage() {
                               </button>
                             </>
                           ) : null}
+                          {canInvitePortal ? (
+                            <>
+                              <br />
+                              <button
+                                type="button"
+                                className="va-link"
+                                style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
+                                disabled={portalBusy}
+                                onClick={() => void handleInviteFamilyPortal(recipientId)}
+                              >
+                                {portalBusy
+                                  ? t("residentDetail.familyPortalInviting")
+                                  : t("residentDetail.familyPortalInvite")}
+                              </button>
+                            </>
+                          ) : null}
+                          {canRevokePortal ? (
+                            <>
+                              <br />
+                              <button
+                                type="button"
+                                className="va-link"
+                                style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
+                                disabled={portalBusy}
+                                onClick={() => void handleRevokeFamilyPortal(recipientId)}
+                              >
+                                {portalBusy
+                                  ? t("residentDetail.familyPortalRevoking")
+                                  : t("residentDetail.familyPortalRevoke")}
+                              </button>
+                            </>
+                          ) : null}
                         </div>
                       )
                     })}
+                    {familyPortalNotice ? (
+                      <>
+                        <br />
+                        <span style={{ color: "var(--va-emerald-700)" }}>{familyPortalNotice}</span>
+                      </>
+                    ) : null}
+                    {familyPortalError ? (
+                      <>
+                        <br />
+                        <span style={{ color: "var(--va-red-600)" }}>{familyPortalError}</span>
+                      </>
+                    ) : null}
                     {familyDigestVerificationNotice ? (
                       <>
                         <br />

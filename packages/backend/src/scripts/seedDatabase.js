@@ -15,6 +15,8 @@ const {
   FraudAbuseAnalysis,
   OnboardingResponse,
   PrivacyRequest,
+  FamilyResidentLink,
+  FamilyWeeklyDigest,
 } = require('../models');
 const config = require('../config/config');
 
@@ -32,6 +34,7 @@ const emergencyPhrasesSeeder = require('./seeders/emergencyPhrases.seeder');
 const clientReportSnapshotSeeder = require('./seeders/clientReportSnapshot.seeder');
 const onboardingSeeder = require('./seeders/onboarding.seeder');
 const familySeeder = require('./seeders/family.seeder');
+const familyPortalSeeder = require('./seeders/familyPortal.seeder');
 
 /**
  * Clear all database collections
@@ -52,6 +55,8 @@ async function clearDatabase() {
   await MedicalAnalysis.deleteMany({});
   await FraudAbuseAnalysis.deleteMany({});
   await PrivacyRequest.deleteMany({});
+  await FamilyResidentLink.deleteMany({});
+  await FamilyWeeklyDigest.deleteMany({});
   // Note: EmergencyPhrase is NOT cleared - it's seeded separately and should persist
   console.log('Database cleared');
 }
@@ -188,6 +193,7 @@ async function seedDatabase() {
     await clientReportSnapshotSeeder.seedClientReportSnapshots([client1, client2, client3]);
 
     const family = await familySeeder.seedFamilyAccount();
+    const familyPortal = await familyPortalSeeder.seedFamilyPortalAccount(org, client1, adminRecord);
 
     console.log('Database seeded successfully!');
     console.log('');
@@ -195,6 +201,7 @@ async function seedDatabase() {
     console.log('  B2B facility staff (web):  fake@example.org');
     console.log('  B2B org admin (web):         admin@example.org');
     console.log('  B2C family / mobile dev:     parent@example.org');
+    console.log('  Org-family portal (mobile):  family.portal@example.org');
     console.log('');
     return { 
       org, 
@@ -203,6 +210,7 @@ async function seedDatabase() {
       invoice, 
       paymentMethods,
       family,
+      familyPortal,
     };
   } catch (error) {
     console.error('Error seeding database:', error);

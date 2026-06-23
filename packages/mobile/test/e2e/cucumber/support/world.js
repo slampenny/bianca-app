@@ -132,6 +132,10 @@ class PlaywrightWorld {
       'staff': { email: 'fake@example.org', password: 'Password1' },
       'orgAdmin': { email: 'admin@example.org', password: 'Password1' },
       'superAdmin': { email: 'superadmin@example.org', password: 'Password1' },
+      /** B2C mobile account owner (Smith family org). */
+      'familyParent': { email: 'parent@example.org', password: 'Password1' },
+      /** Facility digest recipient — org-family read-only mobile mode. */
+      'familyPortal': { email: 'family.portal@example.org', password: 'Password1' },
     };
     return credentials[username] || { email: `${username}@example.org`, password: 'Password1' };
   }

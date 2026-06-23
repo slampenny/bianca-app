@@ -1,7 +1,7 @@
 # Bianca Technologies Inc. - Data Safety Declaration
 
-**Effective Date:** January 5, 2025  
-**Last Updated:** January 5, 2025
+**Effective Date:** June 16, 2026
+**Last Updated:** June 16, 2026
 
 This Data Safety Declaration provides transparency about how Bianca Technologies Inc. collects, uses, and protects your data. This information is designed to help users understand our data practices and is required for app store compliance.
 
@@ -226,5 +226,5 @@ We believe in transparency about our data practices:
 
 **This Data Safety Declaration is part of our comprehensive privacy framework, which includes our Privacy Policy and Terms of Service. For the complete picture of our data practices, please review all our legal documents.**
 
-**Last Reviewed**: January 5, 2025  
-**Next Review**: January 5, 2026
+**Last Reviewed**: June 16, 2026
+**Next Review**: June 16, 2027

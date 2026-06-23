@@ -9,11 +9,13 @@ import { useTheme } from "../theme/ThemeContext"
 interface ScheduleScreenProps {
   initialSchedule: Schedule
   onScheduleChange: (schedule: Schedule) => void
+  readOnly?: boolean
 }
 
 const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
   initialSchedule,
   onScheduleChange,
+  readOnly = false,
 }) => {
   const { colors, currentTheme } = useTheme()
   const [id, setId] = useState(initialSchedule.id)
@@ -148,6 +150,9 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       borderWidth: 1,
       marginBottom: 20,
       padding: 10,
+    },
+    readOnlyField: {
+      opacity: 0.85,
     },
   })
   
@@ -312,17 +317,19 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
           onValueChange={(value) => setTime(value)}
           labelTx="scheduleComponent.startTime"
           testID="schedule-time-picker"
+          enabled={!readOnly}
         />
       </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>{translate("scheduleComponent.frequency")}</Text>
-        <View style={styles.pickerWrapper}>
+        <View style={[styles.pickerWrapper, readOnly && styles.readOnlyField]}>
           <Picker
             selectedValue={frequency}
             onValueChange={setFrequency}
             style={styles.picker}
             itemStyle={styles.pickerItem}
+            enabled={!readOnly}
             dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
           >
             <Picker.Item 
@@ -364,6 +371,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
                     value={selectedDays.includes(index)}
                     onValueChange={(isChecked) => handleDayChange(index, isChecked)}
                     variant="checkbox"
+                    editable={!readOnly}
                   />
                 </View>
               )
@@ -375,12 +383,13 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
       {frequency === "monthly" && (
         <View style={styles.monthlyContainer}>
           <Text style={styles.label}>Day of Month</Text>
-          <View style={styles.pickerWrapper}>
+          <View style={[styles.pickerWrapper, readOnly && styles.readOnlyField]}>
             <Picker
               selectedValue={intervals.length > 0 && intervals[0].day !== undefined ? intervals[0].day : 1}
               onValueChange={handleMonthlyDayChange}
               style={styles.picker}
               itemStyle={styles.pickerItem}
+              enabled={!readOnly}
               dropdownIconColor={colors.text || colors.palette?.biancaHeader || colors.palette?.neutral800 || "#000000"}
             >
               {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
@@ -412,6 +421,7 @@ const ScheduleComponent: React.FC<ScheduleScreenProps> = ({
           variant="switch"
           value={isActive}
           onValueChange={setIsActive}
+          editable={!readOnly}
         />
       </View>
     </View>

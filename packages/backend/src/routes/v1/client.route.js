@@ -112,6 +112,30 @@ router
   .get(auth('readAny:caregiver'), validate(clientValidation.getCaregivers), clientController.getCaregivers);
 
 router
+  .route('/:clientId/family-portal')
+  .get(
+    auth('readOwn:client', 'readAny:client'),
+    validate(clientValidation.getFamilyPortalStatus),
+    clientController.getFamilyPortalStatus
+  );
+
+router
+  .route('/:clientId/family-portal/invite')
+  .post(
+    auth('updateAny:client'),
+    validate(clientValidation.inviteFamilyPortal),
+    clientController.inviteFamilyPortal
+  );
+
+router
+  .route('/:clientId/family-portal/revoke')
+  .post(
+    auth('updateAny:client'),
+    validate(clientValidation.revokeFamilyPortal),
+    clientController.revokeFamilyPortal
+  );
+
+router
   .route('/:clientId/family-digest-email/verification')
   .post(
     auth('updateAny:client'),

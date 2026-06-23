@@ -1,8 +1,8 @@
 # Notice of Privacy Practices
 ## Bianca Technologies Inc. Healthcare Communication Services
 
-**Effective Date**: October 15, 2025  
-**Last Revised**: October 15, 2025
+**Effective Date**: June 16, 2026
+**Last Revised**: June 16, 2026
 
 ---
 
@@ -972,12 +972,12 @@ If you have questions about this Notice of Privacy Practices or want to exercise
 
 ---
 
-**Effective Date**: October 15, 2025  
-**Version**: 1.0
+**Effective Date**: June 16, 2026
+**Version**: 1.1
 
 ---
 
-© 2025 Bianca Technologies Inc.. All rights reserved.
+© 2026 Bianca Technologies Inc.. All rights reserved.
 
 This Notice of Privacy Practices complies with HIPAA Privacy Rule (45 CFR §164.520)
 

@@ -9,6 +9,7 @@ services:
       # Base URLs for production
       - API_BASE_URL=https://api.biancawellness.com
       - FRONTEND_URL=https://app.biancawellness.com
+      - MOBILE_APP_URL=https://mobile.biancawellness.com
       - WEBSOCKET_URL=wss://api.biancawellness.com
       # MongoDB for production (using containerized version)
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service

@@ -144,7 +144,7 @@ resource "aws_iam_role_policy" "production_codedeploy_policy" {
 ################################################################################
 
 resource "aws_s3_bucket" "codedeploy_production_artifacts" {
-  bucket = "bianca-codedeploy-production-artifacts-${var.aws_account_id}"
+  bucket = "bianca-codedeploy-production-artifacts-${var.aws_account_id}-cac1"
 
   tags = {
     Environment = "production"

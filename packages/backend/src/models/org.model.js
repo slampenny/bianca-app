@@ -197,6 +197,17 @@ const orgSchema = mongoose.Schema(
         },
       ],
     },
+    /** Facility family mobile app access (digest recipients invited as read-only app users). */
+    familyPortalSettings: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      allowInviteAfterDigestVerify: {
+        type: Boolean,
+        default: true,
+      },
+    },
     /** Automated Daily Wellness Digest email scheduling (org-local send time). */
     dailyDigestSettings: {
       enabled: {

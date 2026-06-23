@@ -255,6 +255,30 @@ describe('Minimum Necessary Middleware', () => {
       expect(data).not.toHaveProperty('recordings'); // Filtered for staff
     });
 
+    it('should pass through error responses without filtering', async () => {
+      const req = httpMocks.createRequest({
+        caregiver: {
+          _id: '123',
+          role: 'orgAdmin',
+        },
+      });
+      const res = httpMocks.createResponse();
+      const next = jest.fn();
+
+      minimumNecessaryMiddleware('conversation')(req, res, next);
+
+      res.status(404).json({
+        code: 404,
+        message: 'Client not found',
+      });
+
+      const data = res._getJSONData();
+      expect(data).toEqual({
+        code: 404,
+        message: 'Client not found',
+      });
+    });
+
     it('should give orgAdmin access to conversation transcripts', async () => {
       const req = httpMocks.createRequest({
         caregiver: {
@@ -369,6 +393,15 @@ describe('Minimum Necessary Middleware', () => {
       
       // Staff cannot access email
       expect(canAccessField('staff', 'client', 'email')).toBe(false);
+    });
+
+    it('should restrict family role to digest-focused client fields', () => {
+      expect(canAccessField('family', 'client', 'name')).toBe(true);
+      expect(canAccessField('family', 'client', 'preferredName')).toBe(true);
+      expect(canAccessField('family', 'client', 'email')).toBe(false);
+      expect(canAccessField('family', 'client', 'phone')).toBe(false);
+      expect(canAccessField('family', 'client', 'notes')).toBe(false);
+      expect(canAccessField('family', 'familyDigest', 'payload')).toBe(true);
     });
 
     it('should handle alert resource type', () => {

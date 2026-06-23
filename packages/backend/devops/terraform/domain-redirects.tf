@@ -12,10 +12,6 @@
 # - biancatechnologies.com email continues to work via Zoho Mail
 ################################################################################
 
-data "aws_lb" "shared_public_alb" {
-  name = "bianca-shared-alb"
-}
-
 ################################################################################
 # BIANCATECHNOLOGIES.COM — ALIAS to shared ALB
 ################################################################################
@@ -27,8 +23,8 @@ resource "aws_route53_record" "biancatechnologies_root" {
   allow_overwrite = true
 
   alias {
-    name                   = data.aws_lb.shared_public_alb.dns_name
-    zone_id                = data.aws_lb.shared_public_alb.zone_id
+    name                   = aws_lb.shared.dns_name
+    zone_id                = aws_lb.shared.zone_id
     evaluate_target_health = true
   }
 
@@ -44,8 +40,8 @@ resource "aws_route53_record" "biancatechnologies_www" {
   allow_overwrite = true
 
   alias {
-    name                   = data.aws_lb.shared_public_alb.dns_name
-    zone_id                = data.aws_lb.shared_public_alb.zone_id
+    name                   = aws_lb.shared.dns_name
+    zone_id                = aws_lb.shared.zone_id
     evaluate_target_health = true
   }
 

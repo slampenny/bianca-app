@@ -138,7 +138,7 @@ resource "aws_ecs_task_definition" "frontend_task" {
         logDriver = "awslogs"
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.frontend_log_group.name
-          "awslogs-region"        = "us-east-2"
+          "awslogs-region"        = "ca-central-1"
           "awslogs-stream-prefix" = "frontend"
         }
       }
@@ -210,7 +210,7 @@ resource "aws_codebuild_project" "frontend_project" {
     # But we set AWS_REGION for consistency and potential future use
     environment_variable {
       name  = "AWS_REGION"
-      value = "us-east-2"
+      value = "ca-central-1"
     }
   }
 
@@ -244,7 +244,7 @@ resource "aws_codebuild_project" "frontend_tests" {
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
-      value = "us-east-2"
+      value = "ca-central-1"
     }
     # CRITICAL: Set NODE_ENV=test for test stage
     environment_variable {
@@ -265,11 +265,11 @@ resource "aws_codebuild_project" "frontend_tests" {
     }
     environment_variable {
       name  = "AWS_REGION"
-      value = "us-east-2"
+      value = "ca-central-1"
     }
     environment_variable {
       name  = "ECR_REGISTRY"
-      value = "730335291008.dkr.ecr.us-east-2.amazonaws.com"
+      value = "730335291008.dkr.ecr.ca-central-1.amazonaws.com"
     }
     # Inject secrets from Secrets Manager
     environment_variable {
@@ -344,7 +344,7 @@ variable "frontend_github_branch" {
 variable "github_app_connection_arn" {
   description = "GitHub App connection ARN for CodePipeline (shared with backend)"
   type        = string
-  default     = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+  default     = "arn:aws:codeconnections:ca-central-1:730335291008:connection/59f13ffa-0768-43f3-8e7b-eb41f5cdf5d3"
 }
 
 data "terraform_remote_state" "backend" {
@@ -352,7 +352,8 @@ data "terraform_remote_state" "backend" {
   config = {
     bucket = "bianca-terraform-state"
     key    = "backend/terraform.tfstate"
-    region = "us-east-2"
+    # TODO: Migrate Terraform state bucket to ca-central-1 (or use a ca-central-1 bucket) before applying.
+    region = "ca-central-1"
   }
 }
 

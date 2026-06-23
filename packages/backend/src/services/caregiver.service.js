@@ -276,8 +276,13 @@ const updateCaregiverById = async (caregiverId, updateBody) => {
   if (caregiver.role === 'invited' && (updateBody.password || (updateBody.phone && caregiver.password))) {
     // Invited user completing registration — super-admin invite passes role superAdmin explicitly
     if (updateBody.role !== 'superAdmin') {
-      updateBody.role = 'staff';
+      if (caregiver.pendingRole === 'family') {
+        updateBody.role = 'family';
+      } else {
+        updateBody.role = 'staff';
+      }
     }
+    updateBody.pendingRole = undefined;
   }
   
   // If orgAdmin or staff is updating their phone, also update the organization's phone if it's not set

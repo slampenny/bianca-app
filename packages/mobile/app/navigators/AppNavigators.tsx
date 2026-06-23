@@ -1,6 +1,6 @@
 import { createStackNavigator } from "@react-navigation/stack"
 import { Platform, ViewStyle } from "react-native"
-import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, MFAVerificationScreen, ClientConsentScreen, OnboardingAboutYouScreen, OnboardingHowBiancaWorksScreen, OnboardingOrgInfoScreen, OnboardingRegistrationScreen, OnboardingAddLovedOneScreen, OnboardingScheduleScreen } from "app/screens"
+import { LoginScreen, RegisterScreen, RequestResetScreen, ConfirmResetScreen, PrivacyScreen, PrivacyPracticesScreen, TermsScreen, EmailVerifiedScreen, EmailVerificationRequiredScreen, VerifyEmailScreen, VerifyPhoneScreen, SignupScreen, FamilyInviteWelcomeScreen, MFAVerificationScreen, ClientConsentScreen, OnboardingAboutYouScreen, OnboardingHowBiancaWorksScreen, OnboardingOrgInfoScreen, OnboardingRegistrationScreen, OnboardingAddLovedOneScreen, OnboardingScheduleScreen } from "app/screens"
 import MainTabs from "./MainTabs"
 import { AppStackParamList, LoginStackParamList, OnboardingStackParamList } from "./navigationTypes"
 import { translate } from "app/i18n"
@@ -101,6 +101,7 @@ export const UnauthStack = () => {
       <LoginStack.Screen name="OnboardingHowBiancaWorks" component={OnboardingHowBiancaWorksScreen} />
       <LoginStack.Screen name="OnboardingOrgInfo" component={OnboardingOrgInfoScreen} />
       <LoginStack.Screen name="Signup" component={SignupScreen} />
+      <LoginStack.Screen name="FamilyInviteWelcome" component={FamilyInviteWelcomeScreen} />
       <LoginStack.Screen name="RequestReset" component={RequestResetScreen} />
       <LoginStack.Screen name="ConfirmReset" component={ConfirmResetScreen} />
       <LoginStack.Screen 

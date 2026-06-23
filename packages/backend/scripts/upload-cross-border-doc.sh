@@ -5,7 +5,7 @@ set -e
 
 CONFLUENCE_URL="${CONFLUENCE_URL:-https://biancatechnologies.atlassian.net}"
 SPACE_KEY="${SPACE_KEY:-BTD}"
-DOC_FILE="packages/backend/docs/legal/CROSS_BORDER_DATA_TRANSFERS.md"
+DOC_FILE="packages/legal/CROSS_BORDER_DATA_TRANSFERS.md"
 PARENT_CATEGORY="📜 Legal & Privacy"
 
 # Determine script directory and calculate path to .env

@@ -197,6 +197,52 @@ export const clientApi = createApi({
       }),
       invalidatesTags: (_r, _e, { clientId }) => [{ type: "Client", id: clientId }, "Client"],
     }),
+    getFamilyPortalStatus: builder.query<
+      {
+        enabled: boolean
+        recipients: Array<{
+          recipientId: string | null
+          name?: string
+          email?: string
+          relationship?: string
+          emailVerified: boolean
+          portalStatus: "not_invited" | "invited" | "active"
+          linkId: string | null
+        }>
+      },
+      { clientId: string }
+    >({
+      query: ({ clientId }) => `/clients/${clientId}/family-portal`,
+      providesTags: (_r, _e, { clientId }) => [{ type: "Client", id: `${clientId}-family-portal` }],
+    }),
+    inviteFamilyPortal: builder.mutation<
+      { success: boolean; message: string },
+      { clientId: string; recipientId: string }
+    >({
+      query: ({ clientId, recipientId }) => ({
+        url: `/clients/${clientId}/family-portal/invite`,
+        method: "POST",
+        body: { recipientId },
+      }),
+      invalidatesTags: (_r, _e, { clientId }) => [
+        { type: "Client", id: clientId },
+        { type: "Client", id: `${clientId}-family-portal` },
+      ],
+    }),
+    revokeFamilyPortal: builder.mutation<
+      { success: boolean; message: string },
+      { clientId: string; recipientId: string }
+    >({
+      query: ({ clientId, recipientId }) => ({
+        url: `/clients/${clientId}/family-portal/revoke`,
+        method: "POST",
+        body: { recipientId },
+      }),
+      invalidatesTags: (_r, _e, { clientId }) => [
+        { type: "Client", id: clientId },
+        { type: "Client", id: `${clientId}-family-portal` },
+      ],
+    }),
   }),
 })
 
@@ -215,4 +261,7 @@ export const {
   useDeleteClientMutation,
   useAssignCaregiverToClientMutation,
   useRemoveCaregiverFromClientMutation,
+  useGetFamilyPortalStatusQuery,
+  useInviteFamilyPortalMutation,
+  useRevokeFamilyPortalMutation,
 } = clientApi

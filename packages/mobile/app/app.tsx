@@ -60,6 +60,7 @@ const config = {
       exact: true,
     },
     Signup: "signup",
+    FamilyInviteWelcome: "family-welcome",
     ConfirmReset: "reset-password",
     ClientConsent: {
       path: "client/consent/:token?",

@@ -11,6 +11,10 @@ const caregiverController = require('../../controllers/caregiver.controller');
 const router = express.Router();
 
 router
+  .route('/linked-residents')
+  .get(auth('readOwn:caregiver'), caregiverController.getLinkedResidents);
+
+router
   .route('/')
   .post(auth('createAny:caregiver'), validate(caregiverValidation.createCaregiver), caregiverController.createCaregiver)
   .get(auth('readAny:caregiver'), validate(caregiverValidation.getCaregivers), caregiverController.getCaregivers);

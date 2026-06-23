@@ -999,6 +999,102 @@ router.post('/seed', async (req, res) => {
 });
 
 /**
+ * Prepare a pending family portal invite using real portal services (development/test E2E only).
+ * Returns a mobile signup URL with token — no email inbox required.
+ */
+router.post('/seed-family-portal-invite', async (req, res) => {
+  try {
+    if (config.env === 'production') {
+      return res.status(403).json({ error: 'Family portal invite seeding is not allowed in production' });
+    }
+
+    const mongoose = require('mongoose');
+    const { Caregiver, Client, Org, Token, FamilyResidentLink } = require('../../models');
+    const familyPortalService = require('../../services/familyPortal.service');
+    const { tokenTypes } = require('../../config/tokens');
+    const { normalizeEmail } = require('../../utils/familyDigestEligibility');
+
+    const email = normalizeEmail(req.body.email || 'family.invite.e2e@example.org');
+    const name = req.body.name || 'E2E Family Invite';
+    const phone = req.body.phone || '+16045624299';
+
+    const orgAdmin = await Caregiver.findOne({ email: 'admin@example.org' });
+    if (!orgAdmin) {
+      return res.status(404).json({ error: 'Org admin not found. POST /v1/test/seed first.' });
+    }
+
+    const client = await Client.findOne({ email: 'agnes@example.org' });
+    if (!client) {
+      return res.status(404).json({ error: 'Seed resident not found. POST /v1/test/seed first.' });
+    }
+
+    await Org.findByIdAndUpdate(client.org, {
+      familyPortalSettings: { enabled: true, allowInviteAfterDigestVerify: true },
+    });
+
+    const existing = await Caregiver.findOne({ email });
+    if (existing) {
+      await FamilyResidentLink.deleteMany({ caregiver: existing._id });
+      await Token.deleteMany({ caregiver: existing._id });
+      await Caregiver.deleteOne({ _id: existing._id });
+    }
+
+    const recipientId = new mongoose.Types.ObjectId();
+    const otherRecipients = (client.familyDigestRecipients || []).filter(
+      (r) => normalizeEmail(r.email) !== email
+    );
+    client.familyDigestRecipients = [
+      ...otherRecipients,
+      {
+        _id: recipientId,
+        name,
+        relationship: 'daughter',
+        email,
+        familyDigestEmail: {
+          enabled: true,
+          verifiedAt: new Date(),
+          verifiedEmail: email,
+        },
+      },
+    ];
+    await client.save();
+
+    await familyPortalService.inviteFamilyRecipient(
+      { ...orgAdmin.toObject(), id: orgAdmin._id, role: 'orgAdmin' },
+      String(client._id),
+      String(recipientId)
+    );
+
+    const invited = await Caregiver.findOne({ email });
+    if (invited) {
+      await Caregiver.findByIdAndUpdate(invited._id, { phone });
+    }
+
+    const tokenDoc = await Token.findOne({ caregiver: invited._id, type: tokenTypes.INVITE });
+    const inviteToken = tokenDoc?.token;
+    if (!inviteToken) {
+      return res.status(500).json({ error: 'Invite token was not created' });
+    }
+
+    const mobileBase = (config.mobileAppUrl || 'http://localhost:8084').replace(/\/$/, '');
+    const signupUrl = `${mobileBase}/signup?token=${encodeURIComponent(inviteToken)}&family=1`;
+
+    res.json({
+      success: true,
+      email,
+      name,
+      phone,
+      signupUrl,
+      token: inviteToken,
+      clientId: String(client._id),
+    });
+  } catch (error) {
+    logger.error('Error seeding family portal invite:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * @swagger
  * /test/reset-mfa:
  *   post:

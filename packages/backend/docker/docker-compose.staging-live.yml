@@ -33,6 +33,7 @@ services:
     # (Base compose publishes 3001:80; remote-start strips that to avoid merge conflicts.)
     environment:
       - VITE_API_URL=https://staging-api.biancawellness.com/v1
+      - VITE_MOBILE_APP_URL=https://staging-mobile.biancawellness.com
       - VITE_USE_POLLING=1
       - VITE_STAGING_LIVE=1
     command:

@@ -11,7 +11,9 @@ function toOrgIdString(org) {
   return ref != null ? ref.toString() : null;
 }
 
-const CaregiverDTO = (caregiver) => {
+const { accountModeForRole } = require('../utils/familyAccess.util');
+
+const CaregiverDTO = (caregiver, sessionExtras = {}) => {
   // Convert Mongoose document to plain object if needed
   // This ensures all fields are accessible, including isPhoneVerified
   const caregiverObj = caregiver && typeof caregiver.toObject === 'function' 
@@ -58,6 +60,8 @@ const CaregiverDTO = (caregiver) => {
     notificationPreferences: {
       dailyDigestEmail: notificationPreferences?.dailyDigestEmail === true,
     },
+    accountMode: sessionExtras.accountMode || accountModeForRole(role),
+    linkedResidents: sessionExtras.linkedResidents || undefined,
   };
 };
 

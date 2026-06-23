@@ -41,7 +41,7 @@ If you deleted the Home page and need the default content again:
 ## Try the App
 
 - Fallback nav and new menus should use **`/try-the-app/`** (on-site gate), not a bare `app.*` link.
-- **7:00am–1:00pm Pacific:** `/try-the-app/` redirects to `https://app.biancawellness.com`.
-- **Outside that window:** the page explains availability and offers Book a Demo / Contact.
-- URLs are centralized in `functions.php` (`BIANCA_WELLNESS_APP_URL`, `bianca_wellness_try_app_page_url()`).
+- **When the production app is online:** `/try-the-app/` redirects to `https://app.biancawellness.com`.
+- **When the app is offline:** “Try the App” links go to **Book a Demo** at `/book-a-demo/` (Contact Form 7).
+- URLs are centralized in `functions.php` (`BIANCA_WELLNESS_APP_URL`, `bianca_wellness_try_app_link_url()`).
 - After deploy, run `php setup-try-the-app-page.php` on the server once to create the page and fix menu URLs.

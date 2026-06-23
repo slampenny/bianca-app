@@ -13,7 +13,7 @@ provider "aws" {
 variable "aws_region" {
   description = "AWS region for the deployment."
   type        = string
-  default     = "us-east-2"
+  default     = "ca-central-1"
 }
 
 variable "aws_profile" {
@@ -177,7 +177,7 @@ variable "load_balancer_name" {
 variable "bucket_name" {
   description = "Name of the S3 bucket for CodePipeline artifacts."
   type        = string
-  default     = "bianca-codepipeline-artifact-bucket"
+  default     = "bianca-codepipeline-artifact-bucket-cac1"
 }
 
 variable "codepipeline_role_name" {
@@ -225,7 +225,7 @@ variable "github_branch" {
 variable "github_app_connection_arn" {
   description = "ARN of the AWS CodeStar connection to GitHub."
   type        = string
-  default     = "arn:aws:codeconnections:us-east-2:730335291008:connection/a126dbfd-f253-42e4-811b-cda3ebd5a629"
+  default     = "arn:aws:codeconnections:ca-central-1:730335291008:connection/59f13ffa-0768-43f3-8e7b-eb41f5cdf5d3"
 }
 
 # --- Secrets Manager Variables ---
@@ -1230,6 +1230,7 @@ resource "aws_ecs_task_definition" "app_task" {
         { name = "API_BASE_URL", value = "https://api.biancawellness.com" },
         { name = "WEBSOCKET_URL", value = "wss://api.biancawellness.com" },
         { name = "FRONTEND_URL", value = "https://app.biancawellness.com" },
+        { name = "MOBILE_APP_URL", value = "https://mobile.biancawellness.com" },
         { name = "RTP_PORT_RANGE", value = "${var.asterisk_rtp_start_port}-${var.asterisk_rtp_end_port}" },
         
         # Internal communication uses private IP for both ARI and RTP
@@ -1242,7 +1243,7 @@ resource "aws_ecs_task_definition" "app_task" {
         
         { name = "AWS_SES_REGION", value = var.aws_region },
         { name = "EMAIL_FROM", value = "no-reply@biancawellness.com" },
-        { name = "TWILIO_PHONENUMBER", value = "+19786256514" },  # Replace with your actual Twilio number
+        { name = "TWILIO_PHONENUMBER", value = "+16047060134" },  # Vancouver, CA production number
         { name = "TWILIO_ACCOUNTSID", value = "TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED" },  # Replace with your actual Twilio SID
         { name = "STRIPE_PUBLISHABLE_KEY", value = "pk_live_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef" },  # Production Stripe publishable key
         { name = "APP_RTP_PORT_RANGE", value = "${var.app_rtp_port_start}-${var.app_rtp_port_end}"},
@@ -1556,7 +1557,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_ses_policy_attach" {
 
 # S3 Debug Audio Bucket and Policy
 resource "aws_s3_bucket" "debug_audio_bucket" {
-  bucket = "bianca-audio-debug"
+  bucket = "bianca-audio-debug-cac1"
   tags = {
     Name        = "Bianca Debug Audio Bucket"
     Environment = "Debug"
@@ -1578,7 +1579,7 @@ resource "aws_iam_policy" "ecs_task_s3_debug_audio_policy" {
     Statement = [{
       Effect   = "Allow",
       Action   = ["s3:PutObject"],
-      Resource = "arn:aws:s3:::bianca-audio-debug/*"
+      Resource = "arn:aws:s3:::bianca-audio-debug-cac1/*"
     }]
   })
 }

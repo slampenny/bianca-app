@@ -79,6 +79,15 @@ const allRoles = {
     'updateAny:privacy',
   ],
   superAdmin: [], // superAdmin can do everything without explicit permissions
+  /** Facility family digest recipient — read-only linked residents in mobile app */
+  family: [
+    'readOwn:caregiver',
+    'updateOwn:caregiver',
+    'readOwn:client',
+    'readOwn:alert',
+    'readOwn:familyDigest',
+    'readOwn:familyResident',
+  ],
 };
 
 // Initialize AccessControl
