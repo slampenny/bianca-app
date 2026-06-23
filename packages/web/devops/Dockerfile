@@ -9,6 +9,7 @@ COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn ./.yarn
 COPY packages/shared ./packages/shared
 COPY packages/ui ./packages/ui
+COPY packages/legal ./packages/legal
 COPY packages/web ./packages/web
 
 RUN yarn install --immutable || (echo "Lockfile out of sync, updating..." && yarn install && echo "Lockfile updated")
