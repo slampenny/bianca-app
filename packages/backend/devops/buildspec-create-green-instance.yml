@@ -132,6 +132,16 @@ phases:
   post_build:
     commands:
       - |
+        if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
+          echo "Create green failed — cleaning up orphaned green instance(s) if any..."
+          export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+          export CODEPIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-${PIPELINE_EXECUTION_ID:-}}"
+          export ROLLBACK_MONGO=false
+          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/cleanup-pipeline-green-on-failure.sh" || \
+            echo "⚠️  Orphan green cleanup failed (non-fatal in post_build)"
+          exit 1
+        fi
+      - |
         INSTANCE_INFO="$CODEBUILD_SRC_DIR/instance-info.txt"
         if [ ! -f "$INSTANCE_INFO" ]; then
           echo "ERROR: instance-info.txt not found at $INSTANCE_INFO"
@@ -146,6 +156,11 @@ phases:
           echo "Final instance state: $INSTANCE_STATE"
           if [ "$INSTANCE_STATE" != "running" ]; then
             echo "ERROR: Green instance is not in running state: $INSTANCE_STATE"
+            export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+            export CODEPIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-${PIPELINE_EXECUTION_ID:-}}"
+            export ROLLBACK_MONGO=false
+            bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/cleanup-pipeline-green-on-failure.sh" || \
+              echo "⚠️  Orphan green cleanup failed (non-fatal)"
             exit 1
           fi
           echo "Green instance verification passed"

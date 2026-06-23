@@ -488,11 +488,12 @@ phases:
   post_build:
     commands:
       - |
-        # RunTests runs after SwapAndTerminate — only terminate this execution's green instance(s).
         if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
-          echo "Build failed — cleaning up pipeline green instance(s) if production..."
-          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \
-            echo "⚠️  Green cleanup failed (non-fatal in post_build)"
+          echo "RunTests failed — cleaning up orphaned green instance(s) if production..."
+          export CODEPIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-${PIPELINE_EXECUTION_ID:-}}"
+          export ROLLBACK_MONGO=false
+          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/cleanup-pipeline-green-on-failure.sh" || \
+            echo "⚠️  Orphan green cleanup failed (non-fatal in post_build)"
         fi
       - echo "Collecting test artifacts and logs..."
       - |

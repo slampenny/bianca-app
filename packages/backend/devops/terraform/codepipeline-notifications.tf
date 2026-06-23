@@ -83,6 +83,14 @@ resource "aws_iam_role_policy" "pipeline_notify_lambda" {
           "codebuild:BatchGetBuilds"
         ]
         Resource = "arn:aws:codebuild:${var.aws_region}:${var.aws_account_id}:project/bianca-*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances",
+          "ec2:TerminateInstances"
+        ]
+        Resource = "*"
       }
     ]
   })

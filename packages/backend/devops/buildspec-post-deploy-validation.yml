@@ -442,10 +442,12 @@ phases:
     commands:
       - |
         if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
-          echo "Post-deploy validation failed — terminating leftover green instance(s)..."
+          echo "Post-deploy validation failed — cleaning up orphaned green instance(s)..."
           export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
-          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \
-            echo "⚠️  Green cleanup failed (non-fatal in post_build)"
+          export CODEPIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-${PIPELINE_EXECUTION_ID:-}}"
+          export ROLLBACK_MONGO=false
+          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/cleanup-pipeline-green-on-failure.sh" || \
+            echo "⚠️  Orphan green cleanup failed (non-fatal in post_build)"
         else
           echo "✅ Post-deployment validation completed successfully"
           echo "The deployed site is accessible and working correctly"

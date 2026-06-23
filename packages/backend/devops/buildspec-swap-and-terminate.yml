@@ -389,7 +389,12 @@ phases:
             fi
             echo "     If status was Pending/Delayed: EC2 role needs AmazonSSMManagedInstanceCore (terraform: production_ssm_managed_core on bianca-production-role)."
             echo "     Or fix mount/docker on green via SSH, then re-run SwapAndTerminate."
-            bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/rollback-mongodb-volume-to-blue.sh" staging || \
+            export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
+            case "${CODEPIPELINE_NAME}:${BLUE_TAG:-}" in
+              bianca-production-pipeline:*|*:bianca-production) ROLLBACK_ENV=production ;;
+              *) ROLLBACK_ENV=staging ;;
+            esac
+            bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/rollback-mongodb-volume-to-blue.sh" "$ROLLBACK_ENV" || \
               echo "  ⚠️  MongoDB rollback to blue failed (non-fatal)"
             exit 1
           fi
@@ -698,16 +703,11 @@ phases:
     commands:
       - |
         if [ "${CODEBUILD_BUILD_SUCCEEDING:-1}" = "0" ]; then
-          echo "Swap failed — rolling MongoDB volume back to blue if needed..."
+          echo "Swap failed — cleaning up orphaned green instance(s) and rolling back MongoDB if needed..."
           export CODEPIPELINE_NAME="${CODEPIPELINE_NAME:-bianca-staging-pipeline}"
-          case "${CODEPIPELINE_NAME}:${BLUE_TAG:-}" in
-            bianca-production-pipeline:*|*:bianca-production) ROLLBACK_ENV=production ;;
-            *) ROLLBACK_ENV=staging ;;
-          esac
-          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/rollback-mongodb-volume-to-blue.sh" "$ROLLBACK_ENV" || \
-            echo "⚠️  MongoDB rollback failed (non-fatal)"
-          echo "Swap failed — terminating leftover green instance(s)..."
-          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/terminate-pipeline-green.sh" || \
-            echo "⚠️  Green cleanup failed (non-fatal in post_build)"
+          export CODEPIPELINE_EXECUTION_ID="${CODEPIPELINE_EXECUTION_ID:-${PIPELINE_EXECUTION_ID:-}}"
+          export ROLLBACK_MONGO=true
+          bash "$CODEBUILD_SRC_DIR/packages/backend/devops/scripts/cleanup-pipeline-green-on-failure.sh" || \
+            echo "⚠️  Orphan green cleanup failed (non-fatal in post_build)"
         fi
       - echo "Blue-green deployment swap completed"

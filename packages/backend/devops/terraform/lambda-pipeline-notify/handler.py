@@ -8,6 +8,8 @@ from urllib.parse import quote
 import boto3
 from botocore.exceptions import ClientError
 
+from green_cleanup import cleanup_orphan_green
+
 sns = boto3.client("sns")
 codepipeline = boto3.client("codepipeline")
 codebuild = boto3.client("codebuild")
@@ -46,6 +48,11 @@ def handler(event, context):
         lines.append("Failure details:")
         for line in _failure_details(pipeline, execution_id):
             lines.append(line)
+
+        cleanup_result = cleanup_orphan_green(pipeline, execution_id)
+        lines.append("")
+        lines.append(f"Orphan green cleanup: {cleanup_result}")
+        print(f"Orphan green cleanup: {cleanup_result}")
 
     message = "\n".join(lines)
     topic_arn = os.environ["SNS_TOPIC_ARN"]

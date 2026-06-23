@@ -229,6 +229,10 @@ resource "aws_codebuild_project" "production_post_deploy_validation" {
       name  = "GREEN_TAG"
       value = "bianca-production-green"
     }
+    environment_variable {
+      name  = "CODEPIPELINE_NAME"
+      value = "bianca-production-pipeline"
+    }
   }
 
   source {
@@ -629,6 +633,13 @@ resource "aws_codepipeline" "production" {
       configuration = {
         ProjectName   = aws_codebuild_project.production_tests.name
         PrimarySource = "SourceOutput"
+        EnvironmentVariables = jsonencode([
+          {
+            name  = "PIPELINE_EXECUTION_ID"
+            value = "#{codepipeline.PipelineExecutionId}"
+            type  = "PLAINTEXT"
+          }
+        ])
       }
       run_order = 1
     }
@@ -647,6 +658,13 @@ resource "aws_codepipeline" "production" {
       configuration = {
         ProjectName   = aws_codebuild_project.production_post_deploy_validation.name
         PrimarySource = "SourceOutput"
+        EnvironmentVariables = jsonencode([
+          {
+            name  = "PIPELINE_EXECUTION_ID"
+            value = "#{codepipeline.PipelineExecutionId}"
+            type  = "PLAINTEXT"
+          }
+        ])
       }
       run_order = 1
     }
@@ -665,6 +683,13 @@ resource "aws_codepipeline" "production" {
       configuration = {
         ProjectName   = aws_codebuild_project.production_swap_and_terminate.name
         PrimarySource = "SourceOutput"
+        EnvironmentVariables = jsonencode([
+          {
+            name  = "PIPELINE_EXECUTION_ID"
+            value = "#{codepipeline.PipelineExecutionId}"
+            type  = "PLAINTEXT"
+          }
+        ])
       }
       run_order = 1
     }

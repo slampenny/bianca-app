@@ -13,12 +13,27 @@ if [ -z "$EXECUTION_ID" ] && [ -n "${CODEPIPELINE_BUILD_ID:-}" ]; then
 fi
 
 case "$PIPELINE" in
-  bianca-production-pipeline) GREEN_TAG="${GREEN_TAG:-bianca-production-green}" ;;
+  bianca-production-pipeline)
+    GREEN_TAG="${GREEN_TAG:-bianca-production-green}"
+    BLUE_TAG="${BLUE_TAG:-bianca-production}"
+    ;;
   *)
     echo "Skipping green termination (pipeline=$PIPELINE)"
     exit 0
     ;;
 esac
+
+# Never terminate green if blue is gone — swap may have partially completed.
+BLUE_INSTANCE_ID=$(aws ec2 describe-instances \
+  --region "$REGION" \
+  --filters "Name=tag:Name,Values=$BLUE_TAG" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[0].Instances[0].InstanceId' \
+  --output text 2>/dev/null || echo "")
+
+if [ -z "$BLUE_INSTANCE_ID" ] || [ "$BLUE_INSTANCE_ID" = "None" ]; then
+  echo "No running blue instance (Name=$BLUE_TAG) — skipping green termination."
+  exit 0
+fi
 
 if [ -z "$EXECUTION_ID" ]; then
   echo "WARNING: No pipeline execution ID — skipping green termination to avoid killing another run's instance."

@@ -54,7 +54,7 @@ describe('voiceTelephony.service facade', () => {
   it('delegates initiateCall to the active provider', async () => {
     mockTwilioProvider.initiateCall.mockResolvedValue('CA123');
     await expect(voiceTelephonyService.initiateCall('client-id')).resolves.toBe('CA123');
-    expect(mockTwilioProvider.initiateCall).toHaveBeenCalledWith('client-id');
+    expect(mockTwilioProvider.initiateCall).toHaveBeenCalledWith('client-id', undefined);
   });
 
   it('delegates generateAnswerMarkup and deprecated generateCallTwiML alias', () => {
