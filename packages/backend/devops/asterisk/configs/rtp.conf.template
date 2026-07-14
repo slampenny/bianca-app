@@ -1,11 +1,11 @@
 ; /etc/asterisk/rtp.conf
 ; Configuration for RTP (Real-time Transport Protocol) media packets
+; Range must match Docker publish + security group (compose sets RTP_START_PORT / RTP_END_PORT).
 
 [general]
 ; Define the starting and ending UDP ports Asterisk will use for RTP media.
-; This range MUST match the ports forwarded by Docker and your FRP tunnel.
-rtpstart=10000
-rtpend=20000
+rtpstart=${RTP_START_PORT}
+rtpend=${RTP_END_PORT}
 
 ; Other common options (defaults are usually fine unless specific issues arise):
 ; rtpchecksums=no        ; RTP checksums are rarely used and can consume CPU
@@ -17,7 +17,7 @@ strictrtp=no           ; Allows RTP packets from sources other than the negotiat
 ; Jitter buffer settings (defaults usually okay, can be tuned per channel)
 ; jbenable = yes
 ; jbforce = no
-; jbmaxsize = 200
+; jbmaxsize = 1000
 ; jbresyncthreshold = 1000
 ; jbimpl = fixed
 ; jblog = no

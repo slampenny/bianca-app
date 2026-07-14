@@ -35,6 +35,17 @@ async function startServer() {
     await config.loadSecrets();
     logger.info(`[Startup] config.env after loadSecrets: ${config.env}`);
     logger.info(`[Startup] process.env.NODE_ENV after loadSecrets: ${process.env.NODE_ENV || 'NOT_SET'}`);
+    const { assertStagingDataHostsOrExit } = require('./utils/stagingDataHosts.util');
+    assertStagingDataHostsOrExit(
+      {
+        nodeEnv: config.env,
+        secretId: process.env.AWS_SECRET_ID,
+        mongodbUrl: config.mongoose?.url || process.env.MONGODB_URL,
+        redisUrl: process.env.REDIS_URL || config.cache?.redis?.url,
+        redisEndpoint: process.env.REDIS_ENDPOINT,
+      },
+      logger
+    );
     const { logVoiceTurnStartupConfig } = require('./utils/voiceTurnProfile.util');
     logVoiceTurnStartupConfig(logger, config);
     logger.info(`[Startup] ===== END ENVIRONMENT DEBUG =====`);

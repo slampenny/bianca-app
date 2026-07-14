@@ -1,260 +1,219 @@
 #!/bin/bash
+# staging-control.sh — start / stop / status for the Terraform-managed staging EC2.
+# Does NOT provision or terminate instances (terraform owns EIP/ALB lifecycle).
 
-# staging-control.sh
-# Easy control of staging environment for cost optimization
+set -euo pipefail
 
-set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/staging-common.sh"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# AWS (override with env: AWS_PROFILE, AWS_REGION)
-AWS_PROFILE="${AWS_PROFILE:-jordan}"
-REGION="${AWS_REGION:-us-east-2}"
-
-# Get staging instance ID (newest launch wins if multiple share Name=bianca-staging)
-get_staging_instance_id() {
-    aws ec2 describe-instances \
-        --filters "Name=tag:Name,Values=bianca-staging" "Name=instance-state-name,Values=running,stopped,pending,stopping" \
-        --query 'sort_by(Reservations[].Instances[], &LaunchTime)[-1].InstanceId' \
-        --output text \
-        --profile $AWS_PROFILE \
-        --region $REGION
-}
-
-# Get staging instance status
-get_staging_status() {
-    local instance_id=$1
-    aws ec2 describe-instances \
-        --instance-ids $instance_id \
-        --query 'Reservations[0].Instances[0].State.Name' \
-        --output text \
-        --profile $AWS_PROFILE \
-        --region $REGION
-}
-
-# Get staging instance IP
-get_staging_ip() {
-    local instance_id=$1
-    aws ec2 describe-instances \
-        --instance-ids $instance_id \
-        --query 'Reservations[0].Instances[0].PublicIpAddress' \
-        --output text \
-        --profile $AWS_PROFILE \
-        --region $REGION
-}
-
-# Show current status
 show_status() {
-    echo -e "${BLUE}🔍 Checking staging environment status...${NC}"
-    
-    local instance_id=$(get_staging_instance_id)
-    if [ "$instance_id" = "None" ] || [ -z "$instance_id" ]; then
-        echo -e "${RED}❌ No staging instance found${NC}"
-        return 1
-    fi
-    
-    local status=$(get_staging_status $instance_id)
-    local ip=$(get_staging_ip $instance_id)
-    
-    echo -e "Instance ID: ${YELLOW}$instance_id${NC}"
-    echo -e "Status: ${GREEN}$status${NC}"
-    echo -e "IP: ${YELLOW}$ip${NC}"
-    
-    # Check always-on setting
-    local always_on=$(aws ssm get-parameter \
-        --name "/bianca/staging/always-on" \
-        --query 'Parameter.Value' \
-        --output text \
-        --profile $AWS_PROFILE \
-        --region $REGION 2>/dev/null || echo "false")
-    
-    echo -e "Always-on mode: ${YELLOW}$always_on${NC}"
-    echo -e "Auto-stop Lambda: ${YELLOW}bianca-staging-auto-stop${NC} (every 30m if idle — stops bianca-staging only; never starts)"
-    echo -e "Start staging: ${YELLOW}manual only${NC} (yarn staging:up or staging-control.sh start)"
+  echo -e "${BLUE}🔍 Staging status${NC}"
+
+  local ids id count state ip always_on
+  ids=$(staging_list_instance_ids)
+  count=$(echo "$ids" | grep -c . || true)
+
+  if [ "${count:-0}" -eq 0 ]; then
+    echo -e "${RED}❌ No staging instance found (Name=${STAGING_INSTANCE_NAME_TAG}).${NC}"
+    echo "   Apply Terraform: packages/backend/devops/terraform/staging.tf"
+    return 1
+  fi
+
+  if [ "$count" -gt 1 ]; then
+    echo -e "${YELLOW}⚠️  Found $count instances tagged Name=${STAGING_INSTANCE_NAME_TAG}; using EIP-preferred / newest:${NC}"
+    echo "$ids" | sed 's/^/     /'
+  fi
+
+  id=$(staging_get_instance_id)
+  state=$(staging_get_instance_state "$id")
+  ip=$(staging_get_public_ip "$id")
+
+  always_on=$(staging_aws ssm get-parameter \
+    --name "/bianca/staging/always-on" \
+    --query 'Parameter.Value' \
+    --output text 2>/dev/null || echo "false")
+
+  echo -e "Instance ID:     ${YELLOW}${id}${NC}"
+  echo -e "Status:          ${GREEN}${state}${NC}"
+  echo -e "Public IP:       ${YELLOW}${ip}${NC}"
+  echo -e "SIP EIP:         ${YELLOW}$(staging_get_sip_eip || echo unknown)${NC}"
+  echo -e "Always-on:       ${YELLOW}${always_on}${NC}"
+  echo -e "Staging number:  ${YELLOW}${STAGING_PHONE_E164}${NC}"
+  echo -e "Health URL:      ${STAGING_HEALTH_URL}"
+  echo -e "Auto-stop:       bianca-staging-auto-stop (stops idle; never starts)"
+
+  if [ "$state" != "running" ]; then
+    echo -e "${YELLOW}Instance not running — skip remote health/digest checks.${NC}"
+    return 0
+  fi
+
+  echo -n "App health:      "
+  local health_json ari
+  if health_json=$(curl -sf --max-time 10 "$STAGING_HEALTH_URL" 2>/dev/null); then
+    ari=$(echo "$health_json" | python3 -c "import sys,json; d=json.load(sys.stdin); a=d.get('services',{}).get('asterisk',{}); print('ready='+str(a.get('ready'))+' status='+str(a.get('status')))" 2>/dev/null || echo "parse-error")
+    echo -e "${GREEN}OK${NC} (ARI: $ari)"
+  else
+    echo -e "${RED}unreachable${NC}"
+  fi
+
+  if staging_wait_ssm_online "$id" 3 2>/dev/null; then
+    echo "Remote digests / git SHA / trunk:"
+    set +e
+    staging_ssm_run_commands "$id" \
+      "set -euo pipefail" \
+      "echo GIT_SHA=\$(cat ${STAGING_DEPLOY_DIR}/.deployed-git-sha 2>/dev/null || echo unknown)" \
+      "echo DEPLOYED_AT=\$(cat ${STAGING_DEPLOY_DIR}/.deployed-at 2>/dev/null || echo unknown)" \
+      "docker images --format '{{.Repository}}:{{.Tag}} {{.ID}}' | grep -E 'bianca-app-(backend|frontend|admin|asterisk).*staging' || true" \
+      "docker exec staging_asterisk asterisk -rx 'pjsip show endpoints' 2>/dev/null | grep -i twilio || docker exec asterisk asterisk -rx 'pjsip show endpoints' 2>/dev/null | grep -i twilio || echo 'trunk: (unavailable)'"
+    set -e
+  else
+    echo -e "${YELLOW}SSM not online — cannot read digests/trunk${NC}"
+  fi
 }
 
-# Start staging instance
 start_staging() {
-    echo -e "${BLUE}🚀 Starting staging instance...${NC}"
-    
-    local instance_id=$(get_staging_instance_id)
-    if [ "$instance_id" = "None" ] || [ -z "$instance_id" ]; then
-        echo -e "${RED}❌ No staging instance found${NC}"
-        return 1
-    fi
-    
-    local status=$(get_staging_status $instance_id)
-    
-    if [ "$status" = "running" ]; then
-        echo -e "${YELLOW}⚠️  Instance is already running${NC}"
-        return 0
-    fi
+  echo -e "${BLUE}🚀 Starting staging instance...${NC}"
 
-    if [ "$status" = "pending" ]; then
-        echo -e "${YELLOW}⚠️  Instance is already starting (pending)${NC}"
-        aws ec2 wait instance-running \
-            --instance-ids $instance_id \
-            --profile $AWS_PROFILE \
-            --region $REGION
-        local ip=$(get_staging_ip $instance_id)
-        echo -e "${GREEN}✅ Instance is running at $ip${NC}"
-        return 0
-    fi
+  local ids id count status ip
+  ids=$(staging_list_instance_ids)
+  count=$(echo "$ids" | grep -c . || true)
 
-    if [ "$status" = "stopping" ] || [ "$status" = "shutting-down" ]; then
-        echo -e "${RED}❌ Instance is $status — wait until it is fully stopped, then run staging:up again${NC}"
-        return 1
-    fi
-    
-    aws ec2 start-instances \
-        --instance-ids $instance_id \
-        --profile $AWS_PROFILE \
-        --region $REGION
-    
-    echo -e "${GREEN}✅ Instance start initiated${NC}"
-    echo -e "${YELLOW}⏳ Waiting for instance to be ready...${NC}"
-    
-    # Wait for instance to be running
-    aws ec2 wait instance-running \
-        --instance-ids $instance_id \
-        --profile $AWS_PROFILE \
-        --region $REGION
-    
-    local ip=$(get_staging_ip $instance_id)
-    echo -e "${GREEN}✅ Instance is running at $ip${NC}"
+  if [ "${count:-0}" -eq 0 ]; then
+    echo -e "${RED}❌ No staging instance found.${NC}"
+    echo "   Apply staging.tf (Terraform) — do not provision outside Terraform."
+    echo "   Example: cd packages/backend/devops/terraform && terraform apply -target=aws_instance.staging ..."
+    return 1
+  fi
+
+  if [ "$count" -gt 1 ]; then
+    echo -e "${YELLOW}⚠️  $count staging-tagged instances exist; will start the EIP-preferred/newest one only.${NC}"
+  fi
+
+  id=$(staging_get_instance_id)
+  status=$(staging_get_instance_state "$id")
+
+  if [ "$status" = "running" ]; then
+    echo -e "${YELLOW}⚠️  Instance already running (${id})${NC}"
+  elif [ "$status" = "pending" ]; then
+    echo -e "${YELLOW}⚠️  Instance pending — waiting...${NC}"
+    staging_aws ec2 wait instance-running --instance-ids "$id"
+  elif [ "$status" = "stopping" ] || [ "$status" = "shutting-down" ]; then
+    echo -e "${RED}❌ Instance is $status — wait until stopped, then yarn staging:up again${NC}"
+    return 1
+  else
+    staging_aws ec2 start-instances --instance-ids "$id" >/dev/null
+    echo -e "${GREEN}✅ Start initiated — waiting for running + status checks...${NC}"
+    staging_aws ec2 wait instance-running --instance-ids "$id"
+    staging_aws ec2 wait instance-status-ok --instance-ids "$id" 2>/dev/null || true
+  fi
+
+  ip=$(staging_get_public_ip "$id")
+  echo -e "${GREEN}✅ Instance running: ${id} @ ${ip}${NC}"
+
+  # Bootstrap gate
+  echo "   Checking bootstrap (/opt/bianca-staging compose + containers)..."
+  if ! staging_wait_ssm_online "$id" 24; then
+    echo -e "${YELLOW}⚠️  SSM not ready yet. When Online, run: yarn staging:deploy${NC}"
+    print_staging_checklist "unknown" ""
+    return 0
+  fi
+
+  local boot
+  set +e
+  boot=$(staging_ssm_run_commands "$id" \
+    "set -euo pipefail" \
+    "if [ -f ${STAGING_DEPLOY_DIR}/docker-compose.yml ]; then echo COMPOSE=yes; else echo COMPOSE=no; fi" \
+    "echo CONTAINERS=\$(docker ps -q --filter name=staging_ | wc -l | tr -d ' ')" \
+    2>&1)
+  set -e
+  echo "$boot"
+  if ! echo "$boot" | grep -q 'COMPOSE=yes'; then
+    echo -e "${YELLOW}⚠️  Compose not present on host — run: yarn staging:deploy${NC}"
+  elif echo "$boot" | grep -q 'CONTAINERS=0'; then
+    echo -e "${YELLOW}⚠️  No staging_* containers running — run: yarn staging:deploy${NC}"
+  fi
+
+  print_staging_checklist "unknown" ""
 }
 
-# Stop staging instance
 stop_staging() {
-    echo -e "${BLUE}🛑 Stopping staging instance...${NC}"
-    
-    local instance_id=$(get_staging_instance_id)
-    if [ "$instance_id" = "None" ] || [ -z "$instance_id" ]; then
-        echo -e "${RED}❌ No staging instance found${NC}"
-        return 1
-    fi
-    
-    local status=$(get_staging_status $instance_id)
-    
-    if [ "$status" = "stopped" ]; then
-        echo -e "${YELLOW}⚠️  Instance is already stopped${NC}"
-        return 0
-    fi
-    
-    aws ec2 stop-instances \
-        --instance-ids $instance_id \
-        --profile $AWS_PROFILE \
-        --region $REGION
-    
-    echo -e "${GREEN}✅ Instance stop initiated${NC}"
+  echo -e "${BLUE}🛑 Stopping staging instance...${NC}"
+
+  local id status
+  id=$(staging_get_instance_id || true)
+  if [ -z "${id:-}" ] || [ "$id" = "None" ]; then
+    echo -e "${YELLOW}⚠️  No staging instance found — nothing to stop (safe).${NC}"
+    return 0
+  fi
+
+  status=$(staging_get_instance_state "$id")
+  if [ "$status" = "stopped" ]; then
+    echo -e "${YELLOW}⚠️  Already stopped (${id})${NC}"
+    echo "stopped (instance persists; terraform destroy for full teardown)"
+    return 0
+  fi
+
+  staging_aws ec2 stop-instances --instance-ids "$id" >/dev/null
+  echo -e "${GREEN}✅ Stop initiated for ${id}${NC}"
+  echo "stopped (instance persists; terraform destroy for full teardown)"
 }
 
-# Enable always-on mode
 enable_always_on() {
-    echo -e "${BLUE}🔒 Enabling always-on mode...${NC}"
-    
-    aws ssm put-parameter \
-        --name "/bianca/staging/always-on" \
-        --value "true" \
-        --type "String" \
-        --overwrite \
-        --profile $AWS_PROFILE \
-        --region $REGION
-    
-    echo -e "${GREEN}✅ Always-on mode enabled${NC}"
-    echo -e "${YELLOW}ℹ️  Staging will now run 24/7 regardless of schedule${NC}"
+  staging_aws ssm put-parameter \
+    --name "/bianca/staging/always-on" \
+    --value "true" \
+    --type "String" \
+    --overwrite >/dev/null
+  echo -e "${GREEN}✅ Always-on enabled (auto-stop paused)${NC}"
 }
 
-# Disable always-on mode
 disable_always_on() {
-    echo -e "${BLUE}🔓 Disabling always-on mode...${NC}"
-    
-    aws ssm put-parameter \
-        --name "/bianca/staging/always-on" \
-        --value "false" \
-        --type "String" \
-        --overwrite \
-        --profile $AWS_PROFILE \
-        --region $REGION
-    
-    echo -e "${GREEN}✅ Always-on mode disabled${NC}"
-    echo -e "${YELLOW}ℹ️  Staging will now follow business hours schedule${NC}"
+  staging_aws ssm put-parameter \
+    --name "/bianca/staging/always-on" \
+    --value "false" \
+    --type "String" \
+    --overwrite >/dev/null
+  echo -e "${GREEN}✅ Always-on disabled (idle auto-stop resumes)${NC}"
 }
 
-# Deploy to staging (live-dev sync or manual ECR pull)
-deploy_staging() {
-    echo -e "${BLUE}🚀 Staging deploy options${NC}"
-    echo ""
-    echo -e "  ${GREEN}yarn staging:live${NC}          — rsync + nodemon/Vite (recommended)"
-    echo -e "  ${GREEN}./manual-deploy-staging.sh${NC} — pull :staging ECR images"
-    echo ""
-    local instance_id=$(get_staging_instance_id)
-    local status=$(get_staging_status $instance_id)
-
-    if [ "$status" = "stopped" ]; then
-        echo -e "${YELLOW}⚠️  Instance is stopped, starting it first...${NC}"
-        start_staging
-    fi
-}
-
-# Show usage
 show_usage() {
-    echo -e "${BLUE}Bianca Staging Control${NC}"
-    echo ""
-    echo "Usage: $0 [COMMAND]"
-    echo ""
-    echo "Commands:"
-    echo "  status     - Show current staging status"
-    echo "  start      - Start staging instance"
-    echo "  stop       - Stop staging instance"
-    echo "  deploy     - Show staging deploy options (starts instance if stopped)"
-    echo "  always-on  - Enable always-on mode (24/7, pauses auto-stop Lambda)"
-    echo "  schedule   - Disable always-on mode (idle auto-stop resumes)"
-    echo ""
-    echo "Live dev (local rsync + nodemon/Vite on staging — not production):"
-    echo "  yarn staging:live       - sync and watch for changes"
-    echo "  yarn staging:live:off   - restore ECR images"
-    echo "  help       - Show this help message"
-    echo ""
-    echo "Examples:"
-    echo "  $0 status"
-    echo "  $0 start"
-    echo "  $0 deploy"
-    echo "  $0 always-on"
+  cat <<EOF
+Bianca Staging Control
+
+Usage: $0 [COMMAND]
+
+Commands:
+  status      Instance state, health, ARI, trunk, digests, staging number
+  start       Start Terraform-managed instance (idempotent; does not provision)
+  stop        Stop instance (instance persists; terraform destroy for full teardown)
+  always-on   Pause idle auto-stop Lambda
+  schedule    Resume idle auto-stop
+  help
+
+Related:
+  yarn staging:deploy   Build :staging images, SSM compose regenerate, smoke checks
+  yarn staging:live     Rsync live-dev (not production-parity)
+EOF
 }
 
-# Main script logic
 case "${1:-help}" in
-    status)
-        show_status
-        ;;
-    start)
-        start_staging
-        ;;
-    stop)
-        stop_staging
-        ;;
-    deploy)
-        deploy_staging
-        ;;
-    always-on)
-        enable_always_on
-        ;;
-    schedule)
-        disable_always_on
-        ;;
-    help|--help|-h)
-        show_usage
-        ;;
-    *)
-        echo -e "${RED}❌ Unknown command: $1${NC}"
-        echo ""
-        show_usage
-        exit 1
-        ;;
+  status) show_status ;;
+  start) start_staging ;;
+  stop) stop_staging ;;
+  always-on) enable_always_on ;;
+  schedule) disable_always_on ;;
+  help|--help|-h) show_usage ;;
+  *)
+    echo -e "${RED}❌ Unknown command: $1${NC}"
+    show_usage
+    exit 1
+    ;;
 esac

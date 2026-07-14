@@ -58,6 +58,7 @@
     "staging:up": "bash packages/backend/scripts/staging-control.sh start",
     "staging:down": "bash packages/backend/scripts/staging-control.sh stop",
     "staging:status": "bash packages/backend/scripts/staging-control.sh status",
+    "staging:deploy": "bash packages/backend/scripts/staging-deploy.sh",
     "staging:always-on": "bash packages/backend/scripts/staging-control.sh always-on",
     "staging:live": "bash packages/backend/scripts/staging-live-sync.sh --watch",
     "staging:live:sync": "bash packages/backend/scripts/staging-live-sync.sh --sync",

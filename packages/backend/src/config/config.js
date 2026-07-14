@@ -467,7 +467,7 @@ baselineConfig.loadSecrets = async () => {
   // Staging should use test keys, production uses live keys
   // Default to production secret for backwards compatibility
   const secretId = process.env.AWS_SECRET_ID || 'MySecretsManagerSecret';
-  const region = process.env.AWS_REGION || 'us-east-2'; // Use env var for region
+  const region = process.env.AWS_REGION || 'ca-central-1';
 
   try {
     logger.info(`Attempting to load secrets from AWS Secrets Manager (Region: ${region}, SecretId: ${secretId})`);

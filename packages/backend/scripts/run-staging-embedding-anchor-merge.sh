@@ -2,7 +2,7 @@
 # Merge missing embedding anchor phrases into staging MongoDB (uses local repo defaults).
 set -euo pipefail
 export AWS_PROFILE="${AWS_PROFILE:-jordan}"
-export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-2}"
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-ca-central-1}"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BACKEND="$(cd "$(dirname "$0")/.." && pwd)"

@@ -15,7 +15,7 @@ echo -e "${BLUE}🔍 Verifying Staging Deployment${NC}"
 echo ""
 
 # Configuration
-AWS_REGION="us-east-2"
+AWS_REGION="ca-central-1"
 AWS_PROFILE="jordan"
 STAGING_API="https://staging-api.biancawellness.com"
 

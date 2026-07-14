@@ -1,6 +1,7 @@
 #!/bin/bash
-# Minimal staging setup script - Only infrastructure setup
-# Application deployment is handled by CodeDeploy
+# Minimal staging infrastructure setup (Docker, SSM, volume mounts).
+# Application + Asterisk deploy is via `yarn staging:deploy` (SSM: regenerate-host-stack + compose).
+# Staging CodePipeline/CodeDeploy were removed — do not wait for CodeDeploy to ship the app.
 
 set -e
 # Redirect output to log file (avoiding process substitution for compatibility)
@@ -11,7 +12,7 @@ AWS_ACCOUNT_ID="${aws_account_id}"
 AWS_REGION="${region}"
 ENVIRONMENT="staging"
 
-# Export ENVIRONMENT to /etc/environment so it's available to CodeDeploy scripts
+# Export ENVIRONMENT for SSM deploy scripts / regenerate-host-stack.sh
 echo "ENVIRONMENT=$${ENVIRONMENT}" >> /etc/environment
 echo "AWS_REGION=$${AWS_REGION}" >> /etc/environment
 export ENVIRONMENT="$${ENVIRONMENT}"
@@ -181,7 +182,8 @@ fi
 
 echo "==================================="
 echo "Infrastructure setup complete!"
-echo "Waiting for CodeDeploy to handle application deployment..."
+echo "Next: from a workstation run \`yarn staging:deploy\` (SSM compose regenerate + ECR pull)."
+echo "CodeDeploy is not used for staging."
 echo "==================================="
 
 # HIPAA backup cron (scripts installed by CodeDeploy after_install; cron ready for first deploy)

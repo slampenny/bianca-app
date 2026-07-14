@@ -4,7 +4,7 @@ set -e
 
 DEPLOY_DIR="/opt/bianca-staging"
 SRC_DIR="$DEPLOY_DIR/dev-src"
-AWS_REGION="${AWS_REGION:-us-east-2}"
+AWS_REGION="${AWS_REGION:-ca-central-1}"
 
 if docker compose version >/dev/null 2>&1; then
   DC="docker compose"
@@ -63,7 +63,7 @@ sudo touch /opt/maintenance.html 2>/dev/null || true
 cd "$DEPLOY_DIR"
 
 echo "Logging into ECR..."
-aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin 730335291008.dkr.ecr.ca-central-1.amazonaws.com
 
 echo "Starting infrastructure containers (mongodb, asterisk, admin)..."
 $DC pull mongodb asterisk admin 2>/dev/null || true

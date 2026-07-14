@@ -144,12 +144,17 @@ fi
 mkdir -p /opt/bianca-production
 cd /opt/bianca-production
 
-# Fetch Asterisk passwords from Secrets Manager
-echo "Fetching Asterisk passwords from Secrets Manager..."
+# Fetch secrets for bootstrap compose (full stack is regenerated later by CodeDeploy / regenerate-host-stack.sh)
+echo "Fetching secrets from Secrets Manager..."
 SECRET_ARN="arn:aws:secretsmanager:${region}:${aws_account_id}:secret:MySecretsManagerSecret-*"
 SECRET_VALUE=$(aws secretsmanager get-secret-value --region ${region} --secret-id MySecretsManagerSecret --query SecretString --output text)
-ARI_PASSWORD=$(echo $SECRET_VALUE | jq -r .ARI_PASSWORD)
-BIANCA_PASSWORD=$(echo $SECRET_VALUE | jq -r .BIANCA_PASSWORD)
+ARI_PASSWORD=$(echo "$SECRET_VALUE" | jq -r .ARI_PASSWORD)
+BIANCA_PASSWORD=$(echo "$SECRET_VALUE" | jq -r .BIANCA_PASSWORD)
+STRIPE_PUBLISHABLE_KEY=$(echo "$SECRET_VALUE" | jq -r '.STRIPE_PUBLISHABLE_KEY // empty')
+if [ -z "$STRIPE_PUBLISHABLE_KEY" ] || [ "$STRIPE_PUBLISHABLE_KEY" = "null" ]; then
+  echo "ERROR: STRIPE_PUBLISHABLE_KEY missing from Secrets Manager secret MySecretsManagerSecret — fail closed"
+  exit 1
+fi
 
 # Create docker-compose.yml - Asterisk passwords loaded from Secrets Manager
 cat > docker-compose.yml <<EOF
@@ -212,7 +217,7 @@ services:
       - EMAIL_FROM=no-reply@biancawellness.com
       - TWILIO_PHONENUMBER=+16047060134
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
-      - STRIPE_PUBLISHABLE_KEY=pk_live_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
+      - STRIPE_PUBLISHABLE_KEY=$${STRIPE_PUBLISHABLE_KEY}
       - RTP_LISTENER_HOST=0.0.0.0
       - RTP_BIANCA_HOST=production_app
       - RTP_ASTERISK_HOST=asterisk

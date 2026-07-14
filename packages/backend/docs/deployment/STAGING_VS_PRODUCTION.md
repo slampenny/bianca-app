@@ -6,13 +6,21 @@ Use this when **staging works but production doesn’t** and you need to compare
 
 | | Staging | Production |
 |---|---------|------------|
-| **How code gets there** | `yarn staging:live` (rsync + nodemon/Vite) or `manual-deploy-staging.sh` (ECR pull) | **CodePipeline** on push to `main` → blue/green → CodeDeploy |
-| **CI/CD pipeline** | None (removed) | `bianca-production-pipeline` |
-| **On-server reload** | nodemon (backend) + Vite HMR (frontend) in live-dev mode | pm2 + static nginx from ECR images |
+| **How code gets there** | **`yarn staging:deploy`** — local Docker build → ECR `:staging` (ca-central-1) → SSM runs shared `regenerate-host-stack.sh` + `docker compose up` (same compose generation as CodeDeploy BeforeInstall). Optional: `yarn staging:live` for rsync/hot reload (not pipeline-parity). | **CodePipeline** on push to `main` → blue/green → CodeDeploy (BeforeInstall sources the same `regenerate-host-stack.sh`) |
+| **CI/CD pipeline** | None (removed) — deploy is operator-driven via SSM | `bianca-production-pipeline` |
+| **Instance control** | `yarn staging:up` / `staging:down` (**stop**, instance persists) / `staging:status` | `yarn production:up` / `down` / `status` |
+| **On-server reload** | Compose recreate on deploy; nodemon/Vite only in live-dev mode | Docker Compose via CodeDeploy hooks |
 
 Production pipeline stage order: `Source → Build → CreateGreenInstance → Deploy → RunTests → PostDeployValidation → SwapAndTerminate`
 
 Failed **RunTests** or **PostDeployValidation** stops the production pipeline before swap.
+
+```bash
+yarn staging:up       # start Terraform-managed EC2 (does not provision)
+yarn staging:deploy   # build/push :staging, SSM regenerate + compose up, smoke + voice matrix
+yarn staging:status   # health, ARI, trunk, digests, number
+yarn staging:down     # stop instance (persists; terraform destroy for full teardown)
+```
 
 ## Typical differences
 
@@ -47,7 +55,7 @@ ssh -i ~/.ssh/<your-key>.pem ec2-user@<PRODUCTION_PUBLIC_IP>
 
 cd /opt/bianca-production
 
-export AWS_DEFAULT_REGION=us-east-2
+export AWS_DEFAULT_REGION=ca-central-1
 ACCOUNT=730335291008
 aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | \
   docker login --username AWS --password-stdin "${ACCOUNT}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"

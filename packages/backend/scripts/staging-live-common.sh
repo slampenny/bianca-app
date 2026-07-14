@@ -2,7 +2,7 @@
 # Shared helpers for staging live-dev sync (source locally, run on EC2).
 
 AWS_PROFILE="${AWS_PROFILE:-jordan}"
-AWS_REGION="${AWS_REGION:-us-east-2}"
+AWS_REGION="${AWS_REGION:-ca-central-1}"
 STAGING_SSH_KEY="${STAGING_SSH_KEY:-$HOME/.ssh/bianca-key-pair.pem}"
 STAGING_SSH_USER="${STAGING_SSH_USER:-ec2-user}"
 REMOTE_DEPLOY_DIR="/opt/bianca-staging"

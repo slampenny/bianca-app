@@ -118,10 +118,13 @@ phases:
         # Copy scripts directory contents to root
         mkdir -p "$CODEBUILD_SRC_DIR/scripts"
         cp devops/codedeploy/scripts/* "$CODEBUILD_SRC_DIR/scripts/"
+        # Shared compose regeneration (sourced by BeforeInstall; also used by yarn staging:deploy)
+        cp devops/scripts/regenerate-host-stack.sh "$CODEBUILD_SRC_DIR/scripts/"
         chmod +x "$CODEBUILD_SRC_DIR/scripts"/*.sh
         echo Verifying copied scripts...
         ls -la "$CODEBUILD_SRC_DIR/scripts/"
         wc -l "$CODEBUILD_SRC_DIR/scripts/before_install.sh"
+        test -f "$CODEBUILD_SRC_DIR/scripts/regenerate-host-stack.sh"
         echo CodeDeploy artifacts packaged
 
 artifacts:

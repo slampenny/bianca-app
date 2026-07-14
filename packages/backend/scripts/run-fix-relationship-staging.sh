@@ -17,7 +17,7 @@ PATIENT_EMAIL=$1
 CAREGIVER_EMAIL=$1
 
 AWS_PROFILE="jordan"
-REGION="us-east-2"
+REGION="ca-central-1"
 
 echo "🔧 Running fix-caregiver-relationship on staging..."
 echo "   Email (used for both patient and caregiver): $EMAIL"

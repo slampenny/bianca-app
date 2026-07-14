@@ -30,8 +30,8 @@ $DC -f "$COMPOSE_BASE" -f "$COMPOSE_LIVE" stop app frontend nginx 2>/dev/null ||
 $DC -f "$COMPOSE_BASE" -f "$COMPOSE_LIVE" rm -f app frontend 2>/dev/null || true
 
 echo "Logging into ECR and restoring production-like staging containers..."
-AWS_REGION="${AWS_REGION:-us-east-2}"
-aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+AWS_REGION="${AWS_REGION:-ca-central-1}"
+aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin 730335291008.dkr.ecr.ca-central-1.amazonaws.com
 
 $DC -f "$COMPOSE_BASE" pull app frontend nginx 2>/dev/null || $DC -f "$COMPOSE_BASE" pull app frontend
 $DC -f "$COMPOSE_BASE" up -d --force-recreate app frontend nginx

@@ -27,6 +27,10 @@ fi
 echo "Listing contents of $ASTERISK_CONF_DIR:"
 ls -la "$ASTERISK_CONF_DIR"
 
+# Default RTP range to Docker publish / staging+production compose mapping when unset
+export RTP_START_PORT="${RTP_START_PORT:-10000}"
+export RTP_END_PORT="${RTP_END_PORT:-10100}"
+
 # Debug environment variables
 echo "=== Environment Variables ==="
 echo "RTP_START_PORT: $RTP_START_PORT"

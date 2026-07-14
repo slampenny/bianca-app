@@ -20,7 +20,7 @@ services:
       - bianca-network
 
   asterisk:
-    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-asterisk:staging
+    image: 730335291008.dkr.ecr.ca-central-1.amazonaws.com/bianca-app-asterisk:staging
     container_name: staging_asterisk
     restart: unless-stopped
     ports:
@@ -47,7 +47,7 @@ services:
       - bianca-network
 
   bianca-app:
-    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-backend:staging
+    image: 730335291008.dkr.ecr.ca-central-1.amazonaws.com/bianca-app-backend:staging
     container_name: staging_app
     restart: unless-stopped
     ports:
@@ -56,7 +56,7 @@ services:
       - .env
     environment:
       - NODE_ENV=staging
-      - AWS_REGION=us-east-2
+      - AWS_REGION=ca-central-1
       - AWS_SECRET_ID=MySecretsManagerSecret
       - MONGODB_URL=mongodb://mongodb:27017/bianca-service
       - API_BASE_URL=https://staging-api.biancawellness.com
@@ -92,7 +92,7 @@ services:
       - bianca-network
 
   frontend:
-    image: 730335291008.dkr.ecr.us-east-2.amazonaws.com/bianca-app-frontend:staging
+    image: 730335291008.dkr.ecr.ca-central-1.amazonaws.com/bianca-app-frontend:staging
     container_name: staging_frontend
     restart: unless-stopped
     ports:

@@ -8,7 +8,7 @@
 #       → Last 48h of every log line containing that CallSid (full context, no grep filter)
 #
 # Env:
-#   AWS_PROFILE, AWS_REGION (default us-east-2 if unset and your CLI has a default)
+#   AWS_PROFILE, AWS_REGION (default ca-central-1 if unset and your CLI has a default)
 #   SINCE   — for mode 1 only (default 2h), e.g. 6h, 1d
 #   OUT     — output file path
 #

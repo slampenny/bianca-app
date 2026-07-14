@@ -6,7 +6,7 @@ echo "🔄 Updating staging containers with existing images..."
 
 # Get staging instance ID and IP
 echo "⏳ Getting staging instance information..."
-STAGING_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" --query 'Reservations[0].Instances[0].InstanceId' --output text --profile jordan --region us-east-2)
+STAGING_INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=bianca-staging" --query 'Reservations[0].Instances[0].InstanceId' --output text --profile jordan --region ca-central-1)
 
 if [ -z "$STAGING_INSTANCE_ID" ] || [ "$STAGING_INSTANCE_ID" == "None" ]; then
     echo "❌ Staging instance not found. Please check Terraform deployment."
@@ -16,21 +16,21 @@ fi
 echo "Found staging instance: $STAGING_INSTANCE_ID"
 
 # Check instance state and start if stopped
-INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].State.Name' --output text --profile jordan --region us-east-2)
+INSTANCE_STATE=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].State.Name' --output text --profile jordan --region ca-central-1)
 echo "Instance state: $INSTANCE_STATE"
 
 if [ "$INSTANCE_STATE" == "stopped" ]; then
     echo "🔄 Starting stopped instance..."
-    aws ec2 start-instances --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region us-east-2
+    aws ec2 start-instances --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region ca-central-1
     echo "⏳ Waiting for instance to start..."
-    aws ec2 wait instance-running --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region us-east-2
+    aws ec2 wait instance-running --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region ca-central-1
     echo "✅ Instance started"
 fi
 
 # Wait for instance to be running
 if [ "$INSTANCE_STATE" != "running" ]; then
     echo "Waiting for instance to reach running state..."
-    aws ec2 wait instance-running --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region us-east-2 || true
+    aws ec2 wait instance-running --instance-ids "$STAGING_INSTANCE_ID" --profile jordan --region ca-central-1 || true
 fi
 
 # Wait a bit more for public IP to be assigned
@@ -38,7 +38,7 @@ echo "Waiting for public IP assignment..."
 sleep 10
 
 # Get the public IP
-STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region us-east-2)
+STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region ca-central-1)
 
 # Retry if IP is not yet assigned
 MAX_RETRIES=6
@@ -50,7 +50,7 @@ while [ -z "$STAGING_IP" ] || [ "$STAGING_IP" == "None" ] || [ "$STAGING_IP" == 
     fi
     echo "Waiting for public IP... (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
     sleep 10
-    STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region us-east-2)
+    STAGING_IP=$(aws ec2 describe-instances --instance-ids "$STAGING_INSTANCE_ID" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text --profile jordan --region ca-central-1)
     RETRY_COUNT=$((RETRY_COUNT + 1))
 done
 
@@ -59,7 +59,7 @@ echo "🔄 Using AWS Systems Manager (SSM) to execute commands..."
 echo "   SSM works over HTTPS (port 443) which is rarely blocked"
 
 # Check if SSM is available
-SSM_STATUS=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$STAGING_INSTANCE_ID" --profile jordan --region us-east-2 --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null)
+SSM_STATUS=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$STAGING_INSTANCE_ID" --profile jordan --region ca-central-1 --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null)
 
 if [ "$SSM_STATUS" == "Online" ]; then
     echo "✅ SSM is available - using SSM to execute commands"
@@ -70,7 +70,7 @@ else
     sleep 10
     
     # Retry SSM check
-    SSM_STATUS=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$STAGING_INSTANCE_ID" --profile jordan --region us-east-2 --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null)
+    SSM_STATUS=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$STAGING_INSTANCE_ID" --profile jordan --region ca-central-1 --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null)
     
     if [ "$SSM_STATUS" == "Online" ]; then
         echo "✅ SSM is now available"
@@ -83,10 +83,10 @@ else
         echo "   3. Instance may still be initializing"
         echo ""
         echo "   To check SSM status:"
-        echo "   aws ssm describe-instance-information --filters \"Key=InstanceIds,Values=$STAGING_INSTANCE_ID\" --profile jordan --region us-east-2"
+        echo "   aws ssm describe-instance-information --filters \"Key=InstanceIds,Values=$STAGING_INSTANCE_ID\" --profile jordan --region ca-central-1"
         echo ""
         echo "   To use SSM Session Manager:"
-        echo "   aws ssm start-session --target $STAGING_INSTANCE_ID --profile jordan --region us-east-2"
+        echo "   aws ssm start-session --target $STAGING_INSTANCE_ID --profile jordan --region ca-central-1"
         exit 1
     fi
 fi
@@ -101,7 +101,7 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
       cd /opt/bianca-staging
       
       # Login to ECR
-      aws ecr get-login-password --region us-east-2 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.us-east-2.amazonaws.com
+      aws ecr get-login-password --region ca-central-1 | docker login --username AWS --password-stdin 730335291008.dkr.ecr.ca-central-1.amazonaws.com
       
       # Create MongoDB data directory
       sudo mkdir -p /opt/mongodb-data && sudo chown 999:999 /opt/mongodb-data
@@ -216,7 +216,7 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
             --document-name "AWS-RunShellScript" \
             --parameters "{\"commands\":[\"$UPLOAD_AND_RUN_ESCAPED\"]}" \
             --profile jordan \
-            --region us-east-2 \
+            --region ca-central-1 \
             --query 'Command.CommandId' \
             --output text 2>&1)
         
@@ -227,7 +227,7 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
             echo "   Error: $COMMAND_ID"
             echo ""
             echo "💡 Alternative: Use SSM Session Manager to deploy manually:"
-            echo "   aws ssm start-session --target $STAGING_INSTANCE_ID --profile jordan --region us-east-2"
+            echo "   aws ssm start-session --target $STAGING_INSTANCE_ID --profile jordan --region ca-central-1"
             exit 1
         fi
         
@@ -237,7 +237,7 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
             --command-id "$COMMAND_ID" \
             --instance-id "$STAGING_INSTANCE_ID" \
             --profile jordan \
-            --region us-east-2
+            --region ca-central-1
         
         # Get command output
         echo "📋 Command output:"
@@ -245,7 +245,7 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
             --command-id "$COMMAND_ID" \
             --instance-id "$STAGING_INSTANCE_ID" \
             --profile jordan \
-            --region us-east-2 \
+            --region ca-central-1 \
             --query '[StandardOutputContent, StandardErrorContent]' \
             --output text
         
@@ -254,7 +254,7 @@ if [ -n "$STAGING_IP" ] && [ "$STAGING_IP" != "None" ] && [ "$STAGING_IP" != "nu
             --command-id "$COMMAND_ID" \
             --instance-id "$STAGING_INSTANCE_ID" \
             --profile jordan \
-            --region us-east-2 \
+            --region ca-central-1 \
             --query 'Status' \
             --output text)
         

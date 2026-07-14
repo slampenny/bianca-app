@@ -49,6 +49,11 @@ echo "Fetching secrets from AWS Secrets Manager..."
 SECRET_ID="MySecretsManagerSecret"
 ARI_PASSWORD=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_ID} --query SecretString --output text | jq -r .ARI_PASSWORD)
 BIANCA_PASSWORD=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_ID} --query SecretString --output text | jq -r .BIANCA_PASSWORD)
+STRIPE_PUBLISHABLE_KEY=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_ID} --query SecretString --output text | jq -r '.STRIPE_PUBLISHABLE_KEY // empty')
+if [ -z "$${STRIPE_PUBLISHABLE_KEY}" ] || [ "$${STRIPE_PUBLISHABLE_KEY}" = "null" ]; then
+  echo "ERROR: STRIPE_PUBLISHABLE_KEY missing from Secrets Manager secret $${SECRET_ID} — fail closed"
+  exit 1
+fi
 POSTHOG_API_KEY=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_ID} --query SecretString --output text | jq -r '.POSTHOG_API_KEY // empty')
 POSTHOG_SECRET_KEY=$(aws secretsmanager get-secret-value --region $${AWS_REGION} --secret-id $${SECRET_ID} --query SecretString --output text | jq -r '.POSTHOG_SECRET_KEY // empty')
 
@@ -152,7 +157,7 @@ services:
       - EMAIL_FROM=no-reply@myphonefriend.com
       - TWILIO_PHONENUMBER=+19285758645
       - TWILIO_ACCOUNTSID=TWILIO_ACCOUNT_SID_PLACEHOLDER_REMOVED
-      - STRIPE_PUBLISHABLE_KEY=pk_test_51R7r9ACpu9kuPmCAet21mRsIPqgc8iXD6oz5BrwVTEm8fd4j5z4GehmtTbMRuZyiCjJDOpLUKpUUMptDqfqdkG5300uoGHj7Ef
+      - STRIPE_PUBLISHABLE_KEY=$${STRIPE_PUBLISHABLE_KEY}
       - RTP_LISTENER_HOST=0.0.0.0
       - RTP_BIANCA_HOST=staging_app
       - RTP_ASTERISK_HOST=asterisk

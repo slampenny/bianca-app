@@ -4,7 +4,7 @@
 set -e
 
 AWS_PROFILE="jordan"
-REGION="us-east-2"
+REGION="ca-central-1"
 
 echo "🔍 Diagnosing MongoDB connectivity on staging..."
 
