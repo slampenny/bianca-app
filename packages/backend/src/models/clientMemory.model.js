@@ -66,6 +66,22 @@ const clientMemorySchema = mongoose.Schema(
       enum: ['provisional', 'active', 'stale', 'conflicted', 'archived'],
       default: 'provisional',
     },
+    // Follow-up lifecycle (orthogonal to credibility `status` above).
+    // Missing followUpStatus on legacy docs is treated as 'open' via $ne: 'addressed' queries.
+    followUpStatus: {
+      type: String,
+      enum: ['open', 'addressed'],
+      default: 'open',
+    },
+    addressedAt: {
+      type: Date,
+      default: null,
+    },
+    addressedByConversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Conversation',
+      default: null,
+    },
     confidenceScore: {
       type: Number,
       min: 0,
@@ -137,6 +153,9 @@ clientMemorySchema.index({ clientId: 1, extractedAt: -1 });
 clientMemorySchema.index({ clientId: 1, category: 1, extractedAt: -1 });
 clientMemorySchema.index({ clientId: 1, priority: 1, extractedAt: -1 });
 clientMemorySchema.index({ clientId: 1, normalizedKey: 1, status: 1 });
+// Open follow-ups for post-call resolution (missing followUpStatus ≡ open)
+clientMemorySchema.index({ clientId: 1, followUpStatus: 1, priority: 1 });
+clientMemorySchema.index({ clientId: 1, followUpStatus: 1, category: 1 });
 clientMemorySchema.index(
   { clientId: 1, normalizedKey: 1 },
   {

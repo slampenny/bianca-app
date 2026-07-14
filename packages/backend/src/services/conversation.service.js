@@ -719,15 +719,28 @@ const finalizeConversation = async (conversationId, useRealtimeMessages = false)
         );
       });
 
-      // Extract and store client memory facts (async, don't wait) when aiAnalysis consent granted
+      // Extract facts first, then resolve follow-ups (sequenced, still fire-and-forget vs finalize).
+      // Sequencing keeps per-call state deterministic and lets resolve's resolutionFact upsert
+      // reinforce an outcome already written by extract when the normalized text matches.
       if (clientIdForAnalysis && conversationText && conversationText !== 'No conversation content recorded.') {
         const clientService = require('./client.service');
         const hasAiAnalysisConsent = await clientService.checkClientConsent(clientIdForAnalysis, 'aiAnalysis');
         if (hasAiAnalysisConsent) {
-          const { extractAndStoreFacts } = require('./clientMemory.service');
-          extractAndStoreFacts(clientIdForAnalysis, conversationId, conversationText).catch((err) => {
-            logger.error(`[Finalize] Error extracting memory facts for client ${clientIdForAnalysis}: ${err.message}`, err);
-          });
+          const { extractAndStoreFacts, resolveAddressedFacts } = require('./clientMemory.service');
+          extractAndStoreFacts(clientIdForAnalysis, conversationId, conversationText)
+            .catch((err) => {
+              logger.error(
+                `[Finalize] Error extracting memory facts for client ${clientIdForAnalysis}: ${err.message}`,
+                err
+              );
+            })
+            .then(() => resolveAddressedFacts(clientIdForAnalysis, conversationId, conversationText))
+            .catch((err) => {
+              logger.error(
+                `[Finalize] Error resolving addressed memory facts for client ${clientIdForAnalysis}: ${err.message}`,
+                err
+              );
+            });
         } else {
           logger.info(
             `[Finalize] Skipping memory extraction — aiAnalysis consent not granted for client ${clientIdForAnalysis}`

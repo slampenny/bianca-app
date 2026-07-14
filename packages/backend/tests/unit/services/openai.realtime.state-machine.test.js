@@ -171,6 +171,14 @@ describe('OpenAI Realtime Service - State Machine', () => {
       expect(service.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'session_ready')).toBe(true);
       expect(service.getConversationState(callId)).toBe(CONVERSATION_STATES.WAITING_FOR_GREETING);
 
+      // WAITING_FOR_GREETING -> USER_SPEAKING (resident speaks first)
+      expect(service.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, 'user_started_speaking')).toBe(true);
+      expect(service.getConversationState(callId)).toBe(CONVERSATION_STATES.USER_SPEAKING);
+
+      // USER_SPEAKING -> WAITING_FOR_GREETING (connect-noise re-arm)
+      expect(service.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'noise_speech_rearm_greeting')).toBe(true);
+      expect(service.getConversationState(callId)).toBe(CONVERSATION_STATES.WAITING_FOR_GREETING);
+
       // WAITING_FOR_GREETING -> GREETING_ACTIVE
       expect(service.transitionState(callId, CONVERSATION_STATES.GREETING_ACTIVE, 'greeting_triggered')).toBe(true);
       expect(service.getConversationState(callId)).toBe(CONVERSATION_STATES.GREETING_ACTIVE);

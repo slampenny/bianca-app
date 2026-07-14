@@ -51,10 +51,25 @@ describe('voiceTurnProfile.service', () => {
   });
 
   describe('MessageHandler regression', () => {
-    it('buildSessionUpdateForVad includes personalized value on connection', () => {
+    it('buildServerVadTurnDetection includes personalized silence on connection', () => {
+      const conn = { vadSilenceDurationMs: 750 };
+      // Explicit server_vad builder — personalization only applies in that mode
+      const td = MessageHandler.buildServerVadTurnDetection(conn);
+      expect(td.type).toBe('server_vad');
+      expect(td.silence_duration_ms).toBe(750);
+    });
+
+    it('buildSessionUpdateForVad uses configured turn_detection mode', () => {
       const conn = { vadSilenceDurationMs: 750 };
       const msg = MessageHandler.buildSessionUpdateForVad(conn);
-      expect(msg.session.audio.input.turn_detection.silence_duration_ms).toBe(750);
+      const td = msg.session.audio.input.turn_detection;
+      expect(['semantic_vad', 'server_vad']).toContain(td.type);
+      if (td.type === 'semantic_vad') {
+        expect(td.eagerness).toBeDefined();
+        expect(td.silence_duration_ms).toBeUndefined();
+      } else {
+        expect(td.silence_duration_ms).toBe(750);
+      }
     });
   });
 

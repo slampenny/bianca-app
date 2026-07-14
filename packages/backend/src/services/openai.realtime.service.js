@@ -523,13 +523,17 @@ class OpenAIRealtimeService {
 
     let orgId = null;
     let debugAudioUploadEnabled = false;
+    let residentName = '';
     if (clientId) {
       try {
-        const clientRow = await Client.findById(clientId).select('org').lean();
-        if (clientRow?.org) {
-          orgId = clientRow.org.toString();
-          const orgRow = await Org.findById(clientRow.org).select('debugAudioUploadEnabled').lean();
-          debugAudioUploadEnabled = orgRow?.debugAudioUploadEnabled === true;
+        const clientRow = await Client.findById(clientId).select('org preferredName name').lean();
+        if (clientRow) {
+          residentName = (clientRow.preferredName || clientRow.name || '').trim();
+          if (clientRow.org) {
+            orgId = clientRow.org.toString();
+            const orgRow = await Org.findById(clientRow.org).select('debugAudioUploadEnabled').lean();
+            debugAudioUploadEnabled = orgRow?.debugAudioUploadEnabled === true;
+          }
         }
       } catch (orgErr) {
         logger.warn(`[OpenAI Realtime] Could not load org for debug-audio flag (client ${clientId}): ${orgErr.message}`);
@@ -546,6 +550,7 @@ class OpenAIRealtimeService {
       asteriskChannelId: initialAsteriskChannelId, // Store the Asterisk channel ID
       clientId,
       orgId,
+      residentName,
       debugAudioUploadEnabled,
       vadSilenceDurationMs,
       voiceTurnTracking,
@@ -603,6 +608,12 @@ class OpenAIRealtimeService {
       _processedTranscriptItemIds: new Set(),
       // Set true after we handle a .completed in this user turn (avoids 500ms fallback + ASR both inserting)
       _asrTranscriptionEventHandledThisTurn: false,
+      // Non-suppressed ASR this utterance — overrides Bug 2 acoustic min-duration gate for short replies ("yes")
+      _substantiveAsrThisTurn: false,
+      // After speech-too-short abort with no ASR yet; watchdog expires quietly if none arrives
+      _speechTooShortAwaitingTranscript: false,
+      // User spoke while AI mid-response without barge-in — suppress backchannel-only replies for this utterance
+      _userUtteranceDuringAiWithoutBargeIn: false,
       // Set at speech start of an utterance; at speech_stopped, duration = now - this (and FIX Bug 2 min response gate)
       _turnSpeechStartTime: null,
       _turnSpeechDurationMs: 0,
@@ -615,9 +626,16 @@ class OpenAIRealtimeService {
       lastUserSpeechTime: null,
       lastAssistantSpeechTime: null,
       _userHasSpoken: false, // Track if user has spoken to trigger first response
-      _waitingForInitialGreeting: true, // Track if we're waiting for Bianca's initial greeting
-      _initialGreetingTriggered: false, // Prevent multiple initial greeting triggers
-      /** Set true on first response.output_audio.delta; until then, user mic is not sent to input_audio_buffer (no pending queue). */
+      _waitingForInitialGreeting: true, // True until proactive greeting completes or resident-first cancels it
+      _initialGreetingTriggered: false, // Prevent multiple silence-fallback greeting sends
+      _greetingFallbackCancelled: false, // Resident spoke first (confirmed) — never send silence-fallback greeting
+      _greetingFallbackTimer: null, // Silence → proactive greeting
+      _greetingSpeechConfirmTimer: null, // speech_started without commit/ASR → re-arm fallback
+      _greetingSpeechHadCommit: false,
+      _greetingSpeechHadTranscript: false,
+      _greetingRearmCount: 0, // Connect-noise re-arms; capped by GREETING_MAX_REARMS
+      _currentAssistantItemId: null, // Latest assistant item_id for conversation.item.truncate on barge-in
+      /** True once session is ready so the resident can speak first (no longer gated on first AI audio). */
       _userInputToOpenAIAllowed: false,
       _initialGreetingCompletedAt: null, // Track when initial greeting finished (to prevent lingering audio from triggering response)
 
@@ -721,7 +739,7 @@ class OpenAIRealtimeService {
     const pending = conn.pendingUserTranscript || '';
     let isFillerResult = null;
     try {
-      isFillerResult = pending.trim() ? isFiller(pending, lang) : null;
+      isFillerResult = pending.trim() ? this._shouldSuppressUserTranscriptAsFiller(conn, pending) : null;
     } catch (e) {
       isFillerResult = `error:${e.message}`;
     }
@@ -769,9 +787,16 @@ class OpenAIRealtimeService {
 
   /**
    * Push updated server_vad silence_duration_ms to OpenAI for this call.
+   * No-op when TURN_DETECTION_MODE is semantic_vad (silence_duration_ms does not apply).
    * @returns {Promise<boolean>}
    */
   async _applyVoiceTurnVadUpdate(callId, conn, nextMs, reason) {
+    if (!MessageHandler.isServerVadMode()) {
+      logger.debug(
+        `[VoiceTurn] skip silence_duration_ms update reason=${reason} mode=${config.audio?.turnDetection?.mode || 'semantic_vad'} callId=${callId}`
+      );
+      return false;
+    }
     const prev = conn.vadSilenceDurationMs;
     try {
       conn.vadSilenceDurationMs = nextMs;
@@ -813,6 +838,7 @@ class OpenAIRealtimeService {
   async _bumpVadOnAssistantOverUser(callId, conn) {
     if (!callId || !conn) return;
     if (!conn.sessionReady || !conn._userIsSpeaking) return;
+    if (!MessageHandler.isServerVadMode()) return;
 
     const vtConfig = getVoiceTurnConfig(config);
     const { adaptiveSilence, silenceDurationMs: baseMs } = config.audio?.turnDetection || {};
@@ -862,12 +888,109 @@ class OpenAIRealtimeService {
   }
 
   /**
-   * Send response.create to trigger OpenAI to generate responses - ENHANCED with diagnostics
+   * Positional filler: on the user's turn only drop pure acoustic fillers (um/uh/hmm).
+   * Backchannels (yeah/mm-hmm) are suppressed only while Bianca is mid-response without barge-in.
+   * @param {Object|null} conn
+   * @param {string} transcript
+   * @returns {boolean}
    */
+  _shouldSuppressUserTranscriptAsFiller(conn, transcript) {
+    const preferredLanguage = conn?.preferredLanguage || 'en';
+    const suppressBackchannels = Boolean(conn?._userUtteranceDuringAiWithoutBargeIn);
+    return isFiller(transcript, preferredLanguage, { suppressBackchannels });
+  }
+
   /**
+   * True when this user turn has non-empty, non-suppressed ASR (override for acoustic min-duration gate).
+   * @param {Object|null} conn
+   * @returns {boolean}
+   */
+  _hasSubstantiveUserTurnTranscript(conn) {
+    if (!conn) return false;
+    if (conn._substantiveAsrThisTurn) return true;
+    if (conn._greetingSpeechHadTranscript) return true;
+    const pending = (conn.pendingUserTranscript || '').trim();
+    if (pending && !this._shouldSuppressUserTranscriptAsFiller(conn, pending)) return true;
+    const live = (conn._userTranscriptLiveBuffer || '').trim();
+    if (live && !this._shouldSuppressUserTranscriptAsFiller(conn, live)) return true;
+    return false;
+  }
+
+  /**
+   * Clear speech_stopped → response.create watchdog timer (does not clear short-speech await flag).
+   * @param {Object|null} conn
+   */
+  _clearResponseTriggerWatchdog(conn) {
+    if (!conn) return;
+    if (conn._responseTriggerWatchdogTimer) {
+      clearTimeout(conn._responseTriggerWatchdogTimer);
+      conn._responseTriggerWatchdogTimer = null;
+    }
+    conn._responseTriggerWatchdogArmedAt = null;
+    conn._responseTriggerWatchdogReason = null;
+  }
+
+  /**
+   * After speech_stopped schedules a near-term response.create, arm a watchdog so silent-Bianca is visible in logs.
+   * Cleared when response.create is sent. Short-speech acoustic abort without transcript keeps the timer
+   * armed: later non-empty ASR with no response.create must surface as an error; noise (no ASR) expires silently.
+   * @param {string} callId
+   * @param {Object} conn
+   * @param {string} reason
+   */
+  _armResponseTriggerWatchdog(callId, conn, reason) {
+    if (!conn) return;
+    this._clearResponseTriggerWatchdog(conn);
+    const ms = config.audio?.turnDetection?.responseTriggerWatchdogMs ?? 3000;
+    conn._responseTriggerWatchdogArmedAt = Date.now();
+    conn._responseTriggerWatchdogReason = reason || 'speech_stopped';
+    conn._responseTriggerWatchdogTimer = setTimeout(() => {
+      const current = this.connections.get(callId);
+      if (!current) return;
+      current._responseTriggerWatchdogTimer = null;
+      if (
+        current._userTurnResponseCreateSent ||
+        current._responseCreateInFlight ||
+        current._responseCreated
+      ) {
+        current._speechTooShortAwaitingTranscript = false;
+        return;
+      }
+
+      const awaitingAfterShort = Boolean(current._speechTooShortAwaitingTranscript);
+      const hasTranscript = this._hasSubstantiveUserTurnTranscript(current);
+
+      // Acoustic short abort with no ASR at all = noise; expire quietly (no silent-Bianca error).
+      if (awaitingAfterShort && !hasTranscript) {
+        current._speechTooShortAwaitingTranscript = false;
+        logger.info(
+          `[RealtimeRC] RESPONSE_TRIGGER_WATCHDOG expired quietly after speech-too-short with no transcript ` +
+            `callId=${callId} sessionId=${current.sessionId || 'n/a'}`
+        );
+        return;
+      }
+
+      current._speechTooShortAwaitingTranscript = false;
+      logger.error(
+        `[RealtimeRC] RESPONSE_TRIGGER_WATCHDOG: speech_stopped but no response.create within ${ms}ms ` +
+          `callId=${callId} sessionId=${current.sessionId || 'n/a'} conversationId=${current.conversationId || 'n/a'} ` +
+          `asteriskChannelId=${current.asteriskChannelId || 'n/a'} reason=${current._responseTriggerWatchdogReason || reason} ` +
+          `state=${this.getConversationState(callId)} mode=${config.audio?.turnDetection?.mode || 'semantic_vad'} ` +
+          `hasTranscript=${hasTranscript} awaitingAfterShort=${awaitingAfterShort} ` +
+          `_speechStoppedCommittedAiResponding=${Boolean(current._speechStoppedCommittedAiResponding)} ` +
+          `_pendingUserResponseAfterAiStops=${Boolean(current._pendingUserResponseAfterAiStops)} ` +
+          `_aiIsSpeaking=${Boolean(current._aiIsSpeaking)}`
+      );
+    }, ms);
+  }
+
+  /**
+   * Send response.create to trigger OpenAI to generate responses - ENHANCED with diagnostics
+   * @param {string} callId
+   * @param {{ instructions?: string }} [options] - Optional per-response instructions (e.g. silence-fallback greeting)
    * @returns {Promise<boolean>} True if response.create was sent on the wire; false if blocked or send threw.
    */
-  async sendResponseCreate(callId) {
+  async sendResponseCreate(callId, options = {}) {
     logger.info(`[OpenAI Realtime] DEBUG: sendResponseCreate called for ${callId}`);
     const connection = this.connections.get(callId);
     if (!connection) {
@@ -932,20 +1055,32 @@ class OpenAIRealtimeService {
 
     try {
       const useGA = config.openai.useGA !== undefined ? config.openai.useGA : false;
+      const instructions =
+        typeof options.instructions === 'string' && options.instructions.trim()
+          ? options.instructions.trim()
+          : null;
       // GA Realtime rejects response.modalities; session output_modalities already set in session.update.
-      const responseCreateEvent = useGA
-        ? { type: 'response.create' }
-        : {
-            type: 'response.create',
-            response: {
-              modalities: ['text', 'audio'],
-            },
-          };
+      let responseCreateEvent;
+      if (useGA) {
+        responseCreateEvent = instructions
+          ? { type: 'response.create', response: { instructions } }
+          : { type: 'response.create' };
+      } else {
+        responseCreateEvent = {
+          type: 'response.create',
+          response: {
+            modalities: ['text', 'audio'],
+            ...(instructions ? { instructions } : {}),
+          },
+        };
+      }
 
       const messageStr = JSON.stringify(responseCreateEvent);
       connection.webSocket.send(messageStr);
       this._rcDiagSendResponseCreate(callId, connection, 'SENT', 'websocket_send_ok');
       logger.info(`[RealtimeRC] sendResponseCreate:SENT callId=${callId}`);
+      this._clearResponseTriggerWatchdog(connection);
+      connection._speechTooShortAwaitingTranscript = false;
       // Don't set _responseCreated for initial greeting - allow commits
       connection._responseStartTime = Date.now(); // Track when response was created
       const responseStartSnapshot = connection._responseStartTime;
@@ -1102,61 +1237,386 @@ class OpenAIRealtimeService {
     }
   }
 
+  _getGreetingFallbackMs() {
+    const fromConfig = config.openai?.greetingFallbackMs;
+    if (Number.isFinite(fromConfig) && fromConfig >= 0) {
+      return fromConfig;
+    }
+    return CONSTANTS.GREETING_FALLBACK_MS;
+  }
+
+  _getGreetingMaxRearms() {
+    const fromConfig = config.openai?.greetingMaxRearms;
+    if (Number.isFinite(fromConfig) && fromConfig >= 0) {
+      return fromConfig;
+    }
+    return CONSTANTS.GREETING_MAX_REARMS;
+  }
+
+  /** Open-window commit+duration gate (350ms). Was incorrectly MIN_SPEECH_DURATION_MS=800 — too long for "hello?". */
+  _getGreetingMinSpeechConfirmDurationMs() {
+    return CONSTANTS.GREETING_MIN_SPEECH_CONFIRM_DURATION_MS;
+  }
+
+  _clearGreetingFallbackTimer(conn) {
+    if (conn?._greetingFallbackTimer) {
+      clearTimeout(conn._greetingFallbackTimer);
+      conn._greetingFallbackTimer = null;
+    }
+  }
+
+  _clearGreetingSpeechConfirmTimer(conn) {
+    if (conn?._greetingSpeechConfirmTimer) {
+      clearTimeout(conn._greetingSpeechConfirmTimer);
+      conn._greetingSpeechConfirmTimer = null;
+    }
+  }
+
+  _clearGreetingOpenTimers(conn) {
+    this._clearGreetingFallbackTimer(conn);
+    this._clearGreetingSpeechConfirmTimer(conn);
+  }
+
+  _isGreetingFallbackPhase(conn) {
+    return Boolean(
+      conn &&
+        !conn._initialGreetingTriggered &&
+        !conn._greetingFallbackCancelled &&
+        conn._waitingForInitialGreeting
+    );
+  }
+
+  _hasOpenWindowCommitDurationEvidence(conn) {
+    const durationMs = Number.isFinite(conn?._turnSpeechDurationMs) ? conn._turnSpeechDurationMs : 0;
+    return Boolean(conn?._greetingSpeechHadCommit && durationMs >= this._getGreetingMinSpeechConfirmDurationMs());
+  }
+
+  _buildSilenceFallbackGreetingInstructions(conn) {
+    const name = (conn?.residentName || '').trim();
+    if (name) {
+      return `Greet the resident warmly by name (${name}) and ask how they're doing. Keep it brief.`;
+    }
+    return `Greet the resident warmly by name if you know it from context, and ask how they're doing. Keep it brief.`;
+  }
+
   /**
-   * Initial greeting: transition once, then response.create after session is applied (create_response:false relies on us).
-   * Retries on a later session.updated if the first send was blocked. Does not set _initialGreetingTriggered until send succeeds.
+   * On session ready: stay silent, arm GREETING_FALLBACK_MS timer. Do not send response.create immediately.
+   * Resident-first speech cancels the timer; silence fires a proactive greeting.
    */
-  async _sendInitialGreetingIfNeeded(callId) {
+  _armGreetingFallbackIfNeeded(callId) {
     const conn = this.connections.get(callId);
-    if (!conn || conn._initialGreetingTriggered) {
+    if (!conn || conn._initialGreetingTriggered || conn._greetingFallbackCancelled) {
       return;
     }
-    if (conn._initialGreetingSendInProgress) {
+    if (conn._greetingFallbackTimer || conn._greetingSpeechConfirmTimer) {
       return;
     }
 
-    conn._initialGreetingSendInProgress = true;
-    try {
-      conn._waitingForInitialGreeting = true;
+    conn._waitingForInitialGreeting = true;
+    // Resident must be able to speak first — do not wait for assistant audio.
+    if (!conn._userInputToOpenAIAllowed) {
+      conn._userInputToOpenAIAllowed = true;
+      logger.info(
+        `[OpenAI Realtime] User mic → OpenAI enabled for ${callId} (session ready; silence-fallback greeting armed)`
+      );
+    }
 
-      const state = this.getConversationState(callId);
-      if (state === CONVERSATION_STATES.INITIALIZING) {
-        if (!this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'session_ready')) {
-          logger.warn(
-            `[OpenAI Realtime] Cannot transition to WAITING_FOR_GREETING for ${callId} (state=${state}) — greeting deferred for retry`
-          );
-          return;
-        }
-      } else if (state !== CONVERSATION_STATES.WAITING_FOR_GREETING) {
+    const state = this.getConversationState(callId);
+    if (state === CONVERSATION_STATES.INITIALIZING) {
+      if (!this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'session_ready_listen_first')) {
+        logger.warn(
+          `[OpenAI Realtime] Cannot transition to WAITING_FOR_GREETING for ${callId} (state=${state}) — greeting fallback not armed`
+        );
         return;
       }
+    } else if (state !== CONVERSATION_STATES.WAITING_FOR_GREETING) {
+      return;
+    }
 
-      await new Promise((r) => setTimeout(r, CONSTANTS.INITIAL_GREETING_AFTER_SESSION_READY_MS));
+    const delayMs = this._getGreetingFallbackMs();
+    logger.info(
+      `[RealtimeRC] greeting: arming silence fallback timer ${delayMs}ms callId=${callId} state=${this.getConversationState(callId)} rearmCount=${conn._greetingRearmCount || 0}`
+    );
+    conn._greetingFallbackTimer = setTimeout(() => {
+      void this._onGreetingFallbackTimer(callId);
+    }, delayMs);
+  }
 
+  async _onGreetingFallbackTimer(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn) return;
+    conn._greetingFallbackTimer = null;
+
+    if (!this._isGreetingFallbackPhase(conn)) {
+      logger.info(`[RealtimeRC] greeting: fallback timer skipped (phase ended) ${callId}`);
+      return;
+    }
+    if (conn._userIsSpeaking || conn._greetingSpeechConfirmTimer) {
       logger.info(
-        `[RealtimeRC] greeting: about to call sendResponseCreate, sessionReady=${conn.sessionReady}, state=${this.getConversationState(callId)}, _waitingForInitialGreeting=${conn._waitingForInitialGreeting} ${callId}`
+        `[RealtimeRC] greeting: fallback timer deferred — user speaking or speech confirm in progress ${callId}`
       );
+      // Re-arm briefly so we do not leave dead air if confirm later fails
+      conn._greetingFallbackTimer = setTimeout(() => {
+        void this._onGreetingFallbackTimer(callId);
+      }, CONSTANTS.GREETING_SPEECH_CONFIRM_MS);
+      return;
+    }
 
-      const sent = await this.sendResponseCreate(callId);
-
+    const state = this.getConversationState(callId);
+    if (state !== CONVERSATION_STATES.WAITING_FOR_GREETING) {
       logger.info(
-        `[RealtimeRC] greeting: sendResponseCreate returned callId=${callId} sent=${sent} state=${this.getConversationState(callId)} _responseCreateInFlight=${conn._responseCreateInFlight}`
+        `[RealtimeRC] greeting: fallback timer skipped — unexpected state=${state} ${callId}`
       );
+      return;
+    }
 
-      if (sent) {
-        conn._initialGreetingTriggered = true;
-        logger.info(`[OpenAI Realtime] Initial greeting response.create sent for ${callId}`);
+    // Race: user may have started speaking between the pre-check and send
+    if (conn._userIsSpeaking || conn._greetingSpeechConfirmTimer || !this._isGreetingFallbackPhase(conn)) {
+      logger.info(`[RealtimeRC] greeting: aborting send — resident spoke before response.create ${callId}`);
+      return;
+    }
+
+    logger.info(
+      `[RealtimeRC] greeting: silence fallback firing sendResponseCreate callId=${callId}`
+    );
+    const sent = await this.sendResponseCreate(callId, {
+      instructions: this._buildSilenceFallbackGreetingInstructions(conn),
+    });
+    if (sent) {
+      // If resident began speaking while await sendResponseCreate was in flight, barge-in on next speech_started;
+      // still mark triggered so we do not double-greet.
+      conn._initialGreetingTriggered = true;
+      this._clearGreetingSpeechConfirmTimer(conn);
+      logger.info(`[OpenAI Realtime] Silence-fallback greeting response.create sent for ${callId}`);
+    } else {
+      logger.warn(
+        `[RealtimeRC] greeting: silence fallback sendResponseCreate blocked — re-arming ${callId}`,
+        {
+          conversationState: this.getConversationState(callId),
+          _responseCreateInFlight: conn._responseCreateInFlight,
+        }
+      );
+      if (this._isGreetingFallbackPhase(conn)) {
+        conn._greetingFallbackTimer = setTimeout(() => {
+          void this._onGreetingFallbackTimer(callId);
+        }, this._getGreetingFallbackMs());
+      }
+    }
+  }
+
+  /**
+   * Cancel silence-fallback greeting timer on speech_started. Arms a short confirm timer so
+   * connect-line noise that trips VAD without real speech re-arms the greeting.
+   */
+  _onGreetingPhaseSpeechStarted(callId, conn) {
+    if (!this._isGreetingFallbackPhase(conn)) {
+      return;
+    }
+    this._clearGreetingFallbackTimer(conn);
+    this._clearGreetingSpeechConfirmTimer(conn);
+    conn._greetingSpeechHadCommit = false;
+    conn._greetingSpeechHadTranscript = false;
+    logger.info(
+      `[RealtimeRC] greeting: speech_started during open window — cancelled fallback, arming ${CONSTANTS.GREETING_SPEECH_CONFIRM_MS}ms confirm ${callId}`
+    );
+    conn._greetingSpeechConfirmTimer = setTimeout(() => {
+      this._onGreetingSpeechConfirmTimer(callId);
+    }, CONSTANTS.GREETING_SPEECH_CONFIRM_MS);
+  }
+
+  _onGreetingSpeechConfirmTimer(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn) return;
+    conn._greetingSpeechConfirmTimer = null;
+
+    if (!this._isGreetingFallbackPhase(conn)) {
+      return;
+    }
+
+    const durationMs = Number.isFinite(conn._turnSpeechDurationMs) ? conn._turnSpeechDurationMs : 0;
+    const hasRealSpeechEvidence =
+      conn._greetingSpeechHadTranscript || this._hasOpenWindowCommitDurationEvidence(conn);
+
+    if (hasRealSpeechEvidence) {
+      this._cancelGreetingFallbackForResidentFirst(callId, conn, 'speech_confirm_evidence');
+      return;
+    }
+
+    const maxRearms = this._getGreetingMaxRearms();
+    const nextCount = (conn._greetingRearmCount || 0) + 1;
+    if (nextCount > maxRearms) {
+      logger.warn(
+        `[RealtimeRC] greeting: re-arm cap exceeded (count would be ${nextCount}, max=${maxRearms}) — forcing silence-fallback greeting ${callId}`,
+        {
+          hadCommit: conn._greetingSpeechHadCommit,
+          hadTranscript: conn._greetingSpeechHadTranscript,
+          speechDurationMs: Math.round(durationMs),
+        }
+      );
+      conn._greetingSpeechHadCommit = false;
+      conn._greetingSpeechHadTranscript = false;
+      if (conn.activeUserMessageId) {
+        void this.removeUserSpeakingPlaceholder(callId, 're-arm cap — forcing greeting');
+      }
+      const state = this.getConversationState(callId);
+      if (state === CONVERSATION_STATES.USER_SPEAKING) {
+        this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'rearm_cap_force_greeting');
+      }
+      void this._onGreetingFallbackTimer(callId);
+      return;
+    }
+
+    conn._greetingRearmCount = nextCount;
+    logger.info(
+      `[RealtimeRC] greeting: speech_started was noise-only (no transcript / insufficient commit) — re-arming silence fallback ${callId}`,
+      {
+        hadCommit: conn._greetingSpeechHadCommit,
+        hadTranscript: conn._greetingSpeechHadTranscript,
+        speechDurationMs: Math.round(durationMs),
+        rearmCount: conn._greetingRearmCount,
+        maxRearms,
+      }
+    );
+    conn._greetingSpeechHadCommit = false;
+    conn._greetingSpeechHadTranscript = false;
+    if (conn.activeUserMessageId) {
+      void this.removeUserSpeakingPlaceholder(callId, 'connect noise — re-arm greeting fallback');
+    }
+    const state = this.getConversationState(callId);
+    if (state === CONVERSATION_STATES.USER_SPEAKING) {
+      this.transitionState(callId, CONVERSATION_STATES.WAITING_FOR_GREETING, 'noise_speech_rearm_greeting');
+    }
+    this._armGreetingFallbackIfNeeded(callId);
+  }
+
+  /**
+   * Resident spoke first with real audio — never send the silence-fallback greeting.
+   * VAD speech_stopped / ASR path will drive the normal response.create.
+   */
+  _cancelGreetingFallbackForResidentFirst(callId, conn, reason) {
+    if (!conn) return;
+    // Late ASR after greeting already sent: only clear timers (barge-in owns response.cancel)
+    if (conn._initialGreetingTriggered) {
+      this._clearGreetingOpenTimers(conn);
+      return;
+    }
+    if (conn._greetingFallbackCancelled) {
+      this._clearGreetingOpenTimers(conn);
+      return;
+    }
+    conn._greetingFallbackCancelled = true;
+    conn._waitingForInitialGreeting = false;
+    this._clearGreetingOpenTimers(conn);
+
+    const state = this.getConversationState(callId);
+    if (state === CONVERSATION_STATES.WAITING_FOR_GREETING) {
+      if (conn._userIsSpeaking) {
+        this.transitionState(callId, CONVERSATION_STATES.USER_SPEAKING, `resident_first_${reason}`);
       } else {
-        logger.warn(
-          `[RealtimeRC] greeting sendResponseCreate did not send (blocked) — will retry on next session.updated if connection still waiting ${callId}`,
-          {
-            conversationState: this.getConversationState(callId),
-            _responseCreateInFlight: conn._responseCreateInFlight,
-          }
+        // Speech already ended (late ASR after noise re-arm) — allow normal response path
+        this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, `resident_first_late_${reason}`);
+      }
+    }
+
+    logger.info(
+      `[RealtimeRC] greeting: cancelled silence fallback — resident spoke first (${reason}) ${callId}`
+    );
+  }
+
+  /**
+   * Evidence of real speech during open-window confirm (committed buffer and/or ASR).
+   * Non-empty transcription always confirms — including late ASR after confirm closed / fallback re-armed.
+   */
+  _noteGreetingPhaseSpeechEvidence(callId, conn, kind) {
+    if (!conn) return;
+
+    // Proactive greeting already in flight — transcription of resident barge-in is handled by speech_started path
+    if (conn._initialGreetingTriggered) {
+      return;
+    }
+
+    if (kind === 'commit') {
+      conn._greetingSpeechHadCommit = true;
+    } else if (kind === 'transcript') {
+      conn._greetingSpeechHadTranscript = true;
+    }
+
+    // Still open (awaiting silence greeting or mid-confirm): cancel on strong evidence
+    if (this._isGreetingFallbackPhase(conn) || conn._waitingForInitialGreeting) {
+      const strong =
+        conn._greetingSpeechHadTranscript || this._hasOpenWindowCommitDurationEvidence(conn);
+      if (strong || kind === 'transcript') {
+        this._cancelGreetingFallbackForResidentFirst(
+          callId,
+          conn,
+          kind === 'transcript' ? 'transcript_confirm' : 'commit_duration_confirm'
         );
       }
-    } finally {
-      conn._initialGreetingSendInProgress = false;
+    }
+  }
+
+  /**
+   * Cancel in-flight assistant response and truncate unplayed audio (standard barge-in).
+   */
+  async _bargeInCancelAssistant(callId, conn, reason) {
+    logger.info(`[OpenAI Realtime] USER INTERRUPTING AI (${reason}) - canceling AI response for ${callId}`);
+    try {
+      await this.sendJsonMessage(callId, { type: 'response.cancel' });
+      await this._truncateAssistantAudioForBargeIn(callId, conn);
+      const rtpSenderService = require('./rtp.sender.service');
+      rtpSenderService.clearBuffer(callId);
+      conn._aiAudioPlaybackComplete = true;
+      conn._aiIsSpeaking = false;
+      this._resetAssistantOutputAudioLifecycle(conn);
+      conn._responseCanceled = true;
+      conn._responseCanceledAt = Date.now();
+      conn._responseCreateInFlight = false;
+      conn._responseCreated = false;
+      conn.pendingAssistantTranscript = '';
+      conn._currentAssistantItemId = null;
+      const st = this.getConversationState(callId);
+      if (st === CONVERSATION_STATES.GREETING_ACTIVE) {
+        conn._waitingForInitialGreeting = false;
+        this._clearGreetingOpenTimers(conn);
+        this.transitionState(callId, CONVERSATION_STATES.GREETING_COMPLETE, 'initial_greeting_interrupted');
+      } else {
+        this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
+      }
+      logger.info(`[OpenAI Realtime] Response canceled for ${callId} - will wait for user to finish before responding`);
+    } catch (err) {
+      logger.error(`[OpenAI Realtime] Failed to cancel AI response: ${err.message}`);
+    }
+  }
+
+  async _truncateAssistantAudioForBargeIn(callId, conn) {
+    const itemId = conn?._currentAssistantItemId;
+    if (itemId) {
+      const playedMs = conn._lastAiSpeechStart
+        ? Math.max(0, Date.now() - conn._lastAiSpeechStart)
+        : 0;
+      try {
+        await this.sendJsonMessage(callId, {
+          type: 'conversation.item.truncate',
+          item_id: itemId,
+          content_index: 0,
+          audio_end_ms: playedMs,
+        });
+        logger.info(
+          `[RealtimeRC] barge-in truncate item_id=${itemId} audio_end_ms=${playedMs} ${callId}`
+        );
+      } catch (err) {
+        logger.warn(`[OpenAI Realtime] conversation.item.truncate failed for ${callId}: ${err.message}`);
+      }
+      return;
+    }
+    // Greeting may be in flight before first audio delta — clear server output buffer when possible
+    try {
+      await this.sendJsonMessage(callId, { type: 'output_audio_buffer.clear' });
+      logger.info(`[RealtimeRC] barge-in output_audio_buffer.clear (no item_id yet) ${callId}`);
+    } catch (err) {
+      logger.debug(
+        `[OpenAI Realtime] output_audio_buffer.clear unavailable/failed for ${callId}: ${err.message}`
+      );
     }
   }
 
@@ -1506,6 +1966,14 @@ class OpenAIRealtimeService {
               );
             }
 
+            // Track assistant item for conversation.item.truncate on barge-in
+            if (conn) {
+              const assistantItemId = message.item_id || message.item?.id || null;
+              if (assistantItemId) {
+                conn._currentAssistantItemId = String(assistantItemId);
+              }
+            }
+
             if (conn && !conn._userInputToOpenAIAllowed) {
               conn._userInputToOpenAIAllowed = true;
               logger.info(
@@ -1618,6 +2086,9 @@ class OpenAIRealtimeService {
             if (!alreadyUserSpeaking) {
               conn._pendingUserResponseAfterAiStops = false;
               conn._userTurnResponseCreateSent = false;
+              conn._substantiveAsrThisTurn = false;
+              conn._speechTooShortAwaitingTranscript = false;
+              conn._userUtteranceDuringAiWithoutBargeIn = false;
               if (conn.voiceTurnTracking) {
                 conn.voiceTurnTracking.currentTurnHadInterruption = false;
               }
@@ -1646,40 +2117,44 @@ class OpenAIRealtimeService {
               conn._userTranscriptFlushTimer = null;
             }
 
+            // Open-call silence fallback: cancel proactive greeting; confirm real speech vs connect noise
+            if (!alreadyUserSpeaking) {
+              this._onGreetingPhaseSpeechStarted(callId, conn);
+            }
+
             if (conn._aiIsSpeaking || conn._responseCreateInFlight || conn._responseCreated) {
               this._markAssistantPlaybackActive(conn);
             } else {
               this._syncAiAudioPlaybackCompleteFromRtp(callId, conn);
             }
 
+            // Silence-fallback greeting: always barge-in if greeting response.create was sent or is in flight
+            // (RTP may still look idle before first output_audio.delta).
+            const greetingResponseActive =
+              Boolean(conn._initialGreetingTriggered) &&
+              (conn._responseCreateInFlight ||
+                conn._responseCreated ||
+                this.getConversationState(callId) === CONVERSATION_STATES.GREETING_ACTIVE);
             const shouldCancelAiForBargeIn =
-              !conn._aiAudioPlaybackComplete &&
-              (conn._aiIsSpeaking || conn._responseCreateInFlight || conn._responseCreated);
+              greetingResponseActive ||
+              (!conn._aiAudioPlaybackComplete &&
+                (conn._aiIsSpeaking || conn._responseCreateInFlight || conn._responseCreated));
 
             if (shouldCancelAiForBargeIn) {
-              logger.info(`[OpenAI Realtime] USER INTERRUPTING AI - canceling AI response for ${callId}`);
-              try {
-                await this.sendJsonMessage(callId, { type: 'response.cancel' });
-                const rtpSenderService = require('./rtp.sender.service');
-                rtpSenderService.clearBuffer(callId);
-                conn._aiAudioPlaybackComplete = true;
-                conn._aiIsSpeaking = false;
-                this._resetAssistantOutputAudioLifecycle(conn);
-                conn._responseCanceled = true;
-                conn._responseCanceledAt = Date.now();
-                conn.pendingAssistantTranscript = '';
-                const st = this.getConversationState(callId);
-                if (st === CONVERSATION_STATES.GREETING_ACTIVE) {
-                  conn._waitingForInitialGreeting = false;
-                  this.transitionState(callId, CONVERSATION_STATES.GREETING_COMPLETE, 'initial_greeting_interrupted');
-                } else {
-                  this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'ai_response_canceled');
-                }
-                logger.info(`[OpenAI Realtime] Response canceled for ${callId} - will wait for user to finish before responding`);
-              } catch (err) {
-                logger.error(`[OpenAI Realtime] Failed to cancel AI response: ${err.message}`);
-              }
+              conn._userUtteranceDuringAiWithoutBargeIn = false;
+              await this._bargeInCancelAssistant(
+                callId,
+                conn,
+                greetingResponseActive ? 'fallback_greeting_barge_in' : 'user_interrupt'
+              );
             } else {
+              if (
+                !alreadyUserSpeaking &&
+                (conn._aiIsSpeaking || conn._responseCreateInFlight || conn._responseCreated)
+              ) {
+                // Soft overlap / backchannel while Bianca still owns the turn — do not treat yeah/mm-hmm as answers
+                conn._userUtteranceDuringAiWithoutBargeIn = true;
+              }
               logger.info(`[OpenAI Realtime] speech_started barge-in cancel skipped for ${callId}`, {
                 _aiIsSpeaking: conn._aiIsSpeaking,
                 _responseCreateInFlight: conn._responseCreateInFlight,
@@ -1687,12 +2162,14 @@ class OpenAIRealtimeService {
                 _aiAudioPlaybackComplete: conn._aiAudioPlaybackComplete,
                 _aiOutputAudioDeltaSeen: conn._aiOutputAudioDeltaSeen,
                 _aiAudioComplete: conn._aiAudioComplete,
+                _userUtteranceDuringAiWithoutBargeIn: conn._userUtteranceDuringAiWithoutBargeIn,
                 conversationState: this.getConversationState(callId),
               });
             }
 
             // STATE MACHINE: USER_SPEAKING when allowed. AI_RESPONDING→USER_SPEAKING covers barge-in / post-audio tail.
             // USER_SPEAKING→USER_SPEAKING is invalid — treat duplicate VAD as idempotent (common cause of "blocked" logs).
+            // WAITING_FOR_GREETING→USER_SPEAKING: resident speaks first before silence-fallback greeting.
             const stBeforeUser = this.getConversationState(callId);
             if (stBeforeUser === CONVERSATION_STATES.USER_SPEAKING) {
               logger.info(`[RealtimeRC] speech_started → USER_SPEAKING (idempotent, already user_speaking) ${callId}`, {
@@ -1716,10 +2193,12 @@ class OpenAIRealtimeService {
               });
             }
 
-            // Placeholder once the greeting is done — before that, user audio exists but transcripts are ignored,
-            // which would otherwise leave permanent "[Speaking...]" rows.
+            // Placeholder once greeting phase ends, or while confirm runs after speech_started in the open window
+            // (resident-first). Skip only while silent-waiting for the proactive greeting.
             // Duplicate VAD speech_started while still USER_SPEAKING must not create another row (same utterance).
-            if (!conn._waitingForInitialGreeting && !alreadyUserSpeaking) {
+            const allowUserPlaceholder =
+              !conn._waitingForInitialGreeting || Boolean(conn._greetingSpeechConfirmTimer);
+            if (allowUserPlaceholder && !alreadyUserSpeaking) {
               await this.createPlaceholderUserMessage(callId);
             } else if (alreadyUserSpeaking) {
               logger.debug(
@@ -1840,7 +2319,7 @@ class OpenAIRealtimeService {
                 }
                 
                 // Check if transcript is only filler words - if so, don't save or respond, just wait
-                if (isFiller(transcript, preferredLanguage)) {
+                if (this._shouldSuppressUserTranscriptAsFiller(currentConn, transcript)) {
                   this._rcDiagSpeechStopped(callId, currentConn, '500ms_block_filler_only_transcript', {
                     outcome: 'keep_row_no_response',
                     transcript: transcript.length > 200 ? `${transcript.slice(0, 200)}…` : transcript,
@@ -2009,9 +2488,13 @@ class OpenAIRealtimeService {
                     if (postCancelConn) postCancelConn._speechStoppedCommittedAiResponding = true;
                     logger.info(`[OpenAI Realtime] User finished speaking (after cancel debounce) - will trigger AI response for ${callId}`);
                     
+                    this._armResponseTriggerWatchdog(callId, postCancelConn || currentConn, 'speech_stopped_post_cancel');
                     setTimeout(async () => {
                       const finalConn = this.connections.get(callId);
-                      if (!finalConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+                      if (!finalConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) {
+                        this._clearResponseTriggerWatchdog(finalConn);
+                        return;
+                      }
                       if (finalConn._userTurnResponseCreateSent) {
                         logger.info(
                           `[RealtimeRC] post-cancel 200ms timer skipped ${callId} — user-turn response.create already sent`
@@ -2093,7 +2576,7 @@ class OpenAIRealtimeService {
                   }
                 }
                 
-                if (isFiller(conn.pendingUserTranscript, preferredLanguage)) {
+                if (this._shouldSuppressUserTranscriptAsFiller(conn, conn.pendingUserTranscript)) {
                   this._rcDiagSpeechStopped(callId, conn, 'main_path_filler_skip', {
                     outcome: 'sendResponseCreate_not_scheduled',
                     preferredLanguage,
@@ -2148,10 +2631,13 @@ class OpenAIRealtimeService {
                 // OpenAI Realtime already has the user's audio in the server-side buffer; response.create does not wait
                 // on our conversation.item.input_audio_transcription.completed. ASR completion handlers are for UI/DB and
                 // for recovery paths when speech_stopped never reached AI_RESPONDING+schedule (fallback / _waiting path).
+                // create_response:false (required) — OpenAI will not auto-fire; we own the single response.create.
+                this._armResponseTriggerWatchdog(callId, conn, 'speech_stopped_200ms');
                 setTimeout(async () => {
                   const currentConn = this.connections.get(callId);
                   if (!currentConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) {
                     const snapConn = this.connections.get(callId);
+                    this._clearResponseTriggerWatchdog(snapConn || currentConn);
                     this._rcDiagSpeechStopped(callId, snapConn || conn, 'timer_200ms_skip', {
                       outcome: 'sendResponseCreate_not_called_state_mismatch',
                       stateNow: this.getConversationState(callId),
@@ -2159,16 +2645,40 @@ class OpenAIRealtimeService {
                     logger.info(`[OpenAI Realtime] Skipping auto-response trigger for ${callId} - state changed or connection lost`);
                     return;
                   }
-                  // FIX: Bug 2 — do not let short noise + 500+200ms silence trigger Bianca; VAD can resume on more speech
+                  // FIX: Bug 2 — acoustic min duration rejects pure noise. Non-empty substantive ASR overrides
+                  // (short "yes" / "hello?"); empty/no transcript = noise, drop. Mirrors greeting late-ASR confirm.
                   const minResponseMs = CONSTANTS.MIN_SPEECH_DURATION_FOR_RESPONSE_MS;
                   const spDur = Number.isFinite(currentConn._turnSpeechDurationMs) ? currentConn._turnSpeechDurationMs : 0;
-                  if (spDur < minResponseMs) {
+                  const hasSubstantiveTranscript = this._hasSubstantiveUserTurnTranscript(currentConn);
+                  if (spDur < minResponseMs && !hasSubstantiveTranscript) {
                     logger.info(
-                      `[RealtimeRC] Skipping response.create — speech too short (${Math.round(spDur)}ms, min ${minResponseMs}ms) ${callId}`
+                      `[RealtimeRC] Skipping response.create — speech too short (${Math.round(spDur)}ms, min ${minResponseMs}ms) with no transcript ${callId}`
                     );
+                    // Keep watchdog armed: late ASR without a response.create is silent-Bianca; no ASR = quiet expire.
+                    currentConn._speechTooShortAwaitingTranscript = true;
                     currentConn._speechStoppedCommittedAiResponding = false;
-                    this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'speech_too_short_wait_more');
+                    if (this._isGreetingFallbackPhase(currentConn)) {
+                      if (this.getConversationState(callId) === CONVERSATION_STATES.AI_RESPONDING) {
+                        this.transitionState(
+                          callId,
+                          CONVERSATION_STATES.WAITING_FOR_GREETING,
+                          'speech_too_short_rearm_greeting'
+                        );
+                      }
+                      // Confirm timer or silence fallback will greet if speech was noise-only
+                      if (!currentConn._greetingSpeechConfirmTimer && !currentConn._greetingFallbackTimer) {
+                        this._armGreetingFallbackIfNeeded(callId);
+                      }
+                    } else {
+                      this.transitionState(callId, CONVERSATION_STATES.CONVERSATION_ACTIVE, 'speech_too_short_wait_more');
+                    }
                     return;
+                  }
+                  if (spDur < minResponseMs && hasSubstantiveTranscript) {
+                    logger.info(
+                      `[RealtimeRC] Allowing short utterance (${Math.round(spDur)}ms) — substantive ASR overrides duration gate ${callId}`
+                    );
+                    currentConn._speechTooShortAwaitingTranscript = false;
                   }
                   if (currentConn._userTurnResponseCreateSent) {
                     logger.info(
@@ -2184,6 +2694,7 @@ class OpenAIRealtimeService {
                     currentConn._userTurnResponseCreateSent = true;
                     const sent = await this.sendResponseCreate(callId);
                     if (!sent) {
+                      // Leave watchdog armed — silent-Bianca must surface if response.create never landed
                       currentConn._userTurnResponseCreateSent = false;
                       const failConn = this.connections.get(callId);
                       if (failConn) failConn._speechStoppedCommittedAiResponding = false;
@@ -2232,7 +2743,26 @@ class OpenAIRealtimeService {
                 }
               }
             } else if (isActiveResponse) {
-              if (this.canAIRespond(callId) && !this.isInGracePeriod(callId)) {
+              const pendingTrim = (conn.pendingUserTranscript || '').trim();
+              const duringAiNoBarge = Boolean(conn._userUtteranceDuringAiWithoutBargeIn);
+              const isBackchannelOrEmpty =
+                !pendingTrim || this._shouldSuppressUserTranscriptAsFiller(conn, pendingTrim || '');
+              if (duringAiNoBarge && isBackchannelOrEmpty) {
+                // Mid-response backchannel / empty noise without barge-in — do not queue a reply
+                this._clearResponseTriggerWatchdog(conn);
+                conn._speechTooShortAwaitingTranscript = false;
+                this._rcDiagSpeechStopped(callId, conn, 'backchannel_during_ai_skip', {
+                  outcome: 'sendResponseCreate_not_scheduled',
+                  pendingPreview: pendingTrim
+                    ? pendingTrim.length > 160
+                      ? `${pendingTrim.slice(0, 160)}…`
+                      : pendingTrim
+                    : '',
+                });
+                logger.info(
+                  `[OpenAI Realtime] Ignoring speech_stopped for ${callId} — backchannel/noise while AI speaking without barge-in: "${pendingTrim || '(empty)'}"`
+                );
+              } else if (this.canAIRespond(callId) && !this.isInGracePeriod(callId)) {
                 // FIX: Bug 3
                 conn._pendingStopsSetAt = Date.now();
                 conn._pendingUserResponseAfterAiStops = true;
@@ -2299,6 +2829,7 @@ class OpenAIRealtimeService {
         case 'input_audio_buffer.committed':
           logger.info(`[OpenAI Realtime] Audio buffer committed successfully for ${callId}`);
           if (conn) {
+            this._noteGreetingPhaseSpeechEvidence(callId, conn, 'commit');
             conn.pendingCommit = false;
             conn.lastCommitTime = Date.now();
             const chunksProcessed = conn.audioChunksSent || 0;
@@ -2486,17 +3017,18 @@ class OpenAIRealtimeService {
       }
 
       logger.info(`[OpenAI Realtime] Audio pipeline ready for ${callId} - waiting for user input`);
-      logger.info(`[OpenAI Realtime] Session ready for ${callId}. Will run initial greeting after session is applied.`);
+      logger.info(
+        `[OpenAI Realtime] Session ready for ${callId}. Arming silence-fallback greeting (no immediate response.create).`
+      );
     }
 
     try {
-      // Greeting runs whenever session is ready and not yet successfully sent — including a later
-      // session.updated if the first response.create was blocked (create_response:false removes OpenAI auto-reply).
+      // Stay silent on connect; arm GREETING_FALLBACK_MS. Re-arm if a prior attempt was blocked and we are still waiting.
       if (conn.sessionReady) {
         logger.info(
-          `[RealtimeRC] greeting: invoking _sendInitialGreetingIfNeeded callId=${callId} sessionBecameReady=${sessionBecameReady} _initialGreetingTriggered=${conn._initialGreetingTriggered}`
+          `[RealtimeRC] greeting: invoking _armGreetingFallbackIfNeeded callId=${callId} sessionBecameReady=${sessionBecameReady} _initialGreetingTriggered=${conn._initialGreetingTriggered} cancelled=${conn._greetingFallbackCancelled}`
         );
-        await this._sendInitialGreetingIfNeeded(callId);
+        this._armGreetingFallbackIfNeeded(callId);
       }
       if (sessionBecameReady) {
         this.notify(callId, 'openai_session_ready', {});
@@ -2726,10 +3258,10 @@ class OpenAIRealtimeService {
     }
 
     if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
-      const preferredLanguage = conn.preferredLanguage || 'en';
-      if (isFiller(conn.pendingUserTranscript.trim(), preferredLanguage)) {
+      if (this._shouldSuppressUserTranscriptAsFiller(conn, conn.pendingUserTranscript.trim())) {
         logger.info(`[RealtimeRC] maybeFlushDeferredResponse ${callId}: clear pending — filler-only transcript`, {
           outcome: 'pending_cleared_filler',
+          duringAiWithoutBargeIn: Boolean(conn._userUtteranceDuringAiWithoutBargeIn),
         });
         conn._pendingUserResponseAfterAiStops = false;
         return;
@@ -2768,9 +3300,14 @@ class OpenAIRealtimeService {
     });
     conn._pendingUserResponseAfterAiStops = false;
 
+    // Deferred flush still originated from speech_stopped; watch near-term send (not the whole AI-speaking gap).
+    this._armResponseTriggerWatchdog(callId, conn, 'deferred_flush_after_response_done');
     setTimeout(async () => {
       const currentConn = this.connections.get(callId);
-      if (!currentConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+      if (!currentConn || this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) {
+        this._clearResponseTriggerWatchdog(currentConn);
+        return;
+      }
       if (currentConn._userTurnResponseCreateSent) {
         logger.info(`[RealtimeRC] maybeFlush 200ms timer skipped ${callId} — user-turn response.create already sent`);
         return;
@@ -3251,9 +3788,14 @@ class OpenAIRealtimeService {
    */
   async handleInputAudioTranscriptionDelta(callId, message) {
     const conn = this.connections.get(callId);
-    if (!conn || conn._waitingForInitialGreeting || !conn.activeUserMessageId) return;
+    if (!conn) return;
 
     const delta = typeof message.delta === 'string' ? message.delta : '';
+    if (delta.trim()) {
+      this._noteGreetingPhaseSpeechEvidence(callId, conn, 'transcript');
+    }
+
+    if (conn._waitingForInitialGreeting || !conn.activeUserMessageId) return;
     if (!delta) return;
 
     conn._userTranscriptLiveBuffer = (conn._userTranscriptLiveBuffer || '') + delta;
@@ -3286,10 +3828,22 @@ class OpenAIRealtimeService {
     const conn = this.connections.get(callId);
     if (!conn) return;
 
-    // Ignore user input until Bianca has given her initial greeting
-    if (conn._waitingForInitialGreeting) {
-      logger.info(`[OpenAI Realtime] Ignoring user input for ${callId} - waiting for Bianca's initial greeting`);
+    // Non-empty ASR always confirms resident speech in the open window — including late ASR after
+    // GREETING_SPEECH_CONFIRM_MS closed and a silence-fallback timer was re-armed. Never discard.
+    this._noteGreetingPhaseSpeechEvidence(callId, conn, 'transcript');
+
+    // Only ignore while proactive greeting audio is still pending/playing (not resident-first cancel)
+    if (conn._waitingForInitialGreeting && conn._initialGreetingTriggered) {
+      logger.info(
+        `[OpenAI Realtime] Deferring user transcript for ${callId} — silence-fallback greeting still in progress (barge-in clears this)`
+      );
+      // Keep transcript for after barge-in / speech_stopped; do not drop non-empty ASR
+      conn.pendingUserTranscript = transcript;
       return;
+    }
+    if (conn._waitingForInitialGreeting) {
+      // Defensive: evidence path should have cancelled; force-cancel so we never discard
+      this._cancelGreetingFallbackForResidentFirst(callId, conn, 'transcript_force_cancel');
     }
 
     // FIX: Bug 1 — duplicate .completed for same item_id
@@ -3307,6 +3861,7 @@ class OpenAIRealtimeService {
       conn._processedTranscriptItemIds.add(String(itemId));
     }
     conn._asrTranscriptionEventHandledThisTurn = true;
+    conn._substantiveAsrThisTurn = !this._shouldSuppressUserTranscriptAsFiller(conn, transcript);
 
     if (conn._userTranscriptFlushTimer) {
       clearTimeout(conn._userTranscriptFlushTimer);
@@ -3359,7 +3914,7 @@ class OpenAIRealtimeService {
       } else if (!conn._aiIsSpeaking && !conn._responseCreated && this.canAIRespond(callId)) {
         const postAsrGrace = this.isInGracePeriod(callId);
         const postAsrSubstantive =
-          typeof transcript === 'string' && !isFiller(transcript, conn.preferredLanguage || 'en');
+          typeof transcript === 'string' && !this._shouldSuppressUserTranscriptAsFiller(conn, transcript);
         if (postAsrGrace && !postAsrSubstantive) {
           const timeSinceGreeting = Date.now() - (conn._initialGreetingCompletedAt || 0);
           logger.info(
@@ -3367,10 +3922,17 @@ class OpenAIRealtimeService {
             `(${Math.round(timeSinceGreeting)}ms since greeting completed, need ${CONSTANTS.GRACE_PERIOD_MS}ms).`
           );
         } else if (this.transitionState(callId, CONVERSATION_STATES.AI_RESPONDING, 'user_transcript_completed_after_speech_stop')) {
+          this._armResponseTriggerWatchdog(callId, conn, 'asr_waiting_for_user_transcript');
           setTimeout(async () => {
             const currentConn = this.connections.get(callId);
-            if (!currentConn || currentConn._aiIsSpeaking || currentConn._responseCreated) return;
-            if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) return;
+            if (!currentConn || currentConn._aiIsSpeaking || currentConn._responseCreated) {
+              this._clearResponseTriggerWatchdog(currentConn);
+              return;
+            }
+            if (this.getConversationState(callId) !== CONVERSATION_STATES.AI_RESPONDING) {
+              this._clearResponseTriggerWatchdog(currentConn);
+              return;
+            }
             if (currentConn._userTurnResponseCreateSent) {
               logger.info(
                 `[RealtimeRC] ASR _waitingForUserTranscript 120ms timer skipped ${callId} — user-turn response.create already sent`
@@ -3408,7 +3970,7 @@ class OpenAIRealtimeService {
     // when OpenAI rejects or coalesces the duplicate.
     // Also skip entirely when the post-speech_stopped ASR path above already handled this completion event.
     const preferredLanguage = conn.preferredLanguage || 'en';
-    const transcriptIsFillerOnly = isFiller(transcript, preferredLanguage);
+    const transcriptIsFillerOnly = this._shouldSuppressUserTranscriptAsFiller(conn, transcript);
     const inGrace = this.isInGracePeriod(callId);
     // speech_stopped can return early during post-greeting grace while ASR finishes later; allow a
     // substantive (non-filler-only) transcript to recover without a second utterance.
@@ -4876,7 +5438,9 @@ class OpenAIRealtimeService {
     if (connPreDelete) {
       connPreDelete._responseCreateInFlight = false;
       this._clearResponseStuckRecoveryTimers(connPreDelete);
+      this._clearResponseTriggerWatchdog(connPreDelete);
       this._clearAiAudioCompleteDebounceTimer(connPreDelete);
+      this._clearGreetingOpenTimers(connPreDelete);
       if (connPreDelete._speechStoppedFinalizeTimer) {
         clearTimeout(connPreDelete._speechStoppedFinalizeTimer);
         connPreDelete._speechStoppedFinalizeTimer = null;

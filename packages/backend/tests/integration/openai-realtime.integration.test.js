@@ -74,6 +74,13 @@ describe('OpenAI Realtime API Integration Tests', () => {
       expect(sessionConfig.session.audio.input.turn_detection.create_response).toBe(
         config.audio.turnDetection.createResponse === true
       );
+      const expectedMode = config.audio.turnDetection.mode === 'server_vad' ? 'server_vad' : 'semantic_vad';
+      expect(sessionConfig.session.audio.input.turn_detection.type).toBe(expectedMode);
+      if (expectedMode === 'semantic_vad') {
+        expect(sessionConfig.session.audio.input.turn_detection.eagerness).toBe(
+          config.audio.turnDetection.eagerness || 'low'
+        );
+      }
     });
 
     it('should not attach Realtime tools for onboarding calls (capture is server-side)', () => {

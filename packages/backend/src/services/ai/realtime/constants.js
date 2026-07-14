@@ -18,14 +18,30 @@ module.exports = {
   INITIAL_SILENCE_MS: 100, // Conservative: 100ms instead of 50ms
   AUDIO_QUALITY_CHECK_INTERVAL: 5000,
   MAX_CONSECUTIVE_SILENCE_CHUNKS: 50,
-  SPEECH_END_SILENCE_MS: 500, // Heuristic: align with default OpenAI turn_detection (server_vad defaults ~500ms)
+  SPEECH_END_SILENCE_MS: 500, // Legacy heuristic only; live turn end uses session turn_detection (semantic_vad default)
   MIN_SPEECH_DURATION_MS: 800, // Conservative: 800ms instead of 500ms
-  // FIX: Bug 2 — min accumulated user speech before we allow response.create (speech_stopped 200ms path, etc.)
+  // FIX: Bug 2 — acoustic noise gate on speech_stopped 200ms path. Non-empty substantive ASR overrides
+  // (short "yes"); empty/no transcript remains droppable as noise.
   MIN_SPEECH_DURATION_FOR_RESPONSE_MS: 1200,
   // After initial voice greeting: ignore speech_stopped so bridge/echo doesn’t trigger a reply.
   // Keep short — long windows feel like Bianca ignores the first real answer.
   GRACE_PERIOD_MS: 350,
-  /** After session.updated + flush: brief pause before response.create so OpenAI finishes applying session.update (esp. turn_detection). */
-  INITIAL_GREETING_AFTER_SESSION_READY_MS: 100,
+  /**
+   * Silence after session ready before Bianca proactively greets.
+   * Override with GREETING_FALLBACK_MS env (see config.openai.greetingFallbackMs).
+   */
+  GREETING_FALLBACK_MS: 5000,
+  /**
+   * After speech_started during the open greeting window: if no committed audio / transcription
+   * arrives within this window, treat it as connect noise and re-arm the greeting fallback.
+   */
+  GREETING_SPEECH_CONFIRM_MS: 2000,
+  /**
+   * Commit+duration confirmation for open-window speech (not MIN_SPEECH_DURATION_MS=800).
+   * Single-word greetings are ~400–600ms; keep below that so "hello?" counts as real speech.
+   */
+  GREETING_MIN_SPEECH_CONFIRM_DURATION_MS: 350,
+  /** Max connect-noise re-arms before we force the silence-fallback greeting. Env: GREETING_MAX_REARMS */
+  GREETING_MAX_REARMS: 2,
 };
 

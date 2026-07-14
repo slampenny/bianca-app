@@ -113,7 +113,9 @@ resource "aws_security_group" "production" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # RTP ports for Asterisk
+  # RTP ports for Asterisk (see packages/backend/docs/deployment/ASTERISK_SCALING.md —
+  # self-hosted voice does not scale horizontally on this single box; evaluate dedicated
+  # voice hosts or Twilio-only media before ~12K+ residents).
   ingress {
     from_port   = 10000
     to_port     = 20000

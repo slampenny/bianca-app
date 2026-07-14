@@ -74,6 +74,7 @@ Defined in `devops/terraform/production-schedule.tf`:
 - **Timezone** defaults to **`America/Los_Angeles`** (PST/PDT).
 - **Times** default to **07:00** start and **13:00** stop (7am–1pm local Pacific). Override with `production_schedule_*` variables.
 - **Disable** the schedules entirely: set `production_ec2_cost_schedule_enabled = false` and `terraform apply`.
+- **Manual start/stop anytime:** `yarn production:up` / `yarn production:down` (see `packages/backend/scripts/production-control.sh`). Uses the instance holding `bianca-production-eip`, or the newest `Name=bianca-production` instance.
 
 After apply, `terraform output production_ec2_schedule_summary` shows the resolved cron + timezone.
 

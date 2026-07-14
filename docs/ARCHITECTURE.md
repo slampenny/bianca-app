@@ -166,6 +166,8 @@ flowchart LR
   OpenAIRealtime <-->|"WebSocket"| OpenAI
 ```
 
+**Scaling note:** Asterisk currently runs in Docker on the same EC2 as the app (pilot). Self-hosted voice compute becomes the dominant AWS platform cost at large resident counts; see `packages/backend/docs/deployment/ASTERISK_SCALING.md`.
+
 ---
 
 ## Docker (local dev)

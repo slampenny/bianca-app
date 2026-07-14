@@ -160,8 +160,14 @@ const envVarsSchema = Joi.object({
   OPENAI_DEBUG_AUDIO: Joi.string().valid('true', 'false').optional(),
   // Transcription model: 'gpt-4o-mini-transcribe' (latest, faster) or 'gpt-4o-transcribe' (higher accuracy) or 'whisper-1' (legacy)
   OPENAI_REALTIME_TRANSCRIPTION_MODEL: Joi.string().default('gpt-4o-mini-transcribe'),
-  /** Set to "true" so OpenAI server_vad auto response.create on turn end (A/B vs our scheduler). Default unset = false in code. */
+  /** Set to "true" so OpenAI VAD auto response.create on turn end. Must stay unset/false — we send response.create ourselves; enabling doubles replies. */
   OPENAI_REALTIME_VAD_CREATE_RESPONSE: Joi.string().valid('true', 'false').optional(),
+  /** Log error if speech_stopped scheduled a response but response.create was not sent within this many ms. Default 3000. */
+  RESPONSE_TRIGGER_WATCHDOG_MS: Joi.number().integer().min(500).max(60000).optional(),
+  /** Silence after call connect before Bianca proactively greets (ms). Default 5000. */
+  GREETING_FALLBACK_MS: Joi.number().integer().min(0).default(5000),
+  /** Max connect-noise greeting re-arms before forcing a proactive greeting. Default 2. */
+  GREETING_MAX_REARMS: Joi.number().integer().min(0).default(2),
   
   // Cache configuration (optional - defaults to in-memory)
   CACHE_TYPE: Joi.string().valid('memory', 'redis').default('memory'),
@@ -175,6 +181,11 @@ const envVarsSchema = Joi.object({
   /** "true" = use legacy keyword/DB phrase/regex detectors; "false" (default) = embedding-first for fraud + emergency */
   USE_KEYWORD_BASED_DETECTORS: Joi.string().valid('true', 'false').optional(),
 
+  // Voice turn detection: semantic_vad (default) or server_vad for A/B; may also live in Secrets Manager JSON
+  TURN_DETECTION_MODE: Joi.string().valid('semantic_vad', 'server_vad').optional(),
+  TURN_DETECTION_EAGERNESS: Joi.string().valid('low', 'medium', 'high', 'auto').optional(),
+  /** server_vad silence_duration_ms for A/B (e.g. 1200). Preferred over AUDIO_TURN_DETECTION_SILENCE_DURATION_MS. */
+  SILENCE_DURATION_MS: Joi.number().integer().min(200).max(4000).optional(),
   // Voice turn / server_vad personalization (non-secret; may also live in docker-compose or Secrets Manager JSON)
   AUDIO_TURN_PERSONALIZATION_ENABLED: Joi.string().valid('true', 'false').optional(),
   AUDIO_TURN_DEFAULT_SILENCE_DURATION_MS: Joi.number().integer().min(200).max(4000).optional(),

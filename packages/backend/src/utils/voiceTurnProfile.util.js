@@ -292,6 +292,11 @@ function buildProfilePersistenceUpdate(tracking, vtConfig, existingProfile, call
 function logVoiceTurnStartupConfig(logger, cfg) {
   if (!logger || typeof logger.info !== 'function') return;
   try {
+    const td = cfg?.audio?.turnDetection || {};
+    const mode = td.mode === 'server_vad' ? 'server_vad' : 'semantic_vad';
+    logger.info(
+      `[VoiceTurn] turn_detection mode=${mode} eagerness=${td.eagerness || 'low'} silenceDurationMs=${td.silenceDurationMs ?? 500}`
+    );
     const vt = getVoiceTurnConfig(cfg);
     const legacy = vt.legacySilenceDurationMs;
     logger.info(

@@ -39,6 +39,20 @@ const buildOpenAIConfig = (envVars) => {
       realtimeTranscriptionModel: envVars.OPENAI_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe',
       /** Legacy: prefer OPENAI_DEBUG_AUDIO env or per-org `debugAudioUploadEnabled`; kept for any code still reading it */
       debugAudio: envVars.OPENAI_DEBUG_AUDIO === 'true',
+      /** Silence after session ready before proactive greeting (ms). Env: GREETING_FALLBACK_MS */
+      greetingFallbackMs: (() => {
+        const v = envVars.GREETING_FALLBACK_MS;
+        if (v === undefined || v === null || v === '') return 5000;
+        const n = Number(v);
+        return Number.isFinite(n) && n >= 0 ? n : 5000;
+      })(),
+      /** Max connect-noise re-arms before forcing greeting. Env: GREETING_MAX_REARMS */
+      greetingMaxRearms: (() => {
+        const v = envVars.GREETING_MAX_REARMS;
+        if (v === undefined || v === null || v === '') return 2;
+        const n = Number(v);
+        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 2;
+      })(),
     },
   };
 };
@@ -81,6 +95,20 @@ const applyOpenAISecrets = (config, secrets) => {
   if (secrets.OPENAI_IDLE_TIMEOUT !== undefined && secrets.OPENAI_IDLE_TIMEOUT !== null) {
     const n = Number(secrets.OPENAI_IDLE_TIMEOUT);
     config.openai.idleTimeout = Number.isFinite(n) ? Math.max(0, n) : config.openai.idleTimeout;
+  }
+
+  if (secrets.GREETING_FALLBACK_MS !== undefined && secrets.GREETING_FALLBACK_MS !== null) {
+    const n = Number(secrets.GREETING_FALLBACK_MS);
+    if (Number.isFinite(n) && n >= 0) {
+      config.openai.greetingFallbackMs = n;
+    }
+  }
+
+  if (secrets.GREETING_MAX_REARMS !== undefined && secrets.GREETING_MAX_REARMS !== null) {
+    const n = Number(secrets.GREETING_MAX_REARMS);
+    if (Number.isFinite(n) && n >= 0) {
+      config.openai.greetingMaxRearms = Math.floor(n);
+    }
   }
 
   // Chat completions (LangChain summaries, etc.): must mirror loadSecrets' process.env merge so

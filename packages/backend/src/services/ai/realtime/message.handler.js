@@ -5,6 +5,7 @@
 
 const logger = require('../../../config/logger');
 const config = require('../../../config/config');
+const { resolveTurnDetectionPayload } = require('../../../config/audioTurn.config');
 
 /**
  * Message Handler
@@ -54,20 +55,30 @@ class MessageHandler {
   }
 
   /**
-   * GA `audio.input.turn_detection` object; uses connection.vadSilenceDurationMs when set.
+   * Whether session turn_detection is silence-based server_vad (personalization/adaptive bumps apply).
+   * @returns {boolean}
+   */
+  static isServerVadMode() {
+    return config.audio?.turnDetection?.mode === 'server_vad';
+  }
+
+  /**
+   * GA `audio.input.turn_detection` object from env mode (semantic_vad default, or server_vad).
+   * @param {Object} connection
+   */
+  static buildTurnDetection(connection) {
+    return resolveTurnDetectionPayload(config.audio?.turnDetection || {}, connection);
+  }
+
+  /**
+   * @deprecated Use buildTurnDetection — kept for callers that assume server_vad shape in tests.
    * @param {Object} connection
    */
   static buildServerVadTurnDetection(connection) {
-    return {
-      type: 'server_vad',
-      threshold: config.audio?.turnDetection?.threshold ?? 0.6,
-      prefix_padding_ms: config.audio?.turnDetection?.prefixPaddingMs ?? 200,
-      silence_duration_ms: MessageHandler.getTurnDetectionSilenceDurationMs(connection),
-      // Default (createResponse !== true) must stay false: this app schedules its own `sendResponseCreate` on
-      // speech_stopped. Enabling OPENAI_REALTIME_VAD_CREATE_RESPONSE would double-fire and must not be used in production.
-      // FIX: Bug 2
-      create_response: config.audio?.turnDetection?.createResponse === true,
-    };
+    return resolveTurnDetectionPayload(
+      { ...(config.audio?.turnDetection || {}), mode: 'server_vad' },
+      connection
+    );
   }
 
   /**
@@ -81,7 +92,7 @@ class MessageHandler {
         type: 'realtime',
         audio: {
           input: {
-            turn_detection: MessageHandler.buildServerVadTurnDetection(connection),
+            turn_detection: MessageHandler.buildTurnDetection(connection),
           },
         },
       },
@@ -143,8 +154,8 @@ class MessageHandler {
         },
         // OpenAI built-in noise reduction (optimized for phone calls)
         noise_reduction: noiseReductionObject,
-        // Turn detection is nested under audio.input for GA
-        turn_detection: MessageHandler.buildServerVadTurnDetection(connection),
+        // Turn detection is nested under audio.input for GA (semantic_vad default; server_vad via TURN_DETECTION_MODE)
+        turn_detection: MessageHandler.buildTurnDetection(connection),
       },
       output: {
         format: {
@@ -182,8 +193,13 @@ class MessageHandler {
       `[RealtimeRC] buildSessionConfig sessionShape=${JSON.stringify(sessionShape)} correlation=${connection?.callSid || connection?.asteriskChannelId || 'n/a'}`
     );
     logger.info(
-      `[RealtimeRC] buildSessionConfig turn_detection.create_response=${vadCreateResponse} (env OPENAI_REALTIME_VAD_CREATE_RESPONSE=${process.env.OPENAI_REALTIME_VAD_CREATE_RESPONSE ?? 'unset'}) correlation=${connection?.callSid || connection?.asteriskChannelId || 'n/a'}`
+      `[RealtimeRC] buildSessionConfig turn_detection=${JSON.stringify(td)} create_response=${vadCreateResponse} (env TURN_DETECTION_MODE=${process.env.TURN_DETECTION_MODE ?? 'unset'} OPENAI_REALTIME_VAD_CREATE_RESPONSE=${process.env.OPENAI_REALTIME_VAD_CREATE_RESPONSE ?? 'unset'}) correlation=${connection?.callSid || connection?.asteriskChannelId || 'n/a'}`
     );
+    if (vadCreateResponse) {
+      logger.warn(
+        `[RealtimeRC] turn_detection.create_response=true — OpenAI will auto-send response.create on speech_stopped; our scheduler also sends response.create (double-reply risk). Keep OPENAI_REALTIME_VAD_CREATE_RESPONSE unset/false. correlation=${connection?.callSid || connection?.asteriskChannelId || 'n/a'}`
+      );
+    }
 
     return baseConfig;
   }
