@@ -21,6 +21,18 @@ if [ ! -f docker-compose.yml ]; then
   exit 1
 fi
 
+# Prefer plugin; Amazon Linux staging userdata installs standalone docker-compose.
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD=(docker compose)
+  echo "Using: docker compose (plugin)"
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE_CMD=(docker-compose)
+  echo "Using: docker-compose (standalone)"
+else
+  echo "❌ ERROR: Neither 'docker compose' nor 'docker-compose' is available" >&2
+  exit 1
+fi
+
 echo "Logging into ECR ${ECR_REGISTRY}..."
 aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
@@ -31,8 +43,8 @@ docker pull "${ECR_REGISTRY}/bianca-app-admin:staging"
 docker pull "${ECR_REGISTRY}/bianca-app-asterisk:staging"
 
 echo "Starting stack (compose up -d)..."
-docker compose pull || true
-docker compose up -d --remove-orphans
+"${DOCKER_COMPOSE_CMD[@]}" pull || true
+"${DOCKER_COMPOSE_CMD[@]}" up -d --remove-orphans
 
 echo "Waiting for containers..."
 sleep 15
