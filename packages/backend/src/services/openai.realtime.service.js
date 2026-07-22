@@ -24,7 +24,9 @@
  * 
  * FALLBACK MECHANISMS:
  * - Stale transcript cleanup: Messages saved after timeout if speaker doesn't finish cleanly
- * - Call end cleanup: Any remaining messages saved when call ends
+ * - Call end cleanup: Force-commit open user audio + wait briefly for ASR before closing the
+ *   WebSocket, then save pending transcripts (avoids deleting orphan "[Speaking...]" after a
+ *   long monologue that never got speech_stopped / commit)
  * 
  * This ensures messages appear in conversation in the order speakers actually finished speaking,
  * not in the order text was first generated or transcribed.
@@ -3875,6 +3877,7 @@ class OpenAIRealtimeService {
     conn.pendingUserTranscript = transcript;
     logger.info(`[OpenAI Realtime] Stored user transcript for later saving: "${transcript}"`);
     await this.persistUserTranscriptToPlaceholder(callId, transcript);
+    this._signalHangupTranscriptFlush(conn, 'transcription_completed');
 
     const evidenceUserMessageId =
       conn.activeUserMessageId && mongoose.Types.ObjectId.isValid(conn.activeUserMessageId)
@@ -4132,6 +4135,17 @@ class OpenAIRealtimeService {
 
     const conn = this.connections.get(callId);
     if (!conn) return;
+
+    // Hangup flush is waiting on this commit — prefer any live partial over deleting the row.
+    if (conn._hangupTranscriptFlushResolve) {
+      const live = (conn._userTranscriptLiveBuffer || '').trim();
+      if (live) {
+        conn.pendingUserTranscript = live;
+        await this.persistUserTranscriptToPlaceholder(callId, live);
+      }
+      this._signalHangupTranscriptFlush(conn, 'transcription_failed');
+      return;
+    }
 
     if (conn._userTranscriptFlushTimer) {
       clearTimeout(conn._userTranscriptFlushTimer);
@@ -4738,7 +4752,7 @@ class OpenAIRealtimeService {
   async forceCommit(callId) {
     logger.info(`[OpenAI Realtime] Force commit requested for ${callId}`);
     const conn = this.connections.get(callId);
-    if (!conn?.webSocket?.readyState === WebSocket.OPEN || !conn?.sessionReady) {
+    if (!conn?.sessionReady || conn.webSocket?.readyState !== WebSocket.OPEN) {
       logger.error(`[OpenAI Realtime] Cannot force commit - connection not ready for ${callId}`);
       return false;
     }
@@ -5330,6 +5344,145 @@ class OpenAIRealtimeService {
   /**
    * Disconnect - Updated version with better error handling
    */
+  /**
+   * Resolve a hangup ASR flush waiter (if any). Safe to call when no waiter is armed.
+   * @param {object} conn
+   * @param {string} reason
+   */
+  _signalHangupTranscriptFlush(conn, reason) {
+    if (!conn || typeof conn._hangupTranscriptFlushResolve !== 'function') return;
+    const resolve = conn._hangupTranscriptFlushResolve;
+    conn._hangupTranscriptFlushResolve = null;
+    try {
+      resolve(reason);
+    } catch (err) {
+      logger.warn(`[OpenAI Call End] hangup transcript flush resolve threw: ${err.message}`);
+    }
+  }
+
+  /**
+   * True when hangup should force-commit and wait for ASR before closing the socket.
+   * Covers the long-monologue case: semantic_vad never fired speech_stopped, so the
+   * buffer was never committed and the UI only has "[Speaking...]".
+   * @param {object} conn
+   */
+  _needsHangupUserTranscriptFlush(conn) {
+    if (!conn) return false;
+    if ((conn.pendingUserTranscript || '').trim()) return false;
+    const live = (conn._userTranscriptLiveBuffer || '').trim();
+    if (live) return true;
+    // Mid-utterance: VAD never committed (long monologue) or ASR still in flight after speech_stopped.
+    if (conn._userIsSpeaking) return true;
+    if (conn._waitingForUserTranscript && conn.activeUserMessageId) return true;
+    return false;
+  }
+
+  /**
+   * Before closing the Realtime WebSocket on hangup: commit any open user audio and wait
+   * briefly for input_audio_transcription.completed so we do not delete an orphan
+   * "[Speaking...]" that still had uncommitted speech.
+   *
+   * Must run while WS listeners are still attached.
+   * @param {string} callId
+   * @returns {Promise<string>} reason string for logs
+   */
+  async _flushInProgressUserTranscriptBeforeDisconnect(callId) {
+    const conn = this.connections.get(callId);
+    if (!conn || !this._needsHangupUserTranscriptFlush(conn)) {
+      return 'skip_not_needed';
+    }
+
+    // Already have partial ASR deltas — persist immediately even if commit fails.
+    const liveBefore = (conn._userTranscriptLiveBuffer || '').trim();
+    if (liveBefore && !(conn.pendingUserTranscript || '').trim()) {
+      conn.pendingUserTranscript = liveBefore;
+      await this.persistUserTranscriptToPlaceholder(callId, liveBefore);
+    }
+
+    const wsOpen =
+      conn.sessionReady &&
+      conn.webSocket &&
+      conn.webSocket.readyState === WebSocket.OPEN;
+
+    if (!wsOpen) {
+      logger.warn(
+        `[OpenAI Call End] Cannot force-commit user audio on hangup for ${callId} — WebSocket not open; ` +
+          `pendingLen=${(conn.pendingUserTranscript || '').length}`
+      );
+      return 'skip_ws_closed';
+    }
+
+    // Avoid racing an in-flight assistant response against the hangup commit.
+    if (conn._aiIsSpeaking || conn._responseCreated || conn._responseCreateInFlight) {
+      try {
+        await this.sendJsonMessage(callId, { type: 'response.cancel' });
+        conn._aiIsSpeaking = false;
+        conn._responseCreated = false;
+        conn._responseCreateInFlight = false;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      } catch (err) {
+        logger.warn(`[OpenAI Call End] response.cancel before hangup flush failed for ${callId}: ${err.message}`);
+      }
+    }
+
+    const timeoutMs = CONSTANTS.HANGUP_TRANSCRIPT_FLUSH_MS;
+    const flushPromise = new Promise((resolve) => {
+      conn._hangupTranscriptFlushResolve = resolve;
+    });
+
+    try {
+      logger.info(
+        `[OpenAI Call End] Force-committing open user audio before hangup for ${callId} ` +
+          `(waiting up to ${timeoutMs}ms for ASR)`
+      );
+      await this.sendJsonMessage(callId, { type: 'input_audio_buffer.commit' });
+      conn.pendingCommit = true;
+      conn.lastCommitTime = Date.now();
+    } catch (err) {
+      this._signalHangupTranscriptFlush(conn, 'commit_send_failed');
+      logger.warn(`[OpenAI Call End] Hangup force-commit send failed for ${callId}: ${err.message}`);
+      return 'commit_send_failed';
+    }
+
+    const reason = await Promise.race([
+      flushPromise,
+      new Promise((resolve) => setTimeout(() => resolve('timeout'), timeoutMs)),
+    ]);
+
+    if (conn._hangupTranscriptFlushResolve) {
+      conn._hangupTranscriptFlushResolve = null;
+    }
+
+    // Timeout / failed: keep any live partial so handleCallEnd can still persist it.
+    if (reason === 'timeout' || reason === 'transcription_failed') {
+      const live = (conn._userTranscriptLiveBuffer || '').trim();
+      if (live && !(conn.pendingUserTranscript || '').trim()) {
+        conn.pendingUserTranscript = live;
+        await this.persistUserTranscriptToPlaceholder(callId, live);
+      }
+      logger.warn(
+        `[OpenAI Call End] Hangup ASR flush ended with ${reason} for ${callId} ` +
+          `(pendingLen=${(conn.pendingUserTranscript || '').length})`
+      );
+    } else {
+      logger.info(`[OpenAI Call End] Hangup ASR flush complete for ${callId}: ${reason}`);
+    }
+
+    // If create_response:true auto-started a reply from our hangup commit, cancel it.
+    if (conn._aiIsSpeaking || conn._responseCreated || conn._responseCreateInFlight) {
+      try {
+        await this.sendJsonMessage(callId, { type: 'response.cancel' });
+        conn._aiIsSpeaking = false;
+        conn._responseCreated = false;
+        conn._responseCreateInFlight = false;
+      } catch (err) {
+        logger.debug(`[OpenAI Call End] post-flush response.cancel ignored for ${callId}: ${err.message}`);
+      }
+    }
+
+    return reason;
+  }
+
   async disconnect(callId) {
     const conn = this.connections.get(callId);
     if (!conn) {
@@ -5356,6 +5509,16 @@ class OpenAIRealtimeService {
     if (this.pendingReconnections.has(callId)) {
       this.reconnectionManager.removePendingReconnect(callId);
       logger.info(`[OpenAI Realtime] 🚀 BATCH: Removed ${callId} from pending reconnections (disconnect)`);
+    }
+
+    // CRITICAL: Commit + wait for ASR while WS listeners are still attached.
+    // Otherwise long utterances that never got speech_stopped lose their transcript on hangup.
+    try {
+      await this._flushInProgressUserTranscriptBeforeDisconnect(callId);
+    } catch (flushErr) {
+      logger.warn(
+        `[OpenAI Call End] Hangup transcript flush threw for ${callId}: ${flushErr.message}`
+      );
     }
 
     if (conn.webSocket) {
@@ -5848,6 +6011,15 @@ class OpenAIRealtimeService {
 
       // SAVE ANY PENDING MESSAGES BEFORE CLEANUP
       if (conn) {
+        // Last-chance: promote any streamed ASR partials that never got .completed
+        const liveHangup = (conn._userTranscriptLiveBuffer || '').trim();
+        if (liveHangup && !(conn.pendingUserTranscript || '').trim()) {
+          conn.pendingUserTranscript = liveHangup;
+          logger.info(
+            `[OpenAI Call End] Promoting live ASR buffer to pending on hangup for ${callId} (len=${liveHangup.length})`
+          );
+        }
+
         // Save any pending user message
         if (conn.pendingUserTranscript && conn.pendingUserTranscript.trim()) {
           logger.info(`[OpenAI Call End] Saving pending user message for ${callId}`);

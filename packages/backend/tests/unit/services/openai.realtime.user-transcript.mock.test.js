@@ -259,4 +259,72 @@ describe('OpenAI Realtime user transcript (mocked server events)', () => {
     expect(conn.activeUserMessageId).toBeNull();
     expect(conn.pendingUserTranscript).toBe('');
   });
+
+  it('hangup flush force-commits mid-utterance audio and keeps transcript instead of orphan delete', async () => {
+    const conn = baseConn({
+      _userIsSpeaking: true,
+      sessionReady: true,
+      status: 'connected',
+      pendingAssistantTranscript: '',
+      webSocket: { readyState: 1, removeAllListeners() {}, close() {} },
+    });
+    service.connections.set(callId, conn);
+    await service.createPlaceholderUserMessage(callId);
+    const mid = conn.activeUserMessageId;
+
+    const sent = [];
+    service.sendJsonMessage = jest.fn(async (_id, msg) => {
+      sent.push(msg);
+      if (msg.type === 'input_audio_buffer.commit') {
+        setImmediate(() => {
+          service.handleInputAudioTranscriptionCompleted(callId, {
+            type: 'conversation.item.input_audio_transcription.completed',
+            item_id: 'item_hangup_flush_1',
+            transcript: 'I spoke for a long time about how I am settling in.',
+          });
+        });
+      }
+    });
+
+    await service.disconnect(callId);
+
+    expect(sent.some((m) => m.type === 'input_audio_buffer.commit')).toBe(true);
+    const saved = await Message.findById(mid);
+    expect(saved).toBeTruthy();
+    expect(saved.content).toBe('I spoke for a long time about how I am settling in.');
+  });
+
+  it('hangup flush persists live ASR buffer when commit times out', async () => {
+    const prevMs = require('../../../src/services/ai/realtime/constants').HANGUP_TRANSCRIPT_FLUSH_MS;
+    const constants = require('../../../src/services/ai/realtime/constants');
+    constants.HANGUP_TRANSCRIPT_FLUSH_MS = 30;
+
+    const conn = baseConn({
+      _userIsSpeaking: true,
+      sessionReady: true,
+      status: 'connected',
+      _userTranscriptLiveBuffer: 'Partial words from deltas',
+      pendingAssistantTranscript: '',
+      webSocket: { readyState: 1, removeAllListeners() {}, close() {} },
+    });
+    service.connections.set(callId, conn);
+    await service.createPlaceholderUserMessage(callId);
+    const mid = conn.activeUserMessageId;
+
+    service.sendJsonMessage = jest.fn(async () => {});
+
+    try {
+      await service.disconnect(callId);
+      const saved = await Message.findById(mid);
+      expect(saved).toBeTruthy();
+      expect(saved.content).toBe('Partial words from deltas');
+    } finally {
+      constants.HANGUP_TRANSCRIPT_FLUSH_MS = prevMs;
+    }
+  });
+
+  it('_needsHangupUserTranscriptFlush is false when transcript already pending', () => {
+    const conn = baseConn({ pendingUserTranscript: 'Already have it', _userIsSpeaking: true });
+    expect(service._needsHangupUserTranscriptFlush(conn)).toBe(false);
+  });
 });

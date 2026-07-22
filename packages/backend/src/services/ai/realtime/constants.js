@@ -43,5 +43,11 @@ module.exports = {
   GREETING_MIN_SPEECH_CONFIRM_DURATION_MS: 350,
   /** Max connect-noise re-arms before we force the silence-fallback greeting. Env: GREETING_MAX_REARMS */
   GREETING_MAX_REARMS: 2,
+  /**
+   * On hangup, if the user was mid-utterance (semantic_vad never committed), force
+   * input_audio_buffer.commit and wait this long for input_audio_transcription.completed
+   * before closing the WebSocket / deleting the [Speaking...] placeholder.
+   */
+  HANGUP_TRANSCRIPT_FLUSH_MS: 3000,
 };
 
