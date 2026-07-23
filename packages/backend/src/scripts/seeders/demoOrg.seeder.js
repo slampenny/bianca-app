@@ -379,14 +379,18 @@ async function seedDemoOrgData({
     throw new Error(`Org ${orgId} not found`);
   }
 
-  let staff =
-    staffCaregiverId
-      ? await Caregiver.findById(staffCaregiverId)
-      : await Caregiver.findOne({
-          org: oid,
-          role: { $in: ['orgAdmin', 'staff', 'superAdmin'] },
-          active: true,
-        });
+  // Prefer explicit id, else existing orgAdmin (incl. inactive), else other staff roles.
+  // Do not require active:true — refresh must reactivate the primary caregiver.
+  let staff = staffCaregiverId ? await Caregiver.findById(staffCaregiverId) : null;
+  if (!staff) {
+    staff = await Caregiver.findOne({ org: oid, role: 'orgAdmin' });
+  }
+  if (!staff) {
+    staff = await Caregiver.findOne({
+      org: oid,
+      role: { $in: ['staff', 'superAdmin'] },
+    });
+  }
   if (!staff) {
     staff = await Caregiver.create({
       org: oid,
@@ -429,8 +433,14 @@ async function seedDemoOrgData({
     clients.push({ client, trajectoryKey: key });
   }
 
+  // Every refresh: force primary staff digest gates Ready (not Demo Family / other roles).
   await Caregiver.findByIdAndUpdate(staff._id, {
-    $set: { clients: clients.map(({ client }) => client._id) },
+    $set: {
+      clients: clients.map(({ client }) => client._id),
+      isEmailVerified: true,
+      active: true,
+      'notificationPreferences.dailyDigestEmail': true,
+    },
   });
   await Org.findByIdAndUpdate(oid, {
     $set: {

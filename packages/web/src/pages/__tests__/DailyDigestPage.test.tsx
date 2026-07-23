@@ -177,33 +177,33 @@ describe("DailyDigestPage", () => {
   it("shows scheduled vs manual email copy", () => {
     renderPage()
     expect(screen.getByTestId("daily-digest-scheduled-email-hint")).toHaveTextContent(/Automated daily digest emails/i)
-    expect(screen.getByTestId("daily-digest-automation-manual-copy")).toHaveTextContent(/Manual email sends this draft now/i)
-    expect(screen.getByTestId("daily-digest-automation-scheduled-copy")).toHaveTextContent(/Automated email sends once per day/i)
+    expect(screen.getByTestId("daily-digest-automation-indicator")).toHaveTextContent(/Automated digests:/i)
+    expect(screen.queryByTestId("daily-digest-automation-status")).not.toBeInTheDocument()
   })
 
-  it("shows Ready when all automation checks pass for org admin", () => {
+  it("shows Ready one-line indicator when all automation checks pass for org admin", () => {
     caregiverState = { data: defaultCaregiver({ role: "orgAdmin", notificationPreferences: { dailyDigestEmail: true } }) }
     orgState = { data: defaultOrg(), isLoading: false, isError: false }
     renderPage("orgAdmin")
-    expect(screen.getByTestId("daily-digest-automation-ready-badge")).toHaveTextContent(/Ready/i)
-    expect(screen.getByText(/17:30, org-local \(America\/Los_Angeles\)/i)).toBeInTheDocument()
+    expect(screen.getByTestId("daily-digest-automation-indicator")).toHaveTextContent(/Automated digests: Ready/i)
+    expect(screen.queryByTestId("daily-digest-automation-ready-badge")).not.toBeInTheDocument()
   })
 
-  it("shows blocked automation when email is unverified", () => {
+  it("shows Not ready indicator with Settings link when email is unverified", () => {
     caregiverState = { data: defaultCaregiver({ isEmailVerified: false }) }
     renderPage()
-    expect(screen.getByTestId("daily-digest-automation-ready-badge")).toHaveTextContent(/Not ready/i)
-    expect(screen.getByText(/Not verified/i)).toBeInTheDocument()
-    expect(screen.getByTestId("daily-digest-automation-verify-cta")).toHaveTextContent(/Verify your email in Settings/i)
+    expect(screen.getByTestId("daily-digest-automation-indicator")).toHaveTextContent(/Not ready/i)
+    expect(screen.getByTestId("daily-digest-automation-indicator-settings-link")).toHaveAttribute("href", "/settings")
   })
 
-  it("shows Settings CTA when daily digest preference is off", () => {
+  it("shows Not ready indicator when daily digest preference is off", () => {
     caregiverState = { data: defaultCaregiver({ notificationPreferences: { dailyDigestEmail: false } }) }
     renderPage()
-    expect(screen.getByTestId("daily-digest-automation-settings-cta")).toHaveTextContent(/Enable daily digest emails in Settings/i)
+    expect(screen.getByTestId("daily-digest-automation-indicator")).toHaveTextContent(/Not ready/i)
+    expect(screen.getByTestId("daily-digest-automation-indicator-settings-link")).toBeInTheDocument()
   })
 
-  it("shows ask-admin CTA when org scheduling is disabled for org admin", () => {
+  it("shows Not ready when org scheduling is disabled for org admin", () => {
     caregiverState = { data: defaultCaregiver({ role: "orgAdmin" }) }
     orgState = {
       data: defaultOrg({ dailyDigestSettings: { enabled: false, sendTime: "18:00" } }),
@@ -211,12 +211,12 @@ describe("DailyDigestPage", () => {
       isError: false,
     }
     renderPage("orgAdmin")
-    expect(screen.getByTestId("daily-digest-automation-ask-admin")).toHaveTextContent(/Ask an administrator to enable automated digests/i)
+    expect(screen.getByTestId("daily-digest-automation-indicator")).toHaveTextContent(/Not ready/i)
   })
 
-  it("shows org scheduling unavailable for staff", () => {
+  it("shows Not ready for staff when org scheduling is unavailable", () => {
     renderPage("staff")
-    expect(screen.getByTestId("daily-digest-automation-org-unavailable")).toHaveTextContent(/Organization scheduling status is unavailable/i)
+    expect(screen.getByTestId("daily-digest-automation-indicator")).toHaveTextContent(/Not ready/i)
   })
 
   it("shows redacted banner and hides table for redacted digest", async () => {

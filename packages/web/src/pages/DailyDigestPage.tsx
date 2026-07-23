@@ -14,7 +14,7 @@ import { getCurrentUser } from "../store/authSlice"
 import { canManageCaregivers } from "../lib/roleAccess"
 import { buildDailyDigestAutomationStatus } from "../lib/dailyDigestAutomation"
 import { useGetCaregiverQuery } from "../services/api/caregiverApi"
-import { AutomatedDigestStatusPanel } from "../components/AutomatedDigestStatusPanel"
+import { AutomatedDigestStatusIndicator } from "../components/AutomatedDigestStatusIndicator"
 import "../app.css"
 
 function utcDateInputValue(d = new Date()): string {
@@ -390,7 +390,7 @@ export function DailyDigestPage() {
         </p>
       </div>
 
-      <AutomatedDigestStatusPanel status={automationStatus} caregiver={caregiverProfile} orgLoading={orgLoading} />
+      <AutomatedDigestStatusIndicator status={automationStatus} />
 
       <div
         style={{

@@ -2,6 +2,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router-dom"
 import { canManageBilling, canManageCaregivers } from "../lib/roleAccess"
+import {
+  buildDailyDigestAutomationStatus,
+  type OrgSchedulingAvailability,
+} from "../lib/dailyDigestAutomation"
 import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from "../config/legal"
 import { LANGUAGE_OPTIONS } from "../lib/languages"
 import {
@@ -18,6 +22,7 @@ import { useGetOrgQuery, useUpdateOrgMutation } from "../services/api/orgApi"
 import { AuthSelectField } from "../components/AuthSelectField"
 import { AuthTextField } from "../components/AuthTextField"
 import { AvatarPicker } from "../components/AvatarPicker"
+import { AutomatedDigestStatusPanel } from "../components/AutomatedDigestStatusPanel"
 import { clearAuth, getAuthTokens, getCurrentUser } from "../store/authSlice"
 import { setOrg } from "../store/orgSlice"
 import { useAppDispatch, useAppSelector } from "../store/store"
@@ -71,7 +76,7 @@ export function SettingsPage() {
   const orgId = user?.org != null ? String(user.org) : ""
   const canManageOrgSettings = isOrgAdmin && Boolean(orgId)
 
-  const { data: orgData, isLoading: orgLoading } = useGetOrgQuery({ orgId }, { skip: !canManageOrgSettings })
+  const { data: orgData, isLoading: orgLoading, isError: orgError } = useGetOrgQuery({ orgId }, { skip: !canManageOrgSettings })
   const [updateOrg, { isLoading: savingOrg }] = useUpdateOrgMutation()
   const [familyPortalEnabled, setFamilyPortalEnabled] = useState(false)
   const [familyPortalBannerKey, setFamilyPortalBannerKey] = useState<"familyPortalSaved" | "familyPortalSaveFailed" | null>(
@@ -81,6 +86,23 @@ export function SettingsPage() {
   const [orgDailyDigestBannerKey, setOrgDailyDigestBannerKey] = useState<
     "dailyDigestOrgSaved" | "dailyDigestOrgSaveFailed" | null
   >(null)
+
+  const orgSchedulingAvailability = useMemo((): OrgSchedulingAvailability => {
+    if (!canManageOrgSettings) return "unavailable"
+    if (orgLoading) return "loading"
+    if (orgError) return "error"
+    return "available"
+  }, [canManageOrgSettings, orgLoading, orgError])
+
+  const digestAutomationStatus = useMemo(
+    () =>
+      buildDailyDigestAutomationStatus({
+        caregiver: profile,
+        org: orgData ?? null,
+        orgSchedulingAvailability,
+      }),
+    [profile, orgData, orgSchedulingAvailability],
+  )
 
   useEffect(() => {
     setFamilyPortalEnabled(orgData?.familyPortalSettings?.enabled === true)
@@ -456,6 +478,10 @@ export function SettingsPage() {
           )}
         </div>
       ) : null}
+
+      <div className="va-page-section" data-testid="settings-daily-digest-automation">
+        <AutomatedDigestStatusPanel status={digestAutomationStatus} caregiver={profile} orgLoading={orgLoading} />
+      </div>
 
       {canManageOrgSettings ? (
         <div className="va-page-section" data-testid="settings-org-voice-onboarding">

@@ -218,6 +218,52 @@ describe("SettingsPage org daily digest toggle", () => {
   })
 })
 
+describe("SettingsPage daily digest automation panel", () => {
+  beforeEach(() => {
+    updateOrgFn.mockReset()
+  })
+
+  it("shows full Automated email status panel for orgAdmin when ready", async () => {
+    caregiverState = {
+      data: defaultCaregiver({
+        notificationPreferences: { dailyDigestEmail: true },
+        isEmailVerified: true,
+        active: true,
+      }),
+      isLoading: false,
+    }
+    orgState = {
+      data: defaultOrg({ dailyDigestSettings: { enabled: true, sendTime: "17:30" } }),
+      isLoading: false,
+      isError: false,
+    }
+    renderPage("orgAdmin")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-daily-digest-automation")).toBeInTheDocument()
+    })
+    expect(screen.getByTestId("daily-digest-automation-status")).toBeInTheDocument()
+    expect(screen.getByTestId("daily-digest-automation-ready-badge")).toHaveTextContent(/Ready/i)
+    expect(screen.getByTestId("daily-digest-automation-manual-copy")).toBeInTheDocument()
+    expect(screen.getByText(/17:30, org-local/i)).toBeInTheDocument()
+  })
+
+  it("shows full panel for staff (org scheduling unavailable)", async () => {
+    caregiverState = {
+      data: defaultCaregiver({
+        role: "staff",
+        notificationPreferences: { dailyDigestEmail: true },
+      }),
+      isLoading: false,
+    }
+    renderPage("staff")
+    await waitFor(() => {
+      expect(screen.getByTestId("daily-digest-automation-status")).toBeInTheDocument()
+    })
+    expect(screen.getByTestId("daily-digest-automation-ready-badge")).toHaveTextContent(/Not ready/i)
+    expect(screen.getByTestId("daily-digest-automation-org-unavailable")).toBeInTheDocument()
+  })
+})
+
 describe("SettingsPage voice onboarding teaser", () => {
   it("shows voice onboarding section and link for orgAdmin", async () => {
     renderPage("orgAdmin")

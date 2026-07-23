@@ -229,4 +229,51 @@ describe('Admin demo org flag + refresh', () => {
     expect(await FamilyWeeklyDigest.countDocuments({ org: orgId, status: 'sent' })).toBeGreaterThan(0);
     expect(await FraudAbuseAnalysis.countDocuments({ clientId: decline.id })).toBe(declineSeries.length);
   });
+
+  it('forces primary caregiver digest gates Ready on every refresh', async () => {
+    await Org.findByIdAndUpdate(orgId, { $set: { isDemo: true } });
+    const first = await demoOrgService.refreshDemoOrgData({
+      orgId,
+      confirm: 'REFRESH_DEMO_DATA',
+      historyDays: 7,
+      actorCaregiverId: superAdminId,
+      now: new Date('2026-07-23T18:00:00.000Z'),
+    });
+    const primaryId = first.staffCaregiverId;
+    expect(primaryId).toBeTruthy();
+
+    await Caregiver.findByIdAndUpdate(primaryId, {
+      $set: {
+        active: false,
+        isEmailVerified: false,
+        'notificationPreferences.dailyDigestEmail': false,
+      },
+    });
+    await Org.findByIdAndUpdate(orgId, {
+      $set: { 'dailyDigestSettings.enabled': false },
+    });
+
+    await demoOrgService.refreshDemoOrgData({
+      orgId,
+      confirm: 'REFRESH_DEMO_DATA',
+      historyDays: 7,
+      actorCaregiverId: superAdminId,
+      now: new Date('2026-07-23T19:00:00.000Z'),
+    });
+
+    const primary = await Caregiver.findById(primaryId).lean();
+    expect(primary).toBeTruthy();
+    expect(primary.active).toBe(true);
+    expect(primary.isEmailVerified).toBe(true);
+    expect(primary.notificationPreferences?.dailyDigestEmail).toBe(true);
+
+    const org = await Org.findById(orgId).lean();
+    expect(org.dailyDigestSettings?.enabled).toBe(true);
+
+    // Family caregivers must not be force-opted in by the primary-gate $set
+    const family = await Caregiver.find({ org: orgId, role: 'family' }).lean();
+    for (const f of family) {
+      expect(f.notificationPreferences?.dailyDigestEmail).not.toBe(true);
+    }
+  });
 });
