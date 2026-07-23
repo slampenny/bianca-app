@@ -57,12 +57,41 @@ export function parseLoginError(
     }
   }
 
+  const locked = Boolean(errorMessage && /account is locked/i.test(errorMessage))
+  if (locked) {
+    const isGeneric =
+      !errorMessage ||
+      /^internal server error\.?$/i.test(errorMessage.trim()) ||
+      /^an internal server error occurred$/i.test(errorMessage.trim())
+    if (isGeneric) {
+      const translated = t("login.errors.accountLocked")
+      return {
+        message:
+          !translated || translated === "login.errors.accountLocked"
+            ? "This account is locked. Contact support to restore access."
+            : translated,
+      }
+    }
+    return { message: errorMessage }
+  }
+
   let finalMessage = t("login.errors.generic")
-  if (errorMessage) finalMessage = errorMessage
-  else if (typeof dataObj.error === "string") finalMessage = dataObj.error
+  if (
+    errorMessage &&
+    !/^internal server error\.?$/i.test(errorMessage.trim()) &&
+    !/^an internal server error occurred$/i.test(errorMessage.trim())
+  ) {
+    finalMessage = errorMessage
+  } else if (typeof dataObj.error === "string") finalMessage = dataObj.error
   else if (typeof errorData === "string") finalMessage = errorData
   else if (errorStatus === 401 || errorStatus === "FETCH_ERROR") {
     finalMessage = t("login.errors.invalidCredentials")
+  } else if (errorStatus === 500 || (errorMessage && /^internal server error/i.test(errorMessage))) {
+    const translated = t("login.errors.serverProblem")
+    finalMessage =
+      !translated || translated === "login.errors.serverProblem"
+        ? "Sign-in failed due to a server problem. Please try again, or contact support if it continues."
+        : translated
   } else if (errorStatus) {
     finalMessage = t("login.errors.checkCredentials")
   }

@@ -26,6 +26,9 @@ const DETECTION_RULES = {
   },
   data_access_volume: {
     threshold: 100,
+    // Only auto-lock when many *distinct* client/conversation IDs were touched —
+    // otherwise normal admin UI (repeated list/detail refreshes) false-positives lock accounts.
+    uniqueResourceAutoLockThreshold: 50,
     window: 3600000, // 1 hour
     severity: 'CRITICAL'
   },
@@ -34,7 +37,11 @@ const DETECTION_RULES = {
     severity: 'MEDIUM'
   },
   rapid_data_access: {
-    threshold: 20,
+    // Count of READ audit events in the window (list endpoints are 1 event each).
+    threshold: 50,
+    // Only auto-lock when many *distinct* client/conversation IDs were touched —
+    // otherwise normal admin UI (clients list, dashboards) false-positives lock accounts.
+    uniqueResourceAutoLockThreshold: 25,
     window: 60000, // 1 minute
     severity: 'CRITICAL'
   }
@@ -127,6 +134,9 @@ class BreachDetectionService {
       ]);
 
       for (const access of volumeAnalysis) {
+        const uniqueResources = Array.isArray(access.resources) ? access.resources.length : 0;
+        const shouldAutoLock =
+          uniqueResources >= DETECTION_RULES.data_access_volume.uniqueResourceAutoLockThreshold;
         await this.createBreachAlert({
           type: 'unusual_data_access_volume',
           severity: DETECTION_RULES.data_access_volume.severity,
@@ -134,12 +144,14 @@ class BreachDetectionService {
           details: `${access.count} records accessed in 1 hour (normal: <100)`,
           evidence: {
             count: access.count,
-            uniqueResources: access.resources.length,
-            lastAccess: access.lastAccess
+            uniqueResources,
+            lastAccess: access.lastAccess,
+            autoLock: shouldAutoLock,
           },
           affectedResourceIds: access.resources.slice(0, 100), // Limit to first 100
-          affectedCount: access.resources.length,
-          autoLock: true
+          affectedCount: uniqueResources,
+          // Do not lock on high request volume alone (admin list/detail refreshes trip that easily).
+          autoLock: shouldAutoLock,
         });
       }
 
@@ -261,6 +273,9 @@ class BreachDetectionService {
       ]);
 
       for (const access of rapidAccess) {
+        const uniqueResources = Array.isArray(access.resources) ? access.resources.length : 0;
+        const shouldAutoLock =
+          uniqueResources >= DETECTION_RULES.rapid_data_access.uniqueResourceAutoLockThreshold;
         await this.createBreachAlert({
           type: 'data_exfiltration_attempt',
           severity: DETECTION_RULES.rapid_data_access.severity,
@@ -268,11 +283,13 @@ class BreachDetectionService {
           details: `${access.count} records accessed in 1 minute (possible data exfiltration)`,
           evidence: {
             count: access.count,
-            uniqueResources: access.resources.length
+            uniqueResources,
+            autoLock: shouldAutoLock,
           },
           affectedResourceIds: access.resources,
-          affectedCount: access.resources.length,
-          autoLock: true
+          affectedCount: uniqueResources,
+          // Do not lock on high request volume alone (admin list pages trip that easily).
+          autoLock: shouldAutoLock,
         });
       }
 

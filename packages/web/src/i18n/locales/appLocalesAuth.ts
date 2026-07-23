@@ -81,6 +81,9 @@ export const appLocalesAuth = {
       invalidCredentials: "Invalid email or password. Please check your credentials and try again.",
       checkCredentials: "Login failed. Please check your email and password.",
       generic: "Failed to log in. Please check your email and password.",
+      accountLocked: "This account is locked. Contact support to restore access.",
+      serverProblem:
+        "Sign-in failed due to a server problem. Please try again, or contact support if it continues.",
     },
   },
   mfaLogin: {

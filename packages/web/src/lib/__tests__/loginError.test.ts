@@ -61,4 +61,22 @@ describe("parseLoginError", () => {
       ).message,
     ).toBe("Authentication cancelled")
   })
+
+  it("surfaces account lock message and not Internal Server Error", () => {
+    const r = parseLoginError(
+      {
+        status: 403,
+        data: { message: "Account is locked: Automatic lock due to: data_exfiltration_attempt" },
+      },
+      t,
+    )
+    expect(r.message).toContain("Account is locked")
+    expect(r.message).not.toMatch(/internal server error/i)
+  })
+
+  it("replaces bare Internal Server Error with a clearer fallback", () => {
+    const r = parseLoginError({ status: 500, data: { message: "Internal Server Error" } }, t)
+    expect(r.message).not.toMatch(/^internal server error$/i)
+    expect(r.message.toLowerCase()).toMatch(/server problem|try again|contact support/)
+  })
 })

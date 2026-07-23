@@ -184,7 +184,7 @@ describe('Breach Detection Service', () => {
       expect(breaches[0].affectedCount).toBeGreaterThan(100);
     }, 60000);
 
-    it('should lock account for unusual data access', async () => {
+    it('should lock account for unusual data access across many unique resources', async () => {
       const now = new Date();
       for (let i = 0; i < 101; i++) {
         await AuditLog.create({
@@ -203,6 +203,29 @@ describe('Breach Detection Service', () => {
 
       const updatedCaregiver = await Caregiver.findById(testCaregiver._id);
       expect(updatedCaregiver.accountLocked).toBe(true);
+    });
+
+    it('should not auto-lock unusual volume when unique resources are low', async () => {
+      const now = new Date();
+      // 101 READs but only a handful of distinct patients (admin refresh / list churn)
+      for (let i = 0; i < 101; i++) {
+        await AuditLog.create({
+          timestamp: new Date(now.getTime() - i * 30000),
+          userId: testCaregiver._id,
+          userRole: 'staff',
+          action: 'READ',
+          resource: 'client',
+          resourceId: `patient-${i % 5}`,
+          outcome: 'SUCCESS',
+          ipAddress: '192.168.1.100'
+        });
+      }
+
+      const result = await breachDetectionService.detectDataAccessVolume();
+      expect(result).toBeGreaterThan(0);
+
+      const updatedCaregiver = await Caregiver.findById(testCaregiver._id);
+      expect(updatedCaregiver.accountLocked).toBe(false);
     });
 
     it('should not detect normal data access volume', async () => {
@@ -228,16 +251,16 @@ describe('Breach Detection Service', () => {
 
   describe('detectRapidDataAccess', () => {
     it('should detect rapid data access (potential exfiltration)', async () => {
-      // Create 21 accesses in the last minute
+      // Create 51 accesses in the last minute (above count threshold)
       const now = new Date();
-      for (let i = 0; i < 21; i++) {
+      for (let i = 0; i < 51; i++) {
         await AuditLog.create({
-          timestamp: new Date(now.getTime() - i * 2000), // 2 seconds apart
+          timestamp: new Date(now.getTime() - i * 1000), // 1 second apart
           userId: testCaregiver._id,
           userRole: 'staff',
           action: 'READ',
           resource: 'client',
-          resourceId: `patient-${i}`,
+          resourceId: `patient-${i % 5}`, // few unique IDs — alert only, no auto-lock
           outcome: 'SUCCESS',
           ipAddress: '192.168.1.100'
         });
@@ -250,13 +273,16 @@ describe('Breach Detection Service', () => {
       const breaches = await BreachLog.find({ type: 'data_exfiltration_attempt' });
       expect(breaches.length).toBeGreaterThan(0);
       expect(breaches[0].severity).toBe('CRITICAL');
+
+      const updatedCaregiver = await Caregiver.findById(testCaregiver._id);
+      expect(updatedCaregiver.accountLocked).toBe(false);
     }, 60000);
 
-    it('should lock account for rapid data access', async () => {
+    it('should lock account for rapid data access across many unique resources', async () => {
       const now = new Date();
-      for (let i = 0; i < 21; i++) {
+      for (let i = 0; i < 51; i++) {
         await AuditLog.create({
-          timestamp: new Date(now.getTime() - i * 2000),
+          timestamp: new Date(now.getTime() - i * 1000),
           userId: testCaregiver._id,
           userRole: 'staff',
           action: 'READ',
@@ -543,9 +569,9 @@ describe('Breach Detection Service', () => {
       }
 
       // Create rapid data access
-      for (let i = 0; i < 21; i++) {
+      for (let i = 0; i < 51; i++) {
         await AuditLog.create({
-          timestamp: new Date(Date.now() - i * 2000),
+          timestamp: new Date(Date.now() - i * 1000),
           userId: testCaregiver._id,
           userRole: 'staff',
           action: 'READ',

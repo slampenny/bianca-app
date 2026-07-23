@@ -225,7 +225,10 @@ const login = catchAsync(async (req, res, next) => {
 
     // Check if account is locked
     if (caregiver.accountLocked) {
-      throw new Error(`Account is locked: ${caregiver.lockedReason || 'Contact support for assistance'}`);
+      throw new ApiError(
+        httpStatus.FORBIDDEN,
+        `Account is locked: ${caregiver.lockedReason || 'Contact support for assistance'}`
+      );
     }
 
     // Step 1.5: Check email verification status (skip in test/development so integration tests and local dev work without email)
@@ -280,7 +283,7 @@ const login = catchAsync(async (req, res, next) => {
           req.get('user-agent'),
           'Invalid MFA token'
         );
-        throw new Error('Invalid MFA token');
+        throw new ApiError(httpStatus.UNAUTHORIZED, 'Invalid MFA token');
       }
     }
     
@@ -358,11 +361,19 @@ const login = catchAsync(async (req, res, next) => {
       // If it's already an ApiError, just re-throw (properties are already on it)
       throw error;
     } else {
-      // If it's a regular Error, convert to ApiError but preserve custom properties
+      // Convert unexpected Errors — keep auth client failures operational so production
+      // does not replace the message with generic "Internal Server Error".
+      const rawMessage = typeof error.message === 'string' ? error.message : '';
+      const isAccountLocked = /account is locked/i.test(rawMessage);
+      const isInvalidMfa = /invalid mfa/i.test(rawMessage);
+      const statusCode =
+        error.statusCode ||
+        (isAccountLocked ? httpStatus.FORBIDDEN : isInvalidMfa ? httpStatus.UNAUTHORIZED : httpStatus.INTERNAL_SERVER_ERROR);
+      const isOperational = Boolean(error.statusCode) || isAccountLocked || isInvalidMfa;
       const apiError = new ApiError(
-        error.statusCode || httpStatus.INTERNAL_SERVER_ERROR,
-        error.message || 'Internal server error',
-        false,
+        statusCode,
+        rawMessage || 'Internal server error',
+        isOperational,
         error.stack
       );
       if (error.requiresPasswordLinking !== undefined) {
