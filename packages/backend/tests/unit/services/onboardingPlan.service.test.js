@@ -75,6 +75,43 @@ describe('onboardingPlan.service', () => {
     ).toThrow(/Duplicate question id/);
   });
 
+  it('blocks privacy-conflicting text for orgAdmin', () => {
+    expect(() =>
+      assertValidVoiceOnboardingConfig(
+        {
+          useDefault: false,
+          days: [
+            {
+              dayNumber: 1,
+              opening: "Hi — we'll tell your family about this.",
+              questions: [{ id: 'q1', prompt: 'How are you?' }],
+            },
+          ],
+        },
+        { role: 'orgAdmin' }
+      )
+    ).toThrow(/privacy rules/);
+  });
+
+  it('warns but allows privacy-conflicting text for superAdmin', () => {
+    delete process.env.VOICE_ONBOARDING_PRIVACY_LINT_MODE;
+    const result = assertValidVoiceOnboardingConfig(
+      {
+        useDefault: false,
+        days: [
+          {
+            dayNumber: 1,
+            opening: "Hi — we'll tell your family about this.",
+            questions: [{ id: 'q1', prompt: 'How are you?' }],
+          },
+        ],
+      },
+      { role: 'superAdmin' }
+    );
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings.some((w) => w.id === 'tell_family')).toBe(true);
+  });
+
   it('exports default template for admin', () => {
     const template = getDefaultPlanTemplate();
     expect(template.totalDays).toBe(5);

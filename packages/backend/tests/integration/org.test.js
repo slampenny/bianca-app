@@ -195,6 +195,54 @@ describe('Org routes', () => {
       expect(reloaded.voiceOnboarding.days[0].questions[0].id).toBe('day1_topic_1');
     });
 
+    it('should reject privacy-conflicting voice onboarding for org admin', async () => {
+      const res = await request(app)
+        .patch(`/v1/orgs/${orgId}`)
+        .set('Authorization', `Bearer ${orgAdminAccessToken}`)
+        .send({
+          voiceOnboarding: {
+            useDefault: false,
+            days: [
+              {
+                dayNumber: 1,
+                theme: 'Custom day',
+                opening: "Hi — we'll tell your family about this.",
+                questions: [{ id: 'day1_topic_1', prompt: 'Did you eat breakfast?' }],
+              },
+            ],
+          },
+        });
+
+      expect(res.statusCode).toEqual(httpStatus.BAD_REQUEST);
+      expect(res.body.message).toMatch(/privacy rules/i);
+      expect(res.body.message).toMatch(/tell your family/i);
+    });
+
+    it('should warn but allow privacy-conflicting voice onboarding for super admin', async () => {
+      const superAdminAccessToken = tokenService.generateToken(superAdminId);
+      const res = await request(app)
+        .patch(`/v1/orgs/${orgId}`)
+        .set('Authorization', `Bearer ${superAdminAccessToken}`)
+        .send({
+          voiceOnboarding: {
+            useDefault: false,
+            days: [
+              {
+                dayNumber: 1,
+                theme: 'Custom day',
+                opening: "Hi — we'll tell your family about this.",
+                questions: [{ id: 'day1_topic_1', prompt: 'Did you eat breakfast?' }],
+              },
+            ],
+          },
+        });
+
+      expect(res.statusCode).toEqual(httpStatus.OK);
+      expect(res.body.voiceOnboarding.useDefault).toBe(false);
+      expect(res.body.voiceOnboardingPrivacyWarnings?.length).toBeGreaterThan(0);
+      expect(res.body.voiceOnboardingPrivacyWarnings.some((w) => /tell your family/i.test(w.phrase))).toBe(true);
+    });
+
     it('should allow org admin to configure required call questions', async () => {
       const res = await request(app)
         .patch(`/v1/orgs/${orgId}`)

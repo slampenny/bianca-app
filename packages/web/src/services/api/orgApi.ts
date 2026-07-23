@@ -1,5 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react"
-import type { Caregiver, Org } from "./api.types"
+import type { Caregiver, Org, VoiceOnboardingConfig, VoiceOnboardingPlan } from "./api.types"
 import baseQueryWithReauth from "./baseQueryWithAuth"
 
 export type OrgUpdatePayload = {
@@ -23,6 +23,11 @@ export type OrgUpdatePayload = {
     enabled?: boolean
     allowInviteAfterDigestVerify?: boolean
   }
+  voiceOnboarding?: VoiceOnboardingConfig
+}
+
+export type OrgUpdateResult = Org & {
+  voiceOnboardingPrivacyWarnings?: { path: string; phrase: string; id?: string }[]
 }
 
 export const orgApi = createApi({
@@ -34,7 +39,10 @@ export const orgApi = createApi({
       query: ({ orgId }) => `/orgs/${orgId}`,
       providesTags: (_r, _e, { orgId }) => [{ type: "Org", id: orgId }],
     }),
-    updateOrg: builder.mutation<Org, { orgId: string; org: OrgUpdatePayload }>({
+    getDefaultVoiceOnboardingPlan: builder.query<{ plan: VoiceOnboardingPlan }, void>({
+      query: () => `/orgs/onboarding/default-plan`,
+    }),
+    updateOrg: builder.mutation<OrgUpdateResult, { orgId: string; org: OrgUpdatePayload }>({
       query: ({ orgId, org }) => ({
         url: `/orgs/${orgId}`,
         method: "PATCH",
@@ -55,4 +63,5 @@ export const orgApi = createApi({
   }),
 })
 
-export const { useGetOrgQuery, useUpdateOrgMutation, useSendOrgInviteMutation } = orgApi
+export const { useGetOrgQuery, useGetDefaultVoiceOnboardingPlanQuery, useUpdateOrgMutation, useSendOrgInviteMutation } =
+  orgApi

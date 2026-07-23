@@ -29,7 +29,8 @@ const getOrg = catchAsync(async (req, res) => {
 
 const updateOrg = catchAsync(async (req, res) => {
   const { ...orgData } = req.body;
-  const org = await orgService.updateOrgById(req.params.orgId, orgData);
+  const role = req.caregiver?.role || null;
+  const org = await orgService.updateOrgById(req.params.orgId, orgData, { role });
   const warnings = (org.$locals && org.$locals.voiceOnboardingPrivacyWarnings) || [];
   const payload = OrgDTO(org);
   if (warnings.length > 0) {

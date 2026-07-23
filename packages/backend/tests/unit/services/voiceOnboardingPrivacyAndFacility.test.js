@@ -1,6 +1,7 @@
 const {
   lintVoiceOnboardingPrivacy,
   getPrivacyLintMode,
+  getPrivacyLintModeForRole,
 } = require('../../../src/services/voiceOnboardingPrivacyLint.service');
 const { buildCustomOnboardingInstructions } = require('../../../src/templates/onboardingPrompts');
 const {
@@ -33,6 +34,16 @@ describe('voiceOnboardingPrivacyLint', () => {
   it('defaults lint mode to warn', () => {
     delete process.env.VOICE_ONBOARDING_PRIVACY_LINT_MODE;
     expect(getPrivacyLintMode()).toBe('warn');
+  });
+
+  it('blocks orgAdmin regardless of env warn default', () => {
+    delete process.env.VOICE_ONBOARDING_PRIVACY_LINT_MODE;
+    expect(getPrivacyLintModeForRole('orgAdmin')).toBe('block');
+  });
+
+  it('warns for superAdmin by default', () => {
+    delete process.env.VOICE_ONBOARDING_PRIVACY_LINT_MODE;
+    expect(getPrivacyLintModeForRole('superAdmin')).toBe('warn');
   });
 });
 

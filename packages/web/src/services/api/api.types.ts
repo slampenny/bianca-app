@@ -60,6 +60,31 @@ export interface Org {
     enabled?: boolean
     allowInviteAfterDigestVerify?: boolean
   }
+  voiceOnboarding?: VoiceOnboardingConfig
+}
+
+export interface VoiceOnboardingQuestion {
+  id: string
+  prompt: string
+  compressionPriority?: boolean
+}
+
+export interface VoiceOnboardingDay {
+  dayNumber?: number
+  theme?: string
+  opening?: string
+  questions: VoiceOnboardingQuestion[]
+}
+
+export interface VoiceOnboardingConfig {
+  useDefault: boolean
+  days?: VoiceOnboardingDay[]
+}
+
+export interface VoiceOnboardingPlan {
+  useDefault: boolean
+  totalDays: number
+  days: VoiceOnboardingDay[]
 }
 
 export interface RegisterResult {

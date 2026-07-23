@@ -42,6 +42,7 @@ import { SettingsMfaPage } from "./pages/SettingsMfaPage"
 import { SettingsPhonePage } from "./pages/SettingsPhonePage"
 import { SettingsPrivacyPage } from "./pages/SettingsPrivacyPage"
 import { SettingsBillingPage } from "./pages/SettingsBillingPage"
+import { SettingsVoiceOnboardingPage } from "./pages/SettingsVoiceOnboardingPage"
 
 const DevDemoRoot = import.meta.env.DEV
   ? lazy(() => import("./state/DevDemoRoot.dev").then((m) => ({ default: m.DevDemoRoot })))
@@ -101,6 +102,7 @@ function AppRoutes() {
                 <Route path="settings/privacy" element={<SettingsPrivacyPage />} />
                 <Route element={<RequireRole roles={["orgAdmin", "superAdmin"]} />}>
                   <Route path="settings/billing" element={<SettingsBillingPage />} />
+                  <Route path="settings/voice-onboarding" element={<SettingsVoiceOnboardingPage />} />
                 </Route>
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />

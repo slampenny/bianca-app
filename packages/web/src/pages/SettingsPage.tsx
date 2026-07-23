@@ -458,6 +458,31 @@ export function SettingsPage() {
       ) : null}
 
       {canManageOrgSettings ? (
+        <div className="va-page-section" data-testid="settings-org-voice-onboarding">
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("orgSettings.voiceOnboardingSection")}</h2>
+          {orgLoading && !orgData ? (
+            <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("orgSettings.loading")}</p>
+          ) : (
+            <>
+              <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
+                {orgData?.voiceOnboarding?.useDefault === false
+                  ? t("orgSettings.voiceOnboardingStatusCustom")
+                  : t("orgSettings.voiceOnboardingStatusDefault")}
+              </p>
+              <Link
+                to="/settings/voice-onboarding"
+                data-testid="settings-voice-onboarding-link"
+                className="va-btn-secondary"
+                style={{ display: "inline-flex", textDecoration: "none" }}
+              >
+                {t("orgSettings.voiceOnboardingLink")}
+              </Link>
+            </>
+          )}
+        </div>
+      ) : null}
+
+      {canManageOrgSettings ? (
         <div className="va-page-section" data-testid="settings-org-family-portal">
           <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("orgSettings.familyPortalSection")}</h2>
           {orgLoading && !orgData ? (

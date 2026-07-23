@@ -55,7 +55,12 @@ const getOrgByEmail = async (email) => {
  * @param {Object} updateBody
  * @returns {Promise<Org>}
  */
-const updateOrgById = async (orgId, updateBody) => {
+/**
+ * @param {string} orgId
+ * @param {object} updateBody
+ * @param {{ role?: string|null }} [opts] - requesting caregiver role (privacy lint)
+ */
+const updateOrgById = async (orgId, updateBody, opts = {}) => {
   const org = await getOrgById(orgId);
   if (!org) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Org not found');
@@ -84,7 +89,7 @@ const updateOrgById = async (orgId, updateBody) => {
     const { assertValidVoiceOnboardingConfig } = require('./onboardingPlan.service');
     let warnings = [];
     try {
-      const result = assertValidVoiceOnboardingConfig(updateBody.voiceOnboarding);
+      const result = assertValidVoiceOnboardingConfig(updateBody.voiceOnboarding, { role: opts.role });
       warnings = result?.warnings || [];
     } catch (err) {
       throw new ApiError(httpStatus.BAD_REQUEST, err.message);

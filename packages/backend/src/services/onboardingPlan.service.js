@@ -188,14 +188,15 @@ function getDefaultPlanTemplate() {
 
 /**
  * Validate custom org plan before save.
- * Privacy lint: default mode is warn (caller may surface warnings). Set
- * VOICE_ONBOARDING_PRIVACY_LINT_MODE=block to reject conflicting phrases.
+ * Privacy lint is role-aware: orgAdmin → block; superAdmin → warn
+ * (unless VOICE_ONBOARDING_PRIVACY_LINT_MODE=block).
  * @param {{ useDefault?: boolean, days?: object[] }} voiceOnboarding
+ * @param {{ role?: string|null }} [opts]
  * @returns {{ warnings: { path: string, phrase: string, id: string }[] }}
  * @throws {Error}
  */
-function assertValidVoiceOnboardingConfig(voiceOnboarding) {
-  const { lintVoiceOnboardingPrivacy, getPrivacyLintMode } = require('./voiceOnboardingPrivacyLint.service');
+function assertValidVoiceOnboardingConfig(voiceOnboarding, opts = {}) {
+  const { lintVoiceOnboardingPrivacy, getPrivacyLintModeForRole } = require('./voiceOnboardingPrivacyLint.service');
   const warnings = lintVoiceOnboardingPrivacy(voiceOnboarding);
 
   if (!voiceOnboarding || voiceOnboarding.useDefault !== false) {
@@ -215,7 +216,7 @@ function assertValidVoiceOnboardingConfig(voiceOnboarding) {
     }
   }
 
-  if (warnings.length > 0 && getPrivacyLintMode() === 'block') {
+  if (warnings.length > 0 && getPrivacyLintModeForRole(opts.role) === 'block') {
     const detail = warnings.map((w) => `${w.path}: "${w.phrase}"`).join('; ');
     throw new Error(`Voice onboarding text conflicts with privacy rules (${detail})`);
   }

@@ -185,7 +185,11 @@ export function VoiceOnboardingScreen() {
       goBack()
     } catch (error) {
       logger.error("Failed to save voice onboarding:", error)
-      setSaveError(translate("voiceOnboardingScreen.saveError"))
+      const apiMessage =
+        typeof (error as { data?: { message?: unknown } })?.data?.message === "string"
+          ? (error as { data: { message: string } }).data.message
+          : null
+      setSaveError(apiMessage || translate("voiceOnboardingScreen.saveError"))
     }
   }
 

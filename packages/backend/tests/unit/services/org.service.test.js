@@ -205,6 +205,50 @@ describe('orgService', () => {
     expect(reset.voiceOnboarding.days).toEqual([]);
   });
 
+  it('should block privacy-conflicting voiceOnboarding for orgAdmin role', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    await expect(
+      orgService.updateOrgById(
+        org.id,
+        {
+          voiceOnboarding: {
+            useDefault: false,
+            days: [
+              {
+                dayNumber: 1,
+                opening: "Hi — we'll tell your family about this.",
+                questions: [{ id: 'q1', prompt: 'How are you?' }],
+              },
+            ],
+          },
+        },
+        { role: 'orgAdmin' }
+      )
+    ).rejects.toThrow(/privacy rules/);
+  });
+
+  it('should warn but save privacy-conflicting voiceOnboarding for superAdmin role', async () => {
+    const [org] = await insertOrgs([orgOne]);
+    const updated = await orgService.updateOrgById(
+      org.id,
+      {
+        voiceOnboarding: {
+          useDefault: false,
+          days: [
+            {
+              dayNumber: 1,
+              opening: "Hi — we'll tell your family about this.",
+              questions: [{ id: 'q1', prompt: 'How are you?' }],
+            },
+          ],
+        },
+      },
+      { role: 'superAdmin' }
+    );
+    expect(updated.voiceOnboarding.useDefault).toBe(false);
+    expect(updated.$locals.voiceOnboardingPrivacyWarnings.length).toBeGreaterThan(0);
+  });
+
   it('should set the role of a caregiver in an org', async () => {
     const [org] = await insertOrgs([orgOne]);
     const [cg] = await insertCaregivers([

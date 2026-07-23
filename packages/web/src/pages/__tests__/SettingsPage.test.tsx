@@ -217,3 +217,57 @@ describe("SettingsPage org daily digest toggle", () => {
     expect(screen.getByText(/Daily digest scheduling setting saved/i)).toBeInTheDocument()
   })
 })
+
+describe("SettingsPage voice onboarding teaser", () => {
+  it("shows voice onboarding section and link for orgAdmin", async () => {
+    renderPage("orgAdmin")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-org-voice-onboarding")).toBeInTheDocument()
+    })
+    expect(screen.getByText(/Using built-in 5-day plan/i)).toBeInTheDocument()
+    expect(screen.getByTestId("settings-voice-onboarding-link")).toHaveAttribute(
+      "href",
+      "/settings/voice-onboarding",
+    )
+  })
+
+  it("shows custom plan status when org has customized onboarding", async () => {
+    orgState = {
+      data: defaultOrg({
+        voiceOnboarding: {
+          useDefault: false,
+          days: [{ dayNumber: 1, questions: [{ id: "q1", prompt: "Hello?" }] }],
+        },
+      }),
+      isLoading: false,
+      isError: false,
+    }
+    const store = createWebTestStore({
+      auth: {
+        tokens: { access: { token: "t", expires: "2099" }, refresh: { token: "r", expires: "2099" } },
+        authEmail: "admin@test.com",
+        currentUser: defaultCaregiver({ role: "orgAdmin" }),
+        inviteToken: null,
+        pendingOnboarding: false,
+      },
+    })
+    render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <SettingsPage />
+        </MemoryRouter>
+      </Provider>,
+    )
+    await waitFor(() => {
+      expect(screen.getByText(/Custom plan/i)).toBeInTheDocument()
+    })
+  })
+
+  it("does not show voice onboarding section for staff", async () => {
+    renderPage("staff")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-page")).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId("settings-org-voice-onboarding")).not.toBeInTheDocument()
+  })
+})

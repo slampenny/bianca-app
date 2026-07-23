@@ -2,8 +2,10 @@
  * Lint org-authored voice onboarding text for phrases that conflict with the
  * resident-facing privacy / no-caregiver-mention rules.
  *
- * Mode is product-owned: default 'warn' (save allowed, warnings returned).
- * Set VOICE_ONBOARDING_PRIVACY_LINT_MODE=block to reject saves instead.
+ * Enforcement is role-aware (passed from the PATCH caller):
+ * - orgAdmin (and any non-superAdmin editor) → hard block
+ * - superAdmin → warn (save allowed, warnings returned), unless
+ *   VOICE_ONBOARDING_PRIVACY_LINT_MODE=block forces block for everyone
  */
 
 const CONFLICT_PATTERNS = [
@@ -19,11 +21,27 @@ const CONFLICT_PATTERNS = [
 ];
 
 /**
+ * Env override — used for superAdmin (and callers with no role).
  * @returns {'warn'|'block'}
  */
 function getPrivacyLintMode() {
   const raw = String(process.env.VOICE_ONBOARDING_PRIVACY_LINT_MODE || 'warn').toLowerCase();
   return raw === 'block' ? 'block' : 'warn';
+}
+
+/**
+ * Role-aware lint mode for save-time enforcement.
+ * Facility orgAdmins cannot save privacy-conflicting phrasing; Bianca
+ * superAdmins keep warn-by-default so they can review and iterate.
+ *
+ * @param {string|null|undefined} role
+ * @returns {'warn'|'block'}
+ */
+function getPrivacyLintModeForRole(role) {
+  if (role && role !== 'superAdmin') {
+    return 'block';
+  }
+  return getPrivacyLintMode();
 }
 
 /**
@@ -67,5 +85,6 @@ function lintVoiceOnboardingPrivacy(voiceOnboarding) {
 module.exports = {
   CONFLICT_PATTERNS,
   getPrivacyLintMode,
+  getPrivacyLintModeForRole,
   lintVoiceOnboardingPrivacy,
 };
