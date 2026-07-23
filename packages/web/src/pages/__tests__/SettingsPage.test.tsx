@@ -165,3 +165,55 @@ describe("SettingsPage family portal toggle", () => {
     expect(screen.getByText(/Family app setting saved/i)).toBeInTheDocument()
   })
 })
+
+describe("SettingsPage org daily digest toggle", () => {
+  beforeEach(() => {
+    updateOrgFn.mockReset()
+    updateOrgFn.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve(
+          defaultOrg({
+            dailyDigestSettings: { enabled: false, sendTime: "17:30" },
+          }),
+        ),
+    })
+  })
+
+  it("shows org daily digest section for orgAdmin", async () => {
+    renderPage("orgAdmin")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-org-daily-digest")).toBeInTheDocument()
+    })
+    expect(screen.getByTestId("settings-org-daily-digest-enabled")).toBeChecked()
+  })
+
+  it("does not show org daily digest section for staff", async () => {
+    renderPage("staff")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-page")).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId("settings-org-daily-digest")).not.toBeInTheDocument()
+  })
+
+  it("disables org daily digest scheduling when orgAdmin toggles the checkbox", async () => {
+    renderPage("orgAdmin")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-org-daily-digest-enabled")).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByTestId("settings-org-daily-digest-enabled"))
+
+    await waitFor(() => {
+      expect(updateOrgFn).toHaveBeenCalledWith({
+        orgId: "org1",
+        org: {
+          dailyDigestSettings: {
+            enabled: false,
+            sendTime: "17:30",
+          },
+        },
+      })
+    })
+    expect(screen.getByText(/Daily digest scheduling setting saved/i)).toBeInTheDocument()
+  })
+})

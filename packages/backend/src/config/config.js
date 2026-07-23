@@ -513,6 +513,18 @@ baselineConfig.loadSecrets = async () => {
 
     // Re-read voice-turn / VAD env (may be in Secrets Manager JSON or docker-compose; merged into process.env above)
     baselineConfig.audio.turnDetection = buildAudioTurnDetectionConfig(process.env);
+
+    // Re-apply digest scheduler flags from env/secrets (initial parse may precede Secrets Manager merge)
+    baselineConfig.dailyDigestScheduler.enabled = process.env.DAILY_DIGEST_SCHEDULER_ENABLED === 'true';
+    {
+      const raw = parseInt(process.env.DAILY_DIGEST_COORDINATOR_INTERVAL_MINUTES, 10);
+      if (Number.isFinite(raw) && raw > 0) {
+        baselineConfig.dailyDigestScheduler.coordinatorIntervalMinutes = raw;
+      }
+    }
+    if (process.env.DAILY_DIGEST_DEFAULT_SEND_TIME) {
+      baselineConfig.dailyDigestScheduler.defaultSendTime = process.env.DAILY_DIGEST_DEFAULT_SEND_TIME;
+    }
     
     // CRITICAL: Ensure config.env matches runtime NODE_ENV (never override from secrets)
     // This ensures that even if secrets contained NODE_ENV, we use the runtime value

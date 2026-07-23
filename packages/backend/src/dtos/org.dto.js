@@ -29,6 +29,10 @@ const OrgDTO = (org) => {
     requiredCallQuestions,
     dailyDigestSettings,
     familyPortalSettings,
+    isDemo,
+    demoSeededAt,
+    demoHistoryDays,
+    demoSeedVersion,
   } = orgObj;
   
   const id = _id;
@@ -92,6 +96,10 @@ const OrgDTO = (org) => {
       enabled: familyPortalSettings?.enabled === true,
       allowInviteAfterDigestVerify: familyPortalSettings?.allowInviteAfterDigestVerify !== false,
     },
+    isDemo: isDemo === true,
+    demoSeededAt: demoSeededAt || null,
+    demoHistoryDays: typeof demoHistoryDays === 'number' ? demoHistoryDays : null,
+    demoSeedVersion: demoSeedVersion || null,
   };
 };
 

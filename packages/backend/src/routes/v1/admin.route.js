@@ -155,4 +155,25 @@ router.post(
   adminController.placeAdminCall,
 );
 
+router.get(
+  '/demo-orgs',
+  auth(),
+  validate(adminValidation.listDemoOrgs),
+  adminController.listDemoOrgs,
+);
+
+router.post(
+  '/orgs/:orgId/demo-flag',
+  auth(),
+  validate(adminValidation.setOrgDemoFlag),
+  adminController.setOrgDemoFlag,
+);
+
+router.post(
+  '/orgs/:orgId/refresh-demo-data',
+  auth(),
+  validate(adminValidation.refreshDemoOrgData),
+  adminController.refreshDemoOrgData,
+);
+
 module.exports = router;

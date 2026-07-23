@@ -231,6 +231,31 @@ const orgSchema = mongoose.Schema(
         },
       },
     },
+    /**
+     * When true, this org may be wiped/reseeded via admin "refresh demo data".
+     * Default false. Only settable through gated admin endpoints (never public PATCH).
+     */
+    isDemo: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    /** Last successful demo seed run (admin refresh). */
+    demoSeededAt: {
+      type: Date,
+      required: false,
+    },
+    /** historyDays used on last demo seed. */
+    demoHistoryDays: {
+      type: Number,
+      required: false,
+      min: 1,
+    },
+    demoSeedVersion: {
+      type: String,
+      required: false,
+      trim: true,
+    },
   },
   {
     timestamps: true,

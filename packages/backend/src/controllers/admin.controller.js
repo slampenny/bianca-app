@@ -13,6 +13,7 @@ const corpEmailForwardService = require('../services/corpEmailForward.service');
 const breachLogService = require('../services/breachLog.service');
 const hipaaBackupService = require('../services/hipaaBackup.service');
 const phoneUtils = require('../services/messaging/phoneUtils');
+const demoOrgService = require('../services/demoOrg.service');
 
 function assertSuperAdmin(req) {
   if (req.caregiver.role !== 'superAdmin') {
@@ -557,6 +558,49 @@ const placeAdminCall = catchAsync(async (req, res) => {
   });
 });
 
+const listDemoOrgs = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const result = await demoOrgService.listDemoOrgs({
+    limit: req.query.limit,
+    page: req.query.page,
+  });
+  const results = (result.results || [])
+    .map((o) => {
+      const dto = OrgDTO(o);
+      if (!dto) return null;
+      return { ...dto, id: dto.id != null ? String(dto.id) : undefined };
+    })
+    .filter(Boolean);
+  res.send({ ...result, results });
+});
+
+const setOrgDemoFlag = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const actorId = req.caregiver.id || req.caregiver._id;
+  const org = await demoOrgService.setOrgDemoFlag({
+    orgId: req.params.orgId,
+    isDemo: req.body.isDemo === true,
+    confirm: req.body.confirm,
+    actorCaregiverId: actorId,
+    req,
+  });
+  const dto = OrgDTO(org);
+  res.send({ ...dto, id: dto.id != null ? String(dto.id) : undefined });
+});
+
+const refreshDemoOrgData = catchAsync(async (req, res) => {
+  assertSuperAdmin(req);
+  const actorId = req.caregiver.id || req.caregiver._id;
+  const result = await demoOrgService.refreshDemoOrgData({
+    orgId: req.params.orgId,
+    confirm: req.body.confirm,
+    historyDays: req.body.historyDays,
+    actorCaregiverId: actorId,
+    req,
+  });
+  res.send({ success: true, ...result });
+});
+
 module.exports = {
   getObservability,
   searchCaregivers,
@@ -582,4 +626,7 @@ module.exports = {
   triggerBackup,
   restoreBackup,
   placeAdminCall,
+  listDemoOrgs,
+  setOrgDemoFlag,
+  refreshDemoOrgData,
 };

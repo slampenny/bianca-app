@@ -29,7 +29,7 @@ import baseQueryWithAuth from "./baseQueryWithAuth"
 export const adminApi = createApi({
   reducerPath: "adminApi",
   baseQuery: baseQueryWithAuth(),
-  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards", "BreachLogs", "Backups", "AdminCall"],
+  tagTypes: ["Observability", "Scim", "EmbeddingAnchors", "OrgDetail", "CorpEmailForwards", "BreachLogs", "Backups", "AdminCall", "DemoOrgs"],
   endpoints: (builder) => ({
     getObservability: builder.query<ObservabilityPayload, void>({
       query: () => ({
@@ -285,6 +285,43 @@ export const adminApi = createApi({
         body: { outcome },
       }),
     }),
+    listDemoOrgs: builder.query<AdminOrgSearchResponse, { page?: number; limit?: number } | void>({
+      query: (params) => ({
+        url: "/admin/demo-orgs",
+        method: "GET",
+        params: params || {},
+      }),
+      providesTags: ["DemoOrgs"],
+    }),
+    setOrgDemoFlag: builder.mutation<
+      AdminOrgDetail,
+      { orgId: string; isDemo: boolean; confirm: string }
+    >({
+      query: ({ orgId, isDemo, confirm }) => ({
+        url: `/admin/orgs/${orgId}/demo-flag`,
+        method: "POST",
+        body: { isDemo, confirm },
+      }),
+      invalidatesTags: ["DemoOrgs", "OrgDetail"],
+    }),
+    refreshDemoOrgData: builder.mutation<
+      {
+        success: boolean
+        orgId: string
+        historyDays: number
+        clients: Array<{ id: string; name: string; email: string; trajectory: string }>
+        conversationCount?: number
+        analysisPointsPerClient?: number
+      },
+      { orgId: string; confirm: "REFRESH_DEMO_DATA"; historyDays?: 7 | 30 | 90 | 180 }
+    >({
+      query: ({ orgId, confirm, historyDays }) => ({
+        url: `/admin/orgs/${orgId}/refresh-demo-data`,
+        method: "POST",
+        body: { confirm, historyDays },
+      }),
+      invalidatesTags: ["DemoOrgs", "OrgDetail"],
+    }),
   }),
 })
 
@@ -318,4 +355,7 @@ export const {
   usePlaceAdminCallMutation,
   useLazyGetAdminCallStatusQuery,
   useEndAdminCallMutation,
+  useListDemoOrgsQuery,
+  useSetOrgDemoFlagMutation,
+  useRefreshDemoOrgDataMutation,
 } = adminApi

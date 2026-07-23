@@ -228,6 +228,33 @@ const placeAdminCall = {
   }),
 };
 
+const listDemoOrgs = {
+  query: Joi.object().keys({
+    limit: Joi.number().integer().min(1).max(100).default(50),
+    page: Joi.number().integer().min(1).default(1),
+  }),
+};
+
+const setOrgDemoFlag = {
+  params: Joi.object().keys({
+    orgId: Joi.string().custom(objectId).required(),
+  }),
+  body: Joi.object().keys({
+    isDemo: Joi.boolean().required(),
+    confirm: Joi.string().trim().required(),
+  }),
+};
+
+const refreshDemoOrgData = {
+  params: Joi.object().keys({
+    orgId: Joi.string().custom(objectId).required(),
+  }),
+  body: Joi.object().keys({
+    confirm: Joi.string().valid('REFRESH_DEMO_DATA').required(),
+    historyDays: Joi.number().integer().valid(7, 30, 90, 180).default(90),
+  }),
+};
+
 module.exports = {
   searchCaregivers,
   impersonate,
@@ -247,4 +274,7 @@ module.exports = {
   triggerBackup,
   restoreBackup,
   placeAdminCall,
+  listDemoOrgs,
+  setOrgDemoFlag,
+  refreshDemoOrgData,
 };

@@ -268,6 +268,15 @@ echo "   Creating docker-compose.yml..."
 DEMO_502_VOLUME=""
 NGINX_502_BLOCK=""
 
+# Enable daily digest Agenda job registration for staging and production.
+# Org.dailyDigestSettings.enabled + caregiver.notificationPreferences.dailyDigestEmail
+# still gate actual sends — this only registers the coordinator job.
+if [ "$ENVIRONMENT" = "staging" ] || [ "$ENVIRONMENT" = "production" ]; then
+  DAILY_DIGEST_SCHEDULER_ENV_LINE="      - DAILY_DIGEST_SCHEDULER_ENABLED=true"
+else
+  DAILY_DIGEST_SCHEDULER_ENV_LINE=""
+fi
+
 if [ "$ENVIRONMENT" != "demo" ]; then
   ADMIN_BLOCK=$(cat <<ADMINEOF
   admin:
@@ -377,6 +386,7 @@ services:
       - ASTERISK_PUBLIC_IP=$PUBLIC_IP
       - AWS_SES_REGION=$AWS_REGION
       - EMAIL_FROM=no-reply@biancawellness.com
+$DAILY_DIGEST_SCHEDULER_ENV_LINE
       - TWILIO_PHONENUMBER=$TWILIO_PHONENUMBER
       - TWILIO_ACCOUNTSID=$TWILIO_ACCOUNTSID
       - STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY

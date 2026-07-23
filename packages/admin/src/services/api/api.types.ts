@@ -38,6 +38,10 @@ export interface AdminOrgSearchRow {
   id?: string
   name: string
   email: string
+  isDemo?: boolean
+  demoSeededAt?: string | null
+  demoHistoryDays?: number | null
+  demoSeedVersion?: string | null
 }
 
 export interface AdminOrgSearchResponse {
@@ -93,6 +97,12 @@ export interface AdminOrgDetail {
   requireClientConsent?: boolean
   voiceOnboarding?: VoiceOnboardingConfig
   requiredCallQuestions?: RequiredCallQuestionsConfig
+  isDemo?: boolean
+  demoSeededAt?: string | null
+  demoHistoryDays?: number | null
+  demoSeedVersion?: string | null
+  stripeCustomerId?: string
+  stripeSubscriptionId?: string
 }
 
 export interface ScimAdminStatus {

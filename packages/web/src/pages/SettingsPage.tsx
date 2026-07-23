@@ -77,10 +77,18 @@ export function SettingsPage() {
   const [familyPortalBannerKey, setFamilyPortalBannerKey] = useState<"familyPortalSaved" | "familyPortalSaveFailed" | null>(
     null,
   )
+  const [orgDailyDigestEnabled, setOrgDailyDigestEnabled] = useState(false)
+  const [orgDailyDigestBannerKey, setOrgDailyDigestBannerKey] = useState<
+    "dailyDigestOrgSaved" | "dailyDigestOrgSaveFailed" | null
+  >(null)
 
   useEffect(() => {
     setFamilyPortalEnabled(orgData?.familyPortalSettings?.enabled === true)
   }, [orgData?.familyPortalSettings?.enabled])
+
+  useEffect(() => {
+    setOrgDailyDigestEnabled(orgData?.dailyDigestSettings?.enabled === true)
+  }, [orgData?.dailyDigestSettings?.enabled])
 
   useEffect(() => {
     if (!profile) return
@@ -136,6 +144,27 @@ export function SettingsPage() {
     } catch {
       setFamilyPortalEnabled(!enabled)
       setFamilyPortalBannerKey("familyPortalSaveFailed")
+    }
+  }
+
+  const handleOrgDailyDigestChange = async (enabled: boolean) => {
+    if (!canManageOrgSettings) return
+    setOrgDailyDigestBannerKey(null)
+    setOrgDailyDigestEnabled(enabled)
+    try {
+      await updateOrg({
+        orgId,
+        org: {
+          dailyDigestSettings: {
+            enabled,
+            sendTime: orgData?.dailyDigestSettings?.sendTime ?? null,
+          },
+        },
+      }).unwrap()
+      setOrgDailyDigestBannerKey("dailyDigestOrgSaved")
+    } catch {
+      setOrgDailyDigestEnabled(!enabled)
+      setOrgDailyDigestBannerKey("dailyDigestOrgSaveFailed")
     }
   }
 
@@ -378,6 +407,55 @@ export function SettingsPage() {
           </p>
         ) : null}
       </div>
+
+      {canManageOrgSettings ? (
+        <div className="va-page-section" data-testid="settings-org-daily-digest">
+          <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>{t("orgSettings.dailyDigestSection")}</h2>
+          {orgLoading && !orgData ? (
+            <p style={{ color: "var(--va-slate-500)", fontSize: "0.875rem" }}>{t("orgSettings.loading")}</p>
+          ) : (
+            <>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  cursor: savingOrg ? "wait" : "pointer",
+                  fontSize: "0.875rem",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  data-testid="settings-org-daily-digest-enabled"
+                  checked={orgDailyDigestEnabled}
+                  disabled={savingOrg || orgLoading}
+                  onChange={(ev) => void handleOrgDailyDigestChange(ev.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <span style={{ display: "block", fontWeight: 500 }}>{t("orgSettings.dailyDigestEnabledBold")}</span>
+                  <span
+                    style={{
+                      display: "block",
+                      marginTop: 4,
+                      color: "var(--va-slate-500)",
+                      fontSize: "0.8125rem",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    {t("orgSettings.dailyDigestEnabledDetail")}
+                  </span>
+                </span>
+              </label>
+              {orgDailyDigestBannerKey ? (
+                <p style={{ fontSize: "0.8125rem", marginTop: 10, color: "var(--va-slate-600)" }} role="status">
+                  {t(`orgSettings.${orgDailyDigestBannerKey}`)}
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
 
       {canManageOrgSettings ? (
         <div className="va-page-section" data-testid="settings-org-family-portal">

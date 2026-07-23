@@ -974,6 +974,12 @@ export const appLocalesPages = {
     familyPortalSaving: "Saving…",
     familyPortalSaved: "Family app setting saved.",
     familyPortalSaveFailed: "Could not save family app setting.",
+    dailyDigestSection: "Daily wellness digest",
+    dailyDigestEnabledBold: "Enable automated daily digest emails for this organization",
+    dailyDigestEnabledDetail:
+      "When enabled, Bianca can send scheduled daily digests to caregivers who have opted in under Email notifications. Manual sends from the Daily Digest page are unchanged.",
+    dailyDigestOrgSaved: "Daily digest scheduling setting saved.",
+    dailyDigestOrgSaveFailed: "Could not save daily digest scheduling setting.",
     imageReadError: "Could not read the image file.",
     nameRequired: "Organization name is required.",
     emailInvalid: "Enter a valid organization email.",
