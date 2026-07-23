@@ -158,8 +158,19 @@ const orgSchema = mongoose.Schema(
       default: false,
     },
     /**
-     * Per-org resident voice onboarding plan. When useDefault is true (default), the built-in Day 0–4 plan applies.
-     * When useDefault is false, days[] defines the org-specific call sequence and questions.
+     * Facility care setting. Optional. Used to select a voice-onboarding preset when
+     * voiceOnboarding.useDefault is true. Null/unset → global default plan.
+     * Presets are empty until product supplies type-specific content (inert today).
+     */
+    facilityType: {
+      type: String,
+      required: false,
+      enum: ['assisted_living', 'skilled_nursing', 'home_care', 'other'],
+      trim: true,
+    },
+    /**
+     * Per-org resident voice onboarding plan. When useDefault is true (default), the built-in Day 0–4 plan applies
+     * (or a facility-type preset once one exists). When useDefault is false, days[] defines the org-specific call sequence.
      */
     voiceOnboarding: {
       useDefault: {

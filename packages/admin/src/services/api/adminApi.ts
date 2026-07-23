@@ -71,6 +71,7 @@ export const adminApi = createApi({
         orgId: string
         body: {
           debugAudioUploadEnabled?: boolean
+          facilityType?: AdminOrgDetail["facilityType"] | null
           voiceOnboarding?: VoiceOnboardingConfig
         }
       }

@@ -29,6 +29,7 @@ const OrgDTO = (org) => {
     requiredCallQuestions,
     dailyDigestSettings,
     familyPortalSettings,
+    facilityType,
     isDemo,
     demoSeededAt,
     demoHistoryDays,
@@ -64,6 +65,7 @@ const OrgDTO = (org) => {
     privacyOfficerId: privacyOfficerId ? (privacyOfficerId instanceof ObjectId ? privacyOfficerId.toString() : (privacyOfficerId?._id || privacyOfficerId)) : null,
     requireClientConsent: requireClientConsent === true,
     debugAudioUploadEnabled: debugAudioUploadEnabled === true,
+    facilityType: facilityType || null,
     voiceOnboarding: voiceOnboarding
       ? {
           useDefault: voiceOnboarding.useDefault !== false,

@@ -30,7 +30,12 @@ const getOrg = catchAsync(async (req, res) => {
 const updateOrg = catchAsync(async (req, res) => {
   const { ...orgData } = req.body;
   const org = await orgService.updateOrgById(req.params.orgId, orgData);
-  res.send(OrgDTO(org));
+  const warnings = (org.$locals && org.$locals.voiceOnboardingPrivacyWarnings) || [];
+  const payload = OrgDTO(org);
+  if (warnings.length > 0) {
+    payload.voiceOnboardingPrivacyWarnings = warnings;
+  }
+  res.send(payload);
 });
 
 const deleteOrg = catchAsync(async (req, res) => {

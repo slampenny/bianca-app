@@ -95,8 +95,11 @@ export interface AdminOrgDetail {
   timezone?: string
   country?: string
   requireClientConsent?: boolean
+  /** Care setting; null/unset → global default onboarding template */
+  facilityType?: "assisted_living" | "skilled_nursing" | "home_care" | "other" | null
   voiceOnboarding?: VoiceOnboardingConfig
   requiredCallQuestions?: RequiredCallQuestionsConfig
+  voiceOnboardingPrivacyWarnings?: { path: string; phrase: string; id?: string }[]
   isDemo?: boolean
   demoSeededAt?: string | null
   demoHistoryDays?: number | null

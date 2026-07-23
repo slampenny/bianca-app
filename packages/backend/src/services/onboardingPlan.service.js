@@ -3,6 +3,20 @@ const { DEFAULT_ONBOARDING_PLAN } = require('../templates/defaultOnboardingPlan'
 
 const MAX_ONBOARDING_DAYS = 14;
 
+/** Supported Org.facilityType values. Presets are intentionally empty until product supplies content. */
+const FACILITY_TYPES = ['assisted_living', 'skilled_nursing', 'home_care', 'other'];
+
+/**
+ * Facility-type preset plans. Empty until real templates are supplied — every type falls through to global default.
+ * @type {Record<string, null>}
+ */
+const FACILITY_TYPE_PRESETS = {
+  assisted_living: null,
+  skilled_nursing: null,
+  home_care: null,
+  other: null,
+};
+
 /**
  * @typedef {{ id: string, prompt: string, compressionPriority?: boolean }} OnboardingQuestionPlan
  * @typedef {{ dayNumber: number, theme?: string, opening?: string, questions: OnboardingQuestionPlan[] }} OnboardingDayPlan
@@ -10,29 +24,53 @@ const MAX_ONBOARDING_DAYS = 14;
  */
 
 /**
+ * @param {string|null|undefined} facilityType
+ * @returns {ResolvedOnboardingPlan|null} preset plan or null if none / unset
+ */
+function getFacilityTypePreset(facilityType) {
+  if (!facilityType || !FACILITY_TYPES.includes(facilityType)) {
+    return null;
+  }
+  const preset = FACILITY_TYPE_PRESETS[facilityType];
+  if (!preset) {
+    return null;
+  }
+  return normalizePlan({ ...preset, useDefault: true });
+}
+
+/**
  * @param {object|null|undefined} orgVoiceOnboarding
+ * @param {{ facilityType?: string|null }} [opts]
  * @returns {ResolvedOnboardingPlan}
  */
-function resolvePlanFromOrgSettings(orgVoiceOnboarding) {
-  if (!orgVoiceOnboarding || orgVoiceOnboarding.useDefault !== false) {
-    return normalizePlan(DEFAULT_ONBOARDING_PLAN);
+function resolvePlanFromOrgSettings(orgVoiceOnboarding, opts = {}) {
+  // 1) Org custom plan wins
+  if (orgVoiceOnboarding && orgVoiceOnboarding.useDefault === false) {
+    const days = Array.isArray(orgVoiceOnboarding.days) ? orgVoiceOnboarding.days : [];
+    return normalizePlan({
+      useDefault: false,
+      totalDays: days.length,
+      days: days.map((day, index) => ({
+        dayNumber: day.dayNumber != null ? day.dayNumber : index + 1,
+        theme: day.theme || `Day ${index + 1}`,
+        opening: day.opening || '',
+        questions: (day.questions || []).map((q) => ({
+          id: String(q.id || '').trim(),
+          prompt: String(q.prompt || '').trim(),
+          compressionPriority: q.compressionPriority === true,
+        })),
+      })),
+    });
   }
 
-  const days = Array.isArray(orgVoiceOnboarding.days) ? orgVoiceOnboarding.days : [];
-  return normalizePlan({
-    useDefault: false,
-    totalDays: days.length,
-    days: days.map((day, index) => ({
-      dayNumber: day.dayNumber != null ? day.dayNumber : index + 1,
-      theme: day.theme || `Day ${index + 1}`,
-      opening: day.opening || '',
-      questions: (day.questions || []).map((q) => ({
-        id: String(q.id || '').trim(),
-        prompt: String(q.prompt || '').trim(),
-        compressionPriority: q.compressionPriority === true,
-      })),
-    })),
-  });
+  // 2) Facility-type preset if one exists (none shipped yet — inert)
+  const facilityPreset = getFacilityTypePreset(opts.facilityType);
+  if (facilityPreset) {
+    return facilityPreset;
+  }
+
+  // 3) Global default (Day 0–4)
+  return normalizePlan(DEFAULT_ONBOARDING_PLAN);
 }
 
 /**
@@ -110,7 +148,7 @@ function isOnboardingEnabled(plan) {
  * @returns {ResolvedOnboardingPlan}
  */
 function getPlanFromOrg(orgDoc) {
-  return resolvePlanFromOrgSettings(orgDoc?.voiceOnboarding);
+  return resolvePlanFromOrgSettings(orgDoc?.voiceOnboarding, { facilityType: orgDoc?.facilityType });
 }
 
 /**
@@ -121,7 +159,7 @@ async function getPlanForOrgId(orgId) {
   if (!orgId) {
     return normalizePlan(DEFAULT_ONBOARDING_PLAN);
   }
-  const org = await Org.findById(orgId).select('voiceOnboarding').lean();
+  const org = await Org.findById(orgId).select('voiceOnboarding facilityType').lean();
   return getPlanFromOrg(org);
 }
 
@@ -150,16 +188,22 @@ function getDefaultPlanTemplate() {
 
 /**
  * Validate custom org plan before save.
+ * Privacy lint: default mode is warn (caller may surface warnings). Set
+ * VOICE_ONBOARDING_PRIVACY_LINT_MODE=block to reject conflicting phrases.
  * @param {{ useDefault?: boolean, days?: object[] }} voiceOnboarding
+ * @returns {{ warnings: { path: string, phrase: string, id: string }[] }}
  * @throws {Error}
  */
 function assertValidVoiceOnboardingConfig(voiceOnboarding) {
+  const { lintVoiceOnboardingPrivacy, getPrivacyLintMode } = require('./voiceOnboardingPrivacyLint.service');
+  const warnings = lintVoiceOnboardingPrivacy(voiceOnboarding);
+
   if (!voiceOnboarding || voiceOnboarding.useDefault !== false) {
-    return;
+    return { warnings };
   }
   const plan = resolvePlanFromOrgSettings(voiceOnboarding);
   if (!isOnboardingEnabled(plan)) {
-    return;
+    return { warnings };
   }
   const ids = new Set();
   for (const day of plan.days) {
@@ -170,16 +214,26 @@ function assertValidVoiceOnboardingConfig(voiceOnboarding) {
       ids.add(q.id);
     }
   }
+
+  if (warnings.length > 0 && getPrivacyLintMode() === 'block') {
+    const detail = warnings.map((w) => `${w.path}: "${w.phrase}"`).join('; ');
+    throw new Error(`Voice onboarding text conflicts with privacy rules (${detail})`);
+  }
+
+  return { warnings };
 }
 
 module.exports = {
   MAX_ONBOARDING_DAYS,
+  FACILITY_TYPES,
+  FACILITY_TYPE_PRESETS,
   DEFAULT_ONBOARDING_PLAN,
   resolvePlanFromOrgSettings,
   normalizePlan,
   getQuestionIdsForDay,
   isValidOnboardingDay,
   isOnboardingEnabled,
+  getFacilityTypePreset,
   getPlanFromOrg,
   getPlanForOrgId,
   getPlanForClientId,

@@ -63,6 +63,12 @@ const updateOrgById = async (orgId, updateBody) => {
   if (updateBody.email && (await Org.isEmailTaken(updateBody.email, orgId))) {
     throw new ApiError(httpStatus.BAD_REQUEST, 'Email already taken');
   }
+
+  if (Object.prototype.hasOwnProperty.call(updateBody, 'facilityType')) {
+    // null/empty clears facility type (falls back to global default when useDefault)
+    org.facilityType = updateBody.facilityType || undefined;
+    delete updateBody.facilityType;
+  }
   
   // Handle nested callRetrySettings update separately to merge properly
   if (updateBody.callRetrySettings) {
@@ -76,14 +82,18 @@ const updateOrgById = async (orgId, updateBody) => {
     Object.assign(org, restUpdateBody);
   } else if (updateBody.voiceOnboarding) {
     const { assertValidVoiceOnboardingConfig } = require('./onboardingPlan.service');
+    let warnings = [];
     try {
-      assertValidVoiceOnboardingConfig(updateBody.voiceOnboarding);
+      const result = assertValidVoiceOnboardingConfig(updateBody.voiceOnboarding);
+      warnings = result?.warnings || [];
     } catch (err) {
       throw new ApiError(httpStatus.BAD_REQUEST, err.message);
     }
     org.voiceOnboarding = updateBody.voiceOnboarding;
     const { voiceOnboarding, ...restUpdateBody } = updateBody;
     Object.assign(org, restUpdateBody);
+    org.$locals = org.$locals || {};
+    org.$locals.voiceOnboardingPrivacyWarnings = warnings;
   } else if (updateBody.requiredCallQuestions) {
     const { assertValidRequiredCallQuestionsConfig } = require('./requiredCallQuestions.service');
     try {

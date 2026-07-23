@@ -7,13 +7,13 @@ import {
 } from "../services/api/adminApi"
 import { isAuthenticated } from "../store/authSlice"
 import { useAppSelector } from "../store/store"
-import type { AdminOrgSearchRow, VoiceOnboardingDay } from "../services/api/api.types"
+import type { AdminOrgDetail, AdminOrgSearchRow, VoiceOnboardingDay } from "../services/api/api.types"
 import { AdminPageHeader } from "../components/AdminPageHeader"
 import { VoiceOnboardingPlanEditor } from "../components/VoiceOnboardingPlanEditor"
 
 function cloneDays(days: VoiceOnboardingDay[]): VoiceOnboardingDay[] {
   return days.map((day, index) => ({
-    dayNumber: index + 1,
+    dayNumber: day.dayNumber != null ? day.dayNumber : index + 1,
     theme: day.theme || "",
     opening: day.opening || "",
     questions: (day.questions || []).map((q) => ({
@@ -23,6 +23,14 @@ function cloneDays(days: VoiceOnboardingDay[]): VoiceOnboardingDay[] {
     })),
   }))
 }
+
+const FACILITY_TYPE_OPTIONS: { value: "" | NonNullable<AdminOrgDetail["facilityType"]>; label: string }[] = [
+  { value: "", label: "Unset (global default)" },
+  { value: "assisted_living", label: "Assisted living" },
+  { value: "skilled_nursing", label: "Skilled nursing / care home" },
+  { value: "home_care", label: "Home care" },
+  { value: "other", label: "Other" },
+]
 
 function nextQuestionId(dayNumber: number, questions: { id: string }[]): string {
   const prefix = `day${dayNumber}_topic_`
@@ -62,7 +70,9 @@ export function OrgVoiceOnboardingPage() {
 
   const [useDefault, setUseDefault] = useState(true)
   const [days, setDays] = useState<VoiceOnboardingDay[]>([])
+  const [facilityType, setFacilityType] = useState<AdminOrgDetail["facilityType"] | "">("")
   const [saveError, setSaveError] = useState("")
+  const [privacyWarnings, setPrivacyWarnings] = useState<{ path: string; phrase: string }[]>([])
 
   const defaultDays = useMemo(() => defaultPlanData?.plan?.days ?? [], [defaultPlanData?.plan?.days])
   const defaultDayCount = defaultPlanData?.plan?.totalDays ?? (defaultDays.length || 0)
@@ -72,6 +82,7 @@ export function OrgVoiceOnboardingPage() {
     if (!orgDetail) return
     const vo = orgDetail.voiceOnboarding
     const orgUsesDefault = vo?.useDefault !== false
+    setFacilityType(orgDetail.facilityType || "")
 
     if (!orgUsesDefault && vo?.days && vo.days.length > 0) {
       setUseDefault(false)
@@ -200,14 +211,34 @@ export function OrgVoiceOnboardingPage() {
     setUseDefault(false)
   }
 
+  const applyTemplate = () => {
+    // Presets are inert today — every facility type clones the global default (incl. Day 0).
+    if (!defaultDays.length) return
+    setUseDefault(true)
+    setDays(cloneDays(defaultDays))
+    setPrivacyWarnings([])
+  }
+
   const handleSave = async () => {
     if (!selectedOrgId) return
     setSaveError("")
+    setPrivacyWarnings([])
     try {
-      const body = useDefault
-        ? { voiceOnboarding: { useDefault: true, days: [] } }
-        : { voiceOnboarding: { useDefault: false, days: cloneDays(days) } }
-      await patchOrg({ orgId: selectedOrgId, body }).unwrap()
+      const body: {
+        facilityType: AdminOrgDetail["facilityType"] | null
+        voiceOnboarding: { useDefault: boolean; days: VoiceOnboardingDay[] }
+      } = {
+        facilityType: facilityType || null,
+        voiceOnboarding: useDefault
+          ? { useDefault: true, days: [] }
+          : { useDefault: false, days: cloneDays(days) },
+      }
+      const res = await patchOrg({ orgId: selectedOrgId, body }).unwrap()
+      const warnings = (res as AdminOrgDetail & { voiceOnboardingPrivacyWarnings?: { path: string; phrase: string }[] })
+        .voiceOnboardingPrivacyWarnings
+      if (warnings?.length) {
+        setPrivacyWarnings(warnings)
+      }
     } catch {
       setSaveError("Could not save voice onboarding. Check the plan (each day needs questions with unique ids).")
     }
@@ -329,6 +360,37 @@ export function OrgVoiceOnboardingPage() {
 
                 {planStatusBanner}
 
+                <label className="admin-label" style={{ display: "block", marginBottom: "0.75rem" }}>
+                  Facility type
+                  <select
+                    className="admin-input"
+                    value={facilityType || ""}
+                    onChange={(e) => setFacilityType((e.target.value || "") as AdminOrgDetail["facilityType"] | "")}
+                    style={{ marginTop: "0.35rem" }}
+                  >
+                    {FACILITY_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value || "unset"} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="admin-muted" style={{ fontSize: "0.85rem", marginBottom: "1rem" }}>
+                  Type presets are not shipped yet — all types use the shared Day 0–4 default until product supplies
+                  content. &quot;Apply template&quot; clones that default into the editor (Day 0 stays shared across
+                  types).
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" }}>
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn--ghost"
+                    onClick={applyTemplate}
+                    disabled={defaultPlanLoading || defaultDays.length === 0}
+                  >
+                    Apply template
+                  </button>
+                </div>
+
                 <label
                   style={{
                     display: "flex",
@@ -371,6 +433,23 @@ export function OrgVoiceOnboardingPage() {
                   />
                 )}
 
+                {privacyWarnings.length > 0 ? (
+                  <div
+                    className="admin-plan-banner admin-plan-banner--custom"
+                    role="status"
+                    style={{ marginBottom: "0.75rem", borderColor: "var(--va-amber-600, #d97706)" }}
+                  >
+                    <strong>Privacy wording warnings (save succeeded).</strong> These phrases may conflict with
+                    resident-facing privacy rules — consider editing before go-live:
+                    <ul style={{ margin: "0.5rem 0 0", paddingLeft: "1.25rem" }}>
+                      {privacyWarnings.map((w, i) => (
+                        <li key={`${w.path}-${w.phrase}-${i}`}>
+                          {w.path}: &quot;{w.phrase}&quot;
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
                 {saveError ? (
                   <p className="admin-error" role="alert" style={{ marginBottom: "0.75rem" }}>
                     {saveError}

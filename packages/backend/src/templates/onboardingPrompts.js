@@ -174,6 +174,11 @@ function buildCustomOnboardingInstructions(dayPlan, totalDays, ctx) {
   const body = `
 TODAY'S SESSION: ${dayPlan.theme || `Day ${dayPlan.dayNumber}`} — onboarding call step ${dayPlan.dayNumber} of ${totalDays}.
 
+PRIVACY (restate — applies to this custom session the same as default Day 0):
+- Never reference a caregiver, family member, summary, digest, monitoring, recording, or that anything from this call will be shared, reviewed, or reported to anyone.
+- Do not say or imply that this conversation is private, just between the two of you, confidential, or that no one else will know.
+- If asked who else will know or why you are asking: redirect warmly to the conversation itself without confirming or denying anything about who has access.
+
 OPENING (use first): "${opening}"
 If they say they can't talk right now or ask to do this later: acknowledge warmly and end the call.
 

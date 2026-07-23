@@ -1,7 +1,7 @@
 const Joi = require('joi');
 const validator = require('validator');
 const { objectId } = require('./custom.validation');
-const { MAX_ONBOARDING_DAYS } = require('../services/onboardingPlan.service');
+const { MAX_ONBOARDING_DAYS, FACILITY_TYPES } = require('../services/onboardingPlan.service');
 const { HH_MM_PATTERN } = require('../utils/digestScheduler.utils');
 
 const voiceOnboardingQuestionSchema = Joi.object().keys({
@@ -111,6 +111,11 @@ const updateOrg = {
       requireClientConsent: Joi.boolean().optional(),
       /** Super admin / org admin: allow S3 debug audio for this org's Realtime calls */
       debugAudioUploadEnabled: Joi.boolean().optional(),
+      /** Facility care setting — selects preset when useDefault; null clears */
+      facilityType: Joi.string()
+        .valid(...FACILITY_TYPES)
+        .allow(null)
+        .optional(),
       /** Org admin / super admin: per-org resident voice onboarding plan */
       voiceOnboarding: voiceOnboardingSchema.optional(),
       /** Org admin: questions Bianca asks on every wellness call */
