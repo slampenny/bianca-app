@@ -44,6 +44,20 @@ export function caregiverAccountActive(caregiver: Caregiver | null | undefined):
   return true
 }
 
+/** Caregiver-side digest eligibility for org roster (org scheduling is separate). */
+export type DigestEligibilityKind = "ready" | "optedOut" | "unverifiedEmail" | "inactive"
+
+export function resolveDigestEligibilityKind(
+  caregiver: Caregiver | null | undefined,
+): DigestEligibilityKind {
+  if (!caregiverAccountActive(caregiver)) return "inactive"
+  const emailValid = isEmailValid(caregiver?.email)
+  const emailVerified = caregiverEmailVerified(caregiver)
+  if (!emailValid || !emailVerified) return "unverifiedEmail"
+  if (caregiver?.notificationPreferences?.dailyDigestEmail !== true) return "optedOut"
+  return "ready"
+}
+
 export function resolveOrgSendTime(org: Org | null | undefined): string {
   const configured = org?.dailyDigestSettings?.sendTime?.trim()
   if (configured && /^\d{2}:\d{2}$/.test(configured)) return configured

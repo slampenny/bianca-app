@@ -4,15 +4,16 @@ const catchAsync = require('../utils/catchAsync');
 const { caregiverDailyDigestService } = require('../services');
 
 const createDigest = catchAsync(async (req, res) => {
-  const { digestDate, sendEmail } = req.body;
+  const { digestDate, sendEmail, caregiverId } = req.body;
   const digest = await caregiverDailyDigestService.createOrUpdateDigest(req.caregiver, digestDate, {
     sendEmail: Boolean(sendEmail),
+    caregiverId: caregiverId || undefined,
   });
   res.status(httpStatus.OK).send(digest);
 });
 
 const listDigests = catchAsync(async (req, res) => {
-  const filter = pick(req.query, ['caregiverId', 'digestDate', 'includeAllVersions']);
+  const filter = pick(req.query, ['caregiverId', 'digestDate', 'includeAllVersions', 'scope']);
   if (filter.includeAllVersions != null) {
     filter.includeAllVersions = filter.includeAllVersions === true || filter.includeAllVersions === 'true';
   }

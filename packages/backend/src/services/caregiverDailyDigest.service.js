@@ -526,6 +526,15 @@ const enrichDigestListRows = async (rows) => {
 
   return rows.map((row) => {
     const plain = typeof row.toObject === 'function' ? row.toObject() : { ...row };
+    if (plain._id != null && plain.id == null) {
+      plain.id = String(plain._id);
+    }
+    if (plain.caregiver != null && typeof plain.caregiver !== 'string') {
+      plain.caregiver = String(plain.caregiver._id || plain.caregiver);
+    }
+    if (plain.org != null && typeof plain.org !== 'string') {
+      plain.org = String(plain.org._id || plain.org);
+    }
     if (plain.supersedesDigest) {
       const prior = priorById.get(String(plain.supersedesDigest));
       if (prior) {
@@ -607,7 +616,19 @@ const deliverDigestEmail = async (digest) => {
 
 const createOrUpdateDigest = async (requester, digestDateInput, options = {}) => {
   const sendEmail = Boolean(options.sendEmail);
-  const targetId = requester.id || requester._id;
+  const requesterId = requester.id || requester._id;
+  let targetId = requesterId;
+  if (options.caregiverId) {
+    const requestedTarget = String(options.caregiverId);
+    if (
+      requestedTarget !== String(requesterId) &&
+      requester.role !== 'orgAdmin' &&
+      requester.role !== 'superAdmin'
+    ) {
+      throw new ApiError(httpStatus.FORBIDDEN, 'You cannot build a digest for another caregiver');
+    }
+    targetId = requestedTarget;
+  }
   const caregiverDoc = await ensureCaregiverCanAccessTarget(requester, targetId);
   if (!caregiverDoc) {
     throw new ApiError(httpStatus.NOT_FOUND, 'Caregiver not found');
@@ -706,8 +727,50 @@ const paginateLatestDigestsPerDate = async (filter, options) => {
   };
 };
 
+const queryOrgDigestsForDay = async (requester, digestDateInput, options) => {
+  if (requester.role !== 'orgAdmin' && requester.role !== 'superAdmin') {
+    throw new ApiError(httpStatus.FORBIDDEN, 'Only org admins can list digests for the organization');
+  }
+  if (!digestDateInput) {
+    throw new ApiError(httpStatus.BAD_REQUEST, 'digestDate is required when scope=org');
+  }
+  const orgId = toOrgIdString(requester.org);
+  if (!orgId) {
+    throw new ApiError(httpStatus.FORBIDDEN, 'You do not have access to this digest');
+  }
+  const org = await Org.findById(orgId).select('timezone');
+  if (!org && requester.role !== 'superAdmin') {
+    throw new ApiError(httpStatus.NOT_FOUND, 'Organization not found');
+  }
+  const resolved = resolveDigestDayForOrg(org?.timezone, digestDateInput);
+  const orgObjectId =
+    typeof orgId === 'string' && mongoose.Types.ObjectId.isValid(orgId)
+      ? new mongoose.Types.ObjectId(orgId)
+      : requester.org;
+
+  return paginateLatestDigestsPerDate(
+    { org: orgObjectId, digestDate: resolved.digestDate },
+    {
+      ...options,
+      limit: options.limit || 200,
+      page: options.page || 1,
+    }
+  );
+};
+
 const queryDigests = async (requester, filter, options) => {
-  const { caregiverId, digestDate, includeAllVersions } = filter;
+  const { caregiverId, digestDate, includeAllVersions, scope } = filter;
+
+  if (scope === 'org') {
+    if (includeAllVersions) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'includeAllVersions is not supported with scope=org');
+    }
+    if (caregiverId) {
+      throw new ApiError(httpStatus.BAD_REQUEST, 'caregiverId cannot be combined with scope=org');
+    }
+    return queryOrgDigestsForDay(requester, digestDate, options);
+  }
+
   let targetCaregiverId = requester.id || requester._id;
   if (caregiverId && (requester.role === 'orgAdmin' || requester.role === 'superAdmin')) {
     targetCaregiverId = caregiverId;

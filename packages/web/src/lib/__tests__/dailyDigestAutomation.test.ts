@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildDailyDigestAutomationStatus } from "../dailyDigestAutomation"
+import { buildDailyDigestAutomationStatus, resolveDigestEligibilityKind } from "../dailyDigestAutomation"
 import type { Caregiver, Org } from "../../services/api/api.types"
 
 function baseCaregiver(overrides: Partial<Caregiver> = {}): Caregiver {
@@ -87,5 +87,25 @@ describe("buildDailyDigestAutomationStatus", () => {
     expect(status.automatedReady).toBe(false)
     expect(status.checks.find((c) => c.key === "orgScheduling")?.unknown).toBe(true)
     expect(status.orgSendTime).toBeNull()
+  })
+})
+
+describe("resolveDigestEligibilityKind", () => {
+  it("returns ready when active, verified, and opted in", () => {
+    expect(resolveDigestEligibilityKind(baseCaregiver())).toBe("ready")
+  })
+
+  it("returns inactive when account is inactive", () => {
+    expect(resolveDigestEligibilityKind(baseCaregiver({ active: false }))).toBe("inactive")
+  })
+
+  it("returns unverifiedEmail when email is not verified", () => {
+    expect(resolveDigestEligibilityKind(baseCaregiver({ isEmailVerified: false }))).toBe("unverifiedEmail")
+  })
+
+  it("returns optedOut when dailyDigestEmail is off", () => {
+    expect(
+      resolveDigestEligibilityKind(baseCaregiver({ notificationPreferences: { dailyDigestEmail: false } })),
+    ).toBe("optedOut")
   })
 })

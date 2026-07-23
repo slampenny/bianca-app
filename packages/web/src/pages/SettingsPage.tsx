@@ -406,6 +406,17 @@ export function SettingsPage() {
             {t(`settings.${notifBannerKey}`)}
           </p>
         ) : null}
+        <p style={{ fontSize: "0.875rem", color: "var(--va-slate-600)", margin: "0.75rem 0", lineHeight: 1.45 }}>
+          {t("settings.dailyDigestHistoryTeaser")}
+        </p>
+        <Link
+          to="/reports/daily-digest"
+          data-testid="settings-daily-digest-history-link"
+          className="va-btn-secondary"
+          style={{ display: "inline-flex", textDecoration: "none" }}
+        >
+          {t("settings.dailyDigestHistoryLink")}
+        </Link>
       </div>
 
       {canManageOrgSettings ? (

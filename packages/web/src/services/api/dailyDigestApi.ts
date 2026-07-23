@@ -89,7 +89,15 @@ export const dailyDigestApi = createApi({
   endpoints: (builder) => ({
     listCaregiverDailyDigests: builder.query<
       CaregiverDailyDigestPages,
-      { caregiverId?: string; digestDate?: string; includeAllVersions?: boolean; limit?: number; page?: number; sortBy?: string }
+      {
+        caregiverId?: string
+        digestDate?: string
+        includeAllVersions?: boolean
+        scope?: "org"
+        limit?: number
+        page?: number
+        sortBy?: string
+      }
     >({
       query: (params) => ({
         url: "/caregiver-daily-digests",
@@ -104,7 +112,7 @@ export const dailyDigestApi = createApi({
     }),
     generateCaregiverDailyDigest: builder.mutation<
       CaregiverDailyDigest,
-      { digestDate?: string; sendEmail?: boolean }
+      { digestDate?: string; sendEmail?: boolean; caregiverId?: string }
     >({
       query: (body) => ({
         url: "/caregiver-daily-digests",

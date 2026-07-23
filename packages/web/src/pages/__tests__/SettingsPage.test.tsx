@@ -218,6 +218,25 @@ describe("SettingsPage org daily digest toggle", () => {
   })
 })
 
+describe("SettingsPage daily digest history link", () => {
+  it("links to digest history for staff", async () => {
+    renderPage("staff")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-daily-digest-history-link")).toBeInTheDocument()
+    })
+    expect(screen.getByTestId("settings-daily-digest-history-link")).toHaveAttribute("href", "/reports/daily-digest")
+    expect(screen.getByTestId("settings-daily-digest-history-link")).toHaveTextContent(/View digest history/i)
+  })
+
+  it("links to digest history for orgAdmin", async () => {
+    renderPage("orgAdmin")
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-daily-digest-history-link")).toBeInTheDocument()
+    })
+    expect(screen.getByTestId("settings-daily-digest-history-link")).toHaveAttribute("href", "/reports/daily-digest")
+  })
+})
+
 describe("SettingsPage voice onboarding teaser", () => {
   it("shows voice onboarding section and link for orgAdmin", async () => {
     renderPage("orgAdmin")

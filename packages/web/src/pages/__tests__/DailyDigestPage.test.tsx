@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { skipToken } from "@reduxjs/toolkit/query"
 import { Provider } from "react-redux"
 import { MemoryRouter } from "react-router-dom"
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -9,8 +10,19 @@ import type { CaregiverDailyDigest } from "../../services/api/dailyDigestApi"
 import type { Caregiver, Org } from "../../services/api/api.types"
 
 const listRefetch = vi.fn()
+const generateFn = vi.fn()
+const sendFn = vi.fn()
+let listQueryArgs: unknown = null
+let caregiversQueryArgs: unknown = null
+
 let listState: {
   data?: { results: CaregiverDailyDigest[] }
+  isLoading: boolean
+  isError: boolean
+} = { data: { results: [] }, isLoading: false, isError: false }
+
+let caregiversState: {
+  data?: { results: Caregiver[] }
   isLoading: boolean
   isError: boolean
 } = { data: { results: [] }, isLoading: false, isError: false }
@@ -26,12 +38,18 @@ vi.mock("../../services/api/dailyDigestApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../services/api/dailyDigestApi")>()
   return {
     ...actual,
-    useListCaregiverDailyDigestsQuery: () => ({
-      ...listState,
-      refetch: listRefetch,
-    }),
-    useGenerateCaregiverDailyDigestMutation: () => [vi.fn(), { isLoading: false, error: undefined }],
-    useSendCaregiverDailyDigestMutation: () => [vi.fn(), { isLoading: false, error: undefined }],
+    useListCaregiverDailyDigestsQuery: (args: unknown) => {
+      if (args === skipToken) {
+        return { data: undefined, isLoading: false, isError: false, refetch: listRefetch }
+      }
+      listQueryArgs = args
+      return {
+        ...listState,
+        refetch: listRefetch,
+      }
+    },
+    useGenerateCaregiverDailyDigestMutation: () => [generateFn, { isLoading: false, error: undefined }],
+    useSendCaregiverDailyDigestMutation: () => [sendFn, { isLoading: false, error: undefined }],
   }
 })
 
@@ -40,6 +58,14 @@ vi.mock("../../services/api/caregiverApi", async (importOriginal) => {
   return {
     ...actual,
     useGetCaregiverQuery: () => caregiverState,
+    useGetCaregiversQuery: (args: unknown) => {
+      if (args === skipToken) {
+        caregiversQueryArgs = skipToken
+        return { data: undefined, isLoading: false, isError: false, refetch: vi.fn() }
+      }
+      caregiversQueryArgs = args
+      return { ...caregiversState, refetch: vi.fn() }
+    },
   }
 })
 
@@ -155,7 +181,12 @@ function renderPage(role: Caregiver["role"] = "staff") {
 describe("DailyDigestPage", () => {
   beforeEach(() => {
     listRefetch.mockClear()
+    generateFn.mockReset()
+    sendFn.mockReset()
+    listQueryArgs = null
+    caregiversQueryArgs = null
     listState = { data: { results: [] }, isLoading: false, isError: false }
+    caregiversState = { data: { results: [] }, isLoading: false, isError: false }
     caregiverState = { data: defaultCaregiver() }
     orgState = { data: null, isLoading: false, isError: false }
   })
@@ -302,5 +333,174 @@ describe("DailyDigestPage", () => {
     await userEvent.click(screen.getByRole("button", { name: /June 1, 2026/i }))
     expect(screen.getByTestId("daily-digest-empty-no-calls")).toHaveTextContent(/No wellness check-in calls/i)
     expect(screen.getByTestId("daily-digest-table")).toBeInTheDocument()
+  })
+
+  it("expands detail under the clicked row and collapses on second click", async () => {
+    const draft = baseDigest()
+    listState = { data: { results: [draft] }, isLoading: false, isError: false }
+    renderPage()
+    const row = screen.getByTestId("daily-digest-row-digest-1")
+    expect(row).toHaveAttribute("aria-expanded", "false")
+    expect(screen.queryByTestId("daily-digest-expanded-digest-1")).not.toBeInTheDocument()
+
+    await userEvent.click(row)
+    expect(row).toHaveAttribute("aria-expanded", "true")
+    const expanded = screen.getByTestId("daily-digest-expanded-digest-1")
+    expect(expanded).toBeInTheDocument()
+    expect(expanded).toContainElement(screen.getByTestId("daily-digest-detail"))
+    expect(expanded).toContainElement(screen.getByTestId("daily-digest-table"))
+
+    await userEvent.click(row)
+    expect(row).toHaveAttribute("aria-expanded", "false")
+    expect(screen.queryByTestId("daily-digest-expanded-digest-1")).not.toBeInTheDocument()
+  })
+
+  it("keeps only one digest row expanded at a time", async () => {
+    const first = baseDigest({ id: "digest-1", payload: { ...baseDigest().payload, dateLabel: "Sunday, June 1, 2026" } })
+    const second = baseDigest({
+      id: "digest-2",
+      digestDate: "2026-05-31T07:00:00.000Z",
+      localDateKey: "2026-05-31",
+      payload: { ...baseDigest().payload, dateLabel: "Saturday, May 31, 2026", localDateKey: "2026-05-31" },
+    })
+    listState = { data: { results: [first, second] }, isLoading: false, isError: false }
+    renderPage()
+
+    await userEvent.click(screen.getByTestId("daily-digest-row-digest-1"))
+    expect(screen.getByTestId("daily-digest-expanded-digest-1")).toBeInTheDocument()
+    expect(screen.queryByTestId("daily-digest-expanded-digest-2")).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId("daily-digest-row-digest-2"))
+    expect(screen.queryByTestId("daily-digest-expanded-digest-1")).not.toBeInTheDocument()
+    expect(screen.getByTestId("daily-digest-expanded-digest-2")).toBeInTheDocument()
+    expect(screen.getByTestId("daily-digest-row-digest-1")).toHaveAttribute("aria-expanded", "false")
+    expect(screen.getByTestId("daily-digest-row-digest-2")).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("staff does not load caregivers roster or org-day scope", () => {
+    renderPage("staff")
+    expect(screen.queryByTestId("daily-digest-org-roster")).not.toBeInTheDocument()
+    expect(screen.getByTestId("daily-digest-email-when-build-helper")).toBeInTheDocument()
+    expect(caregiversQueryArgs).toBe(skipToken)
+    expect(listQueryArgs).toMatchObject({ limit: 20, sortBy: "digestDate:desc" })
+    expect(listQueryArgs).not.toHaveProperty("scope")
+  })
+
+  it("orgAdmin shows caregiver roster with eligibility and digest status", async () => {
+    const staffCg = defaultCaregiver({
+      id: "cg-staff",
+      name: "Alex Staff",
+      email: "alex@test.com",
+      role: "staff",
+      notificationPreferences: { dailyDigestEmail: false },
+    })
+    const adminCg = defaultCaregiver({
+      id: "cg-admin",
+      name: "Admin User",
+      email: "admin@test.com",
+      role: "orgAdmin",
+    })
+    caregiversState = { data: { results: [adminCg, staffCg] }, isLoading: false, isError: false }
+    listState = {
+      data: {
+        results: [
+          baseDigest({
+            id: "digest-admin",
+            caregiver: "cg-admin",
+            status: "sent",
+            version: 2,
+            sentAt: "2026-06-01T18:00:00.000Z",
+          }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    }
+    caregiverState = { data: adminCg }
+    orgState = { data: defaultOrg(), isLoading: false, isError: false }
+    renderPage("orgAdmin")
+
+    expect(screen.getByTestId("daily-digest-org-roster")).toBeInTheDocument()
+    expect(screen.queryByText(/Filter by caregiver ID/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Show all versions/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("daily-digest-email-when-build-helper")).not.toBeInTheDocument()
+    expect(listQueryArgs).toMatchObject({ scope: "org", limit: 200 })
+    expect(caregiversQueryArgs).toMatchObject({ limit: 200, sortBy: "name:asc" })
+
+    expect(screen.getByTestId("daily-digest-eligibility-cg-staff")).toHaveTextContent(/Opted out/i)
+    expect(screen.getByTestId("daily-digest-eligibility-cg-admin")).toHaveTextContent(/Ready/i)
+    expect(screen.getByTestId("daily-digest-status-cg-staff")).toHaveTextContent(/Not built/i)
+    expect(screen.getByTestId("daily-digest-status-cg-admin")).toHaveTextContent(/Sent · v2/i)
+
+    await userEvent.click(screen.getByTestId("daily-digest-caregiver-row-cg-admin"))
+    const expanded = screen.getByTestId("daily-digest-caregiver-expanded-cg-admin")
+    expect(expanded).toContainElement(screen.getByTestId("daily-digest-detail"))
+    expect(expanded).toContainElement(screen.getByTestId("daily-digest-sent-immutable-banner"))
+  })
+
+  it("orgAdmin not-built row builds for that caregiver id", async () => {
+    const staffCg = defaultCaregiver({
+      id: "cg-staff",
+      name: "Alex Staff",
+      email: "alex@test.com",
+      role: "staff",
+    })
+    caregiversState = { data: { results: [staffCg] }, isLoading: false, isError: false }
+    listState = { data: { results: [] }, isLoading: false, isError: false }
+    caregiverState = { data: defaultCaregiver({ id: "cg-admin", role: "orgAdmin" }) }
+    orgState = { data: defaultOrg(), isLoading: false, isError: false }
+    generateFn.mockReturnValue({
+      unwrap: () =>
+        Promise.resolve(
+          baseDigest({
+            id: "digest-new",
+            caregiver: "cg-staff",
+            status: "draft",
+          }),
+        ),
+    })
+    renderPage("orgAdmin")
+
+    await userEvent.click(screen.getByTestId("daily-digest-caregiver-row-cg-staff"))
+    expect(screen.getByTestId("daily-digest-not-built-hint")).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId("daily-digest-build-cg-staff"))
+    expect(generateFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caregiverId: "cg-staff",
+      }),
+    )
+    expect(await screen.findByTestId("daily-digest-detail")).toBeInTheDocument()
+  })
+
+  it("orgAdmin expand shows PHI redacted banner under caregiver row", async () => {
+    const staffCg = defaultCaregiver({ id: "cg-staff", name: "Alex", email: "a@test.com", role: "staff" })
+    caregiversState = { data: { results: [staffCg] }, isLoading: false, isError: false }
+    listState = {
+      data: {
+        results: [
+          baseDigest({
+            id: "digest-redacted",
+            caregiver: "cg-staff",
+            phiRedactedAt: "2026-06-02T00:00:00.000Z",
+            payload: {
+              ...baseDigest().payload,
+              phiRedacted: true,
+              entries: [],
+              title: "[Redacted]",
+            },
+          }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    }
+    caregiverState = { data: defaultCaregiver({ role: "orgAdmin" }) }
+    orgState = { data: defaultOrg(), isLoading: false, isError: false }
+    renderPage("orgAdmin")
+
+    await userEvent.click(screen.getByTestId("daily-digest-caregiver-row-cg-staff"))
+    const expanded = screen.getByTestId("daily-digest-caregiver-expanded-cg-staff")
+    expect(expanded).toContainElement(screen.getByTestId("daily-digest-phi-redacted-banner"))
+    expect(screen.queryByTestId("daily-digest-table")).not.toBeInTheDocument()
   })
 })

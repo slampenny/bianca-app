@@ -606,6 +606,180 @@ describe('caregiverDailyDigest.service versioning and send', () => {
     });
   });
 
+  it('scope=org is forbidden for staff', async () => {
+    await expect(
+      queryDigests(requester, { scope: 'org', digestDate: '2026-06-01' }, { limit: 200, page: 1 })
+    ).rejects.toMatchObject({
+      statusCode: httpStatus.FORBIDDEN,
+    });
+  });
+
+  it('scope=org returns latest digests for every caregiver in the org for that day', async () => {
+    const admin = await Caregiver.create({
+      name: 'Org Admin',
+      email: 'admin@test.com',
+      phone: '+16045624265',
+      password: 'Password1',
+      role: 'orgAdmin',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: org._id,
+      clients: [client._id],
+    });
+    const otherStaff = await Caregiver.create({
+      name: 'Other Staff',
+      email: 'other@test.com',
+      phone: '+16045624266',
+      password: 'Password1',
+      role: 'staff',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: org._id,
+      clients: [client._id],
+    });
+    const otherOrg = await Org.create({ name: 'Other Org', email: 'other-org@test.com', country: 'US' });
+    const foreignStaff = await Caregiver.create({
+      name: 'Foreign Staff',
+      email: 'foreign@test.com',
+      phone: '+16045624267',
+      password: 'Password1',
+      role: 'staff',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: otherOrg._id,
+      clients: [],
+    });
+
+    const adminRequester = {
+      id: admin._id.toString(),
+      _id: admin._id,
+      role: 'orgAdmin',
+      org: org._id,
+    };
+    const otherRequester = {
+      id: otherStaff._id.toString(),
+      _id: otherStaff._id,
+      role: 'staff',
+      org: org._id,
+    };
+    const foreignRequester = {
+      id: foreignStaff._id.toString(),
+      _id: foreignStaff._id,
+      role: 'staff',
+      org: otherOrg._id,
+    };
+
+    await seedCompletedCall({ summary: 'Admin day' });
+    await createOrUpdateDigest(adminRequester, digestDate);
+    await createOrUpdateDigest(otherRequester, digestDate);
+    await createOrUpdateDigest(foreignRequester, digestDate);
+
+    const list = await queryDigests(
+      adminRequester,
+      { scope: 'org', digestDate: '2026-06-01' },
+      { limit: 200, page: 1 }
+    );
+    expect(list.results.length).toBe(2);
+    const caregiverIds = list.results.map((r) => String(r.caregiver)).sort();
+    expect(caregiverIds).toEqual([admin._id.toString(), otherStaff._id.toString()].sort());
+    expect(list.results.every((r) => r.id)).toBe(true);
+    expect(list.results.every((r) => r.listScope === 'latestPerDigestDate')).toBe(true);
+    expect(list.results.some((r) => String(r.caregiver) === foreignStaff._id.toString())).toBe(false);
+  });
+
+  it('orgAdmin can build a digest for another same-org caregiver', async () => {
+    const admin = await Caregiver.create({
+      name: 'Builder Admin',
+      email: 'builder-admin@test.com',
+      phone: '+16045624268',
+      password: 'Password1',
+      role: 'orgAdmin',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: org._id,
+      clients: [client._id],
+    });
+    const target = await Caregiver.create({
+      name: 'Target Staff',
+      email: 'target-staff@test.com',
+      phone: '+16045624269',
+      password: 'Password1',
+      role: 'staff',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: org._id,
+      clients: [client._id],
+      notificationPreferences: { dailyDigestEmail: false },
+    });
+    const adminRequester = {
+      id: admin._id.toString(),
+      _id: admin._id,
+      role: 'orgAdmin',
+      org: org._id,
+    };
+
+    await seedCompletedCall({ summary: 'Built for target' });
+    const digest = await createOrUpdateDigest(adminRequester, digestDate, {
+      caregiverId: target._id.toString(),
+    });
+    expect(String(digest.caregiver)).toBe(target._id.toString());
+    expect(digest.status).toBe('draft');
+    expect(digest.version).toBe(1);
+  });
+
+  it('orgAdmin cannot build a digest for a caregiver in another org', async () => {
+    const admin = await Caregiver.create({
+      name: 'Cross Admin',
+      email: 'cross-admin@test.com',
+      phone: '+16045624270',
+      password: 'Password1',
+      role: 'orgAdmin',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: org._id,
+      clients: [],
+    });
+    const otherOrg = await Org.create({ name: 'Elsewhere', email: 'elsewhere@test.com', country: 'US' });
+    const foreign = await Caregiver.create({
+      name: 'Elsewhere Staff',
+      email: 'elsewhere-staff@test.com',
+      phone: '+16045624271',
+      password: 'Password1',
+      role: 'staff',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: otherOrg._id,
+      clients: [],
+    });
+    const adminRequester = {
+      id: admin._id.toString(),
+      _id: admin._id,
+      role: 'orgAdmin',
+      org: org._id,
+    };
+
+    await expect(
+      createOrUpdateDigest(adminRequester, digestDate, { caregiverId: foreign._id.toString() })
+    ).rejects.toMatchObject({ statusCode: httpStatus.FORBIDDEN });
+  });
+
+  it('staff cannot build a digest for another caregiver', async () => {
+    const other = await Caregiver.create({
+      name: 'Peer Staff',
+      email: 'peer@test.com',
+      phone: '+16045624272',
+      password: 'Password1',
+      role: 'staff',
+      isEmailVerified: true,
+      isPhoneVerified: true,
+      org: org._id,
+      clients: [],
+    });
+    await expect(
+      createOrUpdateDigest(requester, digestDate, { caregiverId: other._id.toString() })
+    ).rejects.toMatchObject({ statusCode: httpStatus.FORBIDDEN });
+  });
+
   it('captures emailMessageId from capture-mode raw.id', async () => {
     await seedCompletedCall({});
     emailService.sendEmail.mockResolvedValueOnce({
