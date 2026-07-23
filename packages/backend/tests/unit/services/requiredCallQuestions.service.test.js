@@ -108,9 +108,12 @@ describe('requiredCallQuestions.service', () => {
 
     it('returns instructions block for configured questions', () => {
       const section = buildPromptSection([{ id: 'med', prompt: 'Taken your meds?' }], 'Test Facility');
-      expect(section).toContain('REQUIRED CARE TEAM QUESTIONS');
+      expect(section).toContain('REQUIRED CHECK-IN QUESTIONS');
       expect(section).toContain('med — Taken your meds?');
-      expect(section).toContain('Test Facility');
+      expect(section).toContain("I'd like to check in on with you");
+      // Facility name arg is unused — must not attribute questions to staff/facility
+      expect(section).not.toContain('Test Facility');
+      expect(section).not.toMatch(/care team/i);
     });
   });
 });

@@ -199,9 +199,11 @@ describe('conversationService', () => {
     });
 
     const prompt = await conversationService.buildEnhancedPrompt(client._id.toString(), 'outbound');
-    expect(prompt).toContain('REQUIRED CARE TEAM QUESTIONS');
+    expect(prompt).toContain('REQUIRED CHECK-IN QUESTIONS');
     expect(prompt).toContain('med — Have you taken your medication today?');
-    expect(prompt).toContain('Question Org');
+    expect(prompt).toContain("I'd like to check in on with you");
+    // Org/facility name must not be framed as the source of questions
+    expect(prompt).not.toMatch(/care team/i);
   });
 
   it('finalizeConversation stores required question answers in analyzedData', async () => {
