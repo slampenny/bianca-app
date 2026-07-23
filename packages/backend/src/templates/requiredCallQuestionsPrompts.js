@@ -10,7 +10,7 @@ ${MEDICATION_BOUNDARY}`;
 
 /**
  * @param {{ id: string, prompt: string }[]} questions
- * @param {string} [_facilityName] unused — kept for call-site compatibility; do not mention care team / facility staff as the source of questions
+ * @param {string} [_facilityName] unused — kept for call-site compatibility; do not attribute questions to staff or anyone else
  */
 function buildRequiredQuestionsInstructions(questions, _facilityName) {
   const questionLines = questions.map((q) => `- ${q.id} — ${q.prompt}`).join('\n');
