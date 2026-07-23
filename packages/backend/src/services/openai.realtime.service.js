@@ -517,8 +517,10 @@ class OpenAIRealtimeService {
     const plan = clientId ? await onboardingPlanService.getPlanForClientId(clientId) : null;
     const rawOnboardingDay = realtimeOptions?.onboardingDay;
     const onboardingDay =
-      plan && rawOnboardingDay >= 1 && onboardingPlanService.isValidOnboardingDay(plan, rawOnboardingDay)
-        ? rawOnboardingDay
+      plan &&
+      rawOnboardingDay != null &&
+      onboardingPlanService.isValidOnboardingDay(plan, rawOnboardingDay)
+        ? Number(rawOnboardingDay)
         : null;
     const onboardingTotalDays = plan?.totalDays ?? null;
     const onboardingCallMongoId = realtimeOptions?.onboardingCallMongoId || null;
@@ -4393,7 +4395,7 @@ class OpenAIRealtimeService {
    */
   async processOnboardingToolInvocation(callId, item, dbConversationId) {
     const conn = this.connections.get(callId);
-    if (!conn?.onboardingDay) return;
+    if (conn?.onboardingDay == null) return;
 
     let name;
     let argsRaw;

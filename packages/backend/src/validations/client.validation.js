@@ -243,7 +243,7 @@ const getClientOnboarding = {
     clientId: Joi.string().custom(objectId),
   }),
   query: Joi.object().keys({
-    day: Joi.number().integer().min(1).max(4).optional(),
+    day: Joi.number().integer().min(0).max(14).optional(),
   }),
 };
 

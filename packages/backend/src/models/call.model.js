@@ -134,7 +134,7 @@ const callSchema = mongoose.Schema(
     // Resident voice onboarding: set on outbound onboarding calls; completion set when voice session ends
     onboardingDay: {
       type: Number,
-      min: 1,
+      min: 0,
       max: 14,
     },
     onboardingCompletedAt: {

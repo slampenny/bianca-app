@@ -177,7 +177,7 @@ export function CallScreen() {
   const sessionsCompleted =
     polledOnboarding?.sessionsCompleted ?? activeCall?.onboardingSessionsCompleted ?? 0
   const onboardingTotalDays =
-    polledOnboarding?.totalDays ?? activeCall?.onboardingTotalDays ?? 4
+    polledOnboarding?.totalDays ?? activeCall?.onboardingTotalDays ?? undefined
   const currentStageDay =
     polledOnboarding?.currentStageDay ?? activeCall?.onboardingCurrentStageDay ?? null
 

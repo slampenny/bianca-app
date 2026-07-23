@@ -300,15 +300,15 @@ const getLanguageName = (languageCode) => {
  * Build enhanced prompt using your existing Bianca system prompt + client context
  * @param {string} clientId
  * @param {string} [callType]
- * @param {{ onboardingDay?: 1|2|3|4 }} [options]
+ * @param {{ onboardingDay?: number }} [options]
  */
 const buildEnhancedPrompt = async (clientId, callType = 'inbound', options = {}) => {
   try {
     const onboardingPlanService = require('./onboardingPlan.service');
     const plan = await onboardingPlanService.getPlanForClientId(clientId);
     const onboardingDay =
-      options.onboardingDay >= 1 && onboardingPlanService.isValidOnboardingDay(plan, options.onboardingDay)
-        ? options.onboardingDay
+      options.onboardingDay != null && onboardingPlanService.isValidOnboardingDay(plan, options.onboardingDay)
+        ? Number(options.onboardingDay)
         : null;
 
     // Get client info
@@ -321,7 +321,7 @@ const buildEnhancedPrompt = async (clientId, callType = 'inbound', options = {})
       throw new ApiError(httpStatus.NOT_FOUND, `Client ${clientId} not found`);
     }
 
-    if (onboardingDay) {
+    if (onboardingDay != null) {
       const { buildOnboardingInstructions, buildCustomOnboardingInstructions } = require('../templates/onboardingPrompts');
       const facilityName = (client.org && client.org.name) || 'your care team';
       const residentName = client.preferredName || client.name || '';
@@ -345,10 +345,19 @@ const buildEnhancedPrompt = async (clientId, callType = 'inbound', options = {})
       }
       enhancedPrompt += `\n\n=== ONBOARDING SESSION (step ${onboardingDay} of ${plan.totalDays}) ===\n`;
       const dayPlan = plan.days.find((d) => d.dayNumber === onboardingDay);
+      const lastDayNumber = plan.days.length ? plan.days[plan.days.length - 1].dayNumber : plan.totalDays;
       if (plan.useDefault) {
-        enhancedPrompt += buildOnboardingInstructions(onboardingDay, { residentName, facilityName });
+        enhancedPrompt += buildOnboardingInstructions(onboardingDay, {
+          residentName,
+          facilityName,
+          totalDays: plan.totalDays,
+        });
       } else if (dayPlan) {
-        enhancedPrompt += buildCustomOnboardingInstructions(dayPlan, plan.totalDays, { residentName, facilityName });
+        enhancedPrompt += buildCustomOnboardingInstructions(dayPlan, plan.totalDays, {
+          residentName,
+          facilityName,
+          lastDayNumber,
+        });
       }
       logger.info(`[Enhanced Prompt] Onboarding day ${onboardingDay}/${plan.totalDays} for client ${client.name}`);
       return enhancedPrompt;

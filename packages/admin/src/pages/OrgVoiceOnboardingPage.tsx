@@ -65,7 +65,7 @@ export function OrgVoiceOnboardingPage() {
   const [saveError, setSaveError] = useState("")
 
   const defaultDays = useMemo(() => defaultPlanData?.plan?.days ?? [], [defaultPlanData?.plan?.days])
-  const defaultDayCount = defaultPlanData?.plan?.totalDays ?? (defaultDays.length || 4)
+  const defaultDayCount = defaultPlanData?.plan?.totalDays ?? (defaultDays.length || 0)
   const onboardingDisabled = !useDefault && days.length === 0
 
   useEffect(() => {

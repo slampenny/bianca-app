@@ -4,6 +4,14 @@
  * Aligns with onboardingPrompts.js question_id slugs and onboarding.service getDashboardForClient.
  */
 const { Call, OnboardingResponse } = require('../../models');
+const { getDefaultPlanTemplate } = require('../../services/onboardingPlan.service');
+
+const DAY0_TOPICS = [
+  ['day0_name_pref', 'Please call me Maggie.'],
+  ['day0_interests', 'I like gardening and crossword puzzles.'],
+  ['day0_daily_life', 'Coffee in the morning, a walk, then reading.'],
+  ['day0_language_comfort', 'English is fine.'],
+];
 
 const DAY1_TOPICS = [
   ['day1_emotional_orientation', 'Doing pretty well, thanks.'],
@@ -41,7 +49,7 @@ function daysAgoDate(days) {
 }
 
 async function createOnboardingCall(clientId, onboardingDay, { caregiverId, completed, endedReason = 'completed', daysAgo = 1 }) {
-  const start = daysAgoDate(daysAgo + onboardingDay);
+  const start = daysAgoDate(daysAgo + Math.max(onboardingDay, 0));
   const end = new Date(start.getTime() + 8 * 60 * 1000);
   const sid = `SEED_ONB_${String(clientId)}_d${onboardingDay}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
   return Call.create({
@@ -81,14 +89,21 @@ async function insertCaptures(clientId, dayNumber, topicPairs, extraByQuestionId
   }
 }
 
-/** Partial day-1 answers; latest day-1 onboarding call not completed → currentDay 1 */
+/**
+ * Day 0 completed; day 1 answers started but session incomplete → currentDay 1.
+ * (Agnes: sole in-flight clinical example after the social intro.)
+ */
 async function seedDay1InProgress(clientId, caregiverId) {
+  await insertCaptures(clientId, 0, DAY0_TOPICS);
+  await createOnboardingCall(clientId, 0, { caregiverId, completed: true, daysAgo: 3 });
   await insertCaptures(clientId, 1, DAY1_TOPICS.slice(0, 3));
   await createOnboardingCall(clientId, 1, { caregiverId, completed: false, daysAgo: 1 });
 }
 
-/** All four days completed with full captures */
+/** All default plan days completed with full captures */
 async function seedJourneyComplete(clientId, caregiverId) {
+  await insertCaptures(clientId, 0, DAY0_TOPICS);
+  await createOnboardingCall(clientId, 0, { caregiverId, completed: true, daysAgo: 24 });
   await insertCaptures(clientId, 1, DAY1_TOPICS);
   await createOnboardingCall(clientId, 1, { caregiverId, completed: true, daysAgo: 21 });
   await insertCaptures(clientId, 2, DAY2_TOPICS);
@@ -102,13 +117,15 @@ async function seedJourneyComplete(clientId, caregiverId) {
 }
 
 /**
- * Journey complete in dashboard APIs (four completed onboarding calls), no captured answers.
+ * Journey complete in dashboard APIs (completed onboarding calls for every default plan day), no captured answers.
  * Use for bulk seeding so most residents look "done" like real long-term clients.
  */
 async function seedJourneyCompleteCallsOnly(clientId, caregiverId) {
+  const plan = getDefaultPlanTemplate();
   const base = 40;
-  for (let day = 1; day <= 4; day += 1) {
-    await createOnboardingCall(clientId, day, { caregiverId, completed: true, daysAgo: base - (day - 1) * 5 });
+  for (let i = 0; i < plan.days.length; i += 1) {
+    const day = plan.days[i].dayNumber;
+    await createOnboardingCall(clientId, day, { caregiverId, completed: true, daysAgo: base - i * 5 });
   }
 }
 
@@ -125,7 +142,7 @@ async function seedBulkOnboardingComplete(clients, caregiverId) {
 }
 
 /**
- * Agnes Alphabet: day 1 in progress (answers + incomplete session) — sole in-flight example for UI.
+ * Agnes Alphabet: day 0 done + day 1 in progress (answers + incomplete session) — sole in-flight example for UI.
  * Barnaby Button: journey complete (calls only), like a typical long-term resident.
  * Margaret Thompson: full journey with captures (incl. mood flag on day 3) for testing historic answers.
  *
@@ -139,7 +156,7 @@ async function seedPrimaryTestClientsOnboarding(client1, client2, client3, careg
   await seedDay1InProgress(client1._id, caregiverId);
   await seedJourneyCompleteCallsOnly(client2._id, caregiverId);
   await seedJourneyComplete(client3._id, caregiverId);
-  console.log('Onboarding seed: Agnes (day 1 WIP), Barnaby (complete, calls only), Margaret (complete + answers)');
+  console.log('Onboarding seed: Agnes (day 1 WIP after day 0), Barnaby (complete, calls only), Margaret (complete + answers)');
 }
 
 module.exports = {

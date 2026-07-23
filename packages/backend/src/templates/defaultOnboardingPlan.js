@@ -1,11 +1,30 @@
 /**
- * Canonical default resident voice onboarding plan (4 days).
+ * Canonical default resident voice onboarding plan (5 sessions: Day 0–4).
  * Used when org.voiceOnboarding.useDefault is true or unset.
  */
 const DEFAULT_ONBOARDING_PLAN = {
   useDefault: true,
-  totalDays: 4,
+  totalDays: 5,
   days: [
+    {
+      dayNumber: 0,
+      theme: 'First Conversation',
+      opening:
+        "Hi {resident_name}, this is Bianca — I'm an AI companion. This is our first time talking, and I'm really glad we get to meet.",
+      questions: [
+        { id: 'day0_name_pref', prompt: 'What name do you like to be called?' },
+        { id: 'day0_interests', prompt: 'What do you enjoy doing with your time?' },
+        {
+          id: 'day0_daily_life',
+          prompt: 'What does a typical day look like for you?',
+          compressionPriority: true,
+        },
+        {
+          id: 'day0_language_comfort',
+          prompt: "Is there a language you're most comfortable chatting in?",
+        },
+      ],
+    },
     {
       dayNumber: 1,
       theme: 'Safety & Orientation',
@@ -54,7 +73,10 @@ const DEFAULT_ONBOARDING_PLAN = {
           prompt: 'Do you enjoy spending time with other people, or do you tend to prefer quiet time to yourself?',
           compressionPriority: true,
         },
-        { id: 'day3_triggers', prompt: "Is there anything that tends to frustrate or upset you — things you'd want us to know about?" },
+        {
+          id: 'day3_triggers',
+          prompt: 'Is there anything that tends to frustrate or upset you?',
+        },
       ],
     },
     {

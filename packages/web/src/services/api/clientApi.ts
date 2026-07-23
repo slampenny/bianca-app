@@ -49,7 +49,7 @@ export const clientApi = createApi({
     getClientOnboarding: builder.query<ClientOnboardingDashboard, { clientId: string; day?: number }>({
       query: ({ clientId, day }) => ({
         url: `/clients/${clientId}/onboarding`,
-        params: day != null && day >= 1 && day <= 4 ? { day } : undefined,
+        params: day != null && day >= 0 && day <= 14 ? { day } : undefined,
       }),
       providesTags: (_r, _e, { clientId }) => [{ type: "Client", id: clientId }, "OnboardingRollup"],
     }),

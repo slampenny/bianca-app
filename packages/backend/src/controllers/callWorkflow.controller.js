@@ -56,7 +56,7 @@ const initiateCall = catchAsync(async (req, res) => {
         status: 'initiated',
         callStatus: 'initiating',
       });
-    } else if (nextOnboardingDay != null && (call.onboardingDay == null || call.onboardingDay < 1)) {
+    } else if (nextOnboardingDay != null && call.onboardingDay == null) {
       call.onboardingDay = nextOnboardingDay;
       call.callType = 'onboarding';
       await call.save();

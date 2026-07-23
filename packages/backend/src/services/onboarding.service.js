@@ -15,7 +15,7 @@ const _buildJourneyAndFlags = (allRowsForClient, onboardingCallsForClient, plan)
   const latestCallByDay = {};
   for (const c of onboardingCallsForClient) {
     const d = c.onboardingDay;
-    if (!d || !validDayNumbers.has(d)) continue;
+    if (d == null || !validDayNumbers.has(d)) continue;
     const t = new Date(c.startTime || c.createdAt || 0).getTime();
     if (!latestCallByDay[d] || t > latestCallByDay[d].t) {
       latestCallByDay[d] = { t, call: c };
@@ -286,7 +286,7 @@ const getJourneyRollupsForClientIds = async (clientIds) => {
       enabled: onboardingPlanService.isOnboardingEnabled(plan),
       sessionsCompletedCount: 0,
       journeyComplete: !onboardingPlanService.isOnboardingEnabled(plan),
-      currentDay: onboardingPlanService.isOnboardingEnabled(plan) ? plan.days[0]?.dayNumber ?? 1 : null,
+      currentDay: onboardingPlanService.isOnboardingEnabled(plan) ? plan.days[0]?.dayNumber ?? 0 : null,
       hasAnyOnboardingActivity: false,
       flags: {
         safety: false,
@@ -310,7 +310,14 @@ const getJourneyRollupsForClientIds = async (clientIds) => {
       )
       .sort({ dayNumber: 1, capturedAt: -1 })
       .lean(),
-    Call.find({ clientId: { $in: oidList }, onboardingDay: { $in: allDayNumbers.length ? allDayNumbers : [1, 2, 3, 4] } })
+    Call.find({
+      clientId: { $in: oidList },
+      onboardingDay: {
+        $in: allDayNumbers.length
+          ? allDayNumbers
+          : onboardingPlanService.getDefaultPlanTemplate().days.map((d) => d.dayNumber),
+      },
+    })
       .select('clientId onboardingDay onboardingCompletedAt onboardingEndedEarlyReason startTime createdAt')
       .lean(),
   ]);

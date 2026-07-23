@@ -53,7 +53,7 @@ export function ClientOnboardingScreen() {
   }, [filterDay, data?.responses])
 
   const dayNumbers = useMemo(
-    () => data?.journey?.days?.map((d) => d.dayNumber) ?? [1, 2, 3, 4],
+    () => data?.journey?.days?.map((d) => d.dayNumber) ?? [],
     [data?.journey?.days],
   )
 

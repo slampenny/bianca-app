@@ -35,9 +35,10 @@ describe('onboarding.service getDashboardForClient', () => {
     expect(payload.questionCount).toBe(0);
     expect(payload.responses).toHaveLength(0);
     expect(payload.journey.journeyComplete).toBe(false);
-    expect(payload.journey.currentDay).toBe(1);
+    expect(payload.journey.currentDay).toBe(0);
     expect(payload.journey.hasAnyOnboardingActivity).toBe(false);
-    expect(payload.journey.days.map((d) => d.dayNumber)).toEqual([1, 2, 3, 4]);
+    expect(payload.journey.days.map((d) => d.dayNumber)).toEqual([0, 1, 2, 3, 4]);
+    expect(payload.journey.totalDays).toBe(5);
   });
 
   it('returns journeyComplete when org onboarding is disabled', async () => {
@@ -70,8 +71,11 @@ describe('onboarding.service getDashboardForClient', () => {
 
     expect(payload.questionCount).toBe(1);
     expect(payload.flags.mood).toBe(true);
-    expect(payload.journey.days[0].capturedCount).toBe(1);
-    expect(payload.journey.days[1].capturedCount).toBe(0);
+    expect(payload.journey.days[0].dayNumber).toBe(0);
+    expect(payload.journey.days[0].capturedCount).toBe(0);
+    expect(payload.journey.days[1].dayNumber).toBe(1);
+    expect(payload.journey.days[1].capturedCount).toBe(1);
+    expect(payload.journey.days[2].capturedCount).toBe(0);
   });
 
   it('filters responses by dayNumber', async () => {

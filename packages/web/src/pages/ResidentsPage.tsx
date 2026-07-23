@@ -36,11 +36,11 @@ const FILTER_KEYS = [
 
 function defaultOnboardingRollup(): ClientOnboardingRollup {
   return {
-    totalDays: 4,
+    totalDays: 0,
     enabled: true,
     sessionsCompletedCount: 0,
     journeyComplete: false,
-    currentDay: 1,
+    currentDay: null,
     hasAnyOnboardingActivity: false,
     flags: { safety: false, memory: false, mood: false, distress: false, confusion: false },
     questionCount: 0,
@@ -83,7 +83,7 @@ function OnboardingStatusCell({ rollup, loading }: { rollup: ClientOnboardingRol
     <span style={{ fontSize: "0.8125rem", color: "var(--va-amber-800)" }}>
       {t("residents.onboardingProgress", {
         completed: rollup.sessionsCompletedCount,
-        total: rollup.totalDays ?? 4,
+        total: rollup.totalDays,
       })}
       {rollup.currentDay != null
         ? t("residents.onboardingNextDay", { day: rollup.currentDay })

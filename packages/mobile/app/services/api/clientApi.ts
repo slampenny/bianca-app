@@ -134,7 +134,7 @@ export const clientApi = createApi({
     }),
     getClientOnboarding: builder.query<ClientOnboardingPayload, { clientId: string; day?: number }>({
       query: ({ clientId, day }) => {
-        const qs = day != null && day >= 1 && day <= 4 ? `?day=${day}` : ""
+        const qs = day != null && day >= 0 && day <= 14 ? `?day=${day}` : ""
         return {
           url: `/clients/${clientId}/onboarding${qs}`,
           method: "GET",

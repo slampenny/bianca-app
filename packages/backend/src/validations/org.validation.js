@@ -11,7 +11,7 @@ const voiceOnboardingQuestionSchema = Joi.object().keys({
 });
 
 const voiceOnboardingDaySchema = Joi.object().keys({
-  dayNumber: Joi.number().integer().min(1).max(MAX_ONBOARDING_DAYS).optional(),
+  dayNumber: Joi.number().integer().min(0).max(MAX_ONBOARDING_DAYS).optional(),
   theme: Joi.string().trim().max(200).allow('').optional(),
   opening: Joi.string().trim().max(2000).allow('').optional(),
   questions: Joi.array().items(voiceOnboardingQuestionSchema).min(1).required(),

@@ -42,20 +42,28 @@ function resolvePlanFromOrgSettings(orgVoiceOnboarding) {
 function normalizePlan(plan) {
   const sortedDays = [...(plan.days || [])]
     .filter((d) => Array.isArray(d.questions) && d.questions.length > 0)
-    .sort((a, b) => a.dayNumber - b.dayNumber)
+    .sort((a, b) => {
+      const aNum = a.dayNumber != null ? Number(a.dayNumber) : Number.POSITIVE_INFINITY;
+      const bNum = b.dayNumber != null ? Number(b.dayNumber) : Number.POSITIVE_INFINITY;
+      return aNum - bNum;
+    })
     .slice(0, MAX_ONBOARDING_DAYS)
-    .map((day, index) => ({
-      dayNumber: index + 1,
-      theme: day.theme || `Day ${index + 1}`,
-      opening: day.opening || '',
-      questions: day.questions
-        .filter((q) => q.id && q.prompt)
-        .map((q) => ({
-          id: q.id,
-          prompt: q.prompt,
-          compressionPriority: q.compressionPriority === true,
-        })),
-    }))
+    .map((day, index) => {
+      // Preserve explicit day numbers (including Day 0). Only assign sequential 1..n when omitted.
+      const dayNumber = day.dayNumber != null ? Number(day.dayNumber) : index + 1;
+      return {
+        dayNumber,
+        theme: day.theme || `Day ${dayNumber}`,
+        opening: day.opening || '',
+        questions: day.questions
+          .filter((q) => q.id && q.prompt)
+          .map((q) => ({
+            id: q.id,
+            prompt: q.prompt,
+            compressionPriority: q.compressionPriority === true,
+          })),
+      };
+    })
     .filter((d) => d.questions.length > 0);
 
   return {
@@ -82,7 +90,9 @@ function getQuestionIdsForDay(plan, dayNumber) {
  * @returns {boolean}
  */
 function isValidOnboardingDay(plan, dayNumber) {
-  return dayNumber >= 1 && dayNumber <= plan.totalDays && plan.days.some((d) => d.dayNumber === dayNumber);
+  if (dayNumber == null || !Number.isFinite(Number(dayNumber))) return false;
+  const n = Number(dayNumber);
+  return plan.days.some((d) => d.dayNumber === n);
 }
 
 /**

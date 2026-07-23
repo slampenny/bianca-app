@@ -12,7 +12,7 @@ const onboardingResponseSchema = mongoose.Schema(
     dayNumber: {
       type: Number,
       required: true,
-      min: 1,
+      min: 0,
       max: 14,
       index: true,
     },

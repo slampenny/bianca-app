@@ -77,7 +77,7 @@ export function ResidentCallPage() {
   const liveIsOnboardingCall = liveOnboarding?.isOnboardingCall ?? activeCall?.isOnboardingCall ?? false
   const liveOnboardingDay = liveOnboarding?.onboardingDay ?? activeCall?.onboardingDay ?? null
   const liveSessionsCompleted = liveOnboarding?.sessionsCompleted ?? activeCall?.onboardingSessionsCompleted ?? 0
-  const liveOnboardingTotalDays = liveOnboarding?.totalDays ?? activeCall?.onboardingTotalDays ?? 4
+  const liveOnboardingTotalDays = liveOnboarding?.totalDays ?? activeCall?.onboardingTotalDays ?? undefined
   const liveCurrentStageDay = liveOnboarding?.currentStageDay ?? activeCall?.onboardingCurrentStageDay ?? null
 
   const onCallNow = useCallback(async () => {

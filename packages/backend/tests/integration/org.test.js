@@ -164,7 +164,7 @@ describe('Org routes', () => {
 
       expect(res.statusCode).toEqual(httpStatus.OK);
       expect(res.body.plan).toBeDefined();
-      expect(res.body.plan.totalDays).toBe(4);
+      expect(res.body.plan.totalDays).toBe(5);
       expect(res.body.plan.days.every((d) => d.questions.length > 0)).toBe(true);
     });
 

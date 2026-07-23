@@ -687,8 +687,14 @@ describe('Client routes', () => {
           confusion: false,
         },
       });
-      expect(res.body.journey.days).toHaveLength(4);
+      expect(res.body.journey.days).toHaveLength(5);
       expect(res.body.journey.days[0]).toMatchObject({
+        dayNumber: 0,
+        totalQuestions: 4,
+        capturedCount: 0,
+        sessionCompleted: false,
+      });
+      expect(res.body.journey.days[1]).toMatchObject({
         dayNumber: 1,
         totalQuestions: 6,
         capturedCount: 0,
@@ -747,7 +753,7 @@ describe('Client routes', () => {
         clientId: client._id,
         status: 'completed',
         duration: 120,
-        onboardingDay: 1,
+        onboardingDay: 0,
         onboardingCompletedAt: new Date(),
         onboardingEndedEarlyReason: 'completed',
       });
@@ -758,7 +764,7 @@ describe('Client routes', () => {
         .expect(httpStatus.OK);
 
       expect(res.body.journey.sessionsCompletedCount).toBe(1);
-      expect(res.body.journey.currentDay).toBe(2);
+      expect(res.body.journey.currentDay).toBe(1);
       expect(res.body.journey.days[0].sessionCompleted).toBe(true);
       expect(res.body.journey.journeyComplete).toBe(false);
     });
@@ -806,7 +812,7 @@ describe('Client routes', () => {
       expect(res.body.rollups[key]).toMatchObject({
         sessionsCompletedCount: 0,
         journeyComplete: false,
-        currentDay: 1,
+        currentDay: 0,
         hasAnyOnboardingActivity: false,
         questionCount: 0,
       });
@@ -822,7 +828,7 @@ describe('Client routes', () => {
         clientId: client._id,
         status: 'completed',
         duration: 120,
-        onboardingDay: 1,
+        onboardingDay: 0,
         onboardingCompletedAt: new Date(),
         onboardingEndedEarlyReason: 'completed',
       });
@@ -834,7 +840,7 @@ describe('Client routes', () => {
 
       const key = client.id.toString();
       expect(res.body.rollups[key].sessionsCompletedCount).toBe(1);
-      expect(res.body.rollups[key].currentDay).toBe(2);
+      expect(res.body.rollups[key].currentDay).toBe(1);
     });
   });
 });
